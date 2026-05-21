@@ -160,6 +160,56 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ---------- jobPosts (job-board marketplace) ----------
+    // Top-level doc holds only non-sensitive fields. Exact address,
+    // applicationCount, and selectedApplicantId live in /private/meta
+    // so the bid-blind + address-privacy contracts are enforced by rules,
+    // not by client-side stripping. All writes flow through callables.
+    match /jobPosts/{postId} {
+      function postOpen() { return resource.data.status == 'open'; }
+      function isPostOwner() { return isSignedIn() && resource.data.clientId == uid(); }
+      function isVisibleTradie() {
+        return isTradie()
+          && exists(/databases/$(database)/documents/tradespeople/$(uid()))
+          && get(/databases/$(database)/documents/tradespeople/$(uid())).data.isVisible == true;
+      }
+
+      allow read:   if isPostOwner() || isAdmin() || (isVisibleTradie() && postOpen());
+      allow create: if false;  // createJobPost callable only
+      allow update: if false;  // marketplace callables only
+      allow delete: if isAdmin();
+
+      match /private/{docId} {
+        allow read:  if isPostOwner() || isAdmin();
+        allow write: if false;
+      }
+
+      match /applications/{tradieId} {
+        // Bid-blind: post-owning client OR the applicant themselves OR admin.
+        // CollectionGroup queries auto-filter via the same predicate — a tradie
+        // querying applications where tradespersonId == uid gets only their own.
+        allow read: if isAdmin()
+          || resource.data.tradespersonId == uid()
+          || (isSignedIn() && resource.data.clientId == uid());
+        allow create, update, delete: if false;  // marketplace callables only
+      }
+    }
+
+    // ---------- notifications (per-user inbox; writes via Cloud Function) ----------
+    match /notifications/{notifId} {
+      allow read: if isSignedIn() && resource.data.userId == uid();
+      allow update: if isSignedIn()
+        && resource.data.userId == uid()
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow create, delete: if false;
+    }
+
+    // ---------- rateLimits (server-only) ----------
+    match /rateLimits/{limitId} {
+      allow read, write: if false;
+    }
+
     // ---------- chats ----------
     match /chats/{chatId} {
       allow read: if isSignedIn() && (
