@@ -4,6 +4,7 @@ import { useRouter } from "vue-router";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import Password from "primevue/password";
+import Checkbox from "primevue/checkbox";
 import Message from "primevue/message";
 import Divider from "primevue/divider";
 import { useAuthStore } from "@/stores/auth";
@@ -15,6 +16,7 @@ const router = useRouter();
 const displayName = ref("");
 const email = ref("");
 const password = ref("");
+const termsAccepted = ref(false);
 const fieldErrors = ref<Record<string, string>>({});
 const formError = ref<string | null>(null);
 
@@ -26,6 +28,7 @@ async function submit() {
     email: email.value,
     password: password.value,
     role: "client",
+    termsAccepted: termsAccepted.value,
   });
   if (!parsed.success) {
     for (const issue of parsed.error.issues) {
@@ -42,6 +45,15 @@ async function submit() {
 }
 
 async function google() {
+  // Capture consent before opening the Google popup.
+  if (!termsAccepted.value) {
+    fieldErrors.value = {
+      termsAccepted: "You must agree to the Terms of Service and Privacy Policy",
+    };
+    return;
+  }
+  fieldErrors.value = {};
+  formError.value = null;
   try {
     await auth.signInWithGoogle("client");
     router.replace("/dashboard");
@@ -54,7 +66,7 @@ async function google() {
 <template>
   <section class="bs-container py-12 max-w-md mx-auto">
     <h1 class="text-2xl font-bold">Create your account</h1>
-    <p class="text-[color:var(--bs-muted)] mb-6">Find verified tradies near you.</p>
+    <p class="text-[color:var(--bs-muted)] mb-6">Find verified tradespeople near you.</p>
 
     <form class="bs-form bs-card p-6 space-y-4" @submit.prevent="submit">
       <div>
@@ -79,6 +91,21 @@ async function google() {
         <small v-if="fieldErrors.password" class="text-red-600">{{ fieldErrors.password }}</small>
       </div>
 
+      <div>
+        <label class="flex items-start gap-2 text-sm cursor-pointer">
+          <Checkbox v-model="termsAccepted" :binary="true" input-id="terms-accepted" />
+          <span>
+            I agree to the
+            <router-link to="/terms" target="_blank" class="font-medium underline">Terms of Service</router-link>
+            and
+            <router-link to="/privacy" target="_blank" class="font-medium underline">Privacy Policy</router-link>.
+          </span>
+        </label>
+        <small v-if="fieldErrors.termsAccepted" class="text-red-600 block mt-1">
+          {{ fieldErrors.termsAccepted }}
+        </small>
+      </div>
+
       <Message v-if="formError" severity="error" :closable="false">{{ formError }}</Message>
 
       <Button type="submit" label="Create account" :loading="auth.pending" class="w-full" />
@@ -91,8 +118,8 @@ async function google() {
         <router-link to="/sign-in" class="font-medium">Sign in</router-link>
       </p>
       <p class="text-sm text-center text-[color:var(--bs-muted)]">
-        Tradesperson?
-        <router-link to="/sign-up/tradie" class="font-medium">Sign up as a trade</router-link>
+        Are you a tradesperson?
+        <router-link to="/sign-up/tradie" class="font-medium">Sign up as a tradesperson</router-link>
       </p>
     </form>
   </section>

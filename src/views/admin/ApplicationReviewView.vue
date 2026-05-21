@@ -90,7 +90,7 @@ async function approveAll() {
 async function submitRequestInfo() {
   await requestApplicationInfo({ tradieUid: uid, notes: notesInput.value });
   showRequestInfo.value = false;
-  toast.info("Info requested", "Tradie has been emailed.");
+  toast.info("Info requested", "Tradesperson has been emailed.");
   router.replace({ name: "AdminVetting" });
 }
 

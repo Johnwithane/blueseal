@@ -8,15 +8,15 @@ import Button from "primevue/button";
     <div class="bs-container py-16 sm:py-24 grid sm:grid-cols-2 gap-10 items-center">
       <div>
         <h1 class="text-4xl sm:text-5xl font-bold leading-tight">
-          Verified tradies. Real reviews. Honest quotes.
+          Verified tradespeople. Real reviews. Honest quotes.
         </h1>
         <p class="mt-4 text-lg opacity-90 max-w-prose">
-          Blue Seal vets every tradesperson by cert and government ID. Find a trusted pro near you,
+          Blue Seal vets every tradesperson by cert and government ID. Find a trusted tradesperson near you,
           chat, get a quote, and keep your whole job in one place.
         </p>
         <div class="mt-8 flex flex-wrap gap-3">
-          <RouterLink to="/search"><Button label="Find a tradie" icon="pi pi-search" size="large" severity="contrast" /></RouterLink>
-          <RouterLink to="/sign-up/tradie"><Button label="I'm a trade" icon="pi pi-wrench" size="large" outlined severity="contrast" /></RouterLink>
+          <RouterLink to="/search"><Button label="Find a tradesperson" icon="pi pi-search" size="large" severity="contrast" /></RouterLink>
+          <RouterLink to="/sign-up/tradie"><Button label="I'm a tradesperson" icon="pi pi-wrench" size="large" outlined severity="contrast" /></RouterLink>
         </div>
       </div>
       <div class="bs-card p-6 text-[color:var(--bs-text)]">

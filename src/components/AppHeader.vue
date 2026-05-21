@@ -47,7 +47,7 @@ function openMenu(e: Event) {
 
       <nav class="hidden sm:flex items-center gap-1">
         <router-link to="/search">
-          <Button label="Find a tradie" icon="pi pi-search" text />
+          <Button label="Find a tradesperson" icon="pi pi-search" text />
         </router-link>
       </nav>
 

@@ -36,7 +36,7 @@ onMounted(refresh);
       <template #empty>
         <div class="bs-empty"><i class="pi pi-check-circle text-green-600 mr-2" />Queue clear.</div>
       </template>
-      <Column field="id" header="Tradie UID">
+      <Column field="id" header="Tradesperson UID">
         <template #body="{ data }">
           <code class="text-xs">{{ data.id.slice(0, 10) }}…</code>
         </template>

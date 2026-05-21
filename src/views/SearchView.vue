@@ -57,7 +57,7 @@ watch(
 
 <template>
   <section class="bs-container py-6">
-    <h1 class="text-2xl font-bold">Find a tradie</h1>
+    <h1 class="text-2xl font-bold">Find a tradesperson</h1>
     <p class="mb-4 text-[color:var(--bs-muted)]">
       Verified, near you, sorted by distance.
     </p>

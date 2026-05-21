@@ -49,7 +49,7 @@ async function run() {
   <div class="bs-card p-3">
     <h3 class="font-semibold text-sm mb-2">AI tools</h3>
     <Message v-if="!props.hasActiveSubscription" severity="info" :closable="false" class="mb-2">
-      AI tools unlock with the tradie subscription.
+      AI tools unlock with the tradesperson subscription.
     </Message>
     <div class="grid grid-cols-3 gap-2">
       <Button

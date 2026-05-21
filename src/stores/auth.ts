@@ -13,6 +13,7 @@ import {
 import { auth } from "@/firebase/config";
 import { createUser, getUser } from "@/firebase/services/users";
 import type { Role, UserDoc, WithId } from "@/firebase/interfaces";
+import { LEGAL_VERSION } from "@/legal/version";
 
 interface State {
   fbUser: User | null;
@@ -80,6 +81,7 @@ export const useAuthStore = defineStore("auth", {
           email: opts.email,
           displayName: opts.displayName,
           role: opts.role,
+          termsAcceptedVersion: LEGAL_VERSION,
         });
         // Cloud Function `setRoleOnSignup` mirrors role to a custom claim;
         // force a token refresh so the claim is visible right away.
@@ -120,6 +122,7 @@ export const useAuthStore = defineStore("auth", {
             displayName: cred.user.displayName ?? "Anonymous",
             photoURL: cred.user.photoURL,
             role: intendedRole,
+            termsAcceptedVersion: LEGAL_VERSION,
           });
           await cred.user.getIdToken(true);
         }

@@ -5,6 +5,11 @@ export const signUpSchema = z.object({
   password: z.string().min(8, "At least 8 characters"),
   displayName: z.string().min(2, "Enter your name"),
   role: z.enum(["client", "tradesperson"]),
+  termsAccepted: z.literal(true, {
+    errorMap: () => ({
+      message: "You must agree to the Terms of Service and Privacy Policy",
+    }),
+  }),
 });
 export type SignUpInput = z.infer<typeof signUpSchema>;
 

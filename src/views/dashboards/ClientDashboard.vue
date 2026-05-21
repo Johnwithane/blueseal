@@ -41,7 +41,7 @@ const statusSeverity: Record<string, "info" | "success" | "warn" | "danger" | "s
         <p class="text-[color:var(--bs-muted)]">Your active jobs and requests.</p>
       </div>
       <RouterLink to="/search">
-        <Button label="Find a tradie" icon="pi pi-search" />
+        <Button label="Find a tradesperson" icon="pi pi-search" />
       </RouterLink>
     </div>
 
@@ -49,7 +49,7 @@ const statusSeverity: Record<string, "info" | "success" | "warn" | "danger" | "s
       <i class="pi pi-inbox text-3xl mb-2 block"></i>
       <p>No jobs yet. Start by finding a verified tradesperson.</p>
       <RouterLink to="/search" class="inline-block mt-3">
-        <Button label="Browse tradies" icon="pi pi-search" />
+        <Button label="Browse tradespeople" icon="pi pi-search" />
       </RouterLink>
     </div>
 

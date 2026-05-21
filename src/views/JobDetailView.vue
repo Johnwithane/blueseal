@@ -203,7 +203,7 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
           </div>
 
           <div v-if="isTradie" class="bs-card p-3">
-            <h3 class="font-semibold text-sm mb-2">Private notes (tradie only)</h3>
+            <h3 class="font-semibold text-sm mb-2">Private notes (tradesperson only)</h3>
             <Textarea v-model="privateNotes" rows="4" class="w-full" />
             <Button label="Save notes" icon="pi pi-save" outlined size="small" class="mt-2" @click="saveNotes" />
           </div>

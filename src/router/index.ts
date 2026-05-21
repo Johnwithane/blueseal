@@ -27,6 +27,10 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, role: "client" as RoleGuard },
   },
 
+  // Legal
+  { path: "/privacy", name: "Privacy", component: () => import("@/views/PrivacyView.vue") },
+  { path: "/terms", name: "Terms", component: () => import("@/views/TermsView.vue") },
+
   // Auth
   { path: "/sign-in", name: "SignIn", component: () => import("@/views/auth/SignInView.vue") },
   { path: "/sign-up", name: "SignUp", component: () => import("@/views/auth/SignUpView.vue") },

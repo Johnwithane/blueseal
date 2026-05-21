@@ -21,6 +21,8 @@ export interface UserDoc {
   // clients only:
   clientRatingAvg: number;
   clientRatingCount: number;
+  termsAcceptedAt: Timestamp | null;
+  termsAcceptedVersion: string | null;
 }
 
 // ---------------------------------------------------------------------------

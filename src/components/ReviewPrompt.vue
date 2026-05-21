@@ -79,7 +79,7 @@ async function submit() {
   <Dialog
     v-model:visible="open"
     modal
-    :header="props.asRole === 'client' ? 'Review the tradie' : 'Review the client (private)'"
+    :header="props.asRole === 'client' ? 'Review the tradesperson' : 'Review the client (private)'"
     :style="{ width: '32rem' }"
   >
     <Message v-if="error" severity="error" :closable="false" class="mb-3">{{ error }}</Message>

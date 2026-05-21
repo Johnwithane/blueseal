@@ -23,6 +23,7 @@
     "@primevue/themes": "^4.2.5",
     "firebase": "^11.1.0",
     "geofire-common": "^6.0.0",
+    "marked": "^18.0.4",
     "pinia": "^2.3.0",
     "primeicons": "^7.0.0",
     "primevue": "^4.2.5",

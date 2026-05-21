@@ -150,7 +150,7 @@ async function submit() {
       text: `New request: ${title.value}`,
     });
 
-    toast.success("Request sent", "We'll let the tradie know.");
+    toast.success("Request sent", "We'll let the tradesperson know.");
     router.push({ name: "JobDetail", params: { id: jobId } });
   } catch (e) {
     error.value = (e as Error).message;

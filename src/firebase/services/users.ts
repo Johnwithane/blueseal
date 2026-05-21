@@ -23,6 +23,7 @@ export async function createUser(opts: {
   displayName: string;
   photoURL?: string | null;
   phone?: string | null;
+  termsAcceptedVersion: string;
 }): Promise<void> {
   const ref = usersCol(opts.uid);
   // Use setDoc with merge:false so a duplicate signup throws — Cloud Function sets the role claim.
@@ -39,6 +40,8 @@ export async function createUser(opts: {
     stripeCustomerId: null,
     clientRatingAvg: 0,
     clientRatingCount: 0,
+    termsAcceptedAt: serverTimestamp() as never,
+    termsAcceptedVersion: opts.termsAcceptedVersion,
   });
 }
 
