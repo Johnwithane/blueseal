@@ -1,0 +1,25 @@
+{
+  "name": "functions",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "serve": "npm run build && firebase emulators:start --only functions",
+    "shell": "npm run build && firebase functions:shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "engines": { "node": "20" },
+  "main": "lib/index.js",
+  "dependencies": {
+    "@google-cloud/vertexai": "^1.9.2",
+    "firebase-admin": "^13.0.2",
+    "firebase-functions": "^6.1.1",
+    "pdfkit": "^0.15.1",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/pdfkit": "^0.13.6",
+    "typescript": "~5.7.2"
+  }
+}

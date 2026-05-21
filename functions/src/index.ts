@@ -1,0 +1,43 @@
+import { setGlobalOptions } from "firebase-functions/v2";
+
+setGlobalOptions({ region: "us-central1", maxInstances: 10 });
+
+// Auth & roles
+export { setRoleOnSignup } from "./auth/setRoleOnSignup";
+export { setAdminRole } from "./auth/setAdminRole";
+
+// Vetting
+export { submitForVetting } from "./vetting/submitForVetting";
+export { onCertApproved } from "./vetting/onCertApproved";
+export { onIdApproved } from "./vetting/onIdApproved";
+export {
+  approveApplication,
+  requestApplicationInfo,
+  rejectApplication,
+} from "./vetting/decisions";
+export { scheduledIdRetention } from "./vetting/scheduledIdRetention";
+
+// Reviews
+export { onReviewCreated } from "./reviews/onReviewCreated";
+export { onClientReviewCreated } from "./reviews/onClientReviewCreated";
+
+// Chat
+export { onMessageCreated } from "./chat/onMessageCreated";
+
+// Invoicing
+export { onJobCompleted } from "./invoicing/onJobCompleted";
+export { sendInvoice } from "./invoicing/sendInvoice";
+export { markInvoiceOverdue } from "./invoicing/scheduledOverdue";
+
+// AI
+export { aiDiagnose, aiQuote, aiSummarize } from "./ai/tools";
+
+// Payments (stubbed)
+export {
+  createCheckoutSession,
+  stripeWebhook,
+  adminToggleSubscription,
+} from "./payments/stripeStub";
+
+// Seed + ops
+export { seedIntakeSchemas, ping } from "./seed/seedIntakeSchemas";

@@ -1,0 +1,205 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- helpers ----------
+    function isSignedIn() { return request.auth != null; }
+    function uid() { return request.auth.uid; }
+    function hasRole(r) { return isSignedIn() && request.auth.token.role == r; }
+    function isAdmin() { return hasRole('admin'); }
+    function isTradie() { return hasRole('tradesperson'); }
+    function isClient() { return hasRole('client'); }
+    function isOwner(ownerId) { return isSignedIn() && uid() == ownerId; }
+
+    // Fields the client is *never* allowed to set or change.
+    // Cloud Functions set these (denormalized aggregates, vetting flags, etc.).
+    function noServerFieldsTouched(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    // ---------- users ----------
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin() || resource.data.role == 'tradesperson';
+      // Create: user creates their own doc (role set by Cloud Function via custom claim mirror)
+      allow create: if isOwner(userId)
+        && request.resource.data.role in ['client', 'tradesperson']
+        && request.resource.data.hasActiveSubscription == false
+        && request.resource.data.clientRatingAvg == 0
+        && request.resource.data.clientRatingCount == 0;
+      // Update: owner can edit profile fields, never aggregates/role/subscription
+      allow update: if isOwner(userId)
+        && noServerFieldsTouched([
+          'role', 'hasActiveSubscription', 'stripeCustomerId',
+          'clientRatingAvg', 'clientRatingCount', 'emailVerified', 'createdAt'
+        ]);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ---------- tradespeople (public profile, owner-editable while vetting) ----------
+    match /tradespeople/{tradieId} {
+      // Public read only when visible. Owner + admin always read.
+      allow read: if (resource != null && resource.data.isVisible == true)
+                  || isOwner(tradieId) || isAdmin();
+      allow create: if isOwner(tradieId)
+        && request.resource.data.vettingStatus in ['draft', 'pending']
+        && request.resource.data.isVisible == false
+        && request.resource.data.verifiedTrades.size() == 0
+        && request.resource.data.idVerified == false
+        && request.resource.data.ratingAvg == 0
+        && request.resource.data.ratingCount == 0;
+      // Owner can edit profile but not gating flags
+      allow update: if isOwner(tradieId)
+        && noServerFieldsTouched([
+          'verifiedTrades', 'idVerified', 'isVisible', 'ratingAvg', 'ratingCount',
+          'ratingDimensions', 'nextInvoiceNumber'
+        ])
+        && request.resource.data.vettingStatus in ['draft', 'pending', 'info_requested'];
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ---------- certifications ----------
+    match /certifications/{certId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.tradespersonId == uid());
+      allow create: if isTradie()
+        && request.resource.data.tradespersonId == uid()
+        && request.resource.data.status == 'pending';
+      // Owner can replace pending cert; admin can approve/reject
+      allow update: if (isOwner(resource.data.tradespersonId)
+                       && resource.data.status == 'pending'
+                       && noServerFieldsTouched(['status', 'reviewedBy', 'reviewedAt']))
+                    || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ---------- idVerifications (admin-only read; never world-readable) ----------
+    match /idVerifications/{tradieId} {
+      allow read: if isAdmin() || isOwner(tradieId);
+      allow create: if isOwner(tradieId)
+        && request.resource.data.status == 'pending';
+      allow update: if (isOwner(tradieId)
+                       && resource.data.status == 'pending'
+                       && noServerFieldsTouched(['status', 'reviewedBy', 'reviewedAt']))
+                    || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ---------- intake form schemas (public read, admin write) ----------
+    match /intakeFormSchemas/{trade} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ---------- jobs ----------
+    match /jobs/{jobId} {
+      allow read: if isSignedIn() && (
+        resource.data.clientId == uid()
+        || resource.data.tradespersonId == uid()
+        || isAdmin()
+      );
+      allow create: if isClient()
+        && request.resource.data.clientId == uid()
+        && request.resource.data.status == 'requested';
+      allow update: if isSignedIn() && (
+        resource.data.clientId == uid()
+        || resource.data.tradespersonId == uid()
+        || isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    // ---------- chats ----------
+    match /chats/{chatId} {
+      allow read, update: if isSignedIn() && (
+        resource.data.clientId == uid()
+        || resource.data.tradespersonId == uid()
+        || isAdmin()
+      );
+      allow create: if isSignedIn()
+        && (request.resource.data.clientId == uid()
+            || request.resource.data.tradespersonId == uid());
+      allow delete: if isAdmin();
+
+      match /messages/{messageId} {
+        allow read: if isSignedIn() && (
+          get(/databases/$(database)/documents/chats/$(chatId)).data.clientId == uid()
+          || get(/databases/$(database)/documents/chats/$(chatId)).data.tradespersonId == uid()
+          || isAdmin()
+        );
+        allow create: if isSignedIn()
+          && request.resource.data.senderId == uid()
+          && (
+            get(/databases/$(database)/documents/chats/$(chatId)).data.clientId == uid()
+            || get(/databases/$(database)/documents/chats/$(chatId)).data.tradespersonId == uid()
+          );
+        // Messages are immutable for legal accountability
+        allow update, delete: if isAdmin();
+      }
+    }
+
+    // ---------- public reviews (client -> tradie) ----------
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if isClient()
+        && request.resource.data.clientId == uid()
+        && request.resource.data.status == 'active';
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ---------- private client reviews (tradie -> client) ----------
+    match /clientReviews/{reviewId} {
+      allow read: if isTradie() || isAdmin();
+      allow create: if isTradie()
+        && request.resource.data.tradespersonId == uid();
+      allow update, delete: if isAdmin();
+    }
+
+    // ---------- bookings ----------
+    match /bookings/{bookingId} {
+      allow read: if isSignedIn() && (
+        resource.data.tradespersonId == uid() || isAdmin()
+      );
+      allow create, update, delete: if isSignedIn()
+        && request.resource.data.tradespersonId == uid();
+    }
+
+    // ---------- invoices ----------
+    match /invoices/{invoiceId} {
+      allow read: if isSignedIn() && (
+        resource.data.clientId == uid()
+        || resource.data.tradespersonId == uid()
+        || isAdmin()
+      );
+      allow create, update: if isSignedIn() && (
+        request.resource.data.tradespersonId == uid() || isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    // ---------- ai usage (write via Cloud Function; admin/owner read) ----------
+    match /aiUsage/{usageId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.userId == uid());
+      allow write: if false;
+    }
+
+    // ---------- audit log (write via Cloud Function; admin read only) ----------
+    match /auditLog/{entryId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // ---------- mail (Firebase Trigger Email extension; server-only) ----------
+    match /mail/{mailId} {
+      allow read, write: if false;
+    }
+
+    // ---------- canonical static data (trades list, etc.) ----------
+    match /catalog/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}

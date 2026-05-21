@@ -1,0 +1,58 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() { return request.auth != null; }
+    function uid() { return request.auth.uid; }
+    function isAdmin() { return isSignedIn() && request.auth.token.role == 'admin'; }
+    function isOwner(ownerId) { return isSignedIn() && uid() == ownerId; }
+    function sizeOk() { return request.resource.size < 10 * 1024 * 1024; }
+    function isImageOrPdf() {
+      return request.resource.contentType.matches('image/.*')
+          || request.resource.contentType == 'application/pdf';
+    }
+
+    // User avatars — owner write, world read
+    match /users/{userId}/profile/{file=**} {
+      allow read: if true;
+      allow write: if isOwner(userId) && sizeOk() && isImageOrPdf();
+    }
+
+    // Tradesperson portfolio — owner write, world read (gated by isVisible elsewhere)
+    match /tradespeople/{tradieId}/portfolio/{file=**} {
+      allow read: if true;
+      allow write: if isOwner(tradieId) && sizeOk() && isImageOrPdf();
+    }
+
+    // Certifications — owner write, admin + owner read
+    match /tradespeople/{tradieId}/certs/{file=**} {
+      allow read: if isOwner(tradieId) || isAdmin();
+      allow write: if isOwner(tradieId) && sizeOk() && isImageOrPdf();
+    }
+
+    // ID verification — owner write, ADMIN-ONLY READ
+    match /tradespeople/{tradieId}/id/{file=**} {
+      allow read: if isAdmin();
+      allow write: if isOwner(tradieId) && sizeOk() && isImageOrPdf();
+    }
+
+    // Job intake photos — parties of the job + admin
+    match /jobs/{jobId}/intake/{file=**} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && sizeOk() && request.resource.contentType.matches('image/.*');
+    }
+
+    // Chat photo attachments
+    match /chats/{chatId}/{file=**} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && sizeOk() && request.resource.contentType.matches('image/.*');
+    }
+
+    // Invoice PDFs — generated server-side; parties read
+    match /invoices/{invoiceId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+  }
+}

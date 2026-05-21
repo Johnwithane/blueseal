@@ -1,0 +1,55 @@
+{
+  "name": "blueseal",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc -b && vite build",
+    "preview": "vite preview",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write src/",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "functions:build": "cd functions && npm run build",
+    "functions:deploy": "firebase deploy --only functions",
+    "rules:deploy": "firebase deploy --only firestore:rules,storage",
+    "deploy:hosting": "npm run build && firebase deploy --only hosting",
+    "deploy:prod": "npm run build && firebase deploy"
+  },
+  "dependencies": {
+    "@primevue/themes": "^4.2.5",
+    "firebase": "^11.1.0",
+    "geofire-common": "^6.0.0",
+    "pinia": "^2.3.0",
+    "primeicons": "^7.0.0",
+    "primevue": "^4.2.5",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/node": "^22.10.5",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "@vue/test-utils": "^2.4.6",
+    "concurrently": "^9.1.2",
+    "eslint": "^9.18.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-vue": "^9.32.0",
+    "happy-dom": "^16.6.0",
+    "prettier": "^3.4.2",
+    "tailwindcss": "^4.0.0",
+    "typescript": "~5.7.2",
+    "typescript-eslint": "^8.20.0",
+    "vite": "^6.0.7",
+    "vite-plugin-pwa": "^0.21.1",
+    "vitest": "^2.1.8",
+    "vue-tsc": "^2.2.0"
+  },
+  "lint-staged": {
+    "*.{ts,vue}": ["eslint --fix", "prettier --write"],
+    "*.{json,css,md}": ["prettier --write"]
+  }
+}
