@@ -17,6 +17,12 @@ const items = computed(() => [
     command: () => router.push({ name: "Dashboard" }),
   },
   {
+    label: "Account",
+    icon: "pi pi-user",
+    command: () => router.push({ name: "Account" }),
+  },
+  { separator: true },
+  {
     label: "Sign out",
     icon: "pi pi-sign-out",
     command: async () => {
@@ -35,7 +41,7 @@ function openMenu(e: Event) {
   <header class="bg-white border-b border-[color:var(--bs-border)] sticky top-0 z-30">
     <div class="bs-container flex items-center justify-between py-3 gap-3">
       <router-link to="/" class="flex items-center gap-2 no-underline text-inherit">
-        <img src="/favicon.svg" alt="" class="h-8 w-8" />
+        <img src="/icons/blueseal_logo.png" alt="" class="h-8 w-auto" />
         <span class="font-bold text-lg">Blue Seal</span>
       </router-link>
 

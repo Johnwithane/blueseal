@@ -17,6 +17,7 @@ import type { IntakeField, TradespersonDoc, WithId, Urgency } from "@/firebase/i
 import { tradeLabel } from "@/data/trades";
 import IntakeFormRenderer from "@/components/IntakeFormRenderer.vue";
 import { useToast } from "@/composables/useToast";
+import { compressToWebp } from "@/utils/image";
 
 const route = useRoute();
 const router = useRouter();
@@ -61,12 +62,18 @@ async function loadIntake() {
   intakeFields.value = remote?.fields ?? SEED_INTAKE_SCHEMAS[selectedTrade.value] ?? [];
 }
 
-function onPhotos(e: Event) {
+async function onPhotos(e: Event) {
   const target = e.target as HTMLInputElement;
   if (!target.files) return;
   const incoming = Array.from(target.files).slice(0, 8 - photoFiles.value.length);
-  photoFiles.value = [...photoFiles.value, ...incoming];
-  target.value = "";
+  try {
+    const compressed = await Promise.all(incoming.map((f) => compressToWebp(f)));
+    photoFiles.value = [...photoFiles.value, ...compressed];
+  } catch (err) {
+    error.value = (err as Error).message;
+  } finally {
+    target.value = "";
+  }
 }
 
 function removePhoto(idx: number) {

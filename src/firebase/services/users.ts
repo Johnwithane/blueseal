@@ -49,6 +49,10 @@ export async function updateUserProfile(
   await updateDoc(doc(db, "users", uid), { ...patch, lastActiveAt: serverTimestamp() });
 }
 
+export async function updateUserPhoto(uid: string, photoURL: string): Promise<void> {
+  await updateDoc(doc(db, "users", uid), { photoURL, lastActiveAt: serverTimestamp() });
+}
+
 export async function touchUserActive(uid: string): Promise<void> {
   await updateDoc(doc(db, "users", uid), { lastActiveAt: serverTimestamp() });
 }

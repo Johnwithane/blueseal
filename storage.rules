@@ -8,45 +8,47 @@ service firebase.storage {
     function isAdmin() { return isSignedIn() && request.auth.token.role == 'admin'; }
     function isOwner(ownerId) { return isSignedIn() && uid() == ownerId; }
     function sizeOk() { return request.resource.size < 10 * 1024 * 1024; }
-    function isImageOrPdf() {
-      return request.resource.contentType.matches('image/.*')
-          || request.resource.contentType == 'application/pdf';
+    // Client-side compression always converts uploads to image/webp. Storage
+    // rejects every other image type at the gate.
+    function isWebp() { return request.resource.contentType == 'image/webp'; }
+    function isWebpOrPdf() {
+      return isWebp() || request.resource.contentType == 'application/pdf';
     }
 
-    // User avatars — owner write, world read
+    // User avatars — owner write, world read. WebP only.
     match /users/{userId}/profile/{file=**} {
       allow read: if true;
-      allow write: if isOwner(userId) && sizeOk() && isImageOrPdf();
+      allow write: if isOwner(userId) && sizeOk() && isWebp();
     }
 
-    // Tradesperson portfolio — owner write, world read (gated by isVisible elsewhere)
+    // Tradesperson portfolio — owner write, world read (gated by isVisible elsewhere). WebP only.
     match /tradespeople/{tradieId}/portfolio/{file=**} {
       allow read: if true;
-      allow write: if isOwner(tradieId) && sizeOk() && isImageOrPdf();
+      allow write: if isOwner(tradieId) && sizeOk() && isWebp();
     }
 
-    // Certifications — owner write, admin + owner read
+    // Certifications — owner write, admin + owner read. WebP or PDF.
     match /tradespeople/{tradieId}/certs/{file=**} {
       allow read: if isOwner(tradieId) || isAdmin();
-      allow write: if isOwner(tradieId) && sizeOk() && isImageOrPdf();
+      allow write: if isOwner(tradieId) && sizeOk() && isWebpOrPdf();
     }
 
-    // ID verification — owner write, ADMIN-ONLY READ
+    // ID verification — owner write, ADMIN-ONLY READ. WebP or PDF.
     match /tradespeople/{tradieId}/id/{file=**} {
       allow read: if isAdmin();
-      allow write: if isOwner(tradieId) && sizeOk() && isImageOrPdf();
+      allow write: if isOwner(tradieId) && sizeOk() && isWebpOrPdf();
     }
 
-    // Job intake photos — parties of the job + admin
+    // Job intake photos — parties of the job + admin. WebP only.
     match /jobs/{jobId}/intake/{file=**} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn() && sizeOk() && request.resource.contentType.matches('image/.*');
+      allow write: if isSignedIn() && sizeOk() && isWebp();
     }
 
-    // Chat photo attachments
+    // Chat photo attachments — WebP only.
     match /chats/{chatId}/{file=**} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn() && sizeOk() && request.resource.contentType.matches('image/.*');
+      allow write: if isSignedIn() && sizeOk() && isWebp();
     }
 
     // Invoice PDFs — generated server-side; parties read

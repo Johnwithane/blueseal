@@ -64,7 +64,7 @@ The MVP runs end-to-end as soon as you:
 
    Or click "Enable" in Cloud Console → APIs & Services. Without this, AI callables return a friendly error pointing back here.
 
-6. **PWA icons.** Drop `icon-192.png`, `icon-512.png`, and `icon-512-maskable.png` in `public/icons/`. See `public/icons/icon-192.png.placeholder` for sizes.
+6. **PWA icons.** The install icons are the `android-chrome-192x192.png` / `android-chrome-512x512.png` already in `public/`. The header/brand mark is `public/icons/blueseal_logo.png`. Replace either set to rebrand.
 
 7. **Custom domain.** In Firebase Hosting console → Add custom domain → `blueseal.app`. Update CSP `connect-src` in `firebase.json` if you add new external services.
 
@@ -126,7 +126,7 @@ All 10 product phases from [`design.md` § 10](./design.md) are scaffolded:
 - [ ] Send an invoice; confirm PDF lands in Storage and email lands in the `mail` collection.
 - [ ] Submit a review from both sides; confirm aggregates update on the tradie + user docs.
 - [ ] Install Firebase "Trigger Email" extension and verify mail delivery.
-- [ ] Drop PWA icons in `public/icons/` and verify install prompt.
+- [ ] Verify install prompt picks up the `android-chrome-*` icons; swap in branded variants if needed.
 - [ ] Add `blueseal.app` as custom domain; verify CSP allows everything you need.
 
 ---

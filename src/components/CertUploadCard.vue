@@ -5,6 +5,7 @@ import InputText from "primevue/inputtext";
 import Tag from "primevue/tag";
 import type { CertificationDoc, WithId } from "@/firebase/interfaces";
 import { tradeLabel } from "@/data/trades";
+import { compressOrPassPdf } from "@/utils/image";
 
 const props = defineProps<{
   trade: string;
@@ -40,13 +41,16 @@ async function onFile(e: Event) {
   }
   uploading.value = true;
   try {
+    const prepared = await compressOrPassPdf(file);
     emit("uploaded", {
       trade: props.trade,
-      file,
+      file: prepared,
       issuingBody: issuingBody.value,
       certNumber: certNumber.value,
       expiresAt: expiresAt.value || null,
     });
+  } catch (err) {
+    alert((err as Error).message);
   } finally {
     uploading.value = false;
     target.value = "";

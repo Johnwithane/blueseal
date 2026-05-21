@@ -19,6 +19,7 @@
     "deploy:prod": "npm run build && firebase deploy"
   },
   "dependencies": {
+    "@googlemaps/js-api-loader": "^2.0.2",
     "@primevue/themes": "^4.2.5",
     "firebase": "^11.1.0",
     "geofire-common": "^6.0.0",
@@ -31,6 +32,7 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",
+    "@types/google.maps": "^3.64.1",
     "@types/node": "^22.10.5",
     "@vitejs/plugin-vue": "^5.2.1",
     "@vue/test-utils": "^2.4.6",
@@ -49,7 +51,12 @@
     "vue-tsc": "^2.2.0"
   },
   "lint-staged": {
-    "*.{ts,vue}": ["eslint --fix", "prettier --write"],
-    "*.{json,css,md}": ["prettier --write"]
+    "*.{ts,vue}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,css,md}": [
+      "prettier --write"
+    ]
   }
 }

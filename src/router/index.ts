@@ -36,6 +36,14 @@ const routes: RouteRecordRaw[] = [
     component: () => import("@/views/auth/TradieSignUpView.vue"),
   },
 
+  // Account
+  {
+    path: "/account",
+    name: "Account",
+    component: () => import("@/views/AccountView.vue"),
+    meta: { requiresAuth: true, role: "any" as RoleGuard },
+  },
+
   // Dashboards (role-gated)
   {
     path: "/dashboard",

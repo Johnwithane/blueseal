@@ -4,6 +4,7 @@ import Button from "primevue/button";
 import Select from "primevue/select";
 import Tag from "primevue/tag";
 import type { IdDocType } from "@/firebase/interfaces";
+import { compressOrPassPdf } from "@/utils/image";
 
 const props = defineProps<{
   status: "none" | "pending" | "approved" | "rejected";
@@ -20,8 +21,14 @@ async function onFile(e: Event) {
   const target = e.target as HTMLInputElement;
   const file = target.files?.[0];
   if (!file) return;
-  emit("uploaded", { file, documentType: documentType.value });
-  target.value = "";
+  try {
+    const prepared = await compressOrPassPdf(file);
+    emit("uploaded", { file: prepared, documentType: documentType.value });
+  } catch (err) {
+    alert((err as Error).message);
+  } finally {
+    target.value = "";
+  }
 }
 
 const statusSeverity = {

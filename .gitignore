@@ -26,3 +26,4 @@ functions/node_modules/
 .cache/
 .claude/
 *.tsbuildinfo
+functions/set-admin.mjs

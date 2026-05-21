@@ -1,1 +1,0 @@
-REPLACE: generate icon-192.png (192x192), icon-512.png (512x512), and icon-512-maskable.png (512x512, safe area centered) before deploying. The PWA manifest references all three. Until then, the install prompt will fail icon validation but the app still loads.

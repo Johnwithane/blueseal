@@ -11,6 +11,7 @@ import { uploadFile, makeStoragePath } from "@/firebase/services/storage";
 import type { MessageDoc, WithId } from "@/firebase/interfaces";
 import { useAuthStore } from "@/stores/auth";
 import { useFormatters } from "@/composables/useFormatters";
+import { compressToWebp } from "@/utils/image";
 
 const props = defineProps<{
   chatId: string;
@@ -67,16 +68,26 @@ async function uploadPhoto(e: Event) {
   const target = e.target as HTMLInputElement;
   const file = target.files?.[0];
   if (!file) return;
-  const path = makeStoragePath({ scope: "chats", id: props.chatId, filename: file.name });
-  const url = await uploadFile(path, file);
-  await sendMessage({
-    chatId: props.chatId,
-    senderId: auth.fbUser.uid,
-    recipientId: props.recipientId,
-    text: "",
-    photoUrl: url,
-  });
-  target.value = "";
+  try {
+    const compressed = await compressToWebp(file);
+    const path = makeStoragePath({
+      scope: "chats",
+      id: props.chatId,
+      filename: compressed.name,
+    });
+    const url = await uploadFile(path, compressed);
+    await sendMessage({
+      chatId: props.chatId,
+      senderId: auth.fbUser.uid,
+      recipientId: props.recipientId,
+      text: "",
+      photoUrl: url,
+    });
+  } catch (err) {
+    alert((err as Error).message);
+  } finally {
+    target.value = "";
+  }
 }
 </script>
 
