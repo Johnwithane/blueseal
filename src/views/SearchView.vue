@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import Button from "primevue/button";
 import Select from "primevue/select";
 import Rating from "primevue/rating";
@@ -12,7 +13,14 @@ import LocationPicker, {
 } from "@/components/LocationPicker.vue";
 import type { TradespersonDoc, WithId } from "@/firebase/interfaces";
 
-const trade = ref<string | null>(null);
+const route = useRoute();
+
+function tradeFromQuery(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  return TRADES.some((t) => t.key === value) ? value : null;
+}
+
+const trade = ref<string | null>(tradeFromQuery(route.query.trade));
 const minRating = ref(0);
 const location = ref<LocationValue>({
   lat: null,
@@ -51,6 +59,14 @@ watch(
   () => [location.value.lat, location.value.lng] as const,
   ([lat, lng]) => {
     if (lat != null && lng != null && results.value.length === 0) search();
+  },
+);
+
+// Keep dropdown in sync if the URL query changes (e.g. tapping a different trade tile)
+watch(
+  () => route.query.trade,
+  (q) => {
+    trade.value = tradeFromQuery(q);
   },
 );
 </script>

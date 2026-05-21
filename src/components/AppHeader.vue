@@ -41,13 +41,21 @@ function openMenu(e: Event) {
   <header class="bg-white border-b border-[color:var(--bs-border)] sticky top-0 z-30">
     <div class="bs-container flex items-center justify-between py-3 gap-3">
       <router-link to="/" class="flex items-center gap-2 no-underline text-inherit">
-        <img src="/icons/blueseal_logo.png" alt="" class="h-8 w-auto" />
-        <span class="font-bold text-lg">Blue Seal</span>
+        <img src="/icons/blueseal_logo.png" alt="" class="h-9 w-auto" />
+        <span
+          class="text-2xl tracking-wide text-[color:var(--bs-blue-dark)]"
+          style="font-family: var(--bs-font-logo)"
+        >Blue Seal</span>
       </router-link>
 
       <nav class="hidden sm:flex items-center gap-1">
-        <router-link to="/search">
-          <Button label="Find a tradesperson" icon="pi pi-search" text />
+        <router-link
+          to="/search"
+          class="group inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold no-underline bg-[color:var(--bs-blue-light)]/35 text-[color:var(--bs-blue-dark)] ring-1 ring-[color:var(--bs-blue-light)] hover:bg-[color:var(--bs-blue)] hover:text-white hover:ring-[color:var(--bs-blue)] transition-colors"
+        >
+          <i class="pi pi-search text-xs"></i>
+          <span>Find a tradesperson</span>
+          <i class="pi pi-arrow-right text-[10px] opacity-0 -ml-1 group-hover:opacity-100 group-hover:ml-0 transition-all"></i>
         </router-link>
       </nav>
 
