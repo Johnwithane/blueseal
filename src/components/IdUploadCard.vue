@@ -5,6 +5,10 @@ import Select from "primevue/select";
 import Tag from "primevue/tag";
 import type { IdDocType } from "@/firebase/interfaces";
 import { compressOrPassPdf } from "@/utils/image";
+import { useToast } from "@/composables/useToast";
+import { humanizeError } from "@/utils/errors";
+
+const toast = useToast();
 
 const props = defineProps<{
   status: "none" | "pending" | "approved" | "rejected";
@@ -25,7 +29,7 @@ async function onFile(e: Event) {
     const prepared = await compressOrPassPdf(file);
     emit("uploaded", { file: prepared, documentType: documentType.value });
   } catch (err) {
-    alert((err as Error).message);
+    toast.error("Upload failed", humanizeError(err));
   } finally {
     target.value = "";
   }

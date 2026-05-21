@@ -9,6 +9,7 @@ import Divider from "primevue/divider";
 import { useAuthStore } from "@/stores/auth";
 import { signInSchema } from "@/validation/schemas";
 import { useToast } from "@/composables/useToast";
+import { humanizeError } from "@/utils/errors";
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -37,7 +38,7 @@ async function submit() {
     const redirect = (route.query.redirect as string) || "/dashboard";
     router.replace(redirect);
   } catch (e) {
-    formError.value = (e as Error).message;
+    formError.value = humanizeError(e);
   }
 }
 
@@ -46,7 +47,7 @@ async function googleSignIn() {
     await auth.signInWithGoogle("client");
     router.replace("/dashboard");
   } catch (e) {
-    formError.value = (e as Error).message;
+    formError.value = humanizeError(e);
   }
 }
 </script>

@@ -94,6 +94,10 @@ export async function updatePrivateNotes(id: string, notes: string): Promise<voi
   await updateDoc(doc(db, "jobs", id), { privateNotes: notes });
 }
 
+export async function updateJobIntakePhotos(id: string, photos: string[]): Promise<void> {
+  await updateDoc(doc(db, "jobs", id), { intakePhotos: photos });
+}
+
 // Subscribe to all jobs for a tradesperson (kanban + calendar feed).
 export function subscribeTradieJobs(
   tradieUid: string,

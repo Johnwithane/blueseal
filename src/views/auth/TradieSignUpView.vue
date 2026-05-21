@@ -8,6 +8,7 @@ import Checkbox from "primevue/checkbox";
 import Message from "primevue/message";
 import { useAuthStore } from "@/stores/auth";
 import { signUpSchema } from "@/validation/schemas";
+import { humanizeError } from "@/utils/errors";
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -39,7 +40,7 @@ async function submit() {
     await auth.signUp(parsed.data);
     router.replace("/onboarding");
   } catch (e) {
-    formError.value = (e as Error).message;
+    formError.value = humanizeError(e);
   }
 }
 
@@ -56,7 +57,7 @@ async function google() {
     await auth.signInWithGoogle("tradesperson");
     router.replace("/onboarding");
   } catch (e) {
-    formError.value = (e as Error).message;
+    formError.value = humanizeError(e);
   }
 }
 </script>

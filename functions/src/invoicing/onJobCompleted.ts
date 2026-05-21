@@ -1,5 +1,6 @@
 import { onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { FieldValue } from "firebase-admin/firestore";
+import { logger } from "firebase-functions/v2";
 import { db } from "../lib/admin";
 
 interface JobLike {
@@ -12,7 +13,8 @@ interface JobLike {
 
 /**
  * When a job flips to "complete", create a draft invoice and bump the
- * tradie's invoice number atomically.
+ * tradie's invoice number atomically. Uses jobId as the invoice document id
+ * so re-fires of the same Firestore event are naturally idempotent.
  */
 export const onJobCompleted = onDocumentUpdated("jobs/{jobId}", async (event) => {
   const before = event.data?.before.data() as JobLike | undefined;
@@ -20,27 +22,39 @@ export const onJobCompleted = onDocumentUpdated("jobs/{jobId}", async (event) =>
   if (!after || !before) return;
   if (before.status === "complete" || after.status !== "complete") return;
 
-  // Skip if an invoice already exists for this job.
-  const existing = await db
-    .collection("invoices")
-    .where("jobId", "==", event.params.jobId)
-    .limit(1)
-    .get();
-  if (!existing.empty) return;
-
+  const jobId = event.params.jobId;
   const tradieRef = db.doc(`tradespeople/${after.tradespersonId}`);
+  // Deterministic invoice id == jobId — collisions guarantee idempotency.
+  const invoiceRef = db.doc(`invoices/${jobId}`);
+
   await db.runTransaction(async (tx) => {
-    const tradieSnap = await tx.get(tradieRef);
-    if (!tradieSnap.exists) return;
-    const data = tradieSnap.data() as { nextInvoiceNumber?: number; paymentInstructions?: string };
+    const [tradieSnap, invoiceSnap] = await Promise.all([
+      tx.get(tradieRef),
+      tx.get(invoiceRef),
+    ]);
+    if (invoiceSnap.exists) return; // already created
+    if (!tradieSnap.exists) {
+      logger.warn("Job completed but tradesperson doc missing; no invoice drafted", {
+        jobId,
+        tradespersonId: after.tradespersonId,
+      });
+      return;
+    }
+    const data = tradieSnap.data() as {
+      nextInvoiceNumber?: number;
+      paymentInstructions?: string;
+    };
     const seq = data.nextInvoiceNumber ?? 1;
-    const year = new Date().getFullYear();
+    // Year derived from Toronto local time, not us-central1 local time.
+    const year = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Toronto",
+      year: "numeric",
+    }).format(new Date());
     const invoiceNumber = `INV-${year}-${String(seq).padStart(4, "0")}`;
-    const invoiceRef = db.collection("invoices").doc();
     tx.set(invoiceRef, {
       tradespersonId: after.tradespersonId,
       clientId: after.clientId,
-      jobId: event.params.jobId,
+      jobId,
       invoiceNumber,
       status: "draft",
       lineItems: [

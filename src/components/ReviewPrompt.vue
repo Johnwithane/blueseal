@@ -8,6 +8,8 @@ import Message from "primevue/message";
 import { createReview, createClientReview } from "@/firebase/services/reviews";
 import type { JobDoc, WithId } from "@/firebase/interfaces";
 import { useToast } from "@/composables/useToast";
+import { humanizeError } from "@/utils/errors";
+import { reviewSchema, clientReviewSchema } from "@/validation/schemas";
 
 const props = defineProps<{
   job: WithId<JobDoc>;
@@ -15,6 +17,8 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{ reviewed: [] }>();
+
+const toast = useToast();
 
 const open = ref(false);
 const submitting = ref(false);
@@ -30,45 +34,71 @@ const clarity = ref(5);
 const payment = ref(5);
 
 async function submit() {
-  submitting.value = true;
+  if (submitting.value) return;
   error.value = null;
-  try {
-    if (props.asRole === "client") {
+
+  if (props.asRole === "client") {
+    const parsed = reviewSchema.safeParse({
+      rating: overall.value,
+      text: text.value,
+      dimensions: {
+        quality: quality.value,
+        punctuality: punctuality.value,
+        communication: communication.value,
+        value: value.value,
+      },
+    });
+    if (!parsed.success) {
+      error.value = parsed.error.issues[0]?.message ?? "Check the form";
+      return;
+    }
+    submitting.value = true;
+    try {
       await createReview({
         jobId: props.job.id,
         clientId: props.job.clientId,
         tradespersonId: props.job.tradespersonId,
-        rating: overall.value,
-        text: text.value,
-        dimensions: {
-          quality: quality.value,
-          punctuality: punctuality.value,
-          communication: communication.value,
-          value: value.value,
-        },
+        ...parsed.data,
       });
-    } else {
+      toast.success("Review submitted");
+      open.value = false;
+      emit("reviewed");
+    } catch (e) {
+      error.value = humanizeError(e);
+    } finally {
+      submitting.value = false;
+    }
+  } else {
+    const parsed = clientReviewSchema.safeParse({
+      rating: overall.value,
+      text: text.value,
+      categoryScores: {
+        punctuality: punctuality.value,
+        communication: communication.value,
+        clarity: clarity.value,
+        payment: payment.value,
+      },
+    });
+    if (!parsed.success) {
+      error.value = parsed.error.issues[0]?.message ?? "Check the form";
+      return;
+    }
+    submitting.value = true;
+    try {
       await createClientReview({
         jobId: props.job.id,
         clientId: props.job.clientId,
         tradespersonId: props.job.tradespersonId,
-        rating: overall.value,
-        text: text.value,
-        categoryScores: {
-          punctuality: punctuality.value,
-          communication: communication.value,
-          clarity: clarity.value,
-          payment: payment.value,
-        },
+        ...parsed.data,
       });
+      toast.success("Review submitted");
+      open.value = false;
+      emit("reviewed");
+    } catch (e) {
+      error.value = humanizeError(e);
+    } finally {
+      submitting.value = false;
     }
-    useToast().success("Review submitted");
-    open.value = false;
-    emit("reviewed");
-  } catch (e) {
-    error.value = (e as Error).message;
-  } finally {
-    submitting.value = false;
   }
 }
 </script>
@@ -108,12 +138,12 @@ async function submit() {
 
       <div>
         <label class="text-xs font-medium">Comments</label>
-        <Textarea v-model="text" rows="4" class="w-full mt-1" />
+        <Textarea v-model="text" rows="4" maxlength="2000" class="w-full mt-1" />
       </div>
     </div>
     <template #footer>
       <Button label="Cancel" text @click="open = false" />
-      <Button label="Submit" icon="pi pi-send" :loading="submitting" @click="submit" />
+      <Button label="Submit" icon="pi pi-send" :loading="submitting" :disabled="submitting" @click="submit" />
     </template>
   </Dialog>
 </template>

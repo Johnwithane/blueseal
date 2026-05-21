@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { onMounted, onUnmounted, ref } from "vue";
+import { useRoute, useRouter, RouterLink } from "vue-router";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import Textarea from "primevue/textarea";
@@ -18,6 +18,8 @@ import { tradeLabel } from "@/data/trades";
 import IntakeFormRenderer from "@/components/IntakeFormRenderer.vue";
 import { useToast } from "@/composables/useToast";
 import { compressToWebp } from "@/utils/image";
+import { humanizeError } from "@/utils/errors";
+import { jobRequestSchema } from "@/validation/schemas";
 
 const route = useRoute();
 const router = useRouter();
@@ -38,20 +40,26 @@ const city = ref("");
 const region = ref("");
 const postalCode = ref("");
 
-const photoFiles = ref<File[]>([]);
+// Track files alongside a stable preview URL so the template never recomputes
+// `URL.createObjectURL` on every render (the previous version leaked blob URLs).
+interface PendingPhoto {
+  file: File;
+  previewUrl: string;
+}
+const photos = ref<PendingPhoto[]>([]);
 const photoInput = ref<HTMLInputElement | null>(null);
 
 const submitting = ref(false);
 const error = ref<string | null>(null);
 
-function previewUrl(file: File): string {
-  return URL.createObjectURL(file);
-}
-
 onMounted(async () => {
   tradie.value = await getTradesperson(tradieUid);
   selectedTrade.value = tradie.value?.trades[0] ?? "";
   await loadIntake();
+});
+
+onUnmounted(() => {
+  for (const p of photos.value) URL.revokeObjectURL(p.previewUrl);
 });
 
 async function loadIntake() {
@@ -65,29 +73,31 @@ async function loadIntake() {
 async function onPhotos(e: Event) {
   const target = e.target as HTMLInputElement;
   if (!target.files) return;
-  const incoming = Array.from(target.files).slice(0, 8 - photoFiles.value.length);
+  const incoming = Array.from(target.files).slice(0, 8 - photos.value.length);
   try {
     const compressed = await Promise.all(incoming.map((f) => compressToWebp(f)));
-    photoFiles.value = [...photoFiles.value, ...compressed];
+    photos.value = [
+      ...photos.value,
+      ...compressed.map((file) => ({ file, previewUrl: URL.createObjectURL(file) })),
+    ];
   } catch (err) {
-    error.value = (err as Error).message;
+    error.value = humanizeError(err);
   } finally {
     target.value = "";
   }
 }
 
 function removePhoto(idx: number) {
-  photoFiles.value = photoFiles.value.filter((_, i) => i !== idx);
+  const [removed] = photos.value.splice(idx, 1);
+  if (removed) URL.revokeObjectURL(removed.previewUrl);
+  photos.value = [...photos.value];
 }
 
 async function submit() {
   error.value = null;
+  if (submitting.value) return;
   if (!auth.fbUser || !tradie.value) return;
-  if (!title.value || !description.value) {
-    error.value = "Title and description are required.";
-    return;
-  }
-  if (photoFiles.value.length === 0) {
+  if (photos.value.length === 0) {
     error.value = "Upload at least one photo of the issue or area.";
     return;
   }
@@ -101,20 +111,32 @@ async function submit() {
     }
   }
 
+  // Use the canonical Zod schema for everything except the not-yet-uploaded
+  // photos (we validate the URL list after upload).
+  const candidate = {
+    tradespersonId: tradieUid,
+    trade: selectedTrade.value,
+    title: title.value.trim(),
+    description: description.value.trim(),
+    urgency: urgency.value,
+    address: {
+      line1: addressLine1.value.trim(),
+      city: city.value.trim(),
+      region: region.value.trim(),
+      postalCode: postalCode.value.trim().toUpperCase(),
+    },
+    intakeFormData: intakeData.value,
+    intakePhotos: ["https://placeholder.example/pending.webp"], // satisfies min(1); real URLs filled after upload
+  };
+  const parsed = jobRequestSchema.safeParse(candidate);
+  if (!parsed.success) {
+    error.value = parsed.error.issues[0]?.message ?? "Check the form for errors";
+    return;
+  }
+
   submitting.value = true;
   try {
-    // Upload photos first under a temp job-style path (real jobId comes after creation)
-    const photoUrls: string[] = [];
-    for (const file of photoFiles.value) {
-      const path = makeStoragePath({
-        scope: "jobs",
-        id: `${auth.fbUser.uid}-pending`,
-        bucket: "intake",
-        filename: file.name,
-      });
-      photoUrls.push(await uploadFile(path, file));
-    }
-
+    // Chat then job — uploads happen against the real job's intake path.
     const chatId = await createChat({
       jobId: "pending",
       clientId: auth.fbUser.uid,
@@ -126,15 +148,16 @@ async function submit() {
         clientId: auth.fbUser.uid,
         tradespersonId: tradieUid,
         trade: selectedTrade.value,
-        title: title.value,
-        description: description.value,
-        intakeFormData: intakeData.value,
-        intakePhotos: photoUrls,
+        title: parsed.data.title,
+        description: parsed.data.description,
+        intakeFormData: parsed.data.intakeFormData,
+        // Photos will be appended once uploaded.
+        intakePhotos: [],
         address: {
-          line1: addressLine1.value,
-          city: city.value,
-          region: region.value,
-          postalCode: postalCode.value,
+          line1: parsed.data.address.line1,
+          city: parsed.data.address.city,
+          region: parsed.data.address.region,
+          postalCode: parsed.data.address.postalCode,
         },
         preferredDateWindow: { start: null, end: null },
         urgency: urgency.value,
@@ -142,18 +165,34 @@ async function submit() {
       chatId,
     );
 
+    // Upload photos in parallel under the real job path.
+    const photoUrls = await Promise.all(
+      photos.value.map(async (p) => {
+        const path = makeStoragePath({
+          scope: "jobs",
+          id: jobId,
+          bucket: "intake",
+          filename: p.file.name,
+        });
+        return uploadFile(path, p.file);
+      }),
+    );
+
+    // Patch the job with photo URLs.
+    const { updateJobIntakePhotos } = await import("@/firebase/services/jobs");
+    await updateJobIntakePhotos(jobId, photoUrls);
+
     // System message to bootstrap the thread.
     await sendMessage({
       chatId,
       senderId: auth.fbUser.uid,
-      recipientId: tradieUid,
-      text: `New request: ${title.value}`,
+      text: `New request: ${parsed.data.title}`,
     });
 
     toast.success("Request sent", "We'll let the tradesperson know.");
     router.push({ name: "JobDetail", params: { id: jobId } });
   } catch (e) {
-    error.value = (e as Error).message;
+    error.value = humanizeError(e);
   } finally {
     submitting.value = false;
   }
@@ -189,12 +228,12 @@ async function submit() {
 
       <div>
         <label class="text-sm font-medium">Title</label>
-        <InputText v-model="title" placeholder="Short summary of the job" class="mt-1" />
+        <InputText v-model="title" placeholder="Short summary of the job" maxlength="140" class="mt-1" />
       </div>
 
       <div>
         <label class="text-sm font-medium">Describe the issue</label>
-        <Textarea v-model="description" rows="4" />
+        <Textarea v-model="description" rows="4" maxlength="4000" />
       </div>
 
       <div>
@@ -215,10 +254,10 @@ async function submit() {
       <fieldset>
         <legend class="text-sm font-medium mb-2">Address</legend>
         <div class="grid sm:grid-cols-2 gap-2">
-          <InputText v-model="addressLine1" placeholder="Street address" />
-          <InputText v-model="city" placeholder="City" />
-          <InputText v-model="region" placeholder="Province" />
-          <InputText v-model="postalCode" placeholder="Postal code" />
+          <InputText v-model="addressLine1" placeholder="Street address" maxlength="200" autocomplete="address-line1" />
+          <InputText v-model="city" placeholder="City" maxlength="100" autocomplete="address-level2" />
+          <InputText v-model="region" placeholder="Province" maxlength="100" autocomplete="address-level1" />
+          <InputText v-model="postalCode" placeholder="Postal code (A1A 1A1)" maxlength="7" autocomplete="postal-code" />
         </div>
       </fieldset>
 
@@ -226,21 +265,22 @@ async function submit() {
         <label class="text-sm font-medium">Photos (1–8 required)</label>
         <div class="grid grid-cols-4 gap-2 mt-2">
           <div
-            v-for="(file, idx) in photoFiles"
-            :key="idx"
+            v-for="(p, idx) in photos"
+            :key="p.previewUrl"
             class="relative aspect-square bg-gray-100 rounded overflow-hidden"
           >
-            <img :src="previewUrl(file)" :alt="file.name" class="w-full h-full object-cover" />
+            <img :src="p.previewUrl" :alt="p.file.name" class="w-full h-full object-cover" />
             <button
               type="button"
               class="absolute top-1 right-1 bg-black/60 text-white rounded-full w-6 h-6 text-xs"
+              aria-label="Remove photo"
               @click="removePhoto(idx)"
             >
               ×
             </button>
           </div>
           <button
-            v-if="photoFiles.length < 8"
+            v-if="photos.length < 8"
             type="button"
             class="aspect-square border-2 border-dashed border-[color:var(--bs-border)] rounded text-[color:var(--bs-muted)] flex flex-col items-center justify-center"
             @click="photoInput?.click()"
@@ -258,7 +298,7 @@ async function submit() {
       </div>
 
       <div class="flex justify-end">
-        <Button type="submit" label="Send request" icon="pi pi-send" :loading="submitting" />
+        <Button type="submit" label="Send request" icon="pi pi-send" :loading="submitting" :disabled="submitting" />
       </div>
     </form>
   </section>

@@ -38,6 +38,12 @@ const showRequestInfo = ref(false);
 const showReject = ref(false);
 const notesInput = ref("");
 
+// Per-cert and ID rejection live in modals (no native prompt()).
+const showRejectCert = ref(false);
+const showRejectId = ref(false);
+const rejectCertId = ref<string | null>(null);
+const rejectReason = ref("");
+
 async function load() {
   loading.value = true;
   tradie.value = await getTradesperson(uid);
@@ -55,13 +61,22 @@ async function approveCert(certId: string) {
   await load();
 }
 
-async function rejectCert(certId: string) {
-  if (!auth.fbUser) return;
-  const reason = prompt("Reason for rejection?") ?? "";
-  if (!reason) return;
-  await rejectCertification(certId, auth.fbUser.uid, reason);
-  toast.warn("Certification rejected");
-  await load();
+function openRejectCert(certId: string) {
+  rejectCertId.value = certId;
+  rejectReason.value = "";
+  showRejectCert.value = true;
+}
+
+async function confirmRejectCert() {
+  if (!auth.fbUser || !rejectCertId.value || !rejectReason.value.trim()) return;
+  try {
+    await rejectCertification(rejectCertId.value, auth.fbUser.uid, rejectReason.value.trim());
+    toast.warn("Certification rejected");
+    showRejectCert.value = false;
+    await load();
+  } catch (e) {
+    toast.error("Reject failed", (e as Error).message);
+  }
 }
 
 async function approveIdHere() {
@@ -71,13 +86,21 @@ async function approveIdHere() {
   await load();
 }
 
-async function rejectIdHere() {
-  if (!auth.fbUser) return;
-  const reason = prompt("Reason for rejection?") ?? "";
-  if (!reason) return;
-  await rejectId(uid, auth.fbUser.uid, reason);
-  toast.warn("ID rejected");
-  await load();
+function openRejectId() {
+  rejectReason.value = "";
+  showRejectId.value = true;
+}
+
+async function confirmRejectId() {
+  if (!auth.fbUser || !rejectReason.value.trim()) return;
+  try {
+    await rejectId(uid, auth.fbUser.uid, rejectReason.value.trim());
+    toast.warn("ID rejected");
+    showRejectId.value = false;
+    await load();
+  } catch (e) {
+    toast.error("Reject failed", (e as Error).message);
+  }
 }
 
 async function approveAll() {
@@ -150,7 +173,7 @@ const certSeverity = {
             </a>
             <div v-if="c.status === 'pending'" class="flex gap-2 mt-2">
               <Button label="Approve" icon="pi pi-check" severity="success" size="small" @click="approveCert(c.id)" />
-              <Button label="Reject" icon="pi pi-times" severity="danger" outlined size="small" @click="rejectCert(c.id)" />
+              <Button label="Reject" icon="pi pi-times" severity="danger" outlined size="small" @click="openRejectCert(c.id)" />
             </div>
             <div v-else-if="c.rejectionReason" class="text-xs text-red-600 mt-1">
               {{ c.rejectionReason }}
@@ -177,7 +200,7 @@ const certSeverity = {
             </div>
             <div v-if="idDoc.status === 'pending'" class="flex gap-2 mt-2">
               <Button label="Approve ID" icon="pi pi-check" severity="success" size="small" @click="approveIdHere" />
-              <Button label="Reject ID" icon="pi pi-times" severity="danger" outlined size="small" @click="rejectIdHere" />
+              <Button label="Reject ID" icon="pi pi-times" severity="danger" outlined size="small" @click="openRejectId" />
             </div>
             <div v-else-if="idDoc.rejectionReason" class="text-xs text-red-600 mt-1">
               {{ idDoc.rejectionReason }}
@@ -203,15 +226,31 @@ const certSeverity = {
       <Textarea v-model="notesInput" rows="5" class="w-full" placeholder="What do they need to fix?" />
       <template #footer>
         <Button label="Cancel" text @click="showRequestInfo = false" />
-        <Button label="Send request" icon="pi pi-send" @click="submitRequestInfo" :disabled="!notesInput" />
+        <Button label="Send request" icon="pi pi-send" :disabled="!notesInput" @click="submitRequestInfo" />
       </template>
     </Dialog>
 
     <Dialog v-model:visible="showReject" modal header="Reject application" :style="{ width: '32rem' }">
-      <Textarea v-model="notesInput" rows="5" class="w-full" placeholder="Reason (sent to applicant)" />
+      <Textarea v-model="notesInput" rows="5" class="w-full" placeholder="Reason (sent to applicant)" maxlength="2000" />
       <template #footer>
         <Button label="Cancel" text @click="showReject = false" />
-        <Button label="Reject" icon="pi pi-ban" severity="danger" @click="submitReject" :disabled="!notesInput" />
+        <Button label="Reject" icon="pi pi-ban" severity="danger" :disabled="!notesInput.trim()" @click="submitReject" />
+      </template>
+    </Dialog>
+
+    <Dialog v-model:visible="showRejectCert" modal header="Reject certification" :style="{ width: '32rem' }">
+      <Textarea v-model="rejectReason" rows="4" class="w-full" placeholder="Reason for rejection" maxlength="2000" />
+      <template #footer>
+        <Button label="Cancel" text @click="showRejectCert = false" />
+        <Button label="Reject" icon="pi pi-ban" severity="danger" :disabled="!rejectReason.trim()" @click="confirmRejectCert" />
+      </template>
+    </Dialog>
+
+    <Dialog v-model:visible="showRejectId" modal header="Reject ID" :style="{ width: '32rem' }">
+      <Textarea v-model="rejectReason" rows="4" class="w-full" placeholder="Reason for rejection" maxlength="2000" />
+      <template #footer>
+        <Button label="Cancel" text @click="showRejectId = false" />
+        <Button label="Reject" icon="pi pi-ban" severity="danger" :disabled="!rejectReason.trim()" @click="confirmRejectId" />
       </template>
     </Dialog>
   </section>

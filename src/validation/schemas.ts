@@ -1,9 +1,25 @@
 import { z } from "zod";
+import { TRADES } from "@/data/trades";
+
+const tradeKeys = TRADES.map((t) => t.key) as [string, ...string[]];
+const tradeKeyEnum = z.enum(tradeKeys);
+
+// Canadian postal format (e.g. "V8V 2P1"). Tolerates lowercase + hyphen, normalize before storing.
+const caPostalRegex = /^[A-Za-z]\d[A-Za-z][\s-]?\d[A-Za-z]\d$/;
+// Liberal phone format — country prefix optional, allow spaces / dashes / parens.
+const phoneRegex = /^\+?[\d\s\-()]{10,20}$/;
+
+const safeName = z
+  .string()
+  .trim()
+  .min(2, "Enter your name")
+  .max(80)
+  .regex(/^[\p{L}\p{N}\s.'-]+$/u, "Use letters, numbers, spaces, ' . -");
 
 export const signUpSchema = z.object({
-  email: z.string().email("Enter a valid email"),
-  password: z.string().min(8, "At least 8 characters"),
-  displayName: z.string().min(2, "Enter your name"),
+  email: z.string().trim().toLowerCase().email("Enter a valid email").max(200),
+  password: z.string().min(8, "At least 8 characters").max(128),
+  displayName: safeName,
   role: z.enum(["client", "tradesperson"]),
   termsAccepted: z.literal(true, {
     errorMap: () => ({
@@ -14,28 +30,42 @@ export const signUpSchema = z.object({
 export type SignUpInput = z.infer<typeof signUpSchema>;
 
 export const signInSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
+  email: z.string().trim().toLowerCase().email().max(200),
+  password: z.string().min(1).max(128),
 });
 export type SignInInput = z.infer<typeof signInSchema>;
 
 export const profileBasicsSchema = z.object({
-  displayName: z.string().min(2),
-  phone: z.string().min(7).optional().or(z.literal("")),
+  displayName: safeName,
+  phone: z
+    .string()
+    .trim()
+    .regex(phoneRegex, "Enter a valid phone number")
+    .optional()
+    .or(z.literal("")),
   photoURL: z.string().url().nullable().optional(),
 });
 
-export const tradieTradesSchema = z.object({
-  primaryTrade: z.string().min(1, "Pick your primary trade"),
-  secondaryTrades: z.array(z.string()).max(3, "Up to 3 secondary trades"),
-  yearsExperience: z.record(z.number().min(0).max(80)),
-  bio: z.string().min(20, "Tell clients a bit about your work").max(2000),
-});
+export const tradieTradesSchema = z
+  .object({
+    primaryTrade: tradeKeyEnum,
+    secondaryTrades: z.array(tradeKeyEnum).max(3, "Up to 3 secondary trades"),
+    yearsExperience: z.record(z.number().int().min(0).max(80)),
+    bio: z.string().trim().min(20, "Tell clients a bit about your work").max(2000),
+  })
+  .refine(
+    (v) => {
+      const all = new Set([v.primaryTrade, ...v.secondaryTrades]);
+      return Object.keys(v.yearsExperience).every((k) => all.has(k));
+    },
+    { message: "yearsExperience keys must match selected trades", path: ["yearsExperience"] },
+  );
 
 export const tradiePricingSchema = z
   .object({
     pricingModel: z.enum(["hourly", "quote", "both"]),
-    hourlyRate: z.number().int().nonnegative().nullable(),
+    // Cents. Cap at $10,000/hr to catch unit-mistake typos early.
+    hourlyRate: z.number().int().min(0).max(1_000_000).nullable(),
     providesFreeQuotes: z.boolean(),
   })
   .refine(
@@ -44,10 +74,10 @@ export const tradiePricingSchema = z
   );
 
 export const tradieServiceAreaSchema = z.object({
-  primaryAddressText: z.string().min(3),
+  primaryAddressText: z.string().trim().min(3).max(200),
   lat: z.number().refine((n) => n >= -90 && n <= 90),
   lng: z.number().refine((n) => n >= -180 && n <= 180),
-  serviceRadiusKm: z.number().min(1).max(500),
+  serviceRadiusKm: z.number().min(1).max(200),
 });
 
 export const availabilityBlockSchema = z.object({
@@ -66,61 +96,68 @@ export const weeklyAvailabilitySchema = z.object({
 });
 
 export const certificationFormSchema = z.object({
-  trade: z.string().min(1),
-  issuingBody: z.string().min(2),
-  certNumber: z.string().min(1),
-  expiresAt: z.string().nullable(),
-  fileUrl: z.string().url(),
+  trade: tradeKeyEnum,
+  issuingBody: z.string().trim().min(2).max(200),
+  certNumber: z.string().trim().min(1).max(100),
+  expiresAt: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Use a YYYY-MM-DD date")
+    .nullable(),
+  fileUrl: z.string().url().max(2000),
 });
 
 export const idVerificationFormSchema = z.object({
   documentType: z.enum(["drivers_license", "passport", "provincial_id"]),
-  fileUrl: z.string().url(),
+  fileUrl: z.string().url().max(2000),
 });
 
 export const jobRequestSchema = z.object({
-  tradespersonId: z.string().min(1),
-  trade: z.string().min(1),
-  title: z.string().min(3).max(140),
-  description: z.string().min(10).max(4000),
+  tradespersonId: z.string().min(1).max(128),
+  trade: tradeKeyEnum,
+  title: z.string().trim().min(3).max(140),
+  description: z.string().trim().min(10).max(4000),
   urgency: z.enum(["flexible", "this_week", "urgent"]),
   address: z.object({
-    line1: z.string().min(2),
-    city: z.string().min(2),
-    region: z.string().min(2),
-    postalCode: z.string().min(3),
+    line1: z.string().trim().min(2).max(200),
+    city: z.string().trim().min(2).max(100),
+    region: z.string().trim().min(2).max(100),
+    postalCode: z
+      .string()
+      .trim()
+      .regex(caPostalRegex, "Enter a valid Canadian postal code"),
     lat: z.number().optional(),
     lng: z.number().optional(),
   }),
   intakeFormData: z.record(z.unknown()),
-  intakePhotos: z.array(z.string().url()).min(1).max(8),
+  intakePhotos: z.array(z.string().url().max(2000)).min(1).max(8),
 });
 
 export const reviewSchema = z.object({
-  rating: z.number().min(1).max(5),
-  text: z.string().max(2000),
+  rating: z.number().int().min(1).max(5),
+  text: z.string().trim().max(2000),
   dimensions: z.object({
-    quality: z.number().min(1).max(5),
-    punctuality: z.number().min(1).max(5),
-    communication: z.number().min(1).max(5),
-    value: z.number().min(1).max(5),
+    quality: z.number().int().min(1).max(5),
+    punctuality: z.number().int().min(1).max(5),
+    communication: z.number().int().min(1).max(5),
+    value: z.number().int().min(1).max(5),
   }),
 });
 
 export const clientReviewSchema = z.object({
-  rating: z.number().min(1).max(5),
-  text: z.string().max(2000),
+  rating: z.number().int().min(1).max(5),
+  text: z.string().trim().max(2000),
   categoryScores: z.object({
-    punctuality: z.number().min(1).max(5),
-    communication: z.number().min(1).max(5),
-    clarity: z.number().min(1).max(5),
-    payment: z.number().min(1).max(5),
+    punctuality: z.number().int().min(1).max(5),
+    communication: z.number().int().min(1).max(5),
+    clarity: z.number().int().min(1).max(5),
+    payment: z.number().int().min(1).max(5),
   }),
 });
 
 export const lineItemSchema = z.object({
-  description: z.string().min(1),
-  quantity: z.number().positive(),
-  unitPrice: z.number().int().nonnegative(),
-  taxRate: z.number().min(0).max(1),
+  description: z.string().trim().min(1).max(300),
+  quantity: z.number().positive().max(10_000),
+  // Cents. $100,000 cap.
+  unitPrice: z.number().int().nonnegative().max(10_000_000),
+  taxRate: z.number().min(0).max(0.5),
 });

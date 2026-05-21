@@ -22,9 +22,17 @@ const LOCATION = process.env.VERTEX_LOCATION || "us-central1";
 const MODEL = process.env.VERTEX_MODEL || "gemini-2.5-flash";
 
 const Input = z.object({
-  jobId: z.string().min(1),
-  prompt: z.string().max(2000).optional(),
+  jobId: z.string().min(1).max(128),
+  prompt: z.string().trim().max(2000).optional(),
 });
+
+function mimeForUrl(url: string): string {
+  const lower = url.toLowerCase().split("?")[0];
+  if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+  return "image/jpeg";
+}
 
 interface JobDoc {
   trade: string;
@@ -110,7 +118,7 @@ async function runVertex(
     for (const url of imageUrls.slice(0, 4)) {
       // Vertex accepts public HTTPS URIs and gs:// URIs. Storage download URLs are public per the
       // signed-URL token, so this works without additional auth setup.
-      parts.push({ fileData: { mimeType: "image/jpeg", fileUri: url } });
+      parts.push({ fileData: { mimeType: mimeForUrl(url), fileUri: url } });
     }
     const res = await model.generateContent({ contents: [{ role: "user", parts }] });
     const content =
@@ -124,11 +132,12 @@ async function runVertex(
     };
   } catch (err) {
     logger.error("Vertex AI call failed", { error: (err as Error).message });
-    return {
-      content: `[Vertex AI error — likely the Vertex AI API isn't enabled on the project yet. Run: gcloud services enable aiplatform.googleapis.com --project ${PROJECT_ID}]\n\nError: ${(err as Error).message}`,
-      tokensIn: 0,
-      tokensOut: 0,
-    };
+    // Never leak raw provider errors to the client — the message may contain
+    // project IDs, internal hostnames, etc.
+    throw new HttpsError(
+      "internal",
+      "The AI service is unavailable right now. Please try again shortly.",
+    );
   }
 }
 

@@ -7,53 +7,77 @@ service firebase.storage {
     function uid() { return request.auth.uid; }
     function isAdmin() { return isSignedIn() && request.auth.token.role == 'admin'; }
     function isOwner(ownerId) { return isSignedIn() && uid() == ownerId; }
-    function sizeOk() { return request.resource.size < 10 * 1024 * 1024; }
-    // Client-side compression always converts uploads to image/webp. Storage
-    // rejects every other image type at the gate.
-    function isWebp() { return request.resource.contentType == 'image/webp'; }
+    function smallSizeOk() { return request.resource.size < 4 * 1024 * 1024; }
+    function docSizeOk()   { return request.resource.size < 10 * 1024 * 1024; }
+    // contentType is attacker-controllable; the filename extension provides a
+    // second signal and a Cloud Function should additionally inspect magic
+    // bytes on finalize.
+    function isWebp() {
+      return request.resource.contentType == 'image/webp'
+        && request.resource.name.lower().matches('.*\\.webp');
+    }
     function isWebpOrPdf() {
-      return isWebp() || request.resource.contentType == 'application/pdf';
+      return isWebp()
+        || (request.resource.contentType == 'application/pdf'
+            && request.resource.name.lower().matches('.*\\.pdf'));
+    }
+
+    // Lookup helpers — Storage rules can call into Firestore.
+    function jobParty(jobId) {
+      return firestore.exists(/databases/(default)/documents/jobs/$(jobId))
+        && (firestore.get(/databases/(default)/documents/jobs/$(jobId)).data.clientId == uid()
+            || firestore.get(/databases/(default)/documents/jobs/$(jobId)).data.tradespersonId == uid());
+    }
+    function chatParty(chatId) {
+      return firestore.exists(/databases/(default)/documents/chats/$(chatId))
+        && (firestore.get(/databases/(default)/documents/chats/$(chatId)).data.clientId == uid()
+            || firestore.get(/databases/(default)/documents/chats/$(chatId)).data.tradespersonId == uid());
+    }
+    function invoiceParty(invoiceId) {
+      return firestore.exists(/databases/(default)/documents/invoices/$(invoiceId))
+        && (firestore.get(/databases/(default)/documents/invoices/$(invoiceId)).data.clientId == uid()
+            || firestore.get(/databases/(default)/documents/invoices/$(invoiceId)).data.tradespersonId == uid());
     }
 
     // User avatars — owner write, world read. WebP only.
     match /users/{userId}/profile/{file=**} {
       allow read: if true;
-      allow write: if isOwner(userId) && sizeOk() && isWebp();
+      allow write: if isOwner(userId) && smallSizeOk() && isWebp();
     }
 
     // Tradesperson portfolio — owner write, world read (gated by isVisible elsewhere). WebP only.
     match /tradespeople/{tradieId}/portfolio/{file=**} {
       allow read: if true;
-      allow write: if isOwner(tradieId) && sizeOk() && isWebp();
+      allow write: if isOwner(tradieId) && smallSizeOk() && isWebp();
     }
 
     // Certifications — owner write, admin + owner read. WebP or PDF.
     match /tradespeople/{tradieId}/certs/{file=**} {
       allow read: if isOwner(tradieId) || isAdmin();
-      allow write: if isOwner(tradieId) && sizeOk() && isWebpOrPdf();
+      allow write: if isOwner(tradieId) && docSizeOk() && isWebpOrPdf();
     }
 
     // ID verification — owner write, ADMIN-ONLY READ. WebP or PDF.
     match /tradespeople/{tradieId}/id/{file=**} {
       allow read: if isAdmin();
-      allow write: if isOwner(tradieId) && sizeOk() && isWebpOrPdf();
+      allow write: if isOwner(tradieId) && docSizeOk() && isWebpOrPdf();
     }
 
-    // Job intake photos — parties of the job + admin. WebP only.
+    // Job intake photos — parties of the job + admin only.
     match /jobs/{jobId}/intake/{file=**} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && sizeOk() && isWebp();
+      allow read: if isSignedIn() && (jobParty(jobId) || isAdmin());
+      allow write: if isSignedIn() && jobParty(jobId) && smallSizeOk() && isWebp();
     }
 
-    // Chat photo attachments — WebP only.
+    // Chat photo attachments — parties of the chat + admin.
     match /chats/{chatId}/{file=**} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && sizeOk() && isWebp();
+      allow read: if isSignedIn() && (chatParty(chatId) || isAdmin());
+      allow write: if isSignedIn() && chatParty(chatId) && smallSizeOk() && isWebp();
     }
 
-    // Invoice PDFs — generated server-side; parties read
+    // Invoice PDFs — generated server-side; parties read only.
     match /invoices/{invoiceId} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() && (invoiceParty(invoiceId) || isAdmin());
       allow write: if false;
     }
   }

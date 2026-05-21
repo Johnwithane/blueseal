@@ -65,9 +65,19 @@ export const sendInvoice = onCall({ enforceAppCheck: false }, async (req) => {
   const invRef = db.doc(`invoices/${invoiceId}`);
   const invSnap = await invRef.get();
   if (!invSnap.exists) throw new HttpsError("not-found", "Invoice not found.");
-  const inv = invSnap.data() as InvoiceData;
+  const inv = invSnap.data() as InvoiceData & { status?: string };
   if (inv.tradespersonId !== uid) {
     throw new HttpsError("permission-denied", "Only the tradesperson can send this invoice.");
+  }
+  // Only draft / overdue invoices may be (re)sent — never paid/void.
+  if (inv.status && !["draft", "overdue"].includes(inv.status)) {
+    throw new HttpsError(
+      "failed-precondition",
+      `Invoice cannot be sent in status "${inv.status}".`,
+    );
+  }
+  if (!inv.lineItems || inv.lineItems.length === 0 || inv.total <= 0) {
+    throw new HttpsError("failed-precondition", "Invoice has no line items or zero total.");
   }
 
   const [tradieUser, clientUser] = await Promise.all([

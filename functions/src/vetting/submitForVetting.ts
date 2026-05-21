@@ -1,10 +1,10 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { FieldValue } from "firebase-admin/firestore";
 import { db } from "../lib/admin";
-import { requireAuth } from "../lib/auth";
+import { requireRole } from "../lib/auth";
 
 export const submitForVetting = onCall({ enforceAppCheck: false }, async (req) => {
-  const uid = requireAuth(req);
+  const uid = requireRole(req, "tradesperson");
   const tradieRef = db.doc(`tradespeople/${uid}`);
   const idRef = db.doc(`idVerifications/${uid}`);
   const certsSnap = await db
@@ -15,9 +15,23 @@ export const submitForVetting = onCall({ enforceAppCheck: false }, async (req) =
   if (!tradieSnap.exists) throw new HttpsError("failed-precondition", "Profile not started.");
   if (!idSnap.exists) throw new HttpsError("failed-precondition", "ID not uploaded.");
 
-  const tradie = tradieSnap.data() as { trades?: string[] };
+  const tradie = tradieSnap.data() as { trades?: string[]; vettingStatus?: string };
+  // Only draft / info_requested may submit. Already-pending and already-approved
+  // tradies must not be able to reset queue position by re-submitting.
+  if (tradie.vettingStatus && !["draft", "info_requested"].includes(tradie.vettingStatus)) {
+    throw new HttpsError(
+      "failed-precondition",
+      `Cannot submit from status "${tradie.vettingStatus}".`,
+    );
+  }
   const requiredTrades = new Set(tradie.trades ?? []);
-  const certTrades = new Set(certsSnap.docs.map((d) => (d.data() as { trade: string }).trade));
+  // Pending/rejected certs don't count — must have a cert uploaded per trade.
+  const certTrades = new Set(
+    certsSnap.docs
+      .map((d) => d.data() as { trade: string; status?: string })
+      .filter((c) => c.status !== "rejected")
+      .map((c) => c.trade),
+  );
   for (const t of requiredTrades) {
     if (!certTrades.has(t)) {
       throw new HttpsError("failed-precondition", `Missing certification for ${t}.`);

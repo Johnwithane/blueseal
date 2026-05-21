@@ -7,22 +7,14 @@ import DatePicker from "primevue/datepicker";
 import Textarea from "primevue/textarea";
 import Select from "primevue/select";
 import {
-  collection,
-  getDocs,
-  query,
-  where,
-  limit,
-} from "firebase/firestore";
-import { db } from "@/firebase/config";
-
-import {
   getJob,
   scheduleJob,
   updateJobStatus,
   updatePrivateNotes,
 } from "@/firebase/services/jobs";
+import { getInvoiceByJobId } from "@/firebase/services/invoices";
 import { useAuthStore } from "@/stores/auth";
-import type { JobDoc, JobStatus, WithId, InvoiceDoc } from "@/firebase/interfaces";
+import type { JobDoc, JobStatus, WithId } from "@/firebase/interfaces";
 import { useFormatters } from "@/composables/useFormatters";
 import ChatThread from "@/components/ChatThread.vue";
 import IntakeFormRenderer from "@/components/IntakeFormRenderer.vue";
@@ -32,12 +24,13 @@ import ReviewPrompt from "@/components/ReviewPrompt.vue";
 import { SEED_INTAKE_SCHEMAS } from "@/data/intakeSchemas";
 import { getIntakeSchema } from "@/firebase/services/intakeFormSchemas";
 import type { IntakeField } from "@/firebase/interfaces";
-import { getUser } from "@/firebase/services/users";
 import { tradeLabel } from "@/data/trades";
-import { typedConverter } from "@/firebase/converters";
+import { useToast } from "@/composables/useToast";
+import { humanizeError } from "@/utils/errors";
 
 const route = useRoute();
 const auth = useAuthStore();
+const toast = useToast();
 const { date, dateTime } = useFormatters();
 
 const job = ref<WithId<JobDoc> | null>(null);
@@ -62,9 +55,6 @@ const statusOptions: { label: string; value: JobStatus }[] = [
 
 const isTradie = computed(() => auth.fbUser?.uid === job.value?.tradespersonId);
 const isClient = computed(() => auth.fbUser?.uid === job.value?.clientId);
-const recipientId = computed(() =>
-  isTradie.value ? job.value?.clientId ?? "" : job.value?.tradespersonId ?? "",
-);
 
 async function load() {
   loading.value = true;
@@ -74,30 +64,25 @@ async function load() {
     loading.value = false;
     return;
   }
-  // Intake schema
-  const remote = await getIntakeSchema(job.value.trade);
+  // Parallel: intake schema + invoice lookup.
+  const [remote, invoice] = await Promise.all([
+    getIntakeSchema(job.value.trade),
+    getInvoiceByJobId(id),
+  ]);
   intakeFields.value = remote?.fields ?? SEED_INTAKE_SCHEMAS[job.value.trade] ?? [];
+  invoiceId.value = invoice?.id ?? null;
 
   // Hydrate local form copies
   scheduledStart.value = job.value.scheduledStart?.toDate() ?? null;
   scheduledEnd.value = job.value.scheduledEnd?.toDate() ?? null;
   privateNotes.value = job.value.privateNotes ?? "";
 
-  // Look up invoice for this job (if any)
-  const q = query(
-    collection(db, "invoices").withConverter(typedConverter<InvoiceDoc>()),
-    where("jobId", "==", id),
-    limit(1),
-  );
-  const snap = await getDocs(q);
-  invoiceId.value = snap.empty ? null : snap.docs[0].id;
-
-  // Subscription state from current user doc
+  // Only the tradie needs subscription state (AI tools are tradie-only).
+  // Clients have no reason to read the tradie's user doc.
   if (isTradie.value && auth.user) {
     subscriptionOn.value = auth.user.hasActiveSubscription;
-  } else if (job.value.tradespersonId) {
-    const u = await getUser(job.value.tradespersonId);
-    subscriptionOn.value = u?.hasActiveSubscription ?? false;
+  } else {
+    subscriptionOn.value = false;
   }
 
   loading.value = false;
@@ -107,19 +92,37 @@ onMounted(load);
 
 async function saveSchedule() {
   if (!job.value || !scheduledStart.value || !scheduledEnd.value) return;
-  await scheduleJob(job.value.id, scheduledStart.value, scheduledEnd.value);
-  await load();
+  try {
+    await scheduleJob(job.value.id, scheduledStart.value, scheduledEnd.value);
+    await load();
+  } catch (e) {
+    toast.error("Couldn't save schedule", humanizeError(e));
+  }
 }
 
 async function setStatus(s: JobStatus) {
   if (!job.value) return;
-  await updateJobStatus(job.value.id, s);
-  await load();
+  // Mirror Kanban guard: completing a job triggers an invoice draft.
+  if (s === "complete" && !confirm("Mark this job complete? A draft invoice will be created.")) {
+    return;
+  }
+  if (s === "cancelled" && !confirm("Cancel this job?")) return;
+  try {
+    await updateJobStatus(job.value.id, s);
+    await load();
+  } catch (e) {
+    toast.error("Couldn't update status", humanizeError(e));
+  }
 }
 
 async function saveNotes() {
   if (!job.value) return;
-  await updatePrivateNotes(job.value.id, privateNotes.value);
+  try {
+    await updatePrivateNotes(job.value.id, privateNotes.value);
+    toast.success("Notes saved");
+  } catch (e) {
+    toast.error("Couldn't save notes", humanizeError(e));
+  }
 }
 
 const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "secondary"> = {
@@ -153,7 +156,7 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
 
       <div class="grid lg:grid-cols-3 gap-4">
         <div class="lg:col-span-2 space-y-4">
-          <ChatThread :chat-id="job.chatId" :recipient-id="recipientId" />
+          <ChatThread :chat-id="job.chatId" />
 
           <div class="bs-card p-4">
             <h3 class="font-semibold text-sm mb-2">Original request</h3>

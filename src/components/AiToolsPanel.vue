@@ -5,6 +5,7 @@ import Dialog from "primevue/dialog";
 import Textarea from "primevue/textarea";
 import Message from "primevue/message";
 import { diagnose, quoteHelper, summarizeJob } from "@/firebase/services/ai";
+import { humanizeError } from "@/utils/errors";
 
 const props = defineProps<{
   jobId: string;
@@ -25,6 +26,7 @@ function reset(mode: "diagnose" | "quote" | "summary") {
 }
 
 async function run() {
+  if (loading.value) return;
   loading.value = true;
   result.value = null;
   error.value = null;
@@ -35,10 +37,10 @@ async function run() {
         : open.value === "quote"
           ? quoteHelper
           : summarizeJob;
-    const res = await fn({ jobId: props.jobId, prompt: prompt.value });
+    const res = await fn({ jobId: props.jobId, prompt: prompt.value.slice(0, 2000) });
     result.value = res.content;
   } catch (e) {
-    error.value = (e as Error).message;
+    error.value = humanizeError(e);
   } finally {
     loading.value = false;
   }
@@ -88,8 +90,8 @@ async function run() {
       <p class="text-sm text-[color:var(--bs-muted)] mb-2">
         The AI sees the chat + intake photos for this job.
       </p>
-      <Textarea v-model="prompt" rows="3" class="w-full" placeholder="Optional extra context or question…" />
-      <Button label="Run" icon="pi pi-play" :loading="loading" class="mt-2" @click="run" />
+      <Textarea v-model="prompt" rows="3" maxlength="2000" class="w-full" placeholder="Optional extra context or question…" />
+      <Button label="Run" icon="pi pi-play" :loading="loading" :disabled="loading" class="mt-2" @click="run" />
 
       <Message v-if="error" severity="error" :closable="false" class="mt-3">{{ error }}</Message>
       <div v-if="result" class="bs-card p-3 mt-3 whitespace-pre-wrap text-sm">{{ result }}</div>

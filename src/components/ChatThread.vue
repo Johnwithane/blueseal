@@ -6,20 +6,23 @@ import {
   subscribeMessages,
   sendMessage,
   markRead,
+  isAllowedPhotoUrl,
 } from "@/firebase/services/chats";
 import { uploadFile, makeStoragePath } from "@/firebase/services/storage";
 import type { MessageDoc, WithId } from "@/firebase/interfaces";
 import { useAuthStore } from "@/stores/auth";
 import { useFormatters } from "@/composables/useFormatters";
 import { compressToWebp } from "@/utils/image";
+import { useToast } from "@/composables/useToast";
+import { humanizeError } from "@/utils/errors";
 
 const props = defineProps<{
   chatId: string;
-  recipientId: string;
 }>();
 
 const auth = useAuthStore();
 const { dateTime } = useFormatters();
+const toast = useToast();
 
 const messages = ref<WithId<MessageDoc>[]>([]);
 const text = ref("");
@@ -28,36 +31,41 @@ const fileInput = ref<HTMLInputElement | null>(null);
 const scroller = ref<HTMLElement | null>(null);
 let unsub: (() => void) | null = null;
 
-onMounted(() => {
-  unsub = subscribeMessages(props.chatId, (m) => {
+function subscribe(chatId: string) {
+  unsub?.();
+  unsub = subscribeMessages(chatId, (m) => {
     messages.value = m;
-    if (auth.fbUser) markRead(props.chatId, auth.fbUser.uid).catch(() => {});
+    if (auth.fbUser && m.some((msg) => msg.senderId !== auth.fbUser?.uid)) {
+      markRead(chatId).catch((e) => console.warn("markRead failed", e));
+    }
     nextTick(() => scroller.value?.scrollTo({ top: scroller.value.scrollHeight }));
   });
-});
+}
+
+onMounted(() => subscribe(props.chatId));
 
 watch(
   () => props.chatId,
   (next, prev) => {
     if (next === prev) return;
-    unsub?.();
-    unsub = subscribeMessages(next, (m) => (messages.value = m));
+    subscribe(next);
   },
 );
 
 onUnmounted(() => unsub?.());
 
 async function submit() {
-  if (!auth.fbUser || !text.value.trim()) return;
+  if (!auth.fbUser || !text.value.trim() || sending.value) return;
   sending.value = true;
   try {
     await sendMessage({
       chatId: props.chatId,
       senderId: auth.fbUser.uid,
-      recipientId: props.recipientId,
       text: text.value.trim(),
     });
     text.value = "";
+  } catch (err) {
+    toast.error("Couldn't send", humanizeError(err));
   } finally {
     sending.value = false;
   }
@@ -79,12 +87,11 @@ async function uploadPhoto(e: Event) {
     await sendMessage({
       chatId: props.chatId,
       senderId: auth.fbUser.uid,
-      recipientId: props.recipientId,
       text: "",
       photoUrl: url,
     });
   } catch (err) {
-    alert((err as Error).message);
+    toast.error("Photo upload failed", humanizeError(err));
   } finally {
     target.value = "";
   }
@@ -110,9 +117,9 @@ async function uploadPhoto(e: Event) {
               : 'bg-white border border-[color:var(--bs-border)]',
           ]"
         >
-          <template v-if="m.photoUrl">
-            <a :href="m.photoUrl" target="_blank" rel="noopener">
-              <img :src="m.photoUrl" class="rounded max-h-60" alt="" />
+          <template v-if="m.photoUrl && isAllowedPhotoUrl(m.photoUrl)">
+            <a :href="m.photoUrl" target="_blank" rel="noopener noreferrer">
+              <img :src="m.photoUrl" class="rounded max-h-60" alt="Chat photo" loading="lazy" />
             </a>
           </template>
           <div v-if="m.text">{{ m.text }}</div>

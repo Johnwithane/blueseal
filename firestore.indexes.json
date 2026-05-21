@@ -59,6 +59,30 @@
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "issuedAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "invoices",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tradespersonId", "order": "ASCENDING" },
+        { "fieldPath": "issuedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "invoices",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clientId", "order": "ASCENDING" },
+        { "fieldPath": "issuedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "clientReviews",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clientId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

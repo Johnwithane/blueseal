@@ -66,7 +66,23 @@ export function subscribeTradieInvoices(
 }
 
 export async function listClientInvoices(clientUid: string): Promise<WithId<InvoiceDoc>[]> {
-  const q = query(invCol(), where("clientId", "==", clientUid), orderBy("issuedAt", "desc"));
+  const q = query(
+    invCol(),
+    where("clientId", "==", clientUid),
+    orderBy("issuedAt", "desc"),
+    limit(100),
+  );
   const snap = await getDocs(q);
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+export async function getInvoiceByJobId(jobId: string): Promise<WithId<InvoiceDoc> | null> {
+  // onJobCompleted writes invoices/{jobId} deterministically, so this is a
+  // direct lookup. Falls back to the jobId-where query for legacy invoices
+  // that pre-date the deterministic ID.
+  const direct = await getDoc(invRef(jobId));
+  if (direct.exists()) return { id: direct.id, ...direct.data() };
+  const q = query(invCol(), where("jobId", "==", jobId), limit(1));
+  const snap = await getDocs(q);
+  return snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() };
 }

@@ -6,6 +6,10 @@ import Tag from "primevue/tag";
 import type { CertificationDoc, WithId } from "@/firebase/interfaces";
 import { tradeLabel } from "@/data/trades";
 import { compressOrPassPdf } from "@/utils/image";
+import { useToast } from "@/composables/useToast";
+import { humanizeError } from "@/utils/errors";
+
+const toast = useToast();
 
 const props = defineProps<{
   trade: string;
@@ -35,7 +39,7 @@ async function onFile(e: Event) {
   const file = target.files?.[0];
   if (!file) return;
   if (!issuingBody.value || !certNumber.value) {
-    alert("Please fill the issuing body and cert number first.");
+    toast.warn("Add issuing body and cert number first.");
     target.value = "";
     return;
   }
@@ -50,7 +54,7 @@ async function onFile(e: Event) {
       expiresAt: expiresAt.value || null,
     });
   } catch (err) {
-    alert((err as Error).message);
+    toast.error("Upload failed", humanizeError(err));
   } finally {
     uploading.value = false;
     target.value = "";
@@ -74,7 +78,7 @@ const statusSeverity = {
       <div class="bs-form grid sm:grid-cols-3 gap-2 mt-2">
         <InputText v-model="issuingBody" placeholder="Issuing body" />
         <InputText v-model="certNumber" placeholder="Cert number" />
-        <input ref="fileInput" type="date" v-model="expiresAt" class="border rounded p-2 text-sm" />
+        <input ref="fileInput" v-model="expiresAt" type="date" class="border rounded p-2 text-sm" />
       </div>
       <div class="flex items-center justify-between mt-2">
         <Button

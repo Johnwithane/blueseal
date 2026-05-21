@@ -12,27 +12,45 @@ service cloud.firestore {
     function isClient() { return hasRole('client'); }
     function isOwner(ownerId) { return isSignedIn() && uid() == ownerId; }
 
-    // Fields the client is *never* allowed to set or change.
-    // Cloud Functions set these (denormalized aggregates, vetting flags, etc.).
-    function noServerFieldsTouched(fields) {
-      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
-    }
+    function jobDoc(jobId) { return get(/databases/$(database)/documents/jobs/$(jobId)); }
 
     // ---------- users ----------
+    // Public profile fields (displayName, photoURL) live here. Email/phone/Stripe are
+    // private; rules below restrict read to owner + admin. Anyone needing a tradie's
+    // public profile data should read /tradespeople/{uid} instead.
     match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin() || resource.data.role == 'tradesperson';
-      // Create: user creates their own doc (role set by Cloud Function via custom claim mirror)
+      allow read: if isOwner(userId) || isAdmin();
+
+      // Create: caller writes their own doc with role/initial-aggregate fields locked.
+      // Field allowlist via hasOnly prevents attacker-planted keys.
       allow create: if isOwner(userId)
+        && request.resource.data.keys().hasOnly([
+          'role','displayName','email','photoURL','phone',
+          'createdAt','lastActiveAt','emailVerified',
+          'hasActiveSubscription','stripeCustomerId',
+          'clientRatingAvg','clientRatingCount',
+          'termsAcceptedAt','termsAcceptedVersion'
+        ])
         && request.resource.data.role in ['client', 'tradesperson']
         && request.resource.data.hasActiveSubscription == false
+        && request.resource.data.stripeCustomerId == null
         && request.resource.data.clientRatingAvg == 0
-        && request.resource.data.clientRatingCount == 0;
-      // Update: owner can edit profile fields, never aggregates/role/subscription
+        && request.resource.data.clientRatingCount == 0
+        && request.resource.data.emailVerified == false
+        && request.resource.data.termsAcceptedVersion is string;
+
+      // Update: positive field-level equality checks (deletion-safe vs hasAny diff).
       allow update: if isOwner(userId)
-        && noServerFieldsTouched([
-          'role', 'hasActiveSubscription', 'stripeCustomerId',
-          'clientRatingAvg', 'clientRatingCount', 'emailVerified', 'createdAt'
-        ]);
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.hasActiveSubscription == resource.data.hasActiveSubscription
+        && request.resource.data.stripeCustomerId == resource.data.stripeCustomerId
+        && request.resource.data.clientRatingAvg == resource.data.clientRatingAvg
+        && request.resource.data.clientRatingCount == resource.data.clientRatingCount
+        && request.resource.data.emailVerified == resource.data.emailVerified
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.termsAcceptedAt == resource.data.termsAcceptedAt
+        && request.resource.data.termsAcceptedVersion == resource.data.termsAcceptedVersion;
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
@@ -43,19 +61,27 @@ service cloud.firestore {
       allow read: if (resource != null && resource.data.isVisible == true)
                   || isOwner(tradieId) || isAdmin();
       allow create: if isOwner(tradieId)
-        && request.resource.data.vettingStatus in ['draft', 'pending']
+        && request.resource.data.vettingStatus == 'draft'
         && request.resource.data.isVisible == false
         && request.resource.data.verifiedTrades.size() == 0
         && request.resource.data.idVerified == false
         && request.resource.data.ratingAvg == 0
-        && request.resource.data.ratingCount == 0;
-      // Owner can edit profile but not gating flags
+        && request.resource.data.ratingCount == 0
+        && request.resource.data.nextInvoiceNumber == 1;
+      // Owner update: positive equality checks on server-managed fields,
+      // and approved tradies can't yank themselves back into vetting.
       allow update: if isOwner(tradieId)
-        && noServerFieldsTouched([
-          'verifiedTrades', 'idVerified', 'isVisible', 'ratingAvg', 'ratingCount',
-          'ratingDimensions', 'nextInvoiceNumber'
-        ])
-        && request.resource.data.vettingStatus in ['draft', 'pending', 'info_requested'];
+        && request.resource.data.verifiedTrades == resource.data.verifiedTrades
+        && request.resource.data.idVerified == resource.data.idVerified
+        && request.resource.data.isVisible == resource.data.isVisible
+        && request.resource.data.ratingAvg == resource.data.ratingAvg
+        && request.resource.data.ratingCount == resource.data.ratingCount
+        && request.resource.data.ratingDimensions == resource.data.ratingDimensions
+        && request.resource.data.nextInvoiceNumber == resource.data.nextInvoiceNumber
+        && request.resource.data.approvedAt == resource.data.approvedAt
+        && (resource.data.vettingStatus == 'approved'
+            ? request.resource.data.vettingStatus == 'approved'
+            : request.resource.data.vettingStatus in ['draft','pending','info_requested']);
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
@@ -65,11 +91,17 @@ service cloud.firestore {
       allow read: if isAdmin() || (isSignedIn() && resource.data.tradespersonId == uid());
       allow create: if isTradie()
         && request.resource.data.tradespersonId == uid()
-        && request.resource.data.status == 'pending';
+        && request.resource.data.status == 'pending'
+        && request.resource.data.reviewedBy == null
+        && request.resource.data.reviewedAt == null
+        && request.resource.data.rejectionReason == null;
       // Owner can replace pending cert; admin can approve/reject
       allow update: if (isOwner(resource.data.tradespersonId)
                        && resource.data.status == 'pending'
-                       && noServerFieldsTouched(['status', 'reviewedBy', 'reviewedAt']))
+                       && request.resource.data.status == 'pending'
+                       && request.resource.data.tradespersonId == resource.data.tradespersonId
+                       && request.resource.data.reviewedBy == resource.data.reviewedBy
+                       && request.resource.data.reviewedAt == resource.data.reviewedAt)
                     || isAdmin();
       allow delete: if isAdmin();
     }
@@ -77,11 +109,15 @@ service cloud.firestore {
     // ---------- idVerifications (admin-only read; never world-readable) ----------
     match /idVerifications/{tradieId} {
       allow read: if isAdmin() || isOwner(tradieId);
-      allow create: if isOwner(tradieId)
-        && request.resource.data.status == 'pending';
+      allow create: if isTradie() && isOwner(tradieId)
+        && request.resource.data.status == 'pending'
+        && request.resource.data.reviewedBy == null
+        && request.resource.data.reviewedAt == null;
       allow update: if (isOwner(tradieId)
                        && resource.data.status == 'pending'
-                       && noServerFieldsTouched(['status', 'reviewedBy', 'reviewedAt']))
+                       && request.resource.data.status == 'pending'
+                       && request.resource.data.reviewedBy == resource.data.reviewedBy
+                       && request.resource.data.reviewedAt == resource.data.reviewedAt)
                     || isAdmin();
       allow delete: if isAdmin();
     }
@@ -89,7 +125,7 @@ service cloud.firestore {
     // ---------- intake form schemas (public read, admin write) ----------
     match /intakeFormSchemas/{trade} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow create, update, delete: if isAdmin();
     }
 
     // ---------- jobs ----------
@@ -101,22 +137,44 @@ service cloud.firestore {
       );
       allow create: if isClient()
         && request.resource.data.clientId == uid()
-        && request.resource.data.status == 'requested';
-      allow update: if isSignedIn() && (
-        resource.data.clientId == uid()
-        || resource.data.tradespersonId == uid()
-        || isAdmin()
-      );
+        && request.resource.data.status == 'requested'
+        && request.resource.data.tradespersonId is string
+        && request.resource.data.privateNotes == '';
+      // Updates: identity + creation fields immutable. Status transitions are
+      // permitted but the doc cannot be reassigned to a different client/tradie/chat.
+      allow update: if isSignedIn()
+        && (resource.data.clientId == uid()
+            || resource.data.tradespersonId == uid()
+            || isAdmin())
+        && request.resource.data.clientId == resource.data.clientId
+        && request.resource.data.tradespersonId == resource.data.tradespersonId
+        && request.resource.data.chatId == resource.data.chatId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.trade == resource.data.trade
+        && (
+          // Tradie can edit privateNotes; client must not touch them.
+          resource.data.tradespersonId == uid()
+          || isAdmin()
+          || request.resource.data.privateNotes == resource.data.privateNotes
+        );
       allow delete: if isAdmin();
     }
 
     // ---------- chats ----------
     match /chats/{chatId} {
-      allow read, update: if isSignedIn() && (
+      allow read: if isSignedIn() && (
         resource.data.clientId == uid()
         || resource.data.tradespersonId == uid()
         || isAdmin()
       );
+      // Identity fields locked post-create so a party can't boot the other side.
+      allow update: if isSignedIn()
+        && (resource.data.clientId == uid()
+            || resource.data.tradespersonId == uid()
+            || isAdmin())
+        && request.resource.data.clientId == resource.data.clientId
+        && request.resource.data.tradespersonId == resource.data.tradespersonId
+        && request.resource.data.jobId == resource.data.jobId;
       allow create: if isSignedIn()
         && (request.resource.data.clientId == uid()
             || request.resource.data.tradespersonId == uid());
@@ -130,6 +188,9 @@ service cloud.firestore {
         );
         allow create: if isSignedIn()
           && request.resource.data.senderId == uid()
+          && request.resource.data.type in ['text', 'photo']
+          && request.resource.data.text is string
+          && request.resource.data.text.size() <= 5000
           && (
             get(/databases/$(database)/documents/chats/$(chatId)).data.clientId == uid()
             || get(/databases/$(database)/documents/chats/$(chatId)).data.tradespersonId == uid()
@@ -141,19 +202,41 @@ service cloud.firestore {
 
     // ---------- public reviews (client -> tradie) ----------
     match /reviews/{reviewId} {
-      allow read: if true;
+      // Hide flagged/hidden moderated reviews from the public; surface to parties + admin.
+      allow read: if resource.data.status == 'active'
+                  || isAdmin()
+                  || (isSignedIn() && (
+                       resource.data.clientId == uid()
+                       || resource.data.tradespersonId == uid()
+                     ));
       allow create: if isClient()
         && request.resource.data.clientId == uid()
-        && request.resource.data.status == 'active';
+        && request.resource.data.status == 'active'
+        && request.resource.data.rating is int
+        && request.resource.data.rating >= 1
+        && request.resource.data.rating <= 5
+        && exists(/databases/$(database)/documents/jobs/$(request.resource.data.jobId))
+        && jobDoc(request.resource.data.jobId).data.clientId == uid()
+        && jobDoc(request.resource.data.jobId).data.tradespersonId == request.resource.data.tradespersonId
+        && jobDoc(request.resource.data.jobId).data.status in ['complete', 'reviewed'];
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     // ---------- private client reviews (tradie -> client) ----------
     match /clientReviews/{reviewId} {
-      allow read: if isTradie() || isAdmin();
+      // Authoring tradie or admin can read; broader tradesperson access is gated
+      // by future "have you worked with this client" lookup once denormalization lands.
+      allow read: if isAdmin() || (isTradie() && resource.data.tradespersonId == uid());
       allow create: if isTradie()
-        && request.resource.data.tradespersonId == uid();
+        && request.resource.data.tradespersonId == uid()
+        && request.resource.data.rating is int
+        && request.resource.data.rating >= 1
+        && request.resource.data.rating <= 5
+        && exists(/databases/$(database)/documents/jobs/$(request.resource.data.jobId))
+        && jobDoc(request.resource.data.jobId).data.tradespersonId == uid()
+        && jobDoc(request.resource.data.jobId).data.clientId == request.resource.data.clientId
+        && jobDoc(request.resource.data.jobId).data.status in ['complete', 'reviewed'];
       allow update, delete: if isAdmin();
     }
 
@@ -162,8 +245,12 @@ service cloud.firestore {
       allow read: if isSignedIn() && (
         resource.data.tradespersonId == uid() || isAdmin()
       );
-      allow create, update, delete: if isSignedIn()
+      allow create: if isTradie()
         && request.resource.data.tradespersonId == uid();
+      allow update: if isTradie()
+        && resource.data.tradespersonId == uid()
+        && request.resource.data.tradespersonId == resource.data.tradespersonId;
+      allow delete: if isTradie() && resource.data.tradespersonId == uid();
     }
 
     // ---------- invoices ----------
@@ -173,22 +260,34 @@ service cloud.firestore {
         || resource.data.tradespersonId == uid()
         || isAdmin()
       );
-      allow create, update: if isSignedIn() && (
-        request.resource.data.tradespersonId == uid() || isAdmin()
-      );
+      // Tradies can draft invoices for jobs they were assigned to. The number
+      // and identity fields are immutable post-create. Status transitions to
+      // "sent"/"paid" go through the Cloud Function path.
+      allow create: if isTradie()
+        && request.resource.data.tradespersonId == uid()
+        && request.resource.data.status == 'draft'
+        && request.resource.data.paidAt == null;
+      allow update: if isSignedIn()
+        && resource.data.tradespersonId == uid()
+        && request.resource.data.invoiceNumber == resource.data.invoiceNumber
+        && request.resource.data.tradespersonId == resource.data.tradespersonId
+        && request.resource.data.clientId == resource.data.clientId
+        && request.resource.data.jobId == resource.data.jobId
+        && resource.data.status != 'paid';
+      allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     // ---------- ai usage (write via Cloud Function; admin/owner read) ----------
     match /aiUsage/{usageId} {
       allow read: if isAdmin() || (isSignedIn() && resource.data.userId == uid());
-      allow write: if false;
+      allow create, update, delete: if false;
     }
 
     // ---------- audit log (write via Cloud Function; admin read only) ----------
     match /auditLog/{entryId} {
       allow read: if isAdmin();
-      allow write: if false;
+      allow create, update, delete: if false;
     }
 
     // ---------- mail (Firebase Trigger Email extension; server-only) ----------
@@ -199,7 +298,7 @@ service cloud.firestore {
     // ---------- canonical static data (trades list, etc.) ----------
     match /catalog/{docId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow create, update, delete: if isAdmin();
     }
   }
 }
