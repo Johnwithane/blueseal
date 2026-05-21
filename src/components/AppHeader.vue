@@ -1,36 +1,74 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import Button from "primevue/button";
 import Menu from "primevue/menu";
-import { ref } from "vue";
 import { useAuthStore } from "@/stores/auth";
+import { useToast } from "@/composables/useToast";
+import { humanizeError } from "@/utils/errors";
 
 const auth = useAuthStore();
 const router = useRouter();
+const toast = useToast();
 const menu = ref<InstanceType<typeof Menu> | null>(null);
 
-const items = computed(() => [
-  {
-    label: "Dashboard",
-    icon: "pi pi-home",
-    command: () => router.push({ name: "Dashboard" }),
-  },
-  {
-    label: "Account",
-    icon: "pi pi-user",
-    command: () => router.push({ name: "Account" }),
-  },
-  { separator: true },
-  {
-    label: "Sign out",
-    icon: "pi pi-sign-out",
-    command: async () => {
-      await auth.signOut();
-      router.push({ name: "Home" });
+async function switchTo(role: "client" | "tradesperson") {
+  try {
+    await auth.switchActiveRole(role);
+    toast.success(role === "tradesperson" ? "Switched to Tradesperson view" : "Switched to Client view");
+    router.push({ name: "Dashboard" });
+  } catch (e) {
+    toast.error(humanizeError(e));
+  }
+}
+
+const items = computed(() => {
+  const list: Record<string, unknown>[] = [
+    {
+      label: "Dashboard",
+      icon: "pi pi-home",
+      command: () => router.push({ name: "Dashboard" }),
     },
-  },
-]);
+    {
+      label: "Account",
+      icon: "pi pi-user",
+      command: () => router.push({ name: "Account" }),
+    },
+  ];
+
+  // Airbnb-style role switcher — only appears once the user actually holds
+  // both public roles. A separator above + below visually anchors it.
+  if (auth.canSwitchRole) {
+    list.push({ separator: true });
+    if (auth.activeRole !== "client") {
+      list.push({
+        label: "Switch to Client view",
+        icon: "pi pi-user",
+        command: () => switchTo("client"),
+      });
+    }
+    if (auth.activeRole !== "tradesperson") {
+      list.push({
+        label: "Switch to Tradesperson view",
+        icon: "pi pi-wrench",
+        command: () => switchTo("tradesperson"),
+      });
+    }
+  }
+
+  list.push(
+    { separator: true },
+    {
+      label: "Sign out",
+      icon: "pi pi-sign-out",
+      command: async () => {
+        await auth.signOut();
+        router.push({ name: "Home" });
+      },
+    },
+  );
+  return list;
+});
 
 function openMenu(e: Event) {
   menu.value?.toggle(e);

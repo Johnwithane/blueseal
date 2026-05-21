@@ -73,7 +73,7 @@ let unsubMyApp: (() => void) | null = null;
 const isClient = computed(
   () => post.value && auth.fbUser?.uid === post.value.clientId,
 );
-const isTradie = computed(() => auth.role === "tradesperson");
+const isTradie = computed(() => auth.activeRole === "tradesperson");
 
 onMounted(async () => {
   if (!postId.value) return;

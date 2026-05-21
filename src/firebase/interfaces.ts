@@ -8,7 +8,13 @@ export type WithId<T> = T & { id: string };
 // users/{uid}
 // ---------------------------------------------------------------------------
 export interface UserDoc {
-  role: Role;
+  // A user can hold both "client" and "tradesperson" roles ("admin" is layered
+  // on top via setAdminRole and is never user-self-selected). `roles` is the
+  // authoritative list; `activeRole` is the current view-mode (Airbnb-style).
+  // Server-side: rules + callables read `roles`. UI: read `activeRole` for
+  // what to render.
+  roles: Role[];
+  activeRole: Role;
   displayName: string;
   email: string;
   photoURL: string | null;

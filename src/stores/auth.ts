@@ -12,14 +12,25 @@ import {
   type User,
 } from "firebase/auth";
 import { auth } from "@/firebase/config";
-import { createUser, getUser } from "@/firebase/services/users";
+import {
+  addRoleToSelf as callAddRoleToSelf,
+  createUser,
+  getUser,
+  setActiveRole as writeActiveRole,
+} from "@/firebase/services/users";
 import type { Role, UserDoc, WithId } from "@/firebase/interfaces";
 import { LEGAL_VERSION } from "@/legal/version";
 
 interface State {
   fbUser: User | null;
   user: WithId<UserDoc> | null;
-  role: Role | null;
+  // Every role the user holds. Authoritative source for "can this user
+  // access X?" checks; comes from the `roles` custom claim, falling back to
+  // the user doc, falling back to the legacy singular `role` claim.
+  roles: Role[];
+  // Current view-mode. The UI renders this perspective; it can be any role
+  // in `roles`. Persisted on the user doc so it stays consistent across devices.
+  activeRole: Role | null;
   ready: boolean;
   pending: boolean;
   error: string | null;
@@ -27,11 +38,30 @@ interface State {
 
 let unsubscribe: (() => void) | null = null;
 
+/**
+ * Normalize a claim value into a Role[] regardless of which shape it arrives in.
+ * Accepts the new `roles: string[]` claim and the legacy singular `role: string`.
+ */
+function rolesFromClaims(claims: Record<string, unknown>): Role[] {
+  const raw = claims.roles;
+  if (Array.isArray(raw)) {
+    return raw.filter(
+      (r): r is Role => r === "client" || r === "tradesperson" || r === "admin",
+    );
+  }
+  const legacy = claims.role;
+  if (legacy === "client" || legacy === "tradesperson" || legacy === "admin") {
+    return [legacy];
+  }
+  return [];
+}
+
 export const useAuthStore = defineStore("auth", {
   state: (): State => ({
     fbUser: null,
     user: null,
-    role: null,
+    roles: [],
+    activeRole: null,
     ready: false,
     pending: false,
     error: null,
@@ -39,9 +69,18 @@ export const useAuthStore = defineStore("auth", {
 
   getters: {
     isAuthenticated: (s) => !!s.fbUser,
-    isClient: (s) => s.role === "client",
-    isTradie: (s) => s.role === "tradesperson",
-    isAdmin: (s) => s.role === "admin",
+    // "Currently viewing as X" — drives which dashboard / CTAs render.
+    isClient: (s) => s.activeRole === "client",
+    isTradie: (s) => s.activeRole === "tradesperson",
+    isAdmin: (s) => s.activeRole === "admin" || s.roles.includes("admin"),
+    // "Has the X role at all" — drives whether to offer a role switcher or
+    // whether to upsell adding the role.
+    hasClientRole: (s) => s.roles.includes("client"),
+    hasTradieRole: (s) => s.roles.includes("tradesperson"),
+    // True when the user can flip between client and tradesperson views.
+    // Admin is layered on top and uses its own route, so it doesn't count.
+    canSwitchRole: (s) =>
+      s.roles.includes("client") && s.roles.includes("tradesperson"),
   },
 
   actions: {
@@ -52,13 +91,21 @@ export const useAuthStore = defineStore("auth", {
           this.fbUser = fbUser;
           if (fbUser) {
             const tokenResult = await fbUser.getIdTokenResult();
-            const claimRole = tokenResult.claims.role as Role | undefined;
+            const claimRoles = rolesFromClaims(
+              tokenResult.claims as Record<string, unknown>,
+            );
             const doc = await getUser(fbUser.uid);
             this.user = doc;
-            this.role = claimRole ?? doc?.role ?? null;
+            // Doc is authoritative for `roles` (claims can lag), but claims
+            // are checked first so a fresh signup before the doc shim runs
+            // still reports something useful.
+            this.roles = doc?.roles?.length ? doc.roles : claimRoles;
+            this.activeRole =
+              doc?.activeRole ?? this.roles[0] ?? null;
           } else {
             this.user = null;
-            this.role = null;
+            this.roles = [];
+            this.activeRole = null;
           }
           this.ready = true;
           resolve();
@@ -84,11 +131,12 @@ export const useAuthStore = defineStore("auth", {
           role: opts.role,
           termsAcceptedVersion: LEGAL_VERSION,
         });
-        // Cloud Function `setRoleOnSignup` mirrors role to a custom claim;
+        // Cloud Function `setRoleOnSignup` mirrors roles to a custom claim;
         // force a token refresh so the claim is visible right away.
         await cred.user.getIdToken(true);
         await sendEmailVerification(cred.user).catch(() => {});
-        this.role = opts.role;
+        this.roles = [opts.role];
+        this.activeRole = opts.role;
       } catch (e) {
         this.error = (e as Error).message;
         throw e;
@@ -126,6 +174,8 @@ export const useAuthStore = defineStore("auth", {
             termsAcceptedVersion: LEGAL_VERSION,
           });
           await cred.user.getIdToken(true);
+          this.roles = [intendedRole];
+          this.activeRole = intendedRole;
         }
       } catch (e) {
         this.error = (e as Error).message;
@@ -154,7 +204,46 @@ export const useAuthStore = defineStore("auth", {
     async refreshClaims() {
       if (!this.fbUser) return;
       const tokenResult = await this.fbUser.getIdTokenResult(true);
-      this.role = (tokenResult.claims.role as Role | undefined) ?? this.role;
+      const next = rolesFromClaims(tokenResult.claims as Record<string, unknown>);
+      if (next.length > 0) this.roles = next;
+    },
+
+    /**
+     * Adds the other public role (client ⇄ tradesperson) to the current user.
+     * Calls the `addRoleToSelf` callable which provisions a draft tradie doc
+     * when needed and updates the custom claims. Sets activeRole to the
+     * newly-added role so the UI flips into the new view immediately.
+     */
+    async addRole(role: Exclude<Role, "admin">) {
+      if (!this.fbUser) throw new Error("Sign-in required");
+      if (this.roles.includes(role)) {
+        this.activeRole = role;
+        return;
+      }
+      const result = await callAddRoleToSelf(role);
+      // Refresh the token so the new `roles` claim is visible to rules
+      // immediately (otherwise the next Firestore write would still see the
+      // old claim until the next normal refresh, ~1h).
+      await this.fbUser.getIdToken(true);
+      this.roles = result.roles;
+      this.activeRole = result.activeRole;
+      // Re-read the user doc so any server-side fields stay in sync.
+      this.user = await getUser(this.fbUser.uid);
+    },
+
+    /**
+     * Flips the active view-mode. Only succeeds if the user already holds the
+     * target role — call addRole() first if they don't.
+     */
+    async switchActiveRole(role: Role) {
+      if (!this.fbUser) return;
+      if (!this.roles.includes(role)) {
+        throw new Error(`Cannot switch to ${role}: role not held.`);
+      }
+      if (this.activeRole === role) return;
+      await writeActiveRole(this.fbUser.uid, role);
+      this.activeRole = role;
+      if (this.user) this.user.activeRole = role;
     },
   },
 });

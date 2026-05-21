@@ -1,18 +1,26 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
 import { updateProfile } from "firebase/auth";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import Message from "primevue/message";
 import Avatar from "primevue/avatar";
 import { useAuthStore } from "@/stores/auth";
-import { getUser, updateUserProfile, updateUserPhoto } from "@/firebase/services/users";
+import {
+  getUser,
+  grantAllRolesForAdminTesting,
+  updateUserProfile,
+  updateUserPhoto,
+} from "@/firebase/services/users";
 import { uploadFile, makeStoragePath } from "@/firebase/services/storage";
 import { compressToWebp } from "@/utils/image";
 import { useToast } from "@/composables/useToast";
 import { useFormatters } from "@/composables/useFormatters";
+import { humanizeError } from "@/utils/errors";
 
 const auth = useAuthStore();
+const router = useRouter();
 const toast = useToast();
 const { date } = useFormatters();
 
@@ -20,11 +28,13 @@ const displayName = ref("");
 const phone = ref("");
 const photoURL = ref<string | null>(null);
 const email = ref("");
-const role = ref("");
 const createdAt = ref<{ toDate(): Date } | null>(null);
 const saving = ref(false);
 const uploading = ref(false);
 const sendingReset = ref(false);
+const addingTradie = ref(false);
+const addingClient = ref(false);
+const grantingAdminAllRoles = ref(false);
 const error = ref<string | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
 
@@ -36,7 +46,6 @@ onMounted(async () => {
   phone.value = u.phone ?? "";
   photoURL.value = u.photoURL;
   email.value = u.email;
-  role.value = u.role;
   createdAt.value = u.createdAt;
 });
 
@@ -110,6 +119,69 @@ async function sendPasswordReset() {
     error.value = (e as Error).message;
   } finally {
     sendingReset.value = false;
+  }
+}
+
+const ROLE_LABEL: Record<string, string> = {
+  client: "Client",
+  tradesperson: "Tradesperson",
+  admin: "Admin",
+};
+
+async function becomeTradesperson() {
+  addingTradie.value = true;
+  error.value = null;
+  try {
+    await auth.addRole("tradesperson");
+    toast.success("Tradesperson profile created — let's get you set up.");
+    router.push("/onboarding");
+  } catch (e) {
+    error.value = humanizeError(e);
+  } finally {
+    addingTradie.value = false;
+  }
+}
+
+async function addClientView() {
+  addingClient.value = true;
+  error.value = null;
+  try {
+    await auth.addRole("client");
+    toast.success("Client view enabled.");
+  } catch (e) {
+    error.value = humanizeError(e);
+  } finally {
+    addingClient.value = false;
+  }
+}
+
+async function switchView(role: "client" | "tradesperson") {
+  try {
+    await auth.switchActiveRole(role);
+    toast.success(`Switched to ${ROLE_LABEL[role]} view`);
+    router.push("/dashboard");
+  } catch (e) {
+    error.value = humanizeError(e);
+  }
+}
+
+async function grantAdminAllRoles() {
+  grantingAdminAllRoles.value = true;
+  error.value = null;
+  try {
+    await grantAllRolesForAdminTesting();
+    // Refresh the token so the new roles claim is visible to rules; then
+    // refresh local state by re-running the auth store init pathway.
+    await auth.fbUser?.getIdToken(true);
+    await auth.refreshClaims();
+    if (auth.fbUser) auth.user = await getUser(auth.fbUser.uid);
+    auth.roles = auth.user?.roles ?? auth.roles;
+    auth.activeRole = auth.user?.activeRole ?? auth.activeRole;
+    toast.success("All roles enabled for testing — try switching views!");
+  } catch (e) {
+    error.value = humanizeError(e);
+  } finally {
+    grantingAdminAllRoles.value = false;
   }
 }
 </script>
@@ -200,8 +272,112 @@ async function sendPasswordReset() {
       </div>
     </div>
 
+    <div class="bs-card mt-4 p-5">
+      <h2 class="text-lg font-semibold">Your roles</h2>
+      <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
+        You can hold both views on one account. Switch between them anytime.
+      </p>
+
+      <ul class="mt-3 space-y-2">
+        <li
+          v-for="r in auth.roles"
+          :key="r"
+          class="flex items-center justify-between rounded-lg border border-[color:var(--bs-border)] px-3 py-2"
+        >
+          <span class="flex items-center gap-2 text-sm font-medium">
+            <i
+              :class="r === 'tradesperson' ? 'pi pi-wrench' : r === 'admin' ? 'pi pi-shield' : 'pi pi-user'"
+            ></i>
+            {{ ROLE_LABEL[r] }}
+            <span
+              v-if="auth.activeRole === r"
+              class="ml-1 rounded-full bg-[color:var(--bs-blue-light)] px-2 py-0.5 text-xs text-[color:var(--bs-blue-dark)]"
+            >
+              Active
+            </span>
+          </span>
+          <Button
+            v-if="auth.activeRole !== r && r !== 'admin'"
+            label="Switch to this view"
+            size="small"
+            text
+            @click="switchView(r as 'client' | 'tradesperson')"
+          />
+        </li>
+      </ul>
+
+      <div v-if="!auth.hasTradieRole" class="mt-4 rounded-lg bg-[color:var(--bs-surface-alt)] p-4">
+        <div class="flex items-start gap-3">
+          <i class="pi pi-verified text-2xl text-[color:var(--bs-blue)]"></i>
+          <div class="flex-1">
+            <h3 class="font-semibold">Become a tradesperson</h3>
+            <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
+              Add a verified tradesperson profile to your account. You'll need
+              to upload a trade certification and government-issued ID for our
+              vetting team to review.
+            </p>
+            <div class="mt-3">
+              <Button
+                label="Get started"
+                icon="pi pi-arrow-right"
+                icon-pos="right"
+                :loading="addingTradie"
+                @click="becomeTradesperson"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="!auth.hasClientRole" class="mt-4 rounded-lg bg-[color:var(--bs-surface-alt)] p-4">
+        <div class="flex items-start gap-3">
+          <i class="pi pi-user-plus text-2xl text-[color:var(--bs-blue)]"></i>
+          <div class="flex-1">
+            <h3 class="font-semibold">Hire a tradesperson too</h3>
+            <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
+              Need work done at your own place? Add a client view to request
+              quotes and chat with verified tradespeople.
+            </p>
+            <div class="mt-3">
+              <Button
+                label="Add client view"
+                icon="pi pi-plus"
+                outlined
+                :loading="addingClient"
+                @click="addClientView"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div
+        v-if="auth.isAdmin && !(auth.hasClientRole && auth.hasTradieRole)"
+        class="mt-4 rounded-lg border border-dashed border-[color:var(--bs-border)] p-4"
+      >
+        <div class="flex items-start gap-3">
+          <i class="pi pi-shield text-2xl text-[color:var(--bs-blue)]"></i>
+          <div class="flex-1">
+            <h3 class="font-semibold">Admin testing</h3>
+            <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
+              Grant yourself all three roles and a visible tradesperson profile
+              so you can dogfood the full client + tradesperson surface
+              (post jobs, browse the marketplace, submit applications).
+            </p>
+            <div class="mt-3">
+              <Button
+                label="Enable all roles for testing"
+                icon="pi pi-bolt"
+                :loading="grantingAdminAllRoles"
+                @click="grantAdminAllRoles"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="bs-card mt-4 p-5 text-sm text-[color:var(--bs-muted)]">
-      <div><strong>Role:</strong> {{ role }}</div>
       <div><strong>Member since:</strong> {{ date(createdAt) }}</div>
       <div class="mt-2 break-all"><strong>UID:</strong> <code>{{ auth.fbUser?.uid }}</code></div>
     </div>

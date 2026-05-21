@@ -834,7 +834,7 @@ Setup is fully covered in `TECH_STACK_SETUP.md`. Below is the product build sequ
 1. **Launch region?** — affects which trades licensing bodies to reference, default currency, tax setup, geohash precision tuning. Working assumption: BC (Okanagan / Vancouver Island) first.
 2. **AI subscription price?** — affects monetization model and how aggressively to push AI in onboarding. Suggest $39 CAD/mo to start.
 3. **Phone verification at signup?** — adds friction but reduces spam. MVP suggestion: optional for clients, required for tradies.
-4. **One account or separate for dual-role users?** — tradies are often also homeowners. Working assumption: one Firebase Auth user can have either `client` or `tradesperson` role, not both. Dual-role users create a second account.
+4. ~~**One account or separate for dual-role users?** — tradies are often also homeowners. Working assumption: one Firebase Auth user can have either `client` or `tradesperson` role, not both. Dual-role users create a second account.~~ **Resolved (2026-05-21):** one account holds both roles (Airbnb-style). `UserDoc.roles: Role[]` + `activeRole`; custom claim becomes `roles: string[]`. Adding `tradesperson` to an existing client still goes through cert + ID vetting (same gate as fresh tradie signup). Role switcher lives in the header menu; "Become a tradesperson" / "Add client view" CTAs live on `/account`. Implemented via `addRoleToSelf` callable + `setActiveRole` direct doc write.
 5. **Trade-licensing source of truth?** — issuing bodies vary by province. MVP: free-text issuing body + admin verifies against the cert image. Future: structured list per region.
 
 These should be answered before phase 2 to avoid rework.

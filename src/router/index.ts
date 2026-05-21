@@ -160,9 +160,17 @@ router.beforeEach(async (to) => {
   if (requiresAuth && !auth.isAuthenticated) {
     return { name: "SignIn", query: { redirect: to.fullPath } };
   }
-  if (requiresAuth && requiredRole !== "any" && auth.role !== requiredRole) {
-    // Wrong role — bounce to their own dashboard entry.
-    return { name: "Dashboard" };
+  if (requiresAuth && requiredRole !== "any") {
+    // Multi-role: gate on "do you have this role at all?", not "is it active?".
+    // If the user holds the role but is currently viewing as a different one,
+    // flip the active role automatically so the page they navigated to renders
+    // in the right context (Airbnb-style auto-switch).
+    if (!auth.roles.includes(requiredRole as Role)) {
+      return { name: "Dashboard" };
+    }
+    if (auth.activeRole !== requiredRole) {
+      await auth.switchActiveRole(requiredRole as Role).catch(() => {});
+    }
   }
 });
 

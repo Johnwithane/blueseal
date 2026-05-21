@@ -5,7 +5,14 @@ service firebase.storage {
 
     function isSignedIn() { return request.auth != null; }
     function uid() { return request.auth.uid; }
-    function isAdmin() { return isSignedIn() && request.auth.token.role == 'admin'; }
+    // Multi-role-aware: accepts both `token.roles` (new array claim) and
+    // legacy `token.role` so tokens issued before the cutover keep working.
+    function isAdmin() {
+      return isSignedIn() && (
+        (request.auth.token.roles is list && 'admin' in request.auth.token.roles)
+        || request.auth.token.role == 'admin'
+      );
+    }
     function isOwner(ownerId) { return isSignedIn() && uid() == ownerId; }
     function smallSizeOk() { return request.resource.size < 4 * 1024 * 1024; }
     function docSizeOk()   { return request.resource.size < 10 * 1024 * 1024; }

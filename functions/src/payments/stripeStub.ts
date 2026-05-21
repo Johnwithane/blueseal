@@ -58,8 +58,15 @@ export const adminToggleSubscription = onCall({ enforceAppCheck: false }, async 
 
   const targetSnap = await db.doc(`users/${targetUid}`).get();
   if (!targetSnap.exists) throw new HttpsError("not-found", "Target user not found.");
-  const target = targetSnap.data() as { role?: string } | undefined;
-  if (target?.role !== "tradesperson") {
+  const target = targetSnap.data() as
+    | { roles?: unknown; role?: unknown }
+    | undefined;
+  const targetRoles = Array.isArray(target?.roles)
+    ? (target!.roles as unknown[]).filter((r): r is string => typeof r === "string")
+    : typeof target?.role === "string"
+      ? [target.role]
+      : [];
+  if (!targetRoles.includes("tradesperson")) {
     throw new HttpsError(
       "failed-precondition",
       "Subscription only applies to tradespeople.",

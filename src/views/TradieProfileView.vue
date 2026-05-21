@@ -55,7 +55,7 @@ onMounted(async () => {
             </div>
           </div>
           <RouterLink
-            v-if="auth.isAuthenticated && auth.role === 'client'"
+            v-if="auth.isAuthenticated && auth.hasClientRole"
             :to="{ name: 'RequestQuote', params: { uid: tradie.id } }"
           >
             <Button label="Request a quote" icon="pi pi-send" />

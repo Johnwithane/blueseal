@@ -5,6 +5,8 @@ setGlobalOptions({ region: "us-central1", maxInstances: 10 });
 // Auth & roles
 export { setRoleOnSignup } from "./auth/setRoleOnSignup";
 export { setAdminRole } from "./auth/setAdminRole";
+export { addRoleToSelf } from "./auth/addRoleToSelf";
+export { grantAllRolesForAdminTesting } from "./auth/grantAllRolesForAdminTesting";
 
 // Vetting
 export { submitForVetting } from "./vetting/submitForVetting";
