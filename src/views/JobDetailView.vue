@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useRoute, RouterLink } from "vue-router";
+import { useRoute, useRouter, RouterLink } from "vue-router";
 import Button from "primevue/button";
 import Tag from "primevue/tag";
 import DatePicker from "primevue/datepicker";
@@ -11,7 +11,10 @@ import {
   scheduleJob,
   updateJobStatus,
   updatePrivateNotes,
+  saveJobIntakeAndAdvance,
 } from "@/firebase/services/jobs";
+import { returnToApplicants } from "@/firebase/services/jobPosts";
+import { useConfirm } from "primevue/useconfirm";
 import { getInvoiceByJobId } from "@/firebase/services/invoices";
 import { useAuthStore } from "@/stores/auth";
 import type { JobDoc, JobStatus, WithId } from "@/firebase/interfaces";
@@ -29,8 +32,10 @@ import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 
 const route = useRoute();
+const router = useRouter();
 const auth = useAuthStore();
 const toast = useToast();
+const confirmDialog = useConfirm();
 const { date, dateTime } = useFormatters();
 
 const job = ref<WithId<JobDoc> | null>(null);
@@ -43,7 +48,14 @@ const scheduledStart = ref<Date | null>(null);
 const scheduledEnd = ref<Date | null>(null);
 const privateNotes = ref("");
 
+// Marketplace-originated jobs land in status="accepted". The client completes
+// the trade intake here before the standard flow begins.
+const intakeDraft = ref<Record<string, unknown>>({});
+const savingIntake = ref(false);
+const returningToApplicants = ref(false);
+
 const statusOptions: { label: string; value: JobStatus }[] = [
+  { label: "Accepted", value: "accepted" },
   { label: "Requested", value: "requested" },
   { label: "Quoted", value: "quoted" },
   { label: "Scheduled", value: "scheduled" },
@@ -76,6 +88,10 @@ async function load() {
   scheduledStart.value = job.value.scheduledStart?.toDate() ?? null;
   scheduledEnd.value = job.value.scheduledEnd?.toDate() ?? null;
   privateNotes.value = job.value.privateNotes ?? "";
+  // Start the intake draft from whatever's already on the doc — empty {} on
+  // marketplace-originated jobs, possibly populated if the client has been
+  // editing in another tab.
+  intakeDraft.value = { ...(job.value.intakeFormData ?? {}) };
 
   // Only the tradie needs subscription state (AI tools are tradie-only).
   // Clients have no reason to read the tradie's user doc.
@@ -125,6 +141,58 @@ async function saveNotes() {
   }
 }
 
+async function submitBrief() {
+  if (!job.value || savingIntake.value) return;
+  // Soft check required intake fields client-side; server-side enforcement
+  // would be a nice follow-up but isn't load-bearing here (client owns the
+  // job and the doc rules already restrict who can update).
+  for (const f of intakeFields.value) {
+    if (f.required) {
+      const v = intakeDraft.value[f.key];
+      if (v === undefined || v === null || v === "") {
+        toast.error("Missing required field", `Please fill: ${f.label}`);
+        return;
+      }
+    }
+  }
+  savingIntake.value = true;
+  try {
+    await saveJobIntakeAndAdvance(job.value.id, intakeDraft.value);
+    toast.success("Brief sent", "The tradesperson can now prepare a quote.");
+    await load();
+  } catch (e) {
+    toast.error("Couldn't save brief", humanizeError(e));
+  } finally {
+    savingIntake.value = false;
+  }
+}
+
+function onReturnToApplicants() {
+  if (!job.value?.sourcePostId) return;
+  const postId = job.value.sourcePostId;
+  confirmDialog.require({
+    message:
+      "Return to your applicants? This cancels the current job and reopens your post so you can pick again. " +
+      "Rejected applicants will stay rejected.",
+    header: "Return to applicants?",
+    icon: "pi pi-undo",
+    acceptLabel: "Yes, return",
+    rejectLabel: "Cancel",
+    accept: async () => {
+      returningToApplicants.value = true;
+      try {
+        await returnToApplicants(postId);
+        toast.success("Returned to applicants");
+        router.push({ name: "JobPostDetail", params: { postId } });
+      } catch (e) {
+        toast.error("Couldn't return", humanizeError(e));
+      } finally {
+        returningToApplicants.value = false;
+      }
+    },
+  });
+}
+
 const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "secondary"> = {
   accepted: "info",
   requested: "info",
@@ -155,6 +223,54 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
         <Tag :value="job.status" :severity="statusColor[job.status]" />
       </header>
 
+      <!-- ACCEPTED-STATUS BANNERS -->
+      <div
+        v-if="job.status === 'accepted' && isClient"
+        class="bs-card p-4 mb-4 border-l-4 border-l-[color:var(--bs-blue)]"
+      >
+        <div class="flex items-start gap-3">
+          <i class="pi pi-info-circle text-[color:var(--bs-blue)] text-lg mt-0.5"></i>
+          <div class="flex-1">
+            <div class="font-semibold">Complete the brief so they can quote</div>
+            <p class="text-sm text-[color:var(--bs-muted)] mt-1">
+              Fill in the trade-specific details below and submit. The tradesperson can already see your original post and chat with you.
+            </p>
+            <RouterLink
+              v-if="job.sourcePostId"
+              :to="{ name: 'JobPostDetail', params: { postId: job.sourcePostId } }"
+              class="text-xs text-[color:var(--bs-muted)] underline mt-2 inline-block"
+            >
+              Changed your mind? You can return to your applicants until you complete the brief.
+            </RouterLink>
+            <Button
+              v-if="job.sourcePostId"
+              label="Return to applicants"
+              icon="pi pi-undo"
+              text
+              size="small"
+              class="ml-2"
+              :loading="returningToApplicants"
+              @click="onReturnToApplicants"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div
+        v-else-if="job.status === 'accepted' && isTradie"
+        class="bs-card p-4 mb-4 border-l-4 border-l-[color:var(--bs-blue-light)]"
+      >
+        <div class="flex items-start gap-3">
+          <i class="pi pi-clock text-[color:var(--bs-blue)] text-lg mt-0.5"></i>
+          <div>
+            <div class="font-semibold">Awaiting client details</div>
+            <p class="text-sm text-[color:var(--bs-muted)] mt-1">
+              The client is filling in the trade-specific brief. You can introduce yourself in chat in the meantime — they'll see your message.
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div class="grid lg:grid-cols-3 gap-4">
         <div class="lg:col-span-2 space-y-4">
           <ChatThread :chat-id="job.chatId" />
@@ -169,12 +285,28 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
             </div>
             <div v-if="intakeFields.length" class="mt-4">
               <h4 class="font-medium text-sm mb-2">Trade-specific details</h4>
+              <!-- Editable for the client when job is in 'accepted' status
+                   (the marketplace flow's intake step); read-only otherwise. -->
               <IntakeFormRenderer
+                v-if="isClient && job.status === 'accepted'"
+                v-model="intakeDraft"
+                :fields="intakeFields"
+              />
+              <IntakeFormRenderer
+                v-else
                 :model-value="job.intakeFormData"
                 :fields="intakeFields"
                 readonly
                 @update:model-value="() => {}"
               />
+              <div v-if="isClient && job.status === 'accepted'" class="mt-3">
+                <Button
+                  label="Submit brief"
+                  icon="pi pi-send"
+                  :loading="savingIntake"
+                  @click="submitBrief"
+                />
+              </div>
             </div>
           </div>
 

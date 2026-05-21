@@ -101,6 +101,19 @@ export async function updateJobIntakePhotos(id: string, photos: string[]): Promi
   await updateDoc(doc(db, "jobs", id), { intakePhotos: photos });
 }
 
+// Marketplace-originated jobs enter the system in status="accepted" with an
+// empty intakeFormData. Once the client fills the trade-specific intake, we
+// write it and advance to "requested" so the standard flow takes over.
+export async function saveJobIntakeAndAdvance(
+  id: string,
+  intakeFormData: Record<string, unknown>,
+): Promise<void> {
+  await updateDoc(doc(db, "jobs", id), {
+    intakeFormData,
+    status: "requested",
+  });
+}
+
 // Subscribe to all jobs for a tradesperson (kanban + calendar feed).
 export function subscribeTradieJobs(
   tradieUid: string,

@@ -20,6 +20,7 @@ interface Column {
 }
 
 const columns: Column[] = [
+  { key: "accepted", label: "Accepted (awaiting brief)", color: "#a0d6f1" },
   { key: "requested", label: "Inbox", color: "#0ea5e9" },
   { key: "quoted", label: "Quoted", color: "#f59e0b" },
   { key: "scheduled", label: "Scheduled", color: "#16a34a" },
