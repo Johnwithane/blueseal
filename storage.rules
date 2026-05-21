@@ -71,15 +71,14 @@ service firebase.storage {
 
     // Job-post photos — uploaded before the post doc exists (client picks a
     // temp uuid client-side), so we can't gate writes on Firestore parties.
-    // Any signed-in client can write; reads are open to any signed-in user
-    // because the Firestore post-read rules are the discovery gate (a tradie
-    // can't enumerate paths without first reading the post). WebP only.
+    // Any signed-in user can write WebP; the createJobPost callable is the
+    // actual role gate (client-only) — checking role here too is brittle
+    // because the role custom claim isn't always present yet on a freshly-
+    // issued token (race with setRoleOnSignup). Reads stay open to any
+    // signed-in user; the Firestore post-read rules gate discovery.
     match /jobPosts/{postId}/photos/{file=**} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn()
-        && request.auth.token.role == 'client'
-        && smallSizeOk()
-        && isWebp();
+      allow write: if isSignedIn() && smallSizeOk() && isWebp();
     }
 
     // Chat photo attachments — parties of the chat + admin.
