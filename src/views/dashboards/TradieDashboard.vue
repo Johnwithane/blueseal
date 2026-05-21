@@ -61,14 +61,24 @@ const banner = computed(() => {
 
 <template>
   <section class="bs-container py-6">
-    <div class="flex items-start justify-between gap-4 mb-4">
+    <div class="flex items-start justify-between gap-4 mb-4 flex-wrap">
       <div>
         <h1 class="text-2xl font-bold">Your jobs</h1>
         <p class="text-[color:var(--bs-muted)] text-sm">
           Drag cards between columns to update status.
         </p>
       </div>
-      <SelectButton v-model="view" :options="viewOptions" option-label="label" option-value="value" />
+      <div class="flex items-center gap-2 flex-wrap">
+        <SelectButton v-model="view" :options="viewOptions" option-label="label" option-value="value" />
+        <template v-if="tradie?.isVisible">
+          <RouterLink to="/jobs/browse">
+            <Button label="Browse open jobs" icon="pi pi-megaphone" outlined />
+          </RouterLink>
+          <RouterLink to="/my-applications">
+            <Button label="My applications" icon="pi pi-send" text />
+          </RouterLink>
+        </template>
+      </div>
     </div>
 
     <Message v-if="banner" :severity="banner.severity" :closable="false" class="mb-4">
