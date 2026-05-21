@@ -63,8 +63,11 @@ export async function createJob(input: NewJobInput, chatId: string): Promise<str
     scheduledEnd: null,
     createdAt: serverTimestamp() as never,
     completedAt: null,
+    cancelledAt: null,
+    cancelledReason: null,
     chatId,
     privateNotes: "",
+    sourcePostId: null,
   });
   return docRef.id;
 }

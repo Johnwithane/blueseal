@@ -94,7 +94,7 @@ const testimonials = [
                 class="!bg-white !text-[color:var(--bs-blue-dark)] !border-white hover:!bg-[#eaf5fc]"
               />
             </RouterLink>
-            <RouterLink to="/sign-up/tradie">
+            <RouterLink to="/sign-up?as=tradesperson">
               <Button
                 label="I'm a tradesperson"
                 icon="pi pi-wrench"
@@ -285,7 +285,7 @@ const testimonials = [
             <li class="flex items-start gap-3"><i class="pi pi-check-circle mt-1 text-[#a0d6f1]"></i><span>Auto-invoice on job completion.</span></li>
           </ul>
           <div class="mt-8 flex flex-wrap gap-3">
-            <RouterLink to="/sign-up/tradie">
+            <RouterLink to="/sign-up?as=tradesperson">
               <Button
                 label="Apply to be verified"
                 icon="pi pi-id-card"
@@ -447,7 +447,7 @@ const testimonials = [
               class="!bg-white !text-[color:var(--bs-blue-dark)] !border-white hover:!bg-[#eaf5fc]"
             />
           </RouterLink>
-          <RouterLink to="/sign-up/tradie">
+          <RouterLink to="/sign-up?as=tradesperson">
             <Button label="Apply as a tradesperson" icon="pi pi-id-card" size="large" outlined severity="contrast" />
           </RouterLink>
         </div>

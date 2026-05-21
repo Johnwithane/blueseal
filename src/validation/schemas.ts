@@ -35,6 +35,11 @@ export const signInSchema = z.object({
 });
 export type SignInInput = z.infer<typeof signInSchema>;
 
+export const forgotPasswordSchema = z.object({
+  email: z.string().trim().toLowerCase().email("Enter a valid email").max(200),
+});
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+
 export const profileBasicsSchema = z.object({
   displayName: safeName,
   phone: z
@@ -160,4 +165,100 @@ export const lineItemSchema = z.object({
   // Cents. $100,000 cap.
   unitPrice: z.number().int().nonnegative().max(10_000_000),
   taxRate: z.number().min(0).max(0.5),
+});
+
+// ---------------------------------------------------------------------------
+// Job-board marketplace
+// ---------------------------------------------------------------------------
+
+// Canadian forward sortation area = first 3 chars of postal code, e.g. "V1Y".
+const caFsaRegex = /^[A-Za-z]\d[A-Za-z]$/;
+
+const addressPublicSchema = z.object({
+  city: z.string().trim().min(2).max(100),
+  region: z.string().trim().min(2).max(100),
+  postalFsa: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(caFsaRegex, "Enter the first 3 chars of a Canadian postal code"),
+});
+
+const addressPrivateSchema = z.object({
+  line1: z.string().trim().min(2).max(200),
+  fullPostal: z
+    .string()
+    .trim()
+    .regex(caPostalRegex, "Enter a valid Canadian postal code"),
+  lat: z.number().refine((n) => n >= -90 && n <= 90),
+  lng: z.number().refine((n) => n >= -180 && n <= 180),
+});
+
+export const budgetRangeSchema = z
+  .object({
+    // Cents, $5 floor to catch unit-mistake typos.
+    min: z.number().int().min(500).max(100_000_000),
+    max: z.number().int().min(500).max(100_000_000),
+    currency: z.literal("CAD"),
+  })
+  .refine((v) => v.max >= v.min, {
+    message: "Max budget must be at least the min budget",
+    path: ["max"],
+  });
+
+export const createJobPostSchema = z.object({
+  trade: tradeKeyEnum,
+  title: z.string().trim().min(5, "At least 5 characters").max(100),
+  description: z.string().trim().min(20, "At least 20 characters").max(2000),
+  photos: z.array(z.string().min(1).max(500)).min(1, "Add at least 1 photo").max(8),
+  addressPublic: addressPublicSchema,
+  addressPrivate: addressPrivateSchema,
+  budget: budgetRangeSchema,
+  urgency: z.enum(["flexible", "this_week", "urgent"]),
+  preferredDateWindow: z.object({
+    start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a YYYY-MM-DD date").nullable(),
+    end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a YYYY-MM-DD date").nullable(),
+  }),
+});
+export type CreateJobPostInput = z.infer<typeof createJobPostSchema>;
+
+export const proposedPriceSchema = z.object({
+  type: z.enum(["fixed", "hourly"]),
+  // Cents. $5 floor, $100,000 cap.
+  amount: z.number().int().min(500).max(10_000_000),
+  notes: z.string().trim().max(500).optional(),
+});
+
+export const submitApplicationSchema = z.object({
+  postId: z.string().min(1).max(128),
+  message: z
+    .string()
+    .trim()
+    .min(20, "Write at least a couple of sentences")
+    .max(2000),
+  proposedPrice: proposedPriceSchema,
+  proposedStartDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Use a YYYY-MM-DD date")
+    .nullable()
+    .optional(),
+});
+export type SubmitApplicationInput = z.infer<typeof submitApplicationSchema>;
+
+export const acceptApplicationSchema = z.object({
+  postId: z.string().min(1).max(128),
+  applicationId: z.string().min(1).max(128),
+});
+
+export const returnToApplicantsSchema = z.object({
+  postId: z.string().min(1).max(128),
+});
+
+export const cancelJobPostSchema = z.object({
+  postId: z.string().min(1).max(128),
+  reason: z.string().trim().max(500).optional(),
+});
+
+export const withdrawApplicationSchema = z.object({
+  postId: z.string().min(1).max(128),
 });

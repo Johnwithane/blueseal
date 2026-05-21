@@ -64,7 +64,15 @@ async function googleSignIn() {
         <small v-if="fieldErrors.email" class="text-red-600">{{ fieldErrors.email }}</small>
       </div>
       <div>
-        <label class="text-sm font-medium">Password</label>
+        <div class="flex items-baseline justify-between">
+          <label class="text-sm font-medium">Password</label>
+          <router-link
+            to="/forgot-password"
+            class="text-xs font-medium text-[color:var(--bs-blue)] hover:underline"
+          >
+            Forgot password?
+          </router-link>
+        </div>
         <Password
           v-model="password"
           :feedback="false"

@@ -24,6 +24,7 @@ const role = ref("");
 const createdAt = ref<{ toDate(): Date } | null>(null);
 const saving = ref(false);
 const uploading = ref(false);
+const sendingReset = ref(false);
 const error = ref<string | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
 
@@ -97,6 +98,20 @@ async function onPhotoChange(e: Event) {
 
 const initial = () =>
   (displayName.value || email.value || "?").slice(0, 1).toUpperCase();
+
+async function sendPasswordReset() {
+  if (!email.value) return;
+  sendingReset.value = true;
+  error.value = null;
+  try {
+    await auth.sendPasswordReset(email.value);
+    toast.success("Reset link sent — check your inbox");
+  } catch (e) {
+    error.value = (e as Error).message;
+  } finally {
+    sendingReset.value = false;
+  }
+}
 </script>
 
 <template>
@@ -167,6 +182,23 @@ const initial = () =>
         <Button type="submit" label="Save changes" icon="pi pi-save" :loading="saving" />
       </div>
     </form>
+
+    <div class="bs-card mt-4 p-5">
+      <h2 class="text-lg font-semibold">Password</h2>
+      <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
+        We'll email you a secure link to change your password.
+      </p>
+      <div class="mt-3 flex justify-end">
+        <Button
+          label="Send password reset email"
+          icon="pi pi-envelope"
+          outlined
+          :loading="sendingReset"
+          :disabled="!email"
+          @click="sendPasswordReset"
+        />
+      </div>
+    </div>
 
     <div class="bs-card mt-4 p-5 text-sm text-[color:var(--bs-muted)]">
       <div><strong>Role:</strong> {{ role }}</div>

@@ -34,10 +34,12 @@ const routes: RouteRecordRaw[] = [
   // Auth
   { path: "/sign-in", name: "SignIn", component: () => import("@/views/auth/SignInView.vue") },
   { path: "/sign-up", name: "SignUp", component: () => import("@/views/auth/SignUpView.vue") },
+  // Legacy path — tradie signup is now a toggle inside /sign-up.
+  { path: "/sign-up/tradie", redirect: { name: "SignUp", query: { as: "tradesperson" } } },
   {
-    path: "/sign-up/tradie",
-    name: "TradieSignUp",
-    component: () => import("@/views/auth/TradieSignUpView.vue"),
+    path: "/forgot-password",
+    name: "ForgotPassword",
+    component: () => import("@/views/auth/ForgotPasswordView.vue"),
   },
 
   // Account

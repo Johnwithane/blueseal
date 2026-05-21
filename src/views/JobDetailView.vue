@@ -126,6 +126,7 @@ async function saveNotes() {
 }
 
 const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "secondary"> = {
+  accepted: "info",
   requested: "info",
   quoted: "warn",
   scheduled: "success",

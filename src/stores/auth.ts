@@ -4,6 +4,7 @@ import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
   sendEmailVerification,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
@@ -136,6 +137,18 @@ export const useAuthStore = defineStore("auth", {
 
     async signOut() {
       await signOut(auth);
+    },
+
+    async sendPasswordReset(email: string) {
+      // Swallow user-not-found so we don't leak account existence — matches
+      // the wrong-password / user-not-found handling in utils/errors.ts.
+      try {
+        await sendPasswordResetEmail(auth, email);
+      } catch (e) {
+        const code = (e as { code?: string }).code;
+        if (code === "auth/user-not-found") return;
+        throw e;
+      }
     },
 
     async refreshClaims() {
