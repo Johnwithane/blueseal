@@ -124,7 +124,9 @@ Once live, the dashboard becomes home base.
 
 **Calendar view:** same jobs rendered on a weekly/monthly calendar, overlaid on weekly availability blocks. Drag-resize to reschedule.
 
-### 4.3 Client Discovery & Booking Flow
+### 4.3 Client Discovery & Booking Flow (direct-request)
+
+Direct request to a specific, pre-chosen tradesperson. Coexists with the job-board flow (§4.6) — both feed the same downstream Job + chat pipeline.
 
 ```
 Sign up (email/password or Google)
@@ -202,6 +204,87 @@ Every action writes to auditLog (actor, action, target, reason, timestamp)
 
 Target SLA: 1–2 business days. Dashboard shows queue depth + oldest pending age.
 
+### 4.6 Job-Board Marketplace (added in Phase 5b)
+
+A second client entry path, in addition to §4.3's direct request. Lets clients who don't have a specific tradesperson in mind post an open job, see bids from verified tradies in their area, and pick one. Both flows converge on the same `jobs/{jobId}` doc and from that point the workflow is identical.
+
+```
+Landing page → "Post a job, get bids" CTA (no auth required to start)
+  ↓
+PostJobView form (trade, title, description, photos ≥1, budget min/max CAD,
+  address with Google Places autocomplete, urgency, preferred date window).
+  Draft persists to localStorage as the user types.
+  ↓
+Submit:
+  - If unauthed: stash draft, redirect to /sign-in?redirect=/jobs/post
+    (form re-hydrates on return).
+  - If authed: upload photos to jobPosts/{tempUuid}/photos/ (WebP-only),
+    then call createJobPost callable.
+  ↓
+createJobPost (callable):
+  - Enforces 5 open posts per client cap.
+  - Derives geohashExact (length 9) + geohashPublic (length 6, ~1.2km cell)
+    server-side from the lat/lng.
+  - Writes parent jobPosts/{postId} (public-ish fields only) + private/meta
+    subdoc (exact address, applicationCount, selectedApplicantId).
+  - Sets expiresAt = now + 30d.
+  ↓
+Verified tradies (isVisible:true) see the post at /jobs/browse:
+  - Realtime feed bounded by tradie's location + radius (default 25 km) +
+    optional trade filter (default = tradie's primary trade).
+  - Posts the tradie has already applied to are filtered out.
+  - Address shown to tradies: city + region + first 3 chars of postal code
+    (FSA). Exact address never leaves /private/meta until acceptance.
+  ↓
+Tradie applies via submitApplication callable:
+  - Vetted (isVisible:true) tradies only.
+  - One application per tradie per post (rules-enforced via doc id = uid).
+  - Daily rate limit: 10 applications per tradie per 24h.
+  - Cover message ≥ 20 chars + proposed price (fixed or hourly).
+  - Bid-blind: tradies never see other applicants, prices, or applicationCount.
+  ↓
+Client sees applicants at /jobs/posted/:postId:
+  - applicationCount + each applicant's cover message, proposed price,
+    rating, and a profile link that opens in a new tab.
+  - "Pick this tradesperson" button on each pending application.
+  ↓
+acceptApplication (callable, transactional):
+  - Atomic: re-checks post open + selectedApplicantId null + application
+    pending + tradie still isVisible. Pre-allocates job + chat ids so retries
+    are idempotent.
+  - Creates jobs/{newJobId} with status="accepted" + sourcePostId + copies
+    title/description/trade/address/urgency/preferredDateWindow, sets
+    intakeFormData: {} (filled later).
+  - Creates chats/{newChatId} with both parties.
+  - Marks the chosen application "selected"; updates post status="closed",
+    convertedJobId, selectedApplicantId.
+  - Post-commit: server-side copies WebP photo blobs from
+    jobPosts/{postId}/photos/ to jobs/{jobId}/intake/ via the Storage Admin
+    SDK.
+  ↓
+onJobPostClosed trigger fans out rejection notifications to all other
+applicants (paged in batches of 400).
+  ↓
+Client lands in JobDetailView (status="accepted") with a "Complete the brief"
+CTA. The trade-specific IntakeFormRenderer becomes editable; saveJobIntakeAndAdvance
+writes the intake and transitions status to "requested" — the standard flow
+takes over.
+  ↓
+Escape hatch: while status is still "accepted", the client can "Return to
+applicants" (returnToApplicants callable). This cancels the new job, flips
+the post back to "open", and returns the chosen applicant to "pending".
+Rejected applicants stay rejected — no re-spam.
+  ↓
+Posts auto-expire after 30 days via scheduledJobPostExpiry (daily); the
+onJobPostClosed trigger handles applicant fanout the same way.
+```
+
+**Bid-blind contract**: `applicationCount` and `selectedApplicantId` live in `jobPosts/{postId}/private/meta` — rules allow only the post-owning client + admin to read that subdoc. The parent doc carries no signal of how many tradies have applied or who was picked. Applications themselves are readable only by the post owner, the application's own tradie, or admin (collectionGroup queries auto-filter via the same predicate).
+
+**Address-privacy contract**: `addressPublic = { city, region, postalFsa, geohashPublic (length 6, ~1.2km cell) }` on the parent doc. `addressPrivate = { line1, fullPostal, geo, geohashExact (length 9) }` in `private/meta`. Tradies can browse by distance without learning the exact address; the exact address is copied into the converted job on acceptance, where the job's party-based rules govern access.
+
+**Caps and limits (enforced in callables)**: 5 open posts per client; 10 applications per tradie per 24h (via rateLimits/{key} doc); post expiry 30d.
+
 ---
 
 ## 5. Core Features
@@ -234,10 +317,11 @@ Target SLA: 1–2 business days. Dashboard shows queue depth + oldest pending ag
 - v1.1: two-way Google Calendar sync for tradies
 
 ### 5.5 Jobs (Project Tracking)
-- Kanban dashboard for tradies (6 columns above)
+- Kanban dashboard for tradies (7 columns including "Accepted" for marketplace-originated jobs awaiting client brief)
 - Simple status list for clients
-- Per-job detail panel: chat + intake (read-only) + schedule + AI tools + invoice + private notes
-- Status flow: `requested → quoted → scheduled → in_progress → awaiting_payment → complete → reviewed → cancelled`
+- Per-job detail panel: chat + intake (editable for marketplace `accepted` status, read-only otherwise) + schedule + AI tools + invoice + private notes
+- Status flow: `accepted → requested → quoted → scheduled → in_progress → awaiting_payment → complete → reviewed → cancelled`
+- `accepted` is the entry status for marketplace-originated jobs (see §4.6); direct-request jobs skip it and start at `requested`.
 
 ### 5.6 Chat
 - One thread per job (no general DMs — keeps everything tied to accountability)
@@ -345,19 +429,45 @@ intakeFormSchemas/{trade}         // doc id = trade key (e.g. "plumber")
 
 jobs/{jobId}
   clientId, tradespersonId
-  status: "requested" | "quoted" | "scheduled" | "in_progress"
+  status: "accepted" | "requested" | "quoted" | "scheduled" | "in_progress"
         | "awaiting_payment" | "complete" | "reviewed" | "cancelled"
   trade: string                   // primary trade for this job
   title, description
-  intakeFormData: object          // client's submitted form data
-  intakePhotos: string[]          // Storage paths, required >= 1
+  intakeFormData: object          // client's submitted form data; {} on marketplace jobs until the client completes the brief
+  intakePhotos: string[]          // Storage paths, required >= 1 (copied from job post on acceptance)
   address: { line1, city, region, postalCode, geo: GeoPoint }
   preferredDateWindow: { start, end }
   urgency: "flexible" | "this_week" | "urgent"
   scheduledStart, scheduledEnd
-  createdAt, completedAt
+  createdAt, completedAt, cancelledAt, cancelledReason
   chatId
   privateNotes: string            // tradie-only
+  sourcePostId: string | null     // set when this job came from the job-board marketplace (§4.6)
+
+jobPosts/{postId}                 // job-board marketplace (§4.6)
+  clientId
+  status: "open" | "closed" | "cancelled" | "expired"
+  trade: string
+  title, description
+  photos: string[]                // 1-8 WebP paths under jobPosts/{postId}/photos/
+  addressPublic: { city, region, postalFsa, geohashPublic }   // length-6 geohash, ~1.2km cell
+  budget: { min, max, currency: "CAD" }                       // cents
+  urgency, preferredDateWindow
+  convertedJobId: string | null
+  createdAt, expiresAt, closedAt, acceptedAt, editedAt
+
+jobPosts/{postId}/private/meta    // client + admin read only
+  addressPrivate: { line1, fullPostal, geo: GeoPoint, geohashExact }   // length 9
+  applicationCount: number
+  selectedApplicantId: string | null
+
+jobPosts/{postId}/applications/{tradieId}    // doc id = tradie uid (one app per tradie)
+  tradespersonId, postId, clientId
+  status: "pending" | "selected" | "rejected" | "withdrawn"
+  message: string                 // 20-2000 chars
+  proposedPrice: { type: "fixed" | "hourly", amount, notes? }   // cents
+  proposedStartDate
+  createdAt, updatedAt
 
 chats/{chatId}
   jobId, clientId, tradespersonId
@@ -486,6 +596,17 @@ Live in `functions/src/`, organized by domain (`auth/`, `vetting/`, `reviews/`, 
 
 **Audit**
 - `logAdminAction` — internal helper; called from every admin callable to write to `auditLog`
+
+**Job-board marketplace (§4.6)**
+- `createJobPost` — client callable; 5-open-posts cap, derives geohashes server-side, writes parent + private/meta
+- `submitApplication` — vetted-tradie callable; bid-blind contract enforced; 10-apps-per-day rate limit
+- `withdrawApplication` — pending-only tradie callable
+- `acceptApplication` — client (post owner) callable; transactional job + chat creation; post-commit photo copy
+- `returnToApplicants` — client callable; escape hatch while job is still in `accepted` status
+- `cancelJobPost` — client callable
+- `onJobPostClosed` — trigger; pages applications and fans rejection notifications
+- `onApplicationCreated` — trigger; belt-and-suspenders client notification
+- `scheduledJobPostExpiry` — daily 03:00 America/Vancouver; flips open posts past `expiresAt` to `expired`
 
 All callable functions must:
 - Enforce App Check (`enforceAppCheck: true`)
@@ -632,7 +753,7 @@ Setup is fully covered in `TECH_STACK_SETUP.md`. Below is the product build sequ
 - 🟡 v1.1 — Saved searches with alerts, client favorites
 - 🟡 v1.1 — AI-powered matching ("describe your problem")
 - 🔵 Backlog — "Available now" mode, featured listings, service-area heatmaps
-- 🔵 Backlog — **Job board / bid marketplace** — clients post open jobs, tradies bid (Thumbtack-style). Real growth lever but a substantial scope addition; defer until direct-request flow is validated.
+- ✅ MVP — **Job board / bid marketplace** (§4.6) — clients post open jobs, vetted tradies apply with cover message + proposed price, client picks one. Bid-blind. Address-private until acceptance. Coexists with direct-request flow.
 
 ### Communication
 - ✅ MVP — Per-job chat with text + photo
@@ -698,7 +819,9 @@ Setup is fully covered in `TECH_STACK_SETUP.md`. Below is the product build sequ
 - In-app client→tradie payments (offline via invoice instructions until v1.1 brings Stripe Connect)
 - Escrow / dispute resolution beyond admin manual handling
 - Push notifications (email + in-app realtime via Firestore listeners at launch; FCM in v1.1)
-- Job board / bid marketplace (deferred — see backlog)
+- Pre-acceptance 1:1 chat between client and individual applicants (deferred to v1.1; mitigated at MVP by the "Return to applicants" escape hatch — see §4.6)
+- Editing a posted job after applications exist (v1.1)
+- Re-opening a closed/expired post (v1.1; for now the client reposts)
 - Multi-language
 - Native iOS/Android shells (PWA only)
 - Background checks beyond cert + ID
