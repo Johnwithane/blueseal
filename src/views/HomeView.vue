@@ -94,6 +94,14 @@ const testimonials = [
                 class="!bg-white !text-[color:var(--bs-blue-dark)] !border-white hover:!bg-[#eaf5fc]"
               />
             </RouterLink>
+            <RouterLink to="/jobs/post">
+              <Button
+                label="Post a job, get bids"
+                icon="pi pi-megaphone"
+                size="large"
+                class="!bg-white !text-[color:var(--bs-blue-dark)] !border-white hover:!bg-[#eaf5fc]"
+              />
+            </RouterLink>
             <RouterLink to="/sign-up?as=tradesperson">
               <Button
                 label="I'm a tradesperson"
@@ -443,6 +451,14 @@ const testimonials = [
             <Button
               label="Find a tradesperson"
               icon="pi pi-search"
+              size="large"
+              class="!bg-white !text-[color:var(--bs-blue-dark)] !border-white hover:!bg-[#eaf5fc]"
+            />
+          </RouterLink>
+          <RouterLink to="/jobs/post">
+            <Button
+              label="Post a job, get bids"
+              icon="pi pi-megaphone"
               size="large"
               class="!bg-white !text-[color:var(--bs-blue-dark)] !border-white hover:!bg-[#eaf5fc]"
             />

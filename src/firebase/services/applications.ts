@@ -1,0 +1,96 @@
+import {
+  collection,
+  collectionGroup,
+  doc,
+  getDoc,
+  limit,
+  onSnapshot,
+  orderBy,
+  query,
+  where,
+} from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
+import { db, functions } from "@/firebase/config";
+import type { ApplicationDoc, WithId } from "@/firebase/interfaces";
+import { typedConverter } from "@/firebase/converters";
+import type { SubmitApplicationInput } from "@/validation/schemas";
+
+const appsCol = (postId: string) =>
+  collection(db, "jobPosts", postId, "applications").withConverter(
+    typedConverter<ApplicationDoc>(),
+  );
+const appRef = (postId: string, tradieId: string) =>
+  doc(db, "jobPosts", postId, "applications", tradieId).withConverter(
+    typedConverter<ApplicationDoc>(),
+  );
+
+export async function submitApplication(input: SubmitApplicationInput): Promise<void> {
+  const callable = httpsCallable<SubmitApplicationInput, { ok: boolean }>(
+    functions,
+    "submitApplication",
+  );
+  await callable(input);
+}
+
+export async function withdrawApplication(postId: string): Promise<void> {
+  const callable = httpsCallable<{ postId: string }, { ok: boolean }>(
+    functions,
+    "withdrawApplication",
+  );
+  await callable({ postId });
+}
+
+export async function acceptApplication(
+  postId: string,
+  applicationId: string,
+): Promise<{ jobId: string; chatId: string }> {
+  const callable = httpsCallable<
+    { postId: string; applicationId: string },
+    { jobId: string; chatId: string }
+  >(functions, "acceptApplication");
+  const { data } = await callable({ postId, applicationId });
+  return data;
+}
+
+export function subscribeApplicationsForPost(
+  postId: string,
+  cb: (apps: WithId<ApplicationDoc>[]) => void,
+): () => void {
+  const q = query(appsCol(postId), orderBy("createdAt", "asc"), limit(200));
+  return onSnapshot(q, (snap) =>
+    cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+  );
+}
+
+export async function getMyApplicationForPost(
+  postId: string,
+  tradieId: string,
+): Promise<WithId<ApplicationDoc> | null> {
+  const snap = await getDoc(appRef(postId, tradieId));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+
+export function subscribeMyApplicationForPost(
+  postId: string,
+  tradieId: string,
+  cb: (app: WithId<ApplicationDoc> | null) => void,
+): () => void {
+  return onSnapshot(appRef(postId, tradieId), (snap) =>
+    cb(snap.exists() ? { id: snap.id, ...snap.data() } : null),
+  );
+}
+
+export function subscribeMyApplications(
+  tradieId: string,
+  cb: (apps: WithId<ApplicationDoc>[]) => void,
+): () => void {
+  const q = query(
+    collectionGroup(db, "applications").withConverter(typedConverter<ApplicationDoc>()),
+    where("tradespersonId", "==", tradieId),
+    orderBy("createdAt", "desc"),
+    limit(100),
+  );
+  return onSnapshot(q, (snap) =>
+    cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+  );
+}

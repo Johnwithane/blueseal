@@ -1,0 +1,508 @@
+<script setup lang="ts">
+import { onMounted, onUnmounted, ref, watch, computed } from "vue";
+import { useRouter } from "vue-router";
+import Button from "primevue/button";
+import InputText from "primevue/inputtext";
+import InputNumber from "primevue/inputnumber";
+import Textarea from "primevue/textarea";
+import Select from "primevue/select";
+import Message from "primevue/message";
+import DatePicker from "primevue/datepicker";
+import { useAuthStore } from "@/stores/auth";
+import { TRADES, tradeLabel } from "@/data/trades";
+import { formatBudgetGuide } from "@/data/budgetGuides";
+import { compressToWebp } from "@/utils/image";
+import { uploadFile } from "@/firebase/services/storage";
+import { createJobPost } from "@/firebase/services/jobPosts";
+import { useGoogleMaps } from "@/composables/useGoogleMaps";
+import { useToast } from "@/composables/useToast";
+import { humanizeError } from "@/utils/errors";
+import { createJobPostSchema } from "@/validation/schemas";
+import type { Urgency } from "@/firebase/interfaces";
+
+const router = useRouter();
+const auth = useAuthStore();
+const toast = useToast();
+
+const DRAFT_KEY = "jobPostDraft";
+
+interface PendingPhoto {
+  file: File;
+  previewUrl: string;
+}
+
+const trade = ref<string>("");
+const title = ref("");
+const description = ref("");
+const urgency = ref<Urgency>("flexible");
+const budgetMin = ref<number | null>(null);
+const budgetMax = ref<number | null>(null);
+const addressLine1 = ref("");
+const city = ref("");
+const region = ref("");
+const postalCode = ref("");
+const lat = ref<number | null>(null);
+const lng = ref<number | null>(null);
+const startDate = ref<Date | null>(null);
+const endDate = ref<Date | null>(null);
+const photos = ref<PendingPhoto[]>([]);
+
+const photoInput = ref<HTMLInputElement | null>(null);
+const addressAutocompleteEl = ref<HTMLInputElement | null>(null);
+
+const submitting = ref(false);
+const error = ref<string | null>(null);
+
+const tradeOptions = TRADES.map((t) => ({ label: t.label, value: t.key }));
+const urgencyOptions = [
+  { label: "Flexible", value: "flexible" },
+  { label: "This week", value: "this_week" },
+  { label: "Urgent", value: "urgent" },
+];
+
+const budgetHint = computed(() =>
+  trade.value ? formatBudgetGuide(trade.value, tradeLabel(trade.value)) : null,
+);
+
+// Restore draft on load (covers the auth-at-submit redirect round trip).
+onMounted(async () => {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (raw) {
+      const d = JSON.parse(raw) as Partial<{
+        trade: string;
+        title: string;
+        description: string;
+        urgency: Urgency;
+        budgetMin: number;
+        budgetMax: number;
+        addressLine1: string;
+        city: string;
+        region: string;
+        postalCode: string;
+        lat: number;
+        lng: number;
+        startDate: string;
+        endDate: string;
+      }>;
+      trade.value = d.trade ?? "";
+      title.value = d.title ?? "";
+      description.value = d.description ?? "";
+      urgency.value = (d.urgency ?? "flexible") as Urgency;
+      budgetMin.value = d.budgetMin ?? null;
+      budgetMax.value = d.budgetMax ?? null;
+      addressLine1.value = d.addressLine1 ?? "";
+      city.value = d.city ?? "";
+      region.value = d.region ?? "";
+      postalCode.value = d.postalCode ?? "";
+      lat.value = d.lat ?? null;
+      lng.value = d.lng ?? null;
+      startDate.value = d.startDate ? new Date(d.startDate) : null;
+      endDate.value = d.endDate ? new Date(d.endDate) : null;
+    }
+  } catch {
+    /* corrupted draft — ignore */
+  }
+
+  // Wire Google Places autocomplete on the address line.
+  try {
+    await useGoogleMaps().load();
+    if (addressAutocompleteEl.value) {
+      const ac = new google.maps.places.Autocomplete(addressAutocompleteEl.value, {
+        fields: ["address_components", "formatted_address", "geometry"],
+        types: ["geocode"],
+        componentRestrictions: { country: "ca" },
+      });
+      ac.addListener("place_changed", () => {
+        const place = ac.getPlace();
+        if (!place?.address_components) return;
+        const comp = (type: string) =>
+          place.address_components?.find((c) => c.types.includes(type))?.long_name ?? "";
+        const short = (type: string) =>
+          place.address_components?.find((c) => c.types.includes(type))?.short_name ?? "";
+        const streetNumber = comp("street_number");
+        const route = comp("route");
+        addressLine1.value = [streetNumber, route].filter(Boolean).join(" ").trim()
+          || place.formatted_address?.split(",")[0]
+          || "";
+        city.value = comp("locality") || comp("sublocality") || "";
+        region.value = short("administrative_area_level_1") || "";
+        postalCode.value = comp("postal_code") || "";
+        if (place.geometry?.location) {
+          lat.value = place.geometry.location.lat();
+          lng.value = place.geometry.location.lng();
+        }
+      });
+    }
+  } catch {
+    /* maps failed to load — fall back to manual fields */
+  }
+});
+
+onUnmounted(() => {
+  for (const p of photos.value) URL.revokeObjectURL(p.previewUrl);
+});
+
+// Persist draft on any change. Photos aren't persisted (Files don't survive
+// JSON.stringify), so a redirect will lose the photo selections — minor UX
+// cost vs. a much bigger localStorage footprint and blob-handling tangle.
+watch(
+  [
+    trade,
+    title,
+    description,
+    urgency,
+    budgetMin,
+    budgetMax,
+    addressLine1,
+    city,
+    region,
+    postalCode,
+    lat,
+    lng,
+    startDate,
+    endDate,
+  ],
+  () => {
+    try {
+      const payload = {
+        trade: trade.value,
+        title: title.value,
+        description: description.value,
+        urgency: urgency.value,
+        budgetMin: budgetMin.value,
+        budgetMax: budgetMax.value,
+        addressLine1: addressLine1.value,
+        city: city.value,
+        region: region.value,
+        postalCode: postalCode.value,
+        lat: lat.value,
+        lng: lng.value,
+        startDate: startDate.value ? startDate.value.toISOString() : null,
+        endDate: endDate.value ? endDate.value.toISOString() : null,
+      };
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(payload));
+    } catch {
+      /* quota or private mode — ignore */
+    }
+  },
+  { deep: true },
+);
+
+async function onPhotos(e: Event) {
+  const input = e.target as HTMLInputElement;
+  if (!input.files) return;
+  const incoming = Array.from(input.files).slice(0, 8 - photos.value.length);
+  try {
+    const compressed = await Promise.all(incoming.map((f) => compressToWebp(f)));
+    photos.value = [
+      ...photos.value,
+      ...compressed.map((file) => ({ file, previewUrl: URL.createObjectURL(file) })),
+    ];
+  } catch (err) {
+    error.value = humanizeError(err);
+  } finally {
+    input.value = "";
+  }
+}
+
+function removePhoto(idx: number) {
+  const [removed] = photos.value.splice(idx, 1);
+  if (removed) URL.revokeObjectURL(removed.previewUrl);
+  photos.value = [...photos.value];
+}
+
+function toIsoDate(d: Date | null): string | null {
+  if (!d) return null;
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+async function submit() {
+  error.value = null;
+  if (submitting.value) return;
+  if (photos.value.length === 0) {
+    error.value = "Add at least one photo of the job or area.";
+    return;
+  }
+  if (lat.value == null || lng.value == null) {
+    error.value = "Pick your address from the suggestions so we can map your job.";
+    return;
+  }
+  if (budgetMin.value == null || budgetMax.value == null) {
+    error.value = "Enter a budget range.";
+    return;
+  }
+
+  // Auth gate: if not signed in, draft is already persisted — bounce to sign-in.
+  if (!auth.fbUser) {
+    router.push({ name: "SignIn", query: { redirect: "/jobs/post" } });
+    return;
+  }
+
+  submitting.value = true;
+  const tempUuid = crypto.randomUUID();
+
+  try {
+    // Upload photos to a temp path under jobPosts/{tempUuid}/photos/. The
+    // server keeps these paths verbatim on the post doc; the path uuid does
+    // NOT have to match the final postId.
+    const photoPaths = await Promise.all(
+      photos.value.map(async (p, idx) => {
+        const safe = p.file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const path = `jobPosts/${tempUuid}/photos/${Date.now()}_${idx}_${safe}`;
+        await uploadFile(path, p.file);
+        return path;
+      }),
+    );
+
+    const fsa = postalCode.value.trim().toUpperCase().slice(0, 3);
+    const payload = {
+      trade: trade.value,
+      title: title.value.trim(),
+      description: description.value.trim(),
+      photos: photoPaths,
+      addressPublic: {
+        city: city.value.trim(),
+        region: region.value.trim(),
+        postalFsa: fsa,
+      },
+      addressPrivate: {
+        line1: addressLine1.value.trim(),
+        fullPostal: postalCode.value.trim().toUpperCase(),
+        lat: lat.value,
+        lng: lng.value,
+      },
+      budget: {
+        min: Math.round((budgetMin.value ?? 0) * 100),
+        max: Math.round((budgetMax.value ?? 0) * 100),
+        currency: "CAD" as const,
+      },
+      urgency: urgency.value,
+      preferredDateWindow: {
+        start: toIsoDate(startDate.value),
+        end: toIsoDate(endDate.value),
+      },
+    };
+
+    const parsed = createJobPostSchema.safeParse(payload);
+    if (!parsed.success) {
+      error.value = parsed.error.issues[0]?.message ?? "Check the form for errors.";
+      return;
+    }
+
+    const postId = await createJobPost({
+      ...parsed.data,
+      addressPrivate: payload.addressPrivate,
+    });
+
+    localStorage.removeItem(DRAFT_KEY);
+    toast.success("Your post is live", "Verified tradespeople in your area are being notified.");
+    router.push({ name: "JobPostDetail", params: { postId } });
+  } catch (e) {
+    error.value = humanizeError(e);
+  } finally {
+    submitting.value = false;
+  }
+}
+</script>
+
+<template>
+  <section class="bs-container py-6 max-w-3xl">
+    <h1 class="text-2xl font-bold">Post a job</h1>
+    <p class="text-[color:var(--bs-muted)]">
+      Verified tradespeople in your area will see your post and can apply with a quote. You pick the one you like.
+    </p>
+
+    <Message v-if="error" severity="error" :closable="false" class="mt-4">{{ error }}</Message>
+
+    <form class="bs-form bs-card p-5 mt-4 space-y-5" @submit.prevent="submit">
+      <div>
+        <label class="text-sm font-medium">What trade do you need?</label>
+        <Select
+          v-model="trade"
+          :options="tradeOptions"
+          option-label="label"
+          option-value="value"
+          placeholder="Choose a trade"
+          class="mt-1 w-full"
+        />
+      </div>
+
+      <div>
+        <label class="text-sm font-medium">Job title</label>
+        <InputText
+          v-model="title"
+          placeholder="e.g. Replace dripping kitchen tap"
+          maxlength="100"
+          class="mt-1 w-full"
+        />
+      </div>
+
+      <div>
+        <label class="text-sm font-medium">Describe the job</label>
+        <Textarea
+          v-model="description"
+          rows="5"
+          maxlength="2000"
+          placeholder="Anticipate what tradespeople will need to know to quote: what's wrong, when it started, anything you've tried…"
+          class="mt-1 w-full"
+        />
+        <div class="text-xs text-[color:var(--bs-muted)] mt-1">
+          {{ description.length }} / 2000
+        </div>
+      </div>
+
+      <fieldset>
+        <legend class="text-sm font-medium">Budget range (CAD)</legend>
+        <div v-if="budgetHint" class="text-xs text-[color:var(--bs-muted)] mt-1">
+          <i class="pi pi-info-circle mr-1"></i>{{ budgetHint }}
+        </div>
+        <div class="grid grid-cols-2 gap-2 mt-2">
+          <div>
+            <label class="text-xs">Min</label>
+            <InputNumber
+              v-model="budgetMin"
+              mode="currency"
+              currency="CAD"
+              :min="5"
+              :max="1000000"
+              :min-fraction-digits="0"
+              :max-fraction-digits="0"
+              class="w-full"
+            />
+          </div>
+          <div>
+            <label class="text-xs">Max</label>
+            <InputNumber
+              v-model="budgetMax"
+              mode="currency"
+              currency="CAD"
+              :min="5"
+              :max="1000000"
+              :min-fraction-digits="0"
+              :max-fraction-digits="0"
+              class="w-full"
+            />
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend class="text-sm font-medium">Address</legend>
+        <p class="text-xs text-[color:var(--bs-muted)] mt-1">
+          Only the chosen tradesperson sees your exact address — everyone else sees just your city and the first 3 chars of your postal code.
+        </p>
+        <input
+          ref="addressAutocompleteEl"
+          type="text"
+          class="p-inputtext p-component w-full mt-2"
+          placeholder="Start typing your address…"
+          autocomplete="off"
+        />
+        <div class="grid sm:grid-cols-2 gap-2 mt-2">
+          <InputText
+            v-model="addressLine1"
+            placeholder="Street address"
+            maxlength="200"
+            autocomplete="address-line1"
+          />
+          <InputText
+            v-model="city"
+            placeholder="City"
+            maxlength="100"
+            autocomplete="address-level2"
+          />
+          <InputText
+            v-model="region"
+            placeholder="Province"
+            maxlength="100"
+            autocomplete="address-level1"
+          />
+          <InputText
+            v-model="postalCode"
+            placeholder="Postal code (A1A 1A1)"
+            maxlength="7"
+            autocomplete="postal-code"
+          />
+        </div>
+      </fieldset>
+
+      <div>
+        <label class="text-sm font-medium">Urgency</label>
+        <Select
+          v-model="urgency"
+          :options="urgencyOptions"
+          option-label="label"
+          option-value="value"
+          class="mt-1 w-full"
+        />
+      </div>
+
+      <fieldset>
+        <legend class="text-sm font-medium">Preferred date window (optional)</legend>
+        <div class="grid grid-cols-2 gap-2 mt-2">
+          <div>
+            <label class="text-xs">Start</label>
+            <DatePicker v-model="startDate" date-format="yy-mm-dd" class="w-full" />
+          </div>
+          <div>
+            <label class="text-xs">End</label>
+            <DatePicker v-model="endDate" date-format="yy-mm-dd" class="w-full" />
+          </div>
+        </div>
+      </fieldset>
+
+      <div>
+        <label class="text-sm font-medium">Photos (1–8 required)</label>
+        <div class="grid grid-cols-4 gap-2 mt-2">
+          <div
+            v-for="(p, idx) in photos"
+            :key="p.previewUrl"
+            class="relative aspect-square rounded-md overflow-hidden border border-[color:var(--bs-border)]"
+          >
+            <img :src="p.previewUrl" alt="" class="h-full w-full object-cover" />
+            <button
+              type="button"
+              class="absolute top-1 right-1 h-6 w-6 rounded-full bg-black/60 text-white text-xs"
+              @click="removePhoto(idx)"
+            >
+              ✕
+            </button>
+          </div>
+          <button
+            v-if="photos.length < 8"
+            type="button"
+            class="aspect-square rounded-md border-2 border-dashed border-[color:var(--bs-border)] text-[color:var(--bs-muted)] flex items-center justify-center"
+            @click="photoInput?.click()"
+          >
+            <i class="pi pi-plus"></i>
+          </button>
+          <input
+            ref="photoInput"
+            type="file"
+            accept="image/*"
+            multiple
+            class="hidden"
+            @change="onPhotos"
+          />
+        </div>
+      </div>
+
+      <div class="pt-2">
+        <Button
+          type="submit"
+          :label="auth.fbUser ? 'Post job' : 'Sign in and post job'"
+          icon="pi pi-send"
+          :loading="submitting"
+          size="large"
+        />
+        <p v-if="!auth.fbUser" class="text-xs text-[color:var(--bs-muted)] mt-2">
+          Your draft is saved as you type. You'll be asked to sign in to post.
+        </p>
+      </div>
+    </form>
+  </section>
+</template>

@@ -92,6 +92,36 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, role: "any" as RoleGuard },
   },
 
+  // Job-board marketplace
+  {
+    path: "/jobs/post",
+    name: "PostJob",
+    component: () => import("@/views/PostJobView.vue"),
+    // Auth-at-submit: the form persists draft to localStorage and bounces to
+    // sign-in only when the user hits "Post". Letting unauthed users into the
+    // route is intentional.
+  },
+  {
+    path: "/jobs/browse",
+    name: "BrowseJobs",
+    component: () => import("@/views/BrowseJobsView.vue"),
+    // isVisible:true gate handled inside the view so the unverified tradie
+    // gets a "vetting in progress" message instead of a silent bounce.
+    meta: { requiresAuth: true, role: "tradesperson" as RoleGuard },
+  },
+  {
+    path: "/jobs/posted/:postId",
+    name: "JobPostDetail",
+    component: () => import("@/views/JobPostDetailView.vue"),
+    meta: { requiresAuth: true, role: "any" as RoleGuard },
+  },
+  {
+    path: "/my-applications",
+    name: "MyApplications",
+    component: () => import("@/views/MyApplicationsView.vue"),
+    meta: { requiresAuth: true, role: "tradesperson" as RoleGuard },
+  },
+
   // Admin sub-routes
   {
     path: "/admin/vetting",
