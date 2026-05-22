@@ -429,3 +429,38 @@ export interface AuditLogDoc {
   metadata: Record<string, unknown>;
   createdAt: Timestamp;
 }
+
+// ---------------------------------------------------------------------------
+// notifications/{notifId}
+// In-app inbox per user. Writes are Cloud-Function-only (rules block client
+// create + delete); the recipient can only flip `read` (and timestamp it).
+// ---------------------------------------------------------------------------
+export type NotificationType =
+  | "message_received"
+  | "job_requested"
+  | "application_accepted"
+  | "application_rejected"
+  | "vetting_approved"
+  | "vetting_rejected"
+  | "vetting_info_requested"
+  | "cert_approved"
+  | "cert_rejected"
+  | "id_approved"
+  | "id_rejected"
+  | "invoice_sent"
+  | "invoice_paid"
+  | "review_received";
+
+export interface NotificationDoc {
+  userId: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  link: string | null;
+  read: boolean;
+  readAt: Timestamp | null;
+  createdAt: Timestamp;
+  jobId: string | null;
+  chatId: string | null;
+  actorUid: string | null;
+}

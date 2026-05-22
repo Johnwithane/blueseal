@@ -243,12 +243,22 @@ service cloud.firestore {
     }
 
     // ---------- notifications (per-user inbox; writes via Cloud Function) ----------
+    // Owner can only flip read/readAt (mark-as-read). Every other field is
+    // pinned to its prior value so a compromised client can't rewrite a
+    // notification's content, link, or routing context.
     match /notifications/{notifId} {
       allow read: if isSignedIn() && resource.data.userId == uid();
       allow update: if isSignedIn()
         && resource.data.userId == uid()
         && request.resource.data.userId == resource.data.userId
-        && request.resource.data.createdAt == resource.data.createdAt;
+        && request.resource.data.type == resource.data.type
+        && request.resource.data.title == resource.data.title
+        && request.resource.data.body == resource.data.body
+        && request.resource.data.link == resource.data.link
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.jobId == resource.data.jobId
+        && request.resource.data.chatId == resource.data.chatId
+        && request.resource.data.actorUid == resource.data.actorUid;
       allow create, delete: if false;
     }
 
