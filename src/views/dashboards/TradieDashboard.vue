@@ -11,9 +11,16 @@ import { getTradesperson, setWeeklyAvailability } from "@/firebase/services/trad
 import { subscribeTradieJobs } from "@/firebase/services/jobs";
 import {
   createBlock,
+  createBlocksBatch,
   deleteBooking,
   subscribeBookings,
 } from "@/firebase/services/bookings";
+import {
+  fridaysForNextWeeks,
+  weekdaysForNextMonth,
+  weekendsThroughYearEnd,
+  type DateRange,
+} from "@/utils/blockPatterns";
 import { weeklyAvailabilitySchema } from "@/validation/schemas";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
@@ -50,6 +57,42 @@ const blockRange = ref<Date[] | null>(null);
 const savingBlock = ref(false);
 const blockError = ref<string | null>(null);
 
+// Block-off pattern: 'custom' uses the inline range picker; the other three
+// hardcode an absolute set of single-day ranges via utils/blockPatterns.
+type BlockPattern =
+  | "custom"
+  | "weekendsToYearEnd"
+  | "fridays8"
+  | "weekdaysNextMonth";
+const blockPattern = ref<BlockPattern>("custom");
+const patternOptions = [
+  { label: "Custom range", value: "custom" as const },
+  { label: "Weekends through year-end", value: "weekendsToYearEnd" as const },
+  { label: "Fridays for 8 weeks", value: "fridays8" as const },
+  { label: "Weekdays for next month", value: "weekdaysNextMonth" as const },
+];
+const patternPreview = computed<DateRange[]>(() => {
+  switch (blockPattern.value) {
+    case "weekendsToYearEnd":
+      return weekendsThroughYearEnd();
+    case "fridays8":
+      return fridaysForNextWeeks(8);
+    case "weekdaysNextMonth":
+      return weekdaysForNextMonth();
+    default:
+      return [];
+  }
+});
+const patternPreviewSummary = computed(() => {
+  const r = patternPreview.value;
+  if (r.length === 0) return "";
+  const first = r[0].start;
+  const last = r[r.length - 1].end;
+  const fmt = (d: Date) =>
+    d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return `${r.length} day${r.length === 1 ? "" : "s"} blocked — ${fmt(first)} to ${fmt(last)}`;
+});
+
 let unsub: (() => void) | null = null;
 let unsubBookings: (() => void) | null = null;
 
@@ -84,23 +127,33 @@ function openBlockEditor() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   blockRange.value = [today, today];
+  blockPattern.value = "custom";
   blockError.value = null;
   blockOpen.value = true;
 }
 
 async function saveBlock() {
-  if (!auth.fbUser || !blockRange.value || blockRange.value.length === 0) return;
-  const [start, end] = blockRange.value;
-  if (!start) {
-    blockError.value = "Pick at least one date.";
-    return;
-  }
-  const finalEnd = end ?? start;
+  if (!auth.fbUser) return;
   savingBlock.value = true;
   blockError.value = null;
   try {
-    await createBlock(auth.fbUser.uid, start, finalEnd);
-    toast.success("Block-off saved");
+    if (blockPattern.value === "custom") {
+      if (!blockRange.value || blockRange.value.length === 0 || !blockRange.value[0]) {
+        blockError.value = "Pick at least one date.";
+        return;
+      }
+      const [start, end] = blockRange.value;
+      await createBlock(auth.fbUser.uid, start, end ?? start);
+      toast.success("Block-off saved");
+    } else {
+      const ranges = patternPreview.value;
+      if (ranges.length === 0) {
+        blockError.value = "That preset has no dates to block.";
+        return;
+      }
+      const count = await createBlocksBatch(auth.fbUser.uid, ranges);
+      toast.success(`Blocked ${count} day${count === 1 ? "" : "s"}`);
+    }
     blockOpen.value = false;
   } catch (e) {
     blockError.value = humanizeError(e);
@@ -288,7 +341,16 @@ const banner = computed(() => {
       >
         {{ blockError }}
       </Message>
+      <SelectButton
+        v-model="blockPattern"
+        :options="patternOptions"
+        option-label="label"
+        option-value="value"
+        :allow-empty="false"
+        class="mb-3 w-full"
+      />
       <DatePicker
+        v-if="blockPattern === 'custom'"
         v-model="blockRange"
         selection-mode="range"
         :manual-input="false"
@@ -296,6 +358,16 @@ const banner = computed(() => {
         :min-date="new Date()"
         class="w-full"
       />
+      <div
+        v-else
+        class="rounded-lg border border-[color:var(--bs-border)] bg-[color:var(--bs-surface-alt)] p-3 text-sm"
+      >
+        <div class="font-semibold">{{ patternPreviewSummary }}</div>
+        <p class="mt-1 text-[color:var(--bs-muted)]">
+          You can delete individual days later from the calendar view if plans
+          change. Existing blocks aren't touched.
+        </p>
+      </div>
       <template #footer>
         <Button
           label="Cancel"
