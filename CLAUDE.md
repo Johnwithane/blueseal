@@ -306,6 +306,7 @@ If you write the same pattern 3+ times, **stop and extract**:
 - **New conventions or patterns** → update this CLAUDE.md or add a `skills/<name>.md`.
 - **Open questions answered** → strike through in `design.md` § 14 with the resolution noted.
 - **Architectural decisions** (non-obvious choices) → add a comment in the relevant code file explaining why, AND note in commit body.
+- **Setup work that requires human access** (third-party extensions, accounts, secrets, DNS) → append a checkbox section to [`HUMANTASKS.md`](./HUMANTASKS.md) at the repo root in the same commit that adds the feature depending on it. Group by phase so the user can see *why* each task exists.
 
 We're keeping it lightweight at the start — no separate ADR folder until we actually have decisions worth tracking formally.
 
