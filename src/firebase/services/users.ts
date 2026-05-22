@@ -1,9 +1,14 @@
 import {
+  collection,
   doc,
   getDoc,
+  getDocs,
+  limit as fbLimit,
+  query,
   serverTimestamp,
   setDoc,
   updateDoc,
+  where,
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/firebase/config";
@@ -83,6 +88,64 @@ export async function createUser(opts: {
     deletedAt: null,
     notificationPrefs: { emailEnabled: true, whatsappEnabled: true },
   });
+}
+
+/**
+ * Admin user lookup. Tries to detect what kind of identifier was pasted
+ * and runs the matching query; falls back across the three when the
+ * format is ambiguous so support staff can paste in anything. Returns
+ * up to 10 matches to keep the rendering tight.
+ */
+export async function searchUsers(input: string): Promise<WithId<UserDoc>[]> {
+  const value = input.trim();
+  if (!value) return [];
+  const usersCol = collection(db, "users").withConverter(typedConverter<UserDoc>());
+
+  // Cheap exact-match queries — Firestore can't do contains/prefix search
+  // on strings without an external index. Email + phone + UID are exact
+  // by their nature so this is the right shape for a support-lookup UX.
+  const looksLikeEmail = /@/.test(value);
+  const looksLikePhone = /^[+\d][\d\s\-()]+$/.test(value);
+
+  // 1. UID — try a direct doc read first. Cheapest; works for any input
+  //    that happens to be a Firebase Auth uid (~28 chars, no @).
+  if (!looksLikeEmail && value.length >= 20 && value.length <= 64) {
+    const direct = await getUser(value);
+    if (direct) return [direct];
+  }
+
+  const results: WithId<UserDoc>[] = [];
+  const seen = new Set<string>();
+
+  if (looksLikeEmail) {
+    const snap = await getDocs(
+      query(usersCol, where("email", "==", value.toLowerCase()), fbLimit(10)),
+    );
+    for (const d of snap.docs) {
+      if (seen.has(d.id)) continue;
+      seen.add(d.id);
+      results.push({ id: d.id, ...d.data() });
+    }
+  }
+
+  if (looksLikePhone) {
+    // Phone may have been stored with or without formatting; the
+    // searchable field is whatever the user entered on signup, so we
+    // try both raw + stripped.
+    const stripped = value.replace(/[^\d+]/g, "");
+    for (const candidate of [value, stripped]) {
+      const snap = await getDocs(
+        query(usersCol, where("phone", "==", candidate), fbLimit(10)),
+      );
+      for (const d of snap.docs) {
+        if (seen.has(d.id)) continue;
+        seen.add(d.id);
+        results.push({ id: d.id, ...d.data() });
+      }
+    }
+  }
+
+  return results;
 }
 
 /** Save per-channel notification opt-outs. Owner-writable per Firestore rules. */

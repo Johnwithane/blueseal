@@ -27,6 +27,9 @@ onMounted(async () => {
         </p>
       </div>
       <div class="flex flex-wrap gap-2">
+        <RouterLink to="/admin/users">
+          <Button label="User search" icon="pi pi-user-edit" outlined />
+        </RouterLink>
         <RouterLink to="/admin/site-content">
           <Button label="Site content" icon="pi pi-pencil" outlined />
         </RouterLink>
