@@ -5,7 +5,7 @@ import Button from "primevue/button";
 import Select from "primevue/select";
 import Rating from "primevue/rating";
 import Message from "primevue/message";
-import { searchTradespeople } from "@/firebase/services/tradespeople";
+import { searchTradespeople, type AvailabilityFilter } from "@/firebase/services/tradespeople";
 import { TRADES } from "@/data/trades";
 import TradieCard from "@/components/TradieCard.vue";
 import LocationPicker, {
@@ -22,6 +22,7 @@ function tradeFromQuery(value: unknown): string | null {
 
 const trade = ref<string | null>(tradeFromQuery(route.query.trade));
 const minRating = ref(0);
+const availability = ref<AvailabilityFilter>("any");
 const location = ref<LocationValue>({
   lat: null,
   lng: null,
@@ -30,6 +31,12 @@ const location = ref<LocationValue>({
 const results = ref<Array<WithId<TradespersonDoc> & { distanceKm: number }>>([]);
 const loading = ref(false);
 const error = ref<string | null>(null);
+
+const AVAILABILITY_OPTIONS: { label: string; value: AvailabilityFilter }[] = [
+  { label: "Any time", value: "any" },
+  { label: "Today", value: "today" },
+  { label: "This week", value: "this_week" },
+];
 
 async function search() {
   if (location.value.lat == null || location.value.lng == null) {
@@ -45,6 +52,7 @@ async function search() {
       centerLng: location.value.lng,
       radiusKm: location.value.radiusKm,
       minRating: minRating.value || undefined,
+      availability: availability.value === "any" ? undefined : availability.value,
       limit: 50,
     });
   } catch (e) {
@@ -79,7 +87,7 @@ watch(
     </p>
 
     <div class="bs-card bs-form mb-4 p-4">
-      <div class="grid items-end gap-3 sm:grid-cols-2">
+      <div class="grid items-end gap-3 sm:grid-cols-3">
         <div>
           <label class="text-xs font-medium">Trade</label>
           <Select
@@ -89,6 +97,16 @@ watch(
             option-value="key"
             placeholder="Any"
             show-clear
+            class="mt-1 w-full"
+          />
+        </div>
+        <div>
+          <label class="text-xs font-medium">Available</label>
+          <Select
+            v-model="availability"
+            :options="AVAILABILITY_OPTIONS"
+            option-label="label"
+            option-value="value"
             class="mt-1 w-full"
           />
         </div>

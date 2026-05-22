@@ -119,13 +119,39 @@ export async function setPortfolioPhotos(uid: string, photos: string[]): Promise
   await updateDoc(doc(db, "tradespeople", uid), { portfolioPhotos: photos });
 }
 
+export type AvailabilityFilter = "any" | "today" | "this_week";
+
 interface SearchOpts {
   trade?: string;
   centerLat: number;
   centerLng: number;
   radiusKm: number;
   minRating?: number;
+  availability?: AvailabilityFilter;
   limit?: number;
+}
+
+// Day-of-week keys on WeeklyAvailability are stored Mon..Sun. JS
+// Date.getDay() returns 0=Sun..6=Sat, so we re-key for lookup.
+const DOW_KEYS: Array<keyof WeeklyAvailability> = [
+  "sun", "mon", "tue", "wed", "thu", "fri", "sat",
+];
+
+function hasAvailabilityToday(a: WeeklyAvailability | undefined): boolean {
+  if (!a) return false;
+  const key = DOW_KEYS[new Date().getDay()];
+  return (a[key]?.length ?? 0) > 0;
+}
+
+function hasAvailabilityThisWeek(a: WeeklyAvailability | undefined): boolean {
+  if (!a) return false;
+  const today = new Date().getDay();
+  // Check today + the next 6 days (rolling week, not Sun..Sat).
+  for (let offset = 0; offset < 7; offset++) {
+    const key = DOW_KEYS[(today + offset) % 7];
+    if ((a[key]?.length ?? 0) > 0) return true;
+  }
+  return false;
 }
 
 /** Geohash bounding-box search; precise distance filter applied client-side. */
@@ -159,6 +185,8 @@ export async function searchTradespeople(
       if (distKm > opts.radiusKm) continue;
       if (opts.minRating && data.ratingAvg < opts.minRating) continue;
       if (opts.trade && !data.trades.includes(opts.trade)) continue;
+      if (opts.availability === "today" && !hasAvailabilityToday(data.weeklyAvailability)) continue;
+      if (opts.availability === "this_week" && !hasAvailabilityThisWeek(data.weeklyAvailability)) continue;
       out.push({ id: d.id, ...data, distanceKm: distKm });
     }
   }
