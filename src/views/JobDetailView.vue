@@ -19,6 +19,7 @@ import {
 } from "@/firebase/services/jobs";
 import { returnToApplicants } from "@/firebase/services/jobPosts";
 import { getTradesperson } from "@/firebase/services/tradespeople";
+import { findCollisions, type Collision } from "@/firebase/services/bookings";
 import { useConfirm } from "primevue/useconfirm";
 import { getInvoiceByJobId } from "@/firebase/services/invoices";
 import { useAuthStore } from "@/stores/auth";
@@ -66,6 +67,13 @@ const returningToApplicants = ref(false);
 const showCancelDialog = ref(false);
 const cancelReason = ref("");
 const cancelling = ref(false);
+
+// Schedule-collision state. Set when saveSchedule detects an overlap;
+// the dialog gives the tradie the choice to schedule anyway (e.g. they
+// just want to override their own block-off) or pick a different time.
+const collisions = ref<Collision[]>([]);
+const showCollisionDialog = ref(false);
+const savingSchedule = ref(false);
 
 const statusOptions: { label: string; value: JobStatus }[] = [
   { label: "Accepted", value: "accepted" },
@@ -165,8 +173,37 @@ onMounted(load);
 
 async function saveSchedule() {
   if (!job.value || !scheduledStart.value || !scheduledEnd.value) return;
+  if (scheduledEnd.value <= scheduledStart.value) {
+    toast.error("Pick an end time after the start.");
+    return;
+  }
+  savingSchedule.value = true;
+  try {
+    const conflicts = await findCollisions(
+      job.value.tradespersonId,
+      scheduledStart.value,
+      scheduledEnd.value,
+      { excludeJobId: job.value.id },
+    );
+    if (conflicts.length > 0) {
+      collisions.value = conflicts;
+      showCollisionDialog.value = true;
+      return;
+    }
+    await commitSchedule();
+  } catch (e) {
+    toast.error("Couldn't save schedule", humanizeError(e));
+  } finally {
+    savingSchedule.value = false;
+  }
+}
+
+async function commitSchedule() {
+  if (!job.value || !scheduledStart.value || !scheduledEnd.value) return;
   try {
     await scheduleJob(job.value.id, scheduledStart.value, scheduledEnd.value);
+    showCollisionDialog.value = false;
+    collisions.value = [];
     await load();
   } catch (e) {
     toast.error("Couldn't save schedule", humanizeError(e));
@@ -477,7 +514,14 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
             <template v-if="isTradie">
               <DatePicker v-model="scheduledStart" show-time hour-format="24" class="w-full mt-2" placeholder="Start" />
               <DatePicker v-model="scheduledEnd" show-time hour-format="24" class="w-full mt-2" placeholder="End" />
-              <Button label="Save schedule" icon="pi pi-calendar" class="mt-2 w-full" outlined @click="saveSchedule" />
+              <Button
+                label="Save schedule"
+                icon="pi pi-calendar"
+                class="mt-2 w-full"
+                outlined
+                :loading="savingSchedule"
+                @click="saveSchedule"
+              />
             </template>
           </div>
 
@@ -500,6 +544,56 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
         </aside>
       </div>
     </template>
+
+    <Dialog
+      v-model:visible="showCollisionDialog"
+      modal
+      header="Schedule conflict"
+      :style="{ width: '32rem', maxWidth: '92vw' }"
+    >
+      <p class="text-sm text-[color:var(--bs-text)] mb-3">
+        The time you picked overlaps with
+        {{ collisions.length }} existing
+        {{ collisions.length === 1 ? "booking" : "bookings" }}:
+      </p>
+      <ul class="space-y-2">
+        <li
+          v-for="c in collisions"
+          :key="c.id"
+          class="rounded-lg border border-[color:var(--bs-border)] p-3"
+        >
+          <div class="flex items-start gap-2">
+            <i
+              :class="
+                c.type === 'job'
+                  ? 'pi pi-briefcase text-[color:var(--bs-blue)] mt-0.5'
+                  : 'pi pi-ban text-amber-600 mt-0.5'
+              "
+            ></i>
+            <div class="flex-1 min-w-0">
+              <div class="font-medium text-sm">{{ c.label }}</div>
+              <div class="text-xs text-[color:var(--bs-muted)] mt-0.5">
+                {{ dateTime(c.start) }} → {{ dateTime(c.end) }}
+              </div>
+            </div>
+          </div>
+        </li>
+      </ul>
+      <p class="mt-4 text-xs text-[color:var(--bs-muted)]">
+        You can still schedule on top — useful when a block-off was a soft hold
+        you're happy to override. It also lets you double-book if that's actually
+        what you mean.
+      </p>
+      <template #footer>
+        <Button label="Pick a different time" text @click="showCollisionDialog = false" />
+        <Button
+          label="Schedule anyway"
+          icon="pi pi-calendar-plus"
+          severity="warn"
+          @click="commitSchedule"
+        />
+      </template>
+    </Dialog>
 
     <Dialog
       v-model:visible="showCancelDialog"
