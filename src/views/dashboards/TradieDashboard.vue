@@ -4,15 +4,26 @@ import { RouterLink, useRouter } from "vue-router";
 import Button from "primevue/button";
 import SelectButton from "primevue/selectbutton";
 import Message from "primevue/message";
+import Dialog from "primevue/dialog";
 import { useAuthStore } from "@/stores/auth";
-import { getTradesperson } from "@/firebase/services/tradespeople";
+import { getTradesperson, setWeeklyAvailability } from "@/firebase/services/tradespeople";
 import { subscribeTradieJobs } from "@/firebase/services/jobs";
-import type { JobDoc, TradespersonDoc, WithId } from "@/firebase/interfaces";
+import { weeklyAvailabilitySchema } from "@/validation/schemas";
+import { useToast } from "@/composables/useToast";
+import { humanizeError } from "@/utils/errors";
+import type {
+  JobDoc,
+  TradespersonDoc,
+  WeeklyAvailability,
+  WithId,
+} from "@/firebase/interfaces";
 import KanbanBoard from "@/components/KanbanBoard.vue";
 import CalendarView from "@/components/CalendarView.vue";
+import AvailabilityEditor from "@/components/AvailabilityEditor.vue";
 
 const auth = useAuthStore();
 const router = useRouter();
+const toast = useToast();
 const tradie = ref<WithId<TradespersonDoc> | null>(null);
 const jobs = ref<WithId<JobDoc>[]>([]);
 const view = ref<"kanban" | "calendar">("kanban");
@@ -20,6 +31,11 @@ const viewOptions = [
   { label: "Kanban", value: "kanban" },
   { label: "Calendar", value: "calendar" },
 ];
+
+const availabilityOpen = ref(false);
+const draftAvailability = ref<WeeklyAvailability | null>(null);
+const savingAvailability = ref(false);
+const availabilityError = ref<string | null>(null);
 
 let unsub: (() => void) | null = null;
 
@@ -34,6 +50,48 @@ onMounted(async () => {
 });
 
 onUnmounted(() => unsub?.());
+
+function openAvailabilityEditor() {
+  if (!tradie.value) return;
+  // Deep-clone so cancelling discards edits without mutating the live doc.
+  draftAvailability.value = JSON.parse(
+    JSON.stringify(tradie.value.weeklyAvailability),
+  ) as WeeklyAvailability;
+  availabilityError.value = null;
+  availabilityOpen.value = true;
+}
+
+async function saveAvailability() {
+  if (!auth.fbUser || !draftAvailability.value || !tradie.value) return;
+  const parsed = weeklyAvailabilitySchema.safeParse(draftAvailability.value);
+  if (!parsed.success) {
+    availabilityError.value =
+      parsed.error.issues[0]?.message ??
+      "Times must be in HH:MM format (00:00 to 23:59).";
+    return;
+  }
+  // Sanity check: every block must have end > start.
+  for (const day of Object.values(parsed.data)) {
+    for (const block of day) {
+      if (block.end <= block.start) {
+        availabilityError.value = "Each block's end time must be after its start.";
+        return;
+      }
+    }
+  }
+  savingAvailability.value = true;
+  availabilityError.value = null;
+  try {
+    await setWeeklyAvailability(auth.fbUser.uid, parsed.data);
+    tradie.value.weeklyAvailability = parsed.data;
+    availabilityOpen.value = false;
+    toast.success("Availability saved");
+  } catch (e) {
+    availabilityError.value = humanizeError(e);
+  } finally {
+    savingAvailability.value = false;
+  }
+}
 
 const vetting = computed(() => tradie.value?.vettingStatus);
 const banner = computed(() => {
@@ -71,6 +129,12 @@ const banner = computed(() => {
       <div class="flex items-center gap-2 flex-wrap">
         <SelectButton v-model="view" :options="viewOptions" option-label="label" option-value="value" />
         <template v-if="tradie?.isVisible">
+          <Button
+            label="Manage availability"
+            icon="pi pi-clock"
+            outlined
+            @click="openAvailabilityEditor"
+          />
           <RouterLink to="/jobs/browse">
             <Button label="Browse open jobs" icon="pi pi-megaphone" outlined />
           </RouterLink>
@@ -98,5 +162,41 @@ const banner = computed(() => {
         <Button label="Continue onboarding" icon="pi pi-arrow-right" />
       </RouterLink>
     </div>
+
+    <Dialog
+      v-model:visible="availabilityOpen"
+      modal
+      header="Manage weekly availability"
+      :style="{ width: '90vw', maxWidth: '40rem' }"
+      :draggable="false"
+    >
+      <p class="mb-3 text-sm text-[color:var(--bs-muted)]">
+        Set the hours you're typically available each day. Clients see this on
+        your public profile and use it when requesting quotes.
+      </p>
+      <Message
+        v-if="availabilityError"
+        severity="error"
+        :closable="false"
+        class="mb-3"
+      >
+        {{ availabilityError }}
+      </Message>
+      <AvailabilityEditor v-if="draftAvailability" v-model="draftAvailability" />
+      <template #footer>
+        <Button
+          label="Cancel"
+          severity="secondary"
+          text
+          @click="availabilityOpen = false"
+        />
+        <Button
+          label="Save"
+          icon="pi pi-save"
+          :loading="savingAvailability"
+          @click="saveAvailability"
+        />
+      </template>
+    </Dialog>
   </section>
 </template>

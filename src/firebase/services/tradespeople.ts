@@ -97,6 +97,13 @@ export async function submitForReview(uid: string): Promise<void> {
   });
 }
 
+export async function setWeeklyAvailability(
+  uid: string,
+  availability: WeeklyAvailability,
+): Promise<void> {
+  await updateDoc(doc(db, "tradespeople", uid), { weeklyAvailability: availability });
+}
+
 interface SearchOpts {
   trade?: string;
   centerLat: number;
