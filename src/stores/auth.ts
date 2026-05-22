@@ -69,18 +69,20 @@ export const useAuthStore = defineStore("auth", {
 
   getters: {
     isAuthenticated: (s) => !!s.fbUser,
-    // "Currently viewing as X" — drives which dashboard / CTAs render.
+    // "Currently viewing as X" — strictly follows activeRole so DashboardEntry
+    // and other view-mode-driven UI behave correctly when an admin switches
+    // into client or tradesperson view.
     isClient: (s) => s.activeRole === "client",
     isTradie: (s) => s.activeRole === "tradesperson",
-    isAdmin: (s) => s.activeRole === "admin" || s.roles.includes("admin"),
-    // "Has the X role at all" — drives whether to offer a role switcher or
-    // whether to upsell adding the role.
+    isAdmin: (s) => s.activeRole === "admin",
+    // "Has the X role at all" — for offering switchers, CTAs, or admin-only
+    // affordances that should stay visible regardless of the active view.
     hasClientRole: (s) => s.roles.includes("client"),
     hasTradieRole: (s) => s.roles.includes("tradesperson"),
-    // True when the user can flip between client and tradesperson views.
-    // Admin is layered on top and uses its own route, so it doesn't count.
-    canSwitchRole: (s) =>
-      s.roles.includes("client") && s.roles.includes("tradesperson"),
+    hasAdminRole: (s) => s.roles.includes("admin"),
+    // True when the user holds more than one role — drives whether the
+    // header avatar menu shows a switcher.
+    canSwitchRole: (s) => s.roles.length > 1,
   },
 
   actions: {

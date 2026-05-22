@@ -155,7 +155,7 @@ async function addClientView() {
   }
 }
 
-async function switchView(role: "client" | "tradesperson") {
+async function switchView(role: "client" | "tradesperson" | "admin") {
   try {
     await auth.switchActiveRole(role);
     toast.success(`Switched to ${ROLE_LABEL[role]} view`);
@@ -297,11 +297,11 @@ async function grantAdminAllRoles() {
             </span>
           </span>
           <Button
-            v-if="auth.activeRole !== r && r !== 'admin'"
+            v-if="auth.activeRole !== r"
             label="Switch to this view"
             size="small"
             text
-            @click="switchView(r as 'client' | 'tradesperson')"
+            @click="switchView(r as 'client' | 'tradesperson' | 'admin')"
           />
         </li>
       </ul>
@@ -352,7 +352,7 @@ async function grantAdminAllRoles() {
       </div>
 
       <div
-        v-if="auth.isAdmin && !(auth.hasClientRole && auth.hasTradieRole)"
+        v-if="auth.hasAdminRole && !(auth.hasClientRole && auth.hasTradieRole)"
         class="mt-4 rounded-lg border border-dashed border-[color:var(--bs-border)] p-4"
       >
         <div class="flex items-start gap-3">

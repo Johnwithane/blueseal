@@ -12,10 +12,16 @@ const router = useRouter();
 const toast = useToast();
 const menu = ref<InstanceType<typeof Menu> | null>(null);
 
-async function switchTo(role: "client" | "tradesperson") {
+const VIEW_LABEL: Record<string, string> = {
+  client: "Client",
+  tradesperson: "Tradesperson",
+  admin: "Admin",
+};
+
+async function switchTo(role: "client" | "tradesperson" | "admin") {
   try {
     await auth.switchActiveRole(role);
-    toast.success(role === "tradesperson" ? "Switched to Tradesperson view" : "Switched to Client view");
+    toast.success(`Switched to ${VIEW_LABEL[role]} view`);
     router.push({ name: "Dashboard" });
   } catch (e) {
     toast.error(humanizeError(e));
@@ -36,22 +42,29 @@ const items = computed(() => {
     },
   ];
 
-  // Airbnb-style role switcher — only appears once the user actually holds
-  // both public roles. A separator above + below visually anchors it.
+  // Airbnb-style role switcher — shows every held role that isn't the
+  // currently-active one. Appears once the user holds more than one role.
   if (auth.canSwitchRole) {
     list.push({ separator: true });
-    if (auth.activeRole !== "client") {
+    if (auth.hasClientRole && auth.activeRole !== "client") {
       list.push({
         label: "Switch to Client view",
         icon: "pi pi-user",
         command: () => switchTo("client"),
       });
     }
-    if (auth.activeRole !== "tradesperson") {
+    if (auth.hasTradieRole && auth.activeRole !== "tradesperson") {
       list.push({
         label: "Switch to Tradesperson view",
         icon: "pi pi-wrench",
         command: () => switchTo("tradesperson"),
+      });
+    }
+    if (auth.hasAdminRole && auth.activeRole !== "admin") {
+      list.push({
+        label: "Switch to Admin view",
+        icon: "pi pi-shield",
+        command: () => switchTo("admin"),
       });
     }
   }
