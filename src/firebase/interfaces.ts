@@ -84,6 +84,13 @@ export interface TradespersonDoc {
   // owner+admin only). Kept in sync when the user updates their profile.
   displayName?: string;
   photoURL?: string | null;
+  // Optional registered business name, e.g. "ABC Mechanical Ltd." Sole
+  // proprietors leave this null and clients see just the display name.
+  companyName: string | null;
+  // Languages the tradesperson can work in. Used on the public profile and
+  // (eventually) as a search filter. Free-form to allow regional variants
+  // ("Cantonese" + "Mandarin" rather than just "Chinese").
+  languages: string[];
   bio: string;
   trades: string[]; // canonical keys, primary at [0]
   yearsExperience: Record<string, number>;

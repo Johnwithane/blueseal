@@ -2,13 +2,23 @@
 import { onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import Button from "primevue/button";
+import Avatar from "primevue/avatar";
 import { listPendingApplications } from "@/firebase/services/tradespeople";
 import type { TradespersonDoc, WithId } from "@/firebase/interfaces";
 import { useFormatters } from "@/composables";
+import { tradeLabel } from "@/data/trades";
 
 const pending = ref<WithId<TradespersonDoc>[]>([]);
 const loading = ref(true);
 const { relativeTime } = useFormatters();
+
+function nameOf(t: WithId<TradespersonDoc>): string {
+  return t.displayName?.trim() || tradeLabel(t.trades[0] ?? "") || "Unnamed applicant";
+}
+
+function initialOf(t: WithId<TradespersonDoc>): string {
+  return nameOf(t).slice(0, 1).toUpperCase() || "?";
+}
 
 onMounted(async () => {
   loading.value = true;
@@ -66,12 +76,28 @@ onMounted(async () => {
         v-for="t in pending"
         :key="t.id"
         :to="{ name: 'AdminApplication', params: { uid: t.id } }"
-        class="bs-card p-4 flex items-center justify-between no-underline text-inherit hover:shadow-md"
+        class="bs-card p-4 flex items-center gap-3 no-underline text-inherit hover:shadow-md"
       >
-        <div>
-          <div class="font-semibold">{{ t.id }}</div>
-          <div class="text-xs text-[color:var(--bs-muted)]">
-            Trades: {{ t.trades.join(", ") || "—" }} • Submitted {{ relativeTime(t.submittedAt) }}
+        <Avatar
+          v-if="t.photoURL"
+          :image="t.photoURL"
+          size="large"
+          shape="circle"
+        />
+        <Avatar
+          v-else
+          :label="initialOf(t)"
+          size="large"
+          shape="circle"
+          style="background-color: var(--bs-blue); color: white; font-weight: 600;"
+        />
+        <div class="min-w-0 flex-1">
+          <div class="font-semibold truncate">{{ nameOf(t) }}</div>
+          <div v-if="t.companyName" class="text-xs text-[color:var(--bs-muted)] truncate">
+            {{ t.companyName }}
+          </div>
+          <div class="text-xs text-[color:var(--bs-muted)] truncate">
+            {{ t.trades.map(tradeLabel).join(" • ") || "—" }} · Submitted {{ relativeTime(t.submittedAt) }}
           </div>
         </div>
         <i class="pi pi-chevron-right text-[color:var(--bs-muted)]"></i>

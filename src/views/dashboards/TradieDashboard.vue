@@ -203,27 +203,32 @@ async function saveAvailability() {
   }
 }
 
+// Vetting status drives the "Your profile isn't live yet" empty state below.
+// The full status messaging (pending / info-requested / rejected) is rendered
+// app-wide by TradieStatusBanner so the user sees it on every page.
 const vetting = computed(() => tradie.value?.vettingStatus);
-const banner = computed(() => {
-  switch (vetting.value) {
-    case "pending":
-      return {
-        severity: "info" as const,
-        text: "Your application is under review. We'll notify you when it's approved.",
-      };
-    case "info_requested":
-      return {
-        severity: "warn" as const,
-        text: `Reviewer requested more info: ${tradie.value?.vettingNotes ?? ""}`,
-      };
-    case "rejected":
-      return {
-        severity: "error" as const,
-        text: `Application rejected: ${tradie.value?.vettingNotes ?? ""}`,
-      };
-    default:
-      return null;
-  }
+
+// Three reasons isVisible can still be false even after the admin approves:
+// ID not yet approved, no approved cert yet, or vettingStatus isn't approved.
+// Distinguish them so the empty state tells the user the truth (waiting on
+// admin) instead of telling them to redo onboarding.
+const idApproved = computed(() => tradie.value?.idVerified === true);
+const hasApprovedTrade = computed(
+  () => (tradie.value?.verifiedTrades?.length ?? 0) > 0,
+);
+const awaitingVerification = computed(
+  () =>
+    !!tradie.value &&
+    !tradie.value.isVisible &&
+    vetting.value === "approved" &&
+    (!idApproved.value || !hasApprovedTrade.value),
+);
+const awaitingVerificationMessage = computed(() => {
+  const missing: string[] = [];
+  if (!idApproved.value) missing.push("ID verification");
+  if (!hasApprovedTrade.value) missing.push("at least one certification");
+  if (missing.length === 0) return "";
+  return `Your application is approved. We're finishing ${missing.join(" and ")} — you'll go live automatically once that's done.`;
 });
 </script>
 
@@ -262,13 +267,6 @@ const banner = computed(() => {
       </div>
     </div>
 
-    <Message v-if="banner" :severity="banner.severity" :closable="false" class="mb-4">
-      {{ banner.text }}
-      <template v-if="vetting === 'info_requested' || vetting === 'draft'">
-        <RouterLink to="/onboarding" class="ml-2 underline">Update application</RouterLink>
-      </template>
-    </Message>
-
     <KanbanBoard v-if="view === 'kanban' && tradie?.isVisible" :jobs="jobs" />
     <CalendarView
       v-else-if="view === 'calendar' && tradie?.isVisible"
@@ -278,7 +276,17 @@ const banner = computed(() => {
       @remove-block="removeBlock"
     />
 
-    <div v-if="!tradie?.isVisible && vetting !== 'pending'" class="bs-empty mt-4">
+    <div
+      v-if="awaitingVerification"
+      class="bs-empty mt-4"
+    >
+      <i class="pi pi-check-circle text-3xl mb-2 block text-[color:var(--bs-blue)]"></i>
+      <p>{{ awaitingVerificationMessage }}</p>
+    </div>
+    <div
+      v-else-if="!tradie?.isVisible && vetting !== 'pending'"
+      class="bs-empty mt-4"
+    >
       <i class="pi pi-clock text-3xl mb-2 block"></i>
       <p>Your profile isn't live yet. Finish onboarding to start receiving requests.</p>
       <RouterLink to="/onboarding" class="inline-block mt-3">

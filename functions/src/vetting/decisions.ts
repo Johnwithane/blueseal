@@ -33,7 +33,33 @@ export const approveApplication = onCall({ enforceAppCheck: false }, async (req)
   const parsed = ApproveInput.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);
   const { tradieUid } = parsed.data;
-  await requireTradieExists(tradieUid);
+  // Eligibility precheck: an approved application without approved ID + at
+  // least one approved cert lands the tradesperson in a half-state where
+  // isVisible never flips and submitForVetting refuses to re-submit. Block
+  // approval until those are done so they only get the "you're live" email
+  // when they're actually live.
+  const [tradieSnap, idSnap, certsSnap] = await Promise.all([
+    db.doc(`tradespeople/${tradieUid}`).get(),
+    db.doc(`idVerifications/${tradieUid}`).get(),
+    db.collection("certifications").where("tradespersonId", "==", tradieUid).get(),
+  ]);
+  if (!tradieSnap.exists) throw new HttpsError("not-found", "Tradesperson not found.");
+  const idStatus = (idSnap.data() as { status?: string } | undefined)?.status;
+  if (idStatus !== "approved") {
+    throw new HttpsError(
+      "failed-precondition",
+      "Approve the ID verification before approving the application.",
+    );
+  }
+  const hasApprovedCert = certsSnap.docs.some(
+    (d) => (d.data() as { status?: string }).status === "approved",
+  );
+  if (!hasApprovedCert) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Approve at least one certification before approving the application.",
+    );
+  }
 
   await db.doc(`tradespeople/${tradieUid}`).update({
     vettingStatus: "approved",

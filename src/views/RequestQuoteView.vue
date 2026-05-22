@@ -17,6 +17,7 @@ import type { IntakeField, TradespersonDoc, WithId, Urgency } from "@/firebase/i
 import { tradeLabel } from "@/data/trades";
 import IntakeFormRenderer from "@/components/IntakeFormRenderer.vue";
 import { useToast } from "@/composables/useToast";
+import { useGoogleMaps } from "@/composables/useGoogleMaps";
 import { compressToWebp } from "@/utils/image";
 import { humanizeError } from "@/utils/errors";
 import { jobRequestSchema } from "@/validation/schemas";
@@ -48,6 +49,7 @@ interface PendingPhoto {
 }
 const photos = ref<PendingPhoto[]>([]);
 const photoInput = ref<HTMLInputElement | null>(null);
+const addressAutocompleteEl = ref<HTMLInputElement | null>(null);
 
 const submitting = ref(false);
 const error = ref<string | null>(null);
@@ -56,6 +58,37 @@ onMounted(async () => {
   tradie.value = await getTradesperson(tradieUid);
   selectedTrade.value = tradie.value?.trades[0] ?? "";
   await loadIntake();
+
+  // Wire Google Places autocomplete on the address line (mirrors PostJobView).
+  try {
+    await useGoogleMaps().load();
+    if (addressAutocompleteEl.value) {
+      const ac = new google.maps.places.Autocomplete(addressAutocompleteEl.value, {
+        fields: ["address_components", "formatted_address"],
+        types: ["geocode"],
+        componentRestrictions: { country: "ca" },
+      });
+      ac.addListener("place_changed", () => {
+        const place = ac.getPlace();
+        if (!place?.address_components) return;
+        const comp = (type: string) =>
+          place.address_components?.find((c) => c.types.includes(type))?.long_name ?? "";
+        const short = (type: string) =>
+          place.address_components?.find((c) => c.types.includes(type))?.short_name ?? "";
+        const streetNumber = comp("street_number");
+        const route = comp("route");
+        addressLine1.value =
+          [streetNumber, route].filter(Boolean).join(" ").trim() ||
+          place.formatted_address?.split(",")[0] ||
+          "";
+        city.value = comp("locality") || comp("sublocality") || "";
+        region.value = short("administrative_area_level_1") || "";
+        postalCode.value = comp("postal_code") || "";
+      });
+    }
+  } catch {
+    /* maps failed to load — fall back to manual fields */
+  }
 });
 
 onUnmounted(() => {
@@ -253,7 +286,14 @@ async function submit() {
 
       <fieldset>
         <legend class="text-sm font-medium mb-2">Address</legend>
-        <div class="grid sm:grid-cols-2 gap-2">
+        <input
+          ref="addressAutocompleteEl"
+          type="text"
+          class="p-inputtext p-component w-full"
+          placeholder="Start typing your address…"
+          autocomplete="off"
+        />
+        <div class="grid sm:grid-cols-2 gap-2 mt-2">
           <InputText v-model="addressLine1" placeholder="Street address" maxlength="200" autocomplete="address-line1" />
           <InputText v-model="city" placeholder="City" maxlength="100" autocomplete="address-level2" />
           <InputText v-model="region" placeholder="Province" maxlength="100" autocomplete="address-level1" />

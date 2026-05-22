@@ -114,6 +114,22 @@ function urgencyLabel(u: string): string {
       <i class="pi pi-spin pi-spinner mr-2"></i>Loading your profile…
     </div>
 
+    <Message
+      v-else-if="!tradie?.isVisible && tradie?.vettingStatus === 'approved'"
+      severity="info"
+      :closable="false"
+      class="mt-6"
+    >
+      <strong>Application approved.</strong>
+      We're finishing
+      <template v-if="!tradie?.idVerified && (tradie?.verifiedTrades?.length ?? 0) === 0">
+        ID verification and certification approval
+      </template>
+      <template v-else-if="!tradie?.idVerified">ID verification</template>
+      <template v-else>certification approval</template>
+      — you'll be able to browse and apply automatically once that's done.
+    </Message>
+
     <Message v-else-if="!tradie?.isVisible" severity="info" :closable="false" class="mt-6">
       <strong>Vetting in progress.</strong>
       You'll be able to browse and apply to open jobs once your application is approved (typically 1–2 business days).

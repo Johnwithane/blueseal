@@ -4,6 +4,7 @@ import {
   getDoc,
   getDocs,
   limit as fbLimit,
+  onSnapshot,
   orderBy,
   query,
   serverTimestamp,
@@ -38,6 +39,18 @@ export async function getTradesperson(uid: string): Promise<WithId<TradespersonD
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
 
+// Live subscription to a tradesperson doc. Used by the global status banner
+// so the banner clears (or changes) the instant an admin updates vetting.
+// Emits `null` if the doc doesn't exist (e.g. user just added the role).
+export function subscribeTradesperson(
+  uid: string,
+  cb: (tradie: WithId<TradespersonDoc> | null) => void,
+): () => void {
+  return onSnapshot(tradieRef(uid), (snap) => {
+    cb(snap.exists() ? { id: snap.id, ...snap.data() } : null);
+  });
+}
+
 export async function createOrUpdateDraft(
   uid: string,
   draft: Partial<TradespersonDoc>,
@@ -51,6 +64,8 @@ export async function createOrUpdateDraft(
   await setDoc(ref, {
     displayName: "",
     photoURL: null,
+    companyName: null,
+    languages: [],
     bio: "",
     trades: [],
     yearsExperience: {},
@@ -100,6 +115,16 @@ export async function submitForReview(uid: string): Promise<void> {
   await updateDoc(doc(db, "tradespeople", uid), {
     vettingStatus: "pending",
     submittedAt: serverTimestamp(),
+  });
+}
+
+// Pulls a `pending` application back to `draft` so the tradesperson can edit
+// it. Rules allow pending → draft (firestore.rules § tradespeople update).
+// Use only for the explicit "Withdraw to edit" path — autosave must never
+// silently demote a submission.
+export async function withdrawFromReview(uid: string): Promise<void> {
+  await updateDoc(doc(db, "tradespeople", uid), {
+    vettingStatus: "draft",
   });
 }
 

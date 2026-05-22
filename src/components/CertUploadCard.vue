@@ -254,22 +254,42 @@ const displayCertName = computed(() => {
   if (idx === -1) return { name: "", number: raw };
   return { name: raw.slice(0, idx), number: raw.slice(idx + 3) };
 });
+
+// Default-open the card when there's nothing uploaded yet (the user needs
+// to fill out the form) or when the cert was rejected (needs attention).
+// Completed pending / approved certs collapse by default so a long list of
+// trades doesn't dominate the screen — the user can still expand to view.
+const defaultOpen = computed(
+  () => !props.existing || props.existing.status === "rejected" || editing.value,
+);
 </script>
 
 <template>
-  <div class="bs-card p-3">
-    <div class="flex items-center justify-between gap-2 flex-wrap">
+  <details class="bs-card bs-cert-card" :open="defaultOpen">
+    <summary class="bs-cert-card__summary">
       <div class="font-semibold">{{ tradeLabel(trade) }}</div>
-      <!-- "pending" is the default state and just means "admin hasn't
-           reviewed yet" — that's noise while the user is still drafting,
-           and after submission the global TradieStatusBanner covers it.
-           Only surface the admin's actual decisions here. -->
-      <Tag
-        v-if="existing && existing.status !== 'pending'"
-        :value="existing.status"
-        :severity="statusSeverity[existing.status]"
-      />
-    </div>
+      <div class="flex items-center gap-2">
+        <!-- Status hint in the collapsed header so the user knows at a
+             glance whether this trade needs attention. "pending" is the
+             default and uninformative on its own — show "Uploaded" instead
+             so it reads as progress, not as a yellow warning. -->
+        <span v-if="existing" class="text-xs text-[color:var(--bs-muted)]">
+          {{ isNoCertDoc ? "No formal cert" : "Uploaded" }}
+        </span>
+        <Tag
+          v-else
+          value="Needed"
+          severity="warn"
+        />
+        <Tag
+          v-if="existing && existing.status !== 'pending'"
+          :value="existing.status"
+          :severity="statusSeverity[existing.status]"
+        />
+        <i class="pi pi-chevron-down bs-cert-card__chevron" aria-hidden="true"></i>
+      </div>
+    </summary>
+    <div class="bs-cert-card__body">
 
     <!-- UPLOADED STATE: keep the card fully expanded so the user can see what
          was submitted, view the file, and replace / remove it. -->
@@ -502,5 +522,37 @@ const displayCertName = computed(() => {
         </template>
       </div>
     </template>
-  </div>
+    </div>
+  </details>
 </template>
+
+<style scoped>
+.bs-cert-card {
+  /* Replace the default `<details>` triangle with our own chevron. */
+  padding: 0;
+}
+.bs-cert-card > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.75rem;
+  user-select: none;
+}
+.bs-cert-card > summary::-webkit-details-marker {
+  display: none;
+}
+.bs-cert-card__chevron {
+  transition: transform 0.18s ease;
+  color: var(--bs-muted);
+}
+.bs-cert-card[open] > summary .bs-cert-card__chevron {
+  transform: rotate(180deg);
+}
+.bs-cert-card__body {
+  padding: 0 0.75rem 0.75rem;
+}
+</style>

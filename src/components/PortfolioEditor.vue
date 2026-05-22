@@ -10,6 +10,10 @@ import { humanizeError } from "@/utils/errors";
 
 const props = defineProps<{
   tradieUid: string;
+  // The wizard's Basics step renders its own "Portfolio photos" heading
+  // above the editor, so we suppress the inner one there to avoid two
+  // titles in a row. Defaults to false so AccountView usage is unchanged.
+  hideTitle?: boolean;
 }>();
 
 const toast = useToast();
@@ -101,16 +105,20 @@ async function move(idx: number, delta: -1 | 1) {
 <template>
   <div class="bs-card p-5">
     <div class="flex items-center justify-between gap-3">
-      <div>
+      <div v-if="!props.hideTitle">
         <h2 class="text-lg font-semibold">Portfolio</h2>
         <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
           Up to {{ PORTFOLIO_MAX }} photos of your past work. First photo shows
           biggest on your profile.
         </p>
       </div>
+      <p v-else class="text-sm text-[color:var(--bs-muted)]">
+        Up to {{ PORTFOLIO_MAX }} photos. First photo shows biggest on your profile.
+      </p>
       <Button
         icon="pi pi-upload"
         label="Add photo"
+        class="shrink-0 whitespace-nowrap"
         :loading="uploading"
         :disabled="photos.length >= PORTFOLIO_MAX"
         @click="fileInput?.click()"

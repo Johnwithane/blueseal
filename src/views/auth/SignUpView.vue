@@ -5,7 +5,6 @@ import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import Password from "primevue/password";
 import Checkbox from "primevue/checkbox";
-import ToggleSwitch from "primevue/toggleswitch";
 import Message from "primevue/message";
 import Divider from "primevue/divider";
 import { useAuthStore } from "@/stores/auth";
@@ -96,12 +95,35 @@ async function google() {
     <p class="text-[color:var(--bs-muted)] mb-6">{{ subtitle }}</p>
 
     <form class="bs-form bs-card p-6 space-y-4" @submit.prevent="submit">
-      <label
-        class="flex items-center justify-between gap-3 rounded-lg border border-[color:var(--bs-border)] bg-[color:var(--bs-surface-alt)] px-3 py-2 cursor-pointer"
-      >
-        <span class="text-sm font-medium">I'm a tradesperson</span>
-        <ToggleSwitch v-model="isTradie" />
-      </label>
+      <fieldset class="space-y-2">
+        <legend class="text-sm font-medium mb-2">I'm signing up as a…</legend>
+        <div role="radiogroup" class="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            role="radio"
+            :aria-checked="!isTradie"
+            class="role-option"
+            :class="{ 'role-option-active': !isTradie }"
+            @click="isTradie = false"
+          >
+            <i class="pi pi-search text-lg"></i>
+            <span class="role-option-title">A client</span>
+            <span class="role-option-sub">Hiring a tradesperson</span>
+          </button>
+          <button
+            type="button"
+            role="radio"
+            :aria-checked="isTradie"
+            class="role-option"
+            :class="{ 'role-option-active': isTradie }"
+            @click="isTradie = true"
+          >
+            <i class="pi pi-wrench text-lg"></i>
+            <span class="role-option-title">A tradesperson</span>
+            <span class="role-option-sub">Offering services</span>
+          </button>
+        </div>
+      </fieldset>
 
       <div>
         <label class="text-sm font-medium">Your name</label>
@@ -158,3 +180,42 @@ async function google() {
     </form>
   </section>
 </template>
+
+<style scoped>
+.role-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 0.6rem;
+  border: 2px solid var(--bs-border);
+  background: #fff;
+  color: var(--bs-muted);
+  text-align: left;
+  transition: border-color 120ms, background-color 120ms, color 120ms;
+  cursor: pointer;
+}
+.role-option:hover {
+  border-color: var(--bs-blue-light);
+  color: var(--bs-text);
+}
+.role-option:focus-visible {
+  outline: 2px solid var(--bs-blue);
+  outline-offset: 2px;
+}
+.role-option-active {
+  border-color: var(--bs-blue);
+  background: #eaf5fc;
+  color: var(--bs-blue-dark);
+}
+.role-option-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-top: 0.25rem;
+}
+.role-option-sub {
+  font-size: 0.75rem;
+  opacity: 0.85;
+}
+</style>

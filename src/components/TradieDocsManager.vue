@@ -13,18 +13,24 @@ import {
   getIdVerification,
   submitIdVerification,
 } from "@/firebase/services/idVerifications";
+import { getInsurance } from "@/firebase/services/insuranceVerifications";
+import { getWsib } from "@/firebase/services/wsibVerifications";
 import { uploadFile, uploadFileNoUrl, makeStoragePath } from "@/firebase/services/storage";
 import { getTradesperson } from "@/firebase/services/tradespeople";
 import type {
   CertificationDoc,
   IdDocType,
   IdVerificationDoc,
+  InsuranceVerificationDoc,
   WithId,
+  WsibVerificationDoc,
 } from "@/firebase/interfaces";
 import { useToast } from "@/composables/useToast";
 import { useFormatters } from "@/composables/useFormatters";
 import CertUploadCard from "@/components/CertUploadCard.vue";
 import IdUploadCard from "@/components/IdUploadCard.vue";
+import InsuranceUploadCard from "@/components/InsuranceUploadCard.vue";
+import WsibUploadCard from "@/components/WsibUploadCard.vue";
 
 const props = defineProps<{
   tradieUid: string;
@@ -36,19 +42,25 @@ const { date } = useFormatters();
 const trades = ref<string[]>([]);
 const certs = ref<WithId<CertificationDoc>[]>([]);
 const idDoc = ref<WithId<IdVerificationDoc> | null>(null);
+const insuranceDoc = ref<WithId<InsuranceVerificationDoc> | null>(null);
+const wsibDoc = ref<WithId<WsibVerificationDoc> | null>(null);
 const loading = ref(true);
 const showIdReupload = ref(false);
 
 async function load() {
   loading.value = true;
-  const [t, certList, idData] = await Promise.all([
+  const [t, certList, idData, insData, wsibData] = await Promise.all([
     getTradesperson(props.tradieUid),
     listCertsFor(props.tradieUid),
     getIdVerification(props.tradieUid),
+    getInsurance(props.tradieUid),
+    getWsib(props.tradieUid),
   ]);
   trades.value = t?.trades ?? [];
   certs.value = certList;
   idDoc.value = idData;
+  insuranceDoc.value = insData;
+  wsibDoc.value = wsibData;
   showIdReupload.value = !idData;
   loading.value = false;
 }
@@ -111,6 +123,14 @@ async function onIdRemoved() {
   toast.success("ID removed");
 }
 
+async function reloadInsurance() {
+  insuranceDoc.value = await getInsurance(props.tradieUid);
+}
+
+async function reloadWsib() {
+  wsibDoc.value = await getWsib(props.tradieUid);
+}
+
 const statusSeverity = {
   pending: "warn" as const,
   approved: "success" as const,
@@ -122,8 +142,9 @@ const statusSeverity = {
   <div class="bs-card mt-4 p-5">
     <h2 class="text-lg font-semibold">Trade documents</h2>
     <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
-      Manage the certifications and ID you submitted for vetting. Changes
-      reset that document's review status to pending.
+      Manage the certifications, ID, insurance, and workers' comp clearance
+      you submitted for vetting. Changes reset that document's review status
+      to pending.
     </p>
 
     <div v-if="loading" class="bs-empty mt-4">Loading…</div>
@@ -188,6 +209,26 @@ const statusSeverity = {
           text
           size="small"
           @click="showIdReupload = false"
+        />
+      </div>
+
+      <h3 class="font-semibold mt-6 mb-2">Insurance &amp; workers' comp</h3>
+      <p class="text-sm text-[color:var(--bs-muted)]">
+        Optional verifications that add trust badges to your public profile.
+        Reviewed by our team within 48 hours.
+      </p>
+      <div class="space-y-3 mt-2">
+        <InsuranceUploadCard
+          :tradesperson-id="tradieUid"
+          :existing="insuranceDoc"
+          @submitted="reloadInsurance"
+          @updated="reloadInsurance"
+        />
+        <WsibUploadCard
+          :tradesperson-id="tradieUid"
+          :existing="wsibDoc"
+          @submitted="reloadWsib"
+          @updated="reloadWsib"
         />
       </div>
     </template>

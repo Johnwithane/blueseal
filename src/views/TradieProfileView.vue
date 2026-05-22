@@ -28,6 +28,21 @@ const avatarInitial = computed(() => {
   return source.slice(0, 1).toUpperCase() || "?";
 });
 
+// Trades with their experience years, primary first. Used to render the
+// header subtitle ("Plumber · Electrician") and a per-trade chip strip
+// with years of experience so clients see the full picture, not just the
+// primary trade.
+const tradesWithYears = computed(() => {
+  const t = tradie.value;
+  if (!t) return [];
+  return t.trades.map((key) => ({
+    key,
+    label: tradeLabel(key),
+    years: t.yearsExperience?.[key] ?? null,
+    verified: t.verifiedTrades?.includes(key) ?? false,
+  }));
+});
+
 // Trust-badge visibility — auto-hides once expiresAt passes so the badge
 // disappears without admin intervention when a policy or clearance lapses.
 const insuranceLive = computed(() => {
@@ -49,9 +64,10 @@ const shareUrl = computed(() => {
 async function share() {
   if (!tradie.value) return;
   const url = shareUrl.value;
+  const tradesText = tradie.value.trades.map((t) => tradeLabel(t)).join(" · ");
   const title = displayName.value
-    ? `${displayName.value} — ${tradeLabel(tradie.value.trades[0] ?? "")} on Blue Seal`
-    : `${tradeLabel(tradie.value.trades[0] ?? "")} on Blue Seal`;
+    ? `${displayName.value} — ${tradesText} on Blue Seal`
+    : `${tradesText} on Blue Seal`;
   // Prefer native share sheet on mobile; fall back to clipboard everywhere else.
   if (typeof navigator !== "undefined" && "share" in navigator) {
     try {
@@ -102,8 +118,11 @@ onMounted(async () => {
           />
           <div class="flex-1 min-w-0">
             <h1 class="text-2xl font-bold">{{ displayName || tradeLabel(tradie.trades[0]) }}</h1>
+            <div v-if="tradie.companyName" class="text-sm text-[color:var(--bs-muted)]">
+              {{ tradie.companyName }}
+            </div>
             <div class="mt-1 text-sm text-[color:var(--bs-muted)]">
-              {{ tradeLabel(tradie.trades[0]) }}
+              {{ tradesWithYears.map((t) => t.label).join(" · ") }}
               <span v-if="tradie.primaryAddressText"> • {{ tradie.primaryAddressText }}</span>
               <span v-if="tradie.serviceRadiusKm"> • {{ tradie.serviceRadiusKm }} km radius</span>
             </div>
@@ -111,9 +130,25 @@ onMounted(async () => {
               <Tag v-if="tradie.idVerified" value="ID verified" severity="success" />
               <Tag v-if="insuranceLive" value="Insured" severity="info" icon="pi pi-verified" />
               <Tag v-if="wsibLive" value="WSIB verified" severity="info" icon="pi pi-shield" />
-              <span v-for="t in tradie.verifiedTrades" :key="t" class="bs-pill verified">
-                <i class="pi pi-verified"></i>{{ tradeLabel(t) }}
+            </div>
+            <div v-if="tradesWithYears.length" class="mt-2 flex flex-wrap items-center gap-1">
+              <span
+                v-for="t in tradesWithYears"
+                :key="t.key"
+                class="bs-pill"
+                :class="{ verified: t.verified }"
+              >
+                <i v-if="t.verified" class="pi pi-verified"></i>
+                {{ t.label }}
+                <span v-if="t.years" class="opacity-75">· {{ t.years }}y</span>
               </span>
+            </div>
+            <div
+              v-if="tradie.languages && tradie.languages.length"
+              class="mt-2 text-xs text-[color:var(--bs-muted)]"
+            >
+              <i class="pi pi-comments mr-1"></i>
+              Speaks {{ tradie.languages.join(", ") }}
             </div>
           </div>
           <div class="flex flex-wrap gap-2">

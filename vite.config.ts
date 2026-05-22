@@ -32,7 +32,14 @@ export default defineConfig({
         ],
       },
       workbox: {
-        navigateFallback: "/offline.html",
+        // SPA navigation: serve the cached app shell for any client-side route
+        // so Vue Router can resolve it. Do NOT point this at /offline.html —
+        // that swallows every direct navigation (e.g. /onboarding) and shows
+        // the offline page even when the user is online. A real offline
+        // fallback needs a custom SW (injectManifest + setCatchHandler).
+        navigateFallback: "/index.html",
+        // Firebase Hosting reserved paths must hit the network, not the shell.
+        navigateFallbackDenylist: [/^\/__\//],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/firebasestorage\.googleapis\.com\/.*/i,

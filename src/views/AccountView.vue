@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
-import { RouterLink, useRouter } from "vue-router";
+import { onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
 import { updateProfile } from "firebase/auth";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
@@ -9,6 +9,7 @@ import Avatar from "primevue/avatar";
 import Dialog from "primevue/dialog";
 import Textarea from "primevue/textarea";
 import ToggleSwitch from "primevue/toggleswitch";
+import MultiSelect from "primevue/multiselect";
 import { useAuthStore } from "@/stores/auth";
 import {
   exportMyData,
@@ -19,14 +20,17 @@ import {
   updateUserProfile,
   updateUserPhoto,
 } from "@/firebase/services/users";
-import { getTradesperson } from "@/firebase/services/tradespeople";
+import {
+  createOrUpdateDraft,
+  getTradesperson,
+} from "@/firebase/services/tradespeople";
 import type { TradespersonDoc, WithId } from "@/firebase/interfaces";
 import { uploadFile, makeStoragePath } from "@/firebase/services/storage";
 import { compressToWebp } from "@/utils/image";
 import { useToast } from "@/composables/useToast";
 import { useFormatters } from "@/composables/useFormatters";
 import { humanizeError } from "@/utils/errors";
-import TrustBadgesSection from "@/components/TrustBadgesSection.vue";
+import { COMMON_LANGUAGES } from "@/data/languages";
 import PortfolioEditor from "@/components/PortfolioEditor.vue";
 import TradieDocsManager from "@/components/TradieDocsManager.vue";
 
@@ -49,6 +53,15 @@ const addingClient = ref(false);
 const grantingAdminAllRoles = ref(false);
 const error = ref<string | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
+
+// Tradesperson-only profile fields. Pulled from /tradespeople/{uid}; written
+// back via createOrUpdateDraft alongside the same denormalized fields the
+// onboarding wizard manages. Only mounted/saved when the user holds the
+// tradesperson role.
+const companyName = ref("");
+const bio = ref("");
+const languages = ref<string[]>([]);
+const savingTradieProfile = ref(false);
 
 // Privacy section state (PIPEDA — export + delete)
 const showDeleteDialog = ref(false);
@@ -77,65 +90,17 @@ onMounted(async () => {
   // we don't silently change their notification behavior.
   emailEnabled.value = u.notificationPrefs?.emailEnabled ?? true;
   whatsappEnabled.value = u.notificationPrefs?.whatsappEnabled ?? true;
-  // Tradesperson doc drives the status card below — only fetch if the
-  // role is held. Users without the role won't see the card at all.
+  // Pull the tradesperson doc to seed the tradie-only profile fields below
+  // (companyName / bio / languages). The vetting-status banner is rendered
+  // globally by TradieStatusBanner.vue so we don't recompute it here.
   if (auth.hasTradieRole) {
-    tradie.value = await getTradesperson(auth.fbUser.uid);
-  }
-});
-
-interface TradieStatus {
-  tone: "warn" | "info" | "error" | "success";
-  label: string;
-  description: string;
-  cta?: { to: string; label: string };
-}
-
-const tradieStatus = computed<TradieStatus | null>(() => {
-  if (!auth.hasTradieRole) return null;
-  const status = tradie.value?.vettingStatus ?? "draft";
-  switch (status) {
-    case "draft":
-      return {
-        tone: "warn",
-        label: "Onboarding incomplete",
-        description:
-          "Finish your onboarding to submit your application. Until then your tradesperson profile is hidden from search.",
-        cta: { to: "/onboarding", label: "Finish onboarding" },
-      };
-    case "pending":
-      return {
-        tone: "info",
-        label: "Awaiting approval",
-        description:
-          "Your application is with our vetting team. We typically review within 48 hours and will notify you once you're approved.",
-      };
-    case "info_requested":
-      return {
-        tone: "warn",
-        label: "More info needed",
-        description:
-          tradie.value?.vettingNotes?.trim() ||
-          "Our reviewer asked for a few changes before approving your application.",
-        cta: { to: "/onboarding", label: "Update application" },
-      };
-    case "rejected":
-      return {
-        tone: "error",
-        label: "Application not approved",
-        description:
-          tradie.value?.vettingNotes?.trim() ||
-          "Your application wasn't approved. Reply to the email we sent for next steps.",
-      };
-    case "approved":
-      return {
-        tone: "success",
-        label: "Approved — your profile is live",
-        description:
-          "Clients can find you in search and send requests. Keep your availability and portfolio up to date.",
-      };
-    default:
-      return null;
+    const t = await getTradesperson(auth.fbUser.uid);
+    tradie.value = t;
+    if (t) {
+      companyName.value = t.companyName ?? "";
+      bio.value = t.bio ?? "";
+      languages.value = Array.isArray(t.languages) ? [...t.languages] : [];
+    }
   }
 });
 
@@ -163,6 +128,38 @@ async function saveProfile() {
     error.value = (e as Error).message;
   } finally {
     saving.value = false;
+  }
+}
+
+// Tradesperson-only profile fields: companyName / bio / languages live on
+// /tradespeople/{uid} (the public profile reads them there). Mirrors the
+// wizard's Basics step but skipped here for non-tradies. We don't touch
+// vettingStatus — pending applications stay pending; createOrUpdateDraft
+// only patches what's in the object.
+async function saveTradieProfile() {
+  if (!auth.fbUser || !auth.hasTradieRole) return;
+  if (bio.value.length > 0 && bio.value.length < 20) {
+    error.value = "Bio should be at least 20 characters — it's what clients read first.";
+    return;
+  }
+  error.value = null;
+  savingTradieProfile.value = true;
+  try {
+    await createOrUpdateDraft(auth.fbUser.uid, {
+      companyName: companyName.value.trim() || null,
+      bio: bio.value,
+      languages: languages.value,
+    });
+    if (tradie.value) {
+      tradie.value.companyName = companyName.value.trim() || null;
+      tradie.value.bio = bio.value;
+      tradie.value.languages = [...languages.value];
+    }
+    toast.success("Tradesperson profile saved");
+  } catch (e) {
+    error.value = humanizeError(e);
+  } finally {
+    savingTradieProfile.value = false;
   }
 }
 
@@ -419,6 +416,81 @@ async function grantAdminAllRoles() {
       </div>
     </form>
 
+    <!-- Tradesperson profile: company name, bio, languages — mirrors the
+         wizard's Basics step so the tradie can edit these from one place
+         instead of jumping back to the wizard. Portfolio editor lives just
+         below since it's also part of the public profile. -->
+    <form
+      v-if="auth.hasTradieRole"
+      class="bs-card bs-form mt-4 space-y-4 p-5"
+      @submit.prevent="saveTradieProfile"
+    >
+      <div>
+        <h2 class="text-lg font-semibold">Tradesperson profile</h2>
+        <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
+          What clients see on your public profile. You can also edit these
+          during onboarding.
+        </p>
+      </div>
+      <div>
+        <label class="text-sm font-medium">
+          Company / business name
+          <span class="text-xs text-[color:var(--bs-muted)] font-normal">Optional</span>
+        </label>
+        <InputText
+          v-model="companyName"
+          class="mt-1 w-full"
+          placeholder="e.g. ABC Mechanical Ltd."
+        />
+        <p class="mt-1 text-xs text-[color:var(--bs-muted)]">
+          Leave blank if you operate as a sole proprietor.
+        </p>
+      </div>
+      <div>
+        <label class="text-sm font-medium">Short bio</label>
+        <Textarea
+          v-model="bio"
+          rows="5"
+          class="mt-1 w-full"
+          placeholder="What kind of work do you do? How long? What sets you apart?"
+        />
+        <p class="mt-1 text-xs text-[color:var(--bs-muted)]">
+          At least 20 characters — this is what clients read first.
+        </p>
+      </div>
+      <div>
+        <label class="text-sm font-medium">
+          Languages you work in
+          <span class="text-xs text-[color:var(--bs-muted)] font-normal">Optional</span>
+        </label>
+        <MultiSelect
+          v-model="languages"
+          :options="COMMON_LANGUAGES"
+          placeholder="Select all that apply"
+          class="mt-1 w-full"
+          filter
+          :max-selected-labels="6"
+        />
+        <p class="mt-1 text-xs text-[color:var(--bs-muted)]">
+          Helps clients who'd prefer to be served in a specific language.
+        </p>
+      </div>
+      <div class="flex justify-end">
+        <Button
+          type="submit"
+          label="Save tradesperson profile"
+          icon="pi pi-save"
+          :loading="savingTradieProfile"
+        />
+      </div>
+    </form>
+
+    <PortfolioEditor
+      v-if="auth.hasTradieRole && auth.fbUser"
+      :tradie-uid="auth.fbUser.uid"
+      class="mt-4"
+    />
+
     <div class="bs-card mt-4 p-5">
       <h2 class="text-lg font-semibold">Password</h2>
       <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
@@ -541,48 +613,12 @@ async function grantAdminAllRoles() {
       </div>
     </div>
 
-    <div
-      v-if="tradieStatus"
-      :class="[
-        'bs-account-status mt-4 p-5 rounded-2xl border',
-        tradieStatus.tone === 'warn' && 'bs-account-status--warn',
-        tradieStatus.tone === 'info' && 'bs-account-status--info',
-        tradieStatus.tone === 'error' && 'bs-account-status--error',
-        tradieStatus.tone === 'success' && 'bs-account-status--success',
-      ]"
-    >
-      <div class="flex items-start justify-between gap-3 flex-wrap">
-        <div class="min-w-0">
-          <h2 class="text-lg font-semibold">Tradesperson application</h2>
-          <div class="mt-1 inline-flex items-center gap-2">
-            <span class="bs-account-status__dot" aria-hidden="true"></span>
-            <span class="text-sm font-semibold">{{ tradieStatus.label }}</span>
-          </div>
-          <p class="mt-2 text-sm text-[color:var(--bs-text)]/85">
-            {{ tradieStatus.description }}
-          </p>
-        </div>
-        <RouterLink v-if="tradieStatus.cta" :to="tradieStatus.cta.to" class="shrink-0">
-          <Button :label="tradieStatus.cta.label" icon="pi pi-arrow-right" icon-pos="right" />
-        </RouterLink>
-      </div>
-    </div>
+    <!-- Vetting-status banner is rendered globally by TradieStatusBanner.vue
+         (mounted in App.vue), so we don't duplicate it here. -->
 
     <TradieDocsManager
       v-if="auth.hasTradieRole && auth.fbUser"
       :tradie-uid="auth.fbUser.uid"
-    />
-
-    <PortfolioEditor
-      v-if="auth.hasTradieRole && auth.fbUser"
-      :tradie-uid="auth.fbUser.uid"
-      class="mt-4"
-    />
-
-    <TrustBadgesSection
-      v-if="auth.hasTradieRole && auth.fbUser"
-      :tradie-uid="auth.fbUser.uid"
-      class="mt-4"
     />
 
     <div class="bs-card mt-4 p-5">
@@ -736,39 +772,3 @@ async function grantAdminAllRoles() {
   </section>
 </template>
 
-<style scoped>
-.bs-account-status__dot {
-  display: inline-block;
-  width: 0.55rem;
-  height: 0.55rem;
-  border-radius: 999px;
-}
-.bs-account-status--info {
-  background: #eaf5fc;
-  border-color: #bfdcee;
-}
-.bs-account-status--info .bs-account-status__dot {
-  background: var(--bs-blue);
-}
-.bs-account-status--warn {
-  background: #fff5e6;
-  border-color: #f4d6a4;
-}
-.bs-account-status--warn .bs-account-status__dot {
-  background: #d97706;
-}
-.bs-account-status--error {
-  background: #fdecec;
-  border-color: #f5b3b3;
-}
-.bs-account-status--error .bs-account-status__dot {
-  background: #b91c1c;
-}
-.bs-account-status--success {
-  background: #eaf7ee;
-  border-color: #b7e0c2;
-}
-.bs-account-status--success .bs-account-status__dot {
-  background: #15803d;
-}
-</style>

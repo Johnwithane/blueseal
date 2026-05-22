@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import Button from "primevue/button";
 import Tag from "primevue/tag";
@@ -66,6 +66,17 @@ const showRejectInsurance = ref(false);
 const showRejectWsib = ref(false);
 const rejectCertId = ref<string | null>(null);
 const rejectReason = ref("");
+
+// Inline document viewer (PDF iframe / image). Mirrors the onboarding pattern
+// in CertUploadCard so admins don't have to context-switch to a new tab.
+// `watermark` overlays "ADMIN VIEW ONLY" — used for ID docs.
+const viewer = ref<{ url: string; title: string; watermark: boolean } | null>(null);
+const viewerIsPdf = computed(() => viewer.value?.url.toLowerCase().includes(".pdf") ?? false);
+
+function openViewer(url: string | null | undefined, title: string, watermark = false) {
+  if (!url) return;
+  viewer.value = { url, title, watermark };
+}
 
 async function load() {
   loading.value = true;
@@ -185,9 +196,15 @@ async function confirmRejectWsib() {
 
 async function approveAll() {
   // Per design.md: callable handles email + sets isVisible/verifiedTrades via downstream triggers.
-  await approveApplication({ tradieUid: uid });
-  toast.success("Application approved", "Welcome email queued.");
-  router.replace({ name: "AdminVetting" });
+  // Callable also refuses if ID/cert aren't approved yet — surface that to the
+  // admin instead of leaving an unhandled rejection in the console.
+  try {
+    await approveApplication({ tradieUid: uid });
+    toast.success("Application approved", "Welcome email queued.");
+    router.replace({ name: "AdminVetting" });
+  } catch (e) {
+    toast.error("Couldn't approve", (e as Error).message);
+  }
 }
 
 async function submitRequestInfo() {
@@ -209,6 +226,20 @@ const certSeverity = {
   approved: "success" as const,
   rejected: "danger" as const,
 };
+
+// Mirrors the server-side precondition in approveApplication — disable the
+// "Approve all" button until the gates are met so the admin doesn't get a
+// toast error instead of an outcome.
+const idApproved = computed(() => idDoc.value?.status === "approved");
+const hasApprovedCert = computed(() => certs.value.some((c) => c.status === "approved"));
+const canApproveApplication = computed(() => idApproved.value && hasApprovedCert.value);
+const approveBlockerHint = computed(() => {
+  if (idApproved.value && hasApprovedCert.value) return "";
+  const missing: string[] = [];
+  if (!idApproved.value) missing.push("ID");
+  if (!hasApprovedCert.value) missing.push("a certification");
+  return `Approve ${missing.join(" and ")} first.`;
+});
 </script>
 
 <template>
@@ -248,9 +279,14 @@ const certSeverity = {
             <div class="text-xs text-[color:var(--bs-muted)]">
               {{ c.issuingBody }} • #{{ c.certNumber }}
             </div>
-            <a :href="c.fileUrl" target="_blank" rel="noopener" class="text-sm block mt-1">
-              View document →
-            </a>
+            <Button
+              icon="pi pi-eye"
+              label="View document"
+              outlined
+              size="small"
+              class="mt-2"
+              @click="openViewer(c.fileUrl, tradeLabel(c.trade) + ' — certification')"
+            />
             <div v-if="c.status === 'pending'" class="flex gap-2 mt-2">
               <Button label="Approve" icon="pi pi-check" severity="success" size="small" @click="approveCert(c.id)" />
               <Button label="Reject" icon="pi pi-times" severity="danger" outlined size="small" @click="openRejectCert(c.id)" />
@@ -270,15 +306,15 @@ const certSeverity = {
               <div class="font-medium">{{ idDoc.documentType }}</div>
               <Tag :value="idDoc.status" :severity="certSeverity[idDoc.status]" />
             </div>
-            <div class="relative inline-block">
-              <a v-if="idFileUrl" :href="idFileUrl" target="_blank" rel="noopener">
-                <img :src="idFileUrl" alt="ID" class="max-w-full max-h-64 rounded border" />
-              </a>
-              <div v-else class="bs-empty">Loading document…</div>
-              <div class="absolute inset-0 flex items-center justify-center pointer-events-none text-white/80 text-xl font-bold rotate-[-20deg]">
-                ADMIN VIEW ONLY
-              </div>
-            </div>
+            <div v-if="!idFileUrl" class="bs-empty">Loading document…</div>
+            <Button
+              v-else
+              icon="pi pi-id-card"
+              label="View ID document"
+              outlined
+              size="small"
+              @click="openViewer(idFileUrl, 'ID — ' + idDoc.documentType, true)"
+            />
             <div v-if="idDoc.status === 'pending'" class="flex gap-2 mt-2">
               <Button label="Approve ID" icon="pi pi-check" severity="success" size="small" @click="approveIdHere" />
               <Button label="Reject ID" icon="pi pi-times" severity="danger" outlined size="small" @click="openRejectId" />
@@ -313,12 +349,14 @@ const certSeverity = {
               </div>
               <div><dt class="font-medium inline">Expires:</dt> {{ date(insurance.expiresAt) }}</div>
             </dl>
-            <a
-              :href="insurance.fileUrl"
-              target="_blank"
-              rel="noopener"
-              class="text-sm block mt-2"
-            >View document →</a>
+            <Button
+              icon="pi pi-eye"
+              label="View document"
+              outlined
+              size="small"
+              class="mt-2"
+              @click="openViewer(insurance.fileUrl, 'Insurance — ' + insurance.insurer)"
+            />
             <div v-if="insurance.status === 'pending'" class="flex gap-2 mt-2">
               <Button
                 label="Approve"
@@ -357,12 +395,14 @@ const certSeverity = {
               </div>
               <div><dt class="font-medium inline">Expires:</dt> {{ date(wsib.expiresAt) }}</div>
             </dl>
-            <a
-              :href="wsib.fileUrl"
-              target="_blank"
-              rel="noopener"
-              class="text-sm block mt-2"
-            >View document →</a>
+            <Button
+              icon="pi pi-eye"
+              label="View document"
+              outlined
+              size="small"
+              class="mt-2"
+              @click="openViewer(wsib.fileUrl, 'WSIB — ' + wsib.province)"
+            />
             <div v-if="wsib.status === 'pending'" class="flex gap-2 mt-2">
               <Button
                 label="Approve"
@@ -390,12 +430,23 @@ const certSeverity = {
       <!-- Decision bar -->
       <footer class="bs-card p-4 mt-6 flex flex-wrap gap-2 items-center justify-between">
         <div class="text-sm text-[color:var(--bs-muted)]">
-          Approving will set their profile <strong>live</strong> and email them.
+          <template v-if="canApproveApplication">
+            Approving will set their profile <strong>live</strong> and email them.
+          </template>
+          <template v-else>
+            {{ approveBlockerHint }}
+          </template>
         </div>
         <div class="flex gap-2">
           <Button label="Request info" icon="pi pi-question-circle" outlined @click="showRequestInfo = true; notesInput = ''" />
           <Button label="Reject" icon="pi pi-ban" severity="danger" outlined @click="showReject = true; notesInput = ''" />
-          <Button label="Approve all" icon="pi pi-check" severity="success" @click="approveAll" />
+          <Button
+            label="Approve all"
+            icon="pi pi-check"
+            severity="success"
+            :disabled="!canApproveApplication"
+            @click="approveAll"
+          />
         </div>
       </footer>
     </template>
@@ -437,6 +488,41 @@ const certSeverity = {
       <template #footer>
         <Button label="Cancel" text @click="showRejectInsurance = false" />
         <Button label="Reject" icon="pi pi-ban" severity="danger" :disabled="!rejectReason.trim()" @click="confirmRejectInsurance" />
+      </template>
+    </Dialog>
+
+    <Dialog
+      :visible="viewer !== null"
+      modal
+      :header="viewer?.title ?? ''"
+      :style="{ width: '90vw', maxWidth: '900px' }"
+      @update:visible="(v) => { if (!v) viewer = null; }"
+    >
+      <div v-if="viewer" class="relative w-full" style="height: 70vh">
+        <iframe
+          v-if="viewerIsPdf"
+          :src="viewer.url"
+          class="w-full h-full rounded border"
+          title="Document"
+        />
+        <img
+          v-else
+          :src="viewer.url"
+          alt="Document"
+          class="w-full h-full object-contain rounded border"
+        />
+        <div
+          v-if="viewer.watermark"
+          class="absolute inset-0 flex items-center justify-center pointer-events-none text-white/80 text-3xl font-bold rotate-[-20deg]"
+          style="text-shadow: 0 0 8px rgba(0,0,0,0.6);"
+        >
+          ADMIN VIEW ONLY
+        </div>
+      </div>
+      <template #footer>
+        <a v-if="viewer" :href="viewer.url" target="_blank" rel="noopener" class="text-sm">
+          Open in new tab →
+        </a>
       </template>
     </Dialog>
 

@@ -32,6 +32,23 @@ export async function getWsib(uid: string): Promise<WithId<WsibVerificationDoc> 
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
 
+// Owner-only edit of an in-review submission. Same shape as updateInsurance:
+// fix typos on a pending doc without re-uploading the file. Rules require
+// status to stay 'pending' and disallow touching reviewedBy / reviewedAt.
+export interface UpdateWsibInput {
+  province: CanadaProvince;
+  clearanceNumber: string;
+  expiresAt: Date;
+}
+
+export async function updateWsib(uid: string, input: UpdateWsibInput): Promise<void> {
+  await updateDoc(doc(db, "wsibVerifications", uid), {
+    province: input.province,
+    clearanceNumber: input.clearanceNumber.trim(),
+    expiresAt: Timestamp.fromDate(input.expiresAt),
+  });
+}
+
 export async function approveWsib(uid: string, adminUid: string): Promise<void> {
   await updateDoc(doc(db, "wsibVerifications", uid), {
     status: "approved",

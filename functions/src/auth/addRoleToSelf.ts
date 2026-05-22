@@ -60,6 +60,8 @@ export const addRoleToSelf = onCall({ enforceAppCheck: false }, async (req) => {
         // tradie's name + photo without needing read access to /users/.
         displayName: typeof userData.displayName === "string" ? userData.displayName : "",
         photoURL: typeof userData.photoURL === "string" ? userData.photoURL : null,
+        companyName: null,
+        languages: [],
         bio: "",
         trades: [],
         yearsExperience: {},

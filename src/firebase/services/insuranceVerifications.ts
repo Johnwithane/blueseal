@@ -38,6 +38,30 @@ export async function getInsurance(
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
 
+// Owner-only edit of an in-review submission. Lets the tradesperson fix a
+// typo (insurer name, policy number, coverage, expiry) without re-uploading
+// the certificate file. Rules require status to stay 'pending' and disallow
+// touching reviewedBy / reviewedAt — both are enforced server-side, and this
+// patch deliberately omits both fields.
+export interface UpdateInsuranceInput {
+  insurer: string;
+  policyNumber: string;
+  coverageAmount: number; // cents
+  expiresAt: Date;
+}
+
+export async function updateInsurance(
+  uid: string,
+  input: UpdateInsuranceInput,
+): Promise<void> {
+  await updateDoc(doc(db, "insuranceVerifications", uid), {
+    insurer: input.insurer.trim(),
+    policyNumber: input.policyNumber.trim(),
+    coverageAmount: input.coverageAmount,
+    expiresAt: Timestamp.fromDate(input.expiresAt),
+  });
+}
+
 export async function approveInsurance(uid: string, adminUid: string): Promise<void> {
   await updateDoc(doc(db, "insuranceVerifications", uid), {
     status: "approved",

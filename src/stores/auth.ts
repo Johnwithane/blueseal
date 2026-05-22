@@ -36,7 +36,12 @@ interface State {
   error: string | null;
 }
 
-let unsubscribe: (() => void) | null = null;
+// Single in-flight init promise: every caller (main.ts, router guard,
+// DashboardEntry) awaits the same one. Without this, a second caller can hit
+// an early-return AFTER the listener is attached but BEFORE the first callback
+// has fired — leaving the guard to read `fbUser = null` and bounce a signed-in
+// user to /sign-in.
+let initPromise: Promise<void> | null = null;
 
 /**
  * Normalize a claim value into a Role[] regardless of which shape it arrives in.
@@ -87,49 +92,61 @@ export const useAuthStore = defineStore("auth", {
 
   actions: {
     init(): Promise<void> {
-      if (unsubscribe) return Promise.resolve();
-      return new Promise((resolve) => {
-        unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
-          this.fbUser = fbUser;
-          if (fbUser) {
-            const tokenResult = await fbUser.getIdTokenResult();
-            const claimRoles = rolesFromClaims(
-              tokenResult.claims as Record<string, unknown>,
-            );
-            const doc = await getUser(fbUser.uid);
-            // PIPEDA: refuse to seat the session for an account that's been
-            // marked for deletion. Sign-out happens server-side via Firebase
-            // Auth; the scheduledHardDelete sweep wipes the account fully
-            // after the grace period. Recovery within the window is via
-            // support (no self-serve un-delete by design).
-            if (doc?.deletedAt) {
-              this.error =
-                "This account is scheduled for deletion. Reply to your confirmation email to recover it.";
-              await signOut(auth);
-              this.fbUser = null;
-              this.user = null;
-              this.roles = [];
-              this.activeRole = null;
-              this.ready = true;
-              resolve();
-              return;
-            }
-            this.user = doc;
-            // Doc is authoritative for `roles` (claims can lag), but claims
-            // are checked first so a fresh signup before the doc shim runs
-            // still reports something useful.
-            this.roles = doc?.roles?.length ? doc.roles : claimRoles;
-            this.activeRole =
-              doc?.activeRole ?? this.roles[0] ?? null;
-          } else {
-            this.user = null;
-            this.roles = [];
-            this.activeRole = null;
-          }
-          this.ready = true;
-          resolve();
+      if (initPromise) return initPromise;
+      initPromise = (async () => {
+        // Wait for Firebase to load persisted auth state BEFORE attaching the
+        // listener. Without this, onAuthStateChanged can fire once with `null`
+        // (before persistence loads) and a second time with the user — which
+        // resolves init() in the null state and lets the router redirect a
+        // signed-in user to /sign-in.
+        await auth.authStateReady();
+        await this.applyAuthState(auth.currentUser);
+        // From here on, keep state in sync with auth changes (sign-in,
+        // sign-out, role refresh). The listener lives for the app lifetime,
+        // so we don't hold the unsubscribe handle.
+        onAuthStateChanged(auth, (fbUser) => {
+          void this.applyAuthState(fbUser);
         });
-      });
+      })();
+      return initPromise;
+    },
+
+    async applyAuthState(fbUser: User | null) {
+      this.fbUser = fbUser;
+      if (fbUser) {
+        const tokenResult = await fbUser.getIdTokenResult();
+        const claimRoles = rolesFromClaims(
+          tokenResult.claims as Record<string, unknown>,
+        );
+        const doc = await getUser(fbUser.uid);
+        // PIPEDA: refuse to seat the session for an account that's been
+        // marked for deletion. Sign-out happens server-side via Firebase
+        // Auth; the scheduledHardDelete sweep wipes the account fully
+        // after the grace period. Recovery within the window is via
+        // support (no self-serve un-delete by design).
+        if (doc?.deletedAt) {
+          this.error =
+            "This account is scheduled for deletion. Reply to your confirmation email to recover it.";
+          await signOut(auth);
+          this.fbUser = null;
+          this.user = null;
+          this.roles = [];
+          this.activeRole = null;
+          this.ready = true;
+          return;
+        }
+        this.user = doc;
+        // Doc is authoritative for `roles` (claims can lag), but claims
+        // are checked first so a fresh signup before the doc shim runs
+        // still reports something useful.
+        this.roles = doc?.roles?.length ? doc.roles : claimRoles;
+        this.activeRole = doc?.activeRole ?? this.roles[0] ?? null;
+      } else {
+        this.user = null;
+        this.roles = [];
+        this.activeRole = null;
+      }
+      this.ready = true;
     },
 
     async signUp(opts: {
