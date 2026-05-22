@@ -6,7 +6,10 @@ import Tag from "primevue/tag";
 import DatePicker from "primevue/datepicker";
 import Textarea from "primevue/textarea";
 import Select from "primevue/select";
+import Dialog from "primevue/dialog";
 import {
+  CANCELLABLE_STATUSES,
+  cancelJob,
   getJob,
   scheduleJob,
   updateJobStatus,
@@ -54,6 +57,13 @@ const intakeDraft = ref<Record<string, unknown>>({});
 const savingIntake = ref(false);
 const returningToApplicants = ref(false);
 
+// Client-side cancellation state. The button + dialog are visible to the
+// client only while the job is in a cancellable status — once work starts
+// or money is owed, cancellation goes through a dispute (not built yet).
+const showCancelDialog = ref(false);
+const cancelReason = ref("");
+const cancelling = ref(false);
+
 const statusOptions: { label: string; value: JobStatus }[] = [
   { label: "Accepted", value: "accepted" },
   { label: "Requested", value: "requested" },
@@ -67,6 +77,13 @@ const statusOptions: { label: string; value: JobStatus }[] = [
 
 const isTradie = computed(() => auth.fbUser?.uid === job.value?.tradespersonId);
 const isClient = computed(() => auth.fbUser?.uid === job.value?.clientId);
+
+const canClientCancel = computed(
+  () =>
+    isClient.value &&
+    job.value != null &&
+    (CANCELLABLE_STATUSES as readonly string[]).includes(job.value.status),
+);
 
 async function load() {
   loading.value = true;
@@ -164,6 +181,31 @@ async function submitBrief() {
     toast.error("Couldn't save brief", humanizeError(e));
   } finally {
     savingIntake.value = false;
+  }
+}
+
+function openCancelDialog() {
+  cancelReason.value = "";
+  showCancelDialog.value = true;
+}
+
+async function confirmCancel() {
+  if (!job.value || cancelling.value) return;
+  const reason = cancelReason.value.trim();
+  if (!reason) {
+    toast.error("Please add a reason so the tradesperson knows what happened.");
+    return;
+  }
+  cancelling.value = true;
+  try {
+    await cancelJob(job.value.id, reason);
+    toast.success("Job cancelled", "The tradesperson has been notified.");
+    showCancelDialog.value = false;
+    await load();
+  } catch (e) {
+    toast.error("Couldn't cancel", humanizeError(e));
+  } finally {
+    cancelling.value = false;
   }
 }
 
@@ -326,6 +368,22 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
             />
           </div>
 
+          <div v-if="canClientCancel" class="bs-card p-3">
+            <h3 class="font-semibold text-sm mb-2">Change of plans?</h3>
+            <p class="text-xs text-[color:var(--bs-muted)] mb-2">
+              You can cancel until work starts. The tradesperson will be notified.
+            </p>
+            <Button
+              label="Cancel this job"
+              icon="pi pi-ban"
+              severity="danger"
+              outlined
+              size="small"
+              class="w-full"
+              @click="openCancelDialog"
+            />
+          </div>
+
           <div class="bs-card p-3">
             <h3 class="font-semibold text-sm mb-2">Schedule</h3>
             <div v-if="job.scheduledStart" class="text-sm">
@@ -357,5 +415,34 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
         </aside>
       </div>
     </template>
+
+    <Dialog
+      v-model:visible="showCancelDialog"
+      modal
+      header="Cancel this job?"
+      :style="{ width: '28rem', maxWidth: '92vw' }"
+    >
+      <p class="text-sm text-[color:var(--bs-text)] mb-3">
+        Tell the tradesperson what changed. They'll see this in their inbox.
+      </p>
+      <Textarea
+        v-model="cancelReason"
+        rows="4"
+        class="w-full"
+        placeholder="e.g. I fixed it myself, scope changed, picking a different timeline…"
+        :maxlength="1000"
+        autofocus
+      />
+      <template #footer>
+        <Button label="Keep job" text @click="showCancelDialog = false" />
+        <Button
+          label="Cancel job"
+          icon="pi pi-ban"
+          severity="danger"
+          :loading="cancelling"
+          @click="confirmCancel"
+        />
+      </template>
+    </Dialog>
   </section>
 </template>

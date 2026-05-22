@@ -13,7 +13,7 @@ import {
   where,
   GeoPoint,
 } from "firebase/firestore";
-import { db } from "@/firebase/config";
+import { auth as fbAuth, db } from "@/firebase/config";
 import type { JobAddress, JobDoc, JobStatus, WithId, Urgency } from "@/firebase/interfaces";
 import { typedConverter } from "@/firebase/converters";
 
@@ -84,6 +84,33 @@ export async function updateJobStatus(id: string, status: JobStatus): Promise<vo
   } else {
     await updateDoc(doc(db, "jobs", id), { status });
   }
+}
+
+// Statuses where either party can still cancel. Once work has started
+// ("in_progress") or money is owed ("awaiting_payment"/"complete"/
+// "reviewed"), cancellation has to go through a dispute or admin instead.
+export const CANCELLABLE_STATUSES: readonly JobStatus[] = [
+  "accepted",
+  "requested",
+  "quoted",
+  "scheduled",
+] as const;
+
+/**
+ * Cancel a job and record who did it + why. The onJobCancelled Cloud
+ * Function trigger notifies the opposite party. `cancelledBy` is read from
+ * the current Firebase user; the firestore rules already restrict updates
+ * to parties of the job, so a stranger can't set this.
+ */
+export async function cancelJob(id: string, reason: string): Promise<void> {
+  const uid = fbAuth.currentUser?.uid;
+  if (!uid) throw new Error("Sign in required to cancel.");
+  await updateDoc(doc(db, "jobs", id), {
+    status: "cancelled",
+    cancelledAt: serverTimestamp(),
+    cancelledReason: reason.trim().slice(0, 1000),
+    cancelledBy: uid,
+  });
 }
 
 export async function scheduleJob(id: string, start: Date, end: Date): Promise<void> {
