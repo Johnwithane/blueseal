@@ -4,6 +4,8 @@ import { RouterLink } from "vue-router";
 import Button from "primevue/button";
 import { TRADES } from "@/data/trades";
 import { useAuthStore } from "@/stores/auth";
+import { getHomeContent } from "@/firebase/services/siteContent";
+import type { Testimonial } from "@/firebase/interfaces";
 
 const auth = useAuthStore();
 
@@ -49,26 +51,13 @@ const chatImg =
 
 const featuredTrades = TRADES.slice(0, 8);
 
-const testimonials = [
-  {
-    quote:
-      "Booked an electrician on a Tuesday, fixed by Thursday. The verified badge meant I didn't have to guess.",
-    name: "Sarah M.",
-    role: "Homeowner, Calgary",
-  },
-  {
-    quote:
-      "Quotes, photos, schedule, invoice — all in one place. I stopped losing job details in text threads.",
-    name: "Devon R.",
-    role: "Plumber, Vancouver",
-  },
-  {
-    quote:
-      "The AI quote helper saves me 20 minutes a job. Clients get a clear breakdown, I get paid faster.",
-    name: "Priya K.",
-    role: "HVAC Tech, Toronto",
-  },
-];
+// Testimonials come from siteContent/home — editable in the admin panel.
+// Hide the section entirely when empty so we don't ship fake quotes.
+const testimonials = ref<Testimonial[]>([]);
+onMounted(async () => {
+  const content = await getHomeContent();
+  testimonials.value = content?.testimonials ?? [];
+});
 </script>
 
 <template>
@@ -408,8 +397,8 @@ const testimonials = [
       </div>
     </section>
 
-    <!-- TESTIMONIALS -->
-    <section class="py-20 bg-white relative overflow-hidden">
+    <!-- TESTIMONIALS — hidden until the admin adds real ones in /admin/site-content -->
+    <section v-if="testimonials.length" class="py-20 bg-white relative overflow-hidden">
       <img
         :src="sawImg"
         aria-hidden="true"
@@ -429,7 +418,7 @@ const testimonials = [
         <div class="mt-10 grid md:grid-cols-3 gap-5">
           <figure
             v-for="(t, i) in testimonials"
-            :key="t.name"
+            :key="`${t.name}-${i}`"
             class="bs-reveal bs-card p-6 relative"
             :style="{ transitionDelay: `${i * 80}ms` }"
           >

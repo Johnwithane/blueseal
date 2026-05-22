@@ -491,6 +491,24 @@ export interface AuditLogDoc {
 }
 
 // ---------------------------------------------------------------------------
+// siteContent/{docId} — admin-editable site copy. World-readable, admin-only
+// write. Today this holds homepage testimonials; future content blocks
+// (banner copy, FAQ entries, etc.) get added as new fields on the same
+// doc, or as new docs in this collection (one per page).
+// ---------------------------------------------------------------------------
+export interface Testimonial {
+  quote: string;
+  name: string;
+  role: string;
+}
+
+export interface HomeContentDoc {
+  testimonials: Testimonial[];
+  updatedAt: Timestamp | null;
+  updatedBy: string | null; // admin uid who last saved
+}
+
+// ---------------------------------------------------------------------------
 // notifications/{notifId}
 // In-app inbox per user. Writes are Cloud-Function-only (rules block client
 // create + delete); the recipient can only flip `read` (and timestamp it).

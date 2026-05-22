@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { RouterLink } from "vue-router";
+import Avatar from "primevue/avatar";
 import Tag from "primevue/tag";
 import type { TradespersonDoc, WithId } from "@/firebase/interfaces";
 import { tradeLabel } from "@/data/trades";
@@ -10,6 +11,11 @@ const props = defineProps<{
   tradie: WithId<TradespersonDoc> & { distanceKm?: number };
 }>();
 const { money } = useFormatters();
+
+const avatarInitial = computed(() => {
+  const name = props.tradie.displayName?.trim() || tradeLabel(props.tradie.trades[0] ?? "");
+  return name.slice(0, 1).toUpperCase() || "?";
+});
 
 // Trust-badge visibility checks. Both auto-hide once expiresAt passes so an
 // admin doesn't need to revoke the badge manually when an insurance policy
@@ -34,12 +40,24 @@ const wsibLive = computed(() => {
     class="bs-card p-4 hover:shadow-md transition-shadow no-underline text-inherit block"
   >
     <div class="flex items-start gap-3">
-      <div class="h-12 w-12 rounded-full bg-[color:var(--bs-blue)] text-white flex items-center justify-center font-semibold text-lg">
-        {{ props.tradie.id.slice(0, 1).toUpperCase() }}
-      </div>
+      <Avatar
+        v-if="props.tradie.photoURL"
+        :image="props.tradie.photoURL"
+        size="large"
+        shape="circle"
+      />
+      <Avatar
+        v-else
+        :label="avatarInitial"
+        size="large"
+        shape="circle"
+        style="background-color: var(--bs-blue); color: white; font-weight: 600;"
+      />
       <div class="min-w-0 flex-1">
         <div class="flex items-center gap-1.5 flex-wrap">
-          <span class="font-semibold truncate">{{ tradeLabel(props.tradie.trades[0]) }}</span>
+          <span class="font-semibold truncate">
+            {{ props.tradie.displayName?.trim() || tradeLabel(props.tradie.trades[0]) }}
+          </span>
           <Tag v-if="props.tradie.idVerified" value="ID verified" severity="success" />
           <Tag v-if="insuranceLive" value="Insured" severity="info" />
           <Tag v-if="wsibLive" value="WSIB" severity="info" />

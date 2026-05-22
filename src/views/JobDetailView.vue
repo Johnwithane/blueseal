@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter, RouterLink } from "vue-router";
 import Button from "primevue/button";
 import Tag from "primevue/tag";
+import Avatar from "primevue/avatar";
 import DatePicker from "primevue/datepicker";
 import Textarea from "primevue/textarea";
 import Select from "primevue/select";
@@ -17,10 +18,11 @@ import {
   saveJobIntakeAndAdvance,
 } from "@/firebase/services/jobs";
 import { returnToApplicants } from "@/firebase/services/jobPosts";
+import { getTradesperson } from "@/firebase/services/tradespeople";
 import { useConfirm } from "primevue/useconfirm";
 import { getInvoiceByJobId } from "@/firebase/services/invoices";
 import { useAuthStore } from "@/stores/auth";
-import type { JobDoc, JobStatus, WithId } from "@/firebase/interfaces";
+import type { JobDoc, JobStatus, TradespersonDoc, WithId } from "@/firebase/interfaces";
 import { useFormatters } from "@/composables/useFormatters";
 import ChatThread from "@/components/ChatThread.vue";
 import IntakeFormRenderer from "@/components/IntakeFormRenderer.vue";
@@ -42,6 +44,7 @@ const confirmDialog = useConfirm();
 const { date, dateTime } = useFormatters();
 
 const job = ref<WithId<JobDoc> | null>(null);
+const tradieInfo = ref<WithId<TradespersonDoc> | null>(null);
 const intakeFields = ref<IntakeField[]>([]);
 const invoiceId = ref<string | null>(null);
 const subscriptionOn = ref(false);
@@ -85,6 +88,28 @@ const canClientCancel = computed(
     (CANCELLABLE_STATUSES as readonly string[]).includes(job.value.status),
 );
 
+const tradieDisplayName = computed(
+  () => tradieInfo.value?.displayName?.trim() || "Your tradesperson",
+);
+const tradieAvatarInitial = computed(() =>
+  (tradieDisplayName.value || "?").slice(0, 1).toUpperCase(),
+);
+
+// Mirrors the trust-badge expiry checks elsewhere — keeps badges honest
+// even on a long-running job where the underlying coverage may lapse
+// between booking and completion.
+const now = Date.now();
+const tradieInsuranceLive = computed(() => {
+  if (!tradieInfo.value?.insuranceVerified) return false;
+  const exp = tradieInfo.value.insuranceExpiresAt?.toDate?.().getTime();
+  return exp == null || exp > now;
+});
+const tradieWsibLive = computed(() => {
+  if (!tradieInfo.value?.wsibVerified) return false;
+  const exp = tradieInfo.value.wsibExpiresAt?.toDate?.().getTime();
+  return exp == null || exp > now;
+});
+
 async function load() {
   loading.value = true;
   const id = route.params.id as string;
@@ -116,6 +141,21 @@ async function load() {
     subscriptionOn.value = auth.user.hasActiveSubscription;
   } else {
     subscriptionOn.value = false;
+  }
+
+  // Clients see a "Your tradesperson" panel — fetch the tradesperson doc
+  // so we can render their photo + badges. Read can fail gracefully when
+  // the tradie has gone invisible (suspended/de-listed): rules require
+  // isVisible:true for non-owners. The panel falls back to a generic
+  // "your tradesperson" display when tradieInfo stays null.
+  if (isClient.value && job.value) {
+    try {
+      tradieInfo.value = await getTradesperson(job.value.tradespersonId);
+    } catch {
+      tradieInfo.value = null;
+    }
+  } else {
+    tradieInfo.value = null;
   }
 
   loading.value = false;
@@ -356,6 +396,51 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
         </div>
 
         <aside class="space-y-4">
+          <!-- Client-only: who's coming. Uber-style trust signal — the
+               client sees a face + verified badges before the tradesperson
+               shows up at their door. -->
+          <div v-if="isClient" class="bs-card p-3">
+            <h3 class="font-semibold text-sm mb-2">Your tradesperson</h3>
+            <div class="flex items-start gap-3">
+              <Avatar
+                v-if="tradieInfo?.photoURL"
+                :image="tradieInfo.photoURL"
+                size="large"
+                shape="circle"
+              />
+              <Avatar
+                v-else
+                :label="tradieAvatarInitial"
+                size="large"
+                shape="circle"
+                style="background-color: var(--bs-blue); color: white; font-weight: 600;"
+              />
+              <div class="min-w-0 flex-1">
+                <div class="font-semibold text-sm truncate">{{ tradieDisplayName }}</div>
+                <div
+                  v-if="tradieInfo?.ratingCount"
+                  class="text-xs text-[color:var(--bs-muted)] mt-0.5"
+                >
+                  {{ tradieInfo.ratingAvg.toFixed(1) }} ★ ({{ tradieInfo.ratingCount }})
+                </div>
+                <div class="flex flex-wrap items-center gap-1 mt-2">
+                  <Tag
+                    v-if="tradieInfo?.idVerified"
+                    value="ID verified"
+                    severity="success"
+                  />
+                  <Tag v-if="tradieInsuranceLive" value="Insured" severity="info" />
+                  <Tag v-if="tradieWsibLive" value="WSIB" severity="info" />
+                </div>
+              </div>
+            </div>
+            <RouterLink
+              v-if="tradieInfo"
+              :to="{ name: 'TradieProfile', params: { uid: tradieInfo.id } }"
+              class="mt-3 text-xs text-[color:var(--bs-blue)] inline-block"
+            >View full profile →</RouterLink>
+          </div>
+
           <div v-if="isTradie" class="bs-card p-3">
             <h3 class="font-semibold text-sm mb-2">Status</h3>
             <Select

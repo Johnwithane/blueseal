@@ -474,5 +474,14 @@ service cloud.firestore {
       allow read: if true;
       allow create, update, delete: if isAdmin();
     }
+
+    // ---------- siteContent (admin-editable public site copy) ----------
+    // World-readable so the home page can render testimonials etc. without
+    // requiring auth. Admin-only write — adding new editable content blocks
+    // means adding fields to an existing doc here, or a new doc per page.
+    match /siteContent/{docId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
   }
 }

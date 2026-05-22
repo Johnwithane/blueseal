@@ -26,9 +26,14 @@ onMounted(async () => {
           {{ pending.length }} application{{ pending.length === 1 ? "" : "s" }} awaiting review.
         </p>
       </div>
-      <RouterLink to="/admin/vetting">
-        <Button label="Open vetting queue" icon="pi pi-arrow-right" />
-      </RouterLink>
+      <div class="flex flex-wrap gap-2">
+        <RouterLink to="/admin/site-content">
+          <Button label="Site content" icon="pi pi-pencil" outlined />
+        </RouterLink>
+        <RouterLink to="/admin/vetting">
+          <Button label="Open vetting queue" icon="pi pi-arrow-right" />
+        </RouterLink>
+      </div>
     </div>
 
     <div class="grid sm:grid-cols-3 gap-4 mb-6">
