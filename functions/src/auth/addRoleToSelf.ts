@@ -32,6 +32,8 @@ export const addRoleToSelf = onCall({ enforceAppCheck: false }, async (req) => {
     roles?: unknown;
     role?: unknown;
     activeRole?: unknown;
+    displayName?: unknown;
+    photoURL?: unknown;
   };
   const currentRoles = Array.isArray(userData.roles)
     ? (userData.roles as unknown[]).filter((r): r is string => typeof r === "string")
@@ -54,6 +56,10 @@ export const addRoleToSelf = onCall({ enforceAppCheck: false }, async (req) => {
     const tradieSnap = await tradieRef.get();
     if (!tradieSnap.exists) {
       await tradieRef.set({
+        // Denormalized from the user doc so the public profile renders the
+        // tradie's name + photo without needing read access to /users/.
+        displayName: typeof userData.displayName === "string" ? userData.displayName : "",
+        photoURL: typeof userData.photoURL === "string" ? userData.photoURL : null,
         bio: "",
         trades: [],
         yearsExperience: {},

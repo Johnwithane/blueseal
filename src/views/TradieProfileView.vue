@@ -1,15 +1,17 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRoute, RouterLink } from "vue-router";
 import Button from "primevue/button";
 import Tag from "primevue/tag";
 import Rating from "primevue/rating";
+import Avatar from "primevue/avatar";
 import { getTradesperson } from "@/firebase/services/tradespeople";
 import { listReviewsFor } from "@/firebase/services/reviews";
 import type { ReviewDoc, TradespersonDoc, WithId } from "@/firebase/interfaces";
 import { tradeLabel } from "@/data/trades";
 import { useFormatters } from "@/composables/useFormatters";
 import { useAuthStore } from "@/stores/auth";
+import { useToast } from "@/composables/useToast";
 import CalendarView from "@/components/CalendarView.vue";
 
 const route = useRoute();
@@ -18,6 +20,41 @@ const reviews = ref<WithId<ReviewDoc>[]>([]);
 const loading = ref(true);
 const { money, relativeTime } = useFormatters();
 const auth = useAuthStore();
+const toast = useToast();
+
+const displayName = computed(() => tradie.value?.displayName?.trim() || "");
+const avatarInitial = computed(() => {
+  const source = displayName.value || tradeLabel(tradie.value?.trades[0] ?? "");
+  return source.slice(0, 1).toUpperCase() || "?";
+});
+
+const shareUrl = computed(() => {
+  if (typeof window === "undefined") return "";
+  return window.location.href;
+});
+
+async function share() {
+  if (!tradie.value) return;
+  const url = shareUrl.value;
+  const title = displayName.value
+    ? `${displayName.value} — ${tradeLabel(tradie.value.trades[0] ?? "")} on Blue Seal`
+    : `${tradeLabel(tradie.value.trades[0] ?? "")} on Blue Seal`;
+  // Prefer native share sheet on mobile; fall back to clipboard everywhere else.
+  if (typeof navigator !== "undefined" && "share" in navigator) {
+    try {
+      await navigator.share({ url, title });
+      return;
+    } catch {
+      /* user cancelled — fall through to clipboard */
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    toast.success("Link copied to clipboard");
+  } catch {
+    toast.error("Couldn't copy link");
+  }
+}
 
 onMounted(async () => {
   const uid = route.params.uid as string;
@@ -36,33 +73,52 @@ onMounted(async () => {
     </div>
     <template v-else>
       <header class="bs-card p-5">
-        <div class="flex items-start gap-4">
-          <div class="h-16 w-16 rounded-full bg-[color:var(--bs-blue)] text-white flex items-center justify-center text-2xl font-bold">
-            {{ tradie.id.slice(0, 1).toUpperCase() }}
-          </div>
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-start">
+          <Avatar
+            v-if="tradie.photoURL"
+            :image="tradie.photoURL"
+            size="xlarge"
+            shape="circle"
+          />
+          <Avatar
+            v-else
+            :label="avatarInitial"
+            size="xlarge"
+            shape="circle"
+            style="background-color: var(--bs-blue); color: white; font-weight: 700;"
+          />
           <div class="flex-1 min-w-0">
-            <h1 class="text-xl font-bold flex items-center gap-2 flex-wrap">
+            <h1 class="text-2xl font-bold">{{ displayName || tradeLabel(tradie.trades[0]) }}</h1>
+            <div class="mt-1 text-sm text-[color:var(--bs-muted)]">
               {{ tradeLabel(tradie.trades[0]) }}
-              <Tag v-if="tradie.idVerified" value="ID verified" severity="success" />
-            </h1>
-            <div class="text-sm text-[color:var(--bs-muted)]">
-              {{ tradie.primaryAddressText }} • {{ tradie.serviceRadiusKm }} km radius
+              <span v-if="tradie.primaryAddressText"> • {{ tradie.primaryAddressText }}</span>
+              <span v-if="tradie.serviceRadiusKm"> • {{ tradie.serviceRadiusKm }} km radius</span>
             </div>
-            <div class="flex flex-wrap gap-1 mt-2">
+            <div class="mt-2 flex flex-wrap items-center gap-1">
+              <Tag v-if="tradie.idVerified" value="ID verified" severity="success" />
               <span v-for="t in tradie.verifiedTrades" :key="t" class="bs-pill verified">
                 <i class="pi pi-verified"></i>{{ tradeLabel(t) }}
               </span>
             </div>
           </div>
-          <RouterLink
-            v-if="auth.isAuthenticated && auth.hasClientRole"
-            :to="{ name: 'RequestQuote', params: { uid: tradie.id } }"
-          >
-            <Button label="Request a quote" icon="pi pi-send" />
-          </RouterLink>
-          <RouterLink v-else-if="!auth.isAuthenticated" :to="{ name: 'SignUp' }">
-            <Button label="Sign up to contact" icon="pi pi-user-plus" />
-          </RouterLink>
+          <div class="flex flex-wrap gap-2">
+            <Button
+              label="Share"
+              icon="pi pi-share-alt"
+              severity="secondary"
+              outlined
+              @click="share"
+            />
+            <RouterLink
+              v-if="auth.isAuthenticated && auth.hasClientRole"
+              :to="{ name: 'RequestQuote', params: { uid: tradie.id } }"
+            >
+              <Button label="Request a quote" icon="pi pi-send" />
+            </RouterLink>
+            <RouterLink v-else-if="!auth.isAuthenticated" :to="{ name: 'SignUp' }">
+              <Button label="Sign up to contact" icon="pi pi-user-plus" />
+            </RouterLink>
+          </div>
         </div>
       </header>
 
@@ -97,8 +153,28 @@ onMounted(async () => {
         </section>
       </div>
 
+      <section
+        v-if="tradie.portfolioPhotos.length"
+        class="bs-card p-5 mt-4"
+      >
+        <h2 class="font-semibold mb-3">Portfolio</h2>
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+          <img
+            v-for="(url, i) in tradie.portfolioPhotos"
+            :key="i"
+            :src="url"
+            :alt="`Portfolio photo ${i + 1}`"
+            class="aspect-square w-full rounded-md object-cover"
+            loading="lazy"
+          />
+        </div>
+      </section>
+
       <section class="bs-card p-5 mt-4">
         <h2 class="font-semibold mb-2">Availability</h2>
+        <p class="mb-3 text-xs text-[color:var(--bs-muted)]">
+          Weekly availability pattern — toggle to month view to plan ahead.
+        </p>
         <CalendarView :jobs="[]" :availability="tradie.weeklyAvailability" />
       </section>
 

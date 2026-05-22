@@ -63,6 +63,11 @@ export interface RatingDimension {
 }
 
 export interface TradespersonDoc {
+  // Denormalized from users/{uid} so the public profile page can show the
+  // tradie's name and avatar without needing read access to users (which is
+  // owner+admin only). Kept in sync when the user updates their profile.
+  displayName?: string;
+  photoURL?: string | null;
   bio: string;
   trades: string[]; // canonical keys, primary at [0]
   yearsExperience: Record<string, number>;

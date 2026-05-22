@@ -49,6 +49,8 @@ export async function createOrUpdateDraft(
     return;
   }
   await setDoc(ref, {
+    displayName: "",
+    photoURL: null,
     bio: "",
     trades: [],
     yearsExperience: {},

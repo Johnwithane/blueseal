@@ -10,6 +10,25 @@ import { db, functions } from "@/firebase/config";
 import type { Role, UserDoc, WithId } from "@/firebase/interfaces";
 import { typedConverter } from "@/firebase/converters";
 
+/**
+ * If the user has a tradespeople doc, mirror denormalized profile fields
+ * (displayName, photoURL) into it so the public profile page stays in sync.
+ * Best-effort: failures shouldn't block the user-doc write that triggered it.
+ */
+async function mirrorProfileToTradieIfExists(
+  uid: string,
+  patch: { displayName?: string; photoURL?: string | null },
+): Promise<void> {
+  try {
+    const tradieRef = doc(db, "tradespeople", uid);
+    const snap = await getDoc(tradieRef);
+    if (!snap.exists()) return;
+    await updateDoc(tradieRef, patch);
+  } catch {
+    /* swallow — denormalization is best-effort */
+  }
+}
+
 const usersCol = (uid: string) => doc(db, "users", uid).withConverter(typedConverter<UserDoc>());
 
 /**
@@ -69,10 +88,16 @@ export async function updateUserProfile(
   patch: Partial<Pick<UserDoc, "displayName" | "photoURL" | "phone">>,
 ): Promise<void> {
   await updateDoc(doc(db, "users", uid), { ...patch, lastActiveAt: serverTimestamp() });
+  // Mirror name/photo into the tradesperson doc for the public profile page.
+  const mirror: { displayName?: string; photoURL?: string | null } = {};
+  if (patch.displayName !== undefined) mirror.displayName = patch.displayName;
+  if (patch.photoURL !== undefined) mirror.photoURL = patch.photoURL;
+  if (Object.keys(mirror).length > 0) await mirrorProfileToTradieIfExists(uid, mirror);
 }
 
 export async function updateUserPhoto(uid: string, photoURL: string): Promise<void> {
   await updateDoc(doc(db, "users", uid), { photoURL, lastActiveAt: serverTimestamp() });
+  await mirrorProfileToTradieIfExists(uid, { photoURL });
 }
 
 export async function touchUserActive(uid: string): Promise<void> {

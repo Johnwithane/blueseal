@@ -32,7 +32,11 @@ export const grantAllRolesForAdminTesting = onCall(
 
     const userRef = db.doc(`users/${uid}`);
     const userSnap = await userRef.get();
-    const userData = userSnap.exists ? userSnap.data() ?? {} : {};
+    const userData = (userSnap.exists ? userSnap.data() ?? {} : {}) as {
+      activeRole?: unknown;
+      displayName?: unknown;
+      photoURL?: unknown;
+    };
     const activeRole =
       typeof userData.activeRole === "string" ? userData.activeRole : "admin";
     await userRef.set(
@@ -40,12 +44,20 @@ export const grantAllRolesForAdminTesting = onCall(
       { merge: true },
     );
 
+    // Denormalized fields for the public tradesperson profile.
+    const displayName =
+      typeof userData.displayName === "string" ? userData.displayName : "";
+    const photoURL =
+      typeof userData.photoURL === "string" ? userData.photoURL : null;
+
     // Visible, approved tradesperson doc so the admin can be discovered in
     // search and can browse job posts (isVisibleTradie check passes).
     const tradieRef = db.doc(`tradespeople/${uid}`);
     const tradieSnap = await tradieRef.get();
     if (!tradieSnap.exists) {
       await tradieRef.set({
+        displayName,
+        photoURL,
         bio: "Admin testing profile.",
         trades: [],
         yearsExperience: {},
@@ -79,7 +91,13 @@ export const grantAllRolesForAdminTesting = onCall(
       });
     } else {
       await tradieRef.set(
-        { isVisible: true, vettingStatus: "approved", idVerified: true },
+        {
+          isVisible: true,
+          vettingStatus: "approved",
+          idVerified: true,
+          displayName,
+          photoURL,
+        },
         { merge: true },
       );
     }

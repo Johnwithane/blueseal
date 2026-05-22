@@ -157,6 +157,10 @@ async function saveDraft(): Promise<void> {
       weeklyAvailability: availability.value,
       paymentInstructions: paymentInstructions.value,
       vettingStatus: "draft",
+      // Denormalize from the user doc so the public profile renders the
+      // tradie's identity without needing read access to /users/.
+      displayName: auth.user?.displayName ?? auth.fbUser.displayName ?? "",
+      photoURL: auth.user?.photoURL ?? auth.fbUser.photoURL ?? null,
     };
     if (lat.value != null && lng.value != null) {
       patch.location = new GeoPoint(lat.value, lng.value);
