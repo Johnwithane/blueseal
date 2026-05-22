@@ -121,6 +121,14 @@ onMounted(async () => {
                   class="!bg-white !text-[color:var(--bs-blue-dark)] !border-white hover:!bg-[#eaf5fc]"
                 />
               </RouterLink>
+              <RouterLink v-if="!auth.isAuthenticated" to="/sign-up?as=tradesperson">
+                <Button
+                  label="I'm a tradesperson"
+                  icon="pi pi-wrench"
+                  size="large"
+                  class="!bg-white/10 hover:!bg-white/20 !text-white !border-white/70 backdrop-blur-sm"
+                />
+              </RouterLink>
             </template>
           </div>
         </div>
