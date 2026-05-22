@@ -8,6 +8,7 @@ import Dialog from "primevue/dialog";
 import { getTradesperson } from "@/firebase/services/tradespeople";
 import { listCertsFor, approveCertification, rejectCertification } from "@/firebase/services/certifications";
 import { getIdVerification, approveId, rejectId } from "@/firebase/services/idVerifications";
+import { resolveFileUrl } from "@/firebase/services/storage";
 import {
   approveInsurance,
   getInsurance,
@@ -46,6 +47,10 @@ const uid = route.params.uid as string;
 const tradie = ref<WithId<TradespersonDoc> | null>(null);
 const certs = ref<WithId<CertificationDoc>[]>([]);
 const idDoc = ref<WithId<IdVerificationDoc> | null>(null);
+// The tradesperson's client stores ID as a Storage path (admin-only-read
+// rules block `getDownloadURL` on the owner's session). Resolve to a URL
+// here on the admin's session and render that.
+const idFileUrl = ref<string | null>(null);
 const insurance = ref<WithId<InsuranceVerificationDoc> | null>(null);
 const wsib = ref<WithId<WsibVerificationDoc> | null>(null);
 const loading = ref(true);
@@ -75,6 +80,7 @@ async function load() {
   idDoc.value = idData;
   insurance.value = insuranceData;
   wsib.value = wsibData;
+  idFileUrl.value = idData ? await resolveFileUrl(idData.fileUrl).catch(() => null) : null;
   loading.value = false;
 }
 
@@ -265,9 +271,10 @@ const certSeverity = {
               <Tag :value="idDoc.status" :severity="certSeverity[idDoc.status]" />
             </div>
             <div class="relative inline-block">
-              <a :href="idDoc.fileUrl" target="_blank" rel="noopener">
-                <img :src="idDoc.fileUrl" alt="ID" class="max-w-full max-h-64 rounded border" />
+              <a v-if="idFileUrl" :href="idFileUrl" target="_blank" rel="noopener">
+                <img :src="idFileUrl" alt="ID" class="max-w-full max-h-64 rounded border" />
               </a>
+              <div v-else class="bs-empty">Loading document…</div>
               <div class="absolute inset-0 flex items-center justify-center pointer-events-none text-white/80 text-xl font-bold rotate-[-20deg]">
                 ADMIN VIEW ONLY
               </div>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import { computed, onMounted, ref } from "vue";
+import { RouterLink, useRouter } from "vue-router";
 import { updateProfile } from "firebase/auth";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
@@ -19,6 +19,8 @@ import {
   updateUserProfile,
   updateUserPhoto,
 } from "@/firebase/services/users";
+import { getTradesperson } from "@/firebase/services/tradespeople";
+import type { TradespersonDoc, WithId } from "@/firebase/interfaces";
 import { uploadFile, makeStoragePath } from "@/firebase/services/storage";
 import { compressToWebp } from "@/utils/image";
 import { useToast } from "@/composables/useToast";
@@ -26,6 +28,7 @@ import { useFormatters } from "@/composables/useFormatters";
 import { humanizeError } from "@/utils/errors";
 import TrustBadgesSection from "@/components/TrustBadgesSection.vue";
 import PortfolioEditor from "@/components/PortfolioEditor.vue";
+import TradieDocsManager from "@/components/TradieDocsManager.vue";
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -37,6 +40,7 @@ const phone = ref("");
 const photoURL = ref<string | null>(null);
 const email = ref("");
 const createdAt = ref<{ toDate(): Date } | null>(null);
+const tradie = ref<WithId<TradespersonDoc> | null>(null);
 const saving = ref(false);
 const uploading = ref(false);
 const sendingReset = ref(false);
@@ -73,6 +77,66 @@ onMounted(async () => {
   // we don't silently change their notification behavior.
   emailEnabled.value = u.notificationPrefs?.emailEnabled ?? true;
   whatsappEnabled.value = u.notificationPrefs?.whatsappEnabled ?? true;
+  // Tradesperson doc drives the status card below — only fetch if the
+  // role is held. Users without the role won't see the card at all.
+  if (auth.hasTradieRole) {
+    tradie.value = await getTradesperson(auth.fbUser.uid);
+  }
+});
+
+interface TradieStatus {
+  tone: "warn" | "info" | "error" | "success";
+  label: string;
+  description: string;
+  cta?: { to: string; label: string };
+}
+
+const tradieStatus = computed<TradieStatus | null>(() => {
+  if (!auth.hasTradieRole) return null;
+  const status = tradie.value?.vettingStatus ?? "draft";
+  switch (status) {
+    case "draft":
+      return {
+        tone: "warn",
+        label: "Onboarding incomplete",
+        description:
+          "Finish your onboarding to submit your application. Until then your tradesperson profile is hidden from search.",
+        cta: { to: "/onboarding", label: "Finish onboarding" },
+      };
+    case "pending":
+      return {
+        tone: "info",
+        label: "Awaiting approval",
+        description:
+          "Your application is with our vetting team. We typically review within 48 hours and will notify you once you're approved.",
+      };
+    case "info_requested":
+      return {
+        tone: "warn",
+        label: "More info needed",
+        description:
+          tradie.value?.vettingNotes?.trim() ||
+          "Our reviewer asked for a few changes before approving your application.",
+        cta: { to: "/onboarding", label: "Update application" },
+      };
+    case "rejected":
+      return {
+        tone: "error",
+        label: "Application not approved",
+        description:
+          tradie.value?.vettingNotes?.trim() ||
+          "Your application wasn't approved. Reply to the email we sent for next steps.",
+      };
+    case "approved":
+      return {
+        tone: "success",
+        label: "Approved — your profile is live",
+        description:
+          "Clients can find you in search and send requests. Keep your availability and portfolio up to date.",
+      };
+    default:
+      return null;
+  }
 });
 
 async function saveProfile() {
@@ -477,6 +541,38 @@ async function grantAdminAllRoles() {
       </div>
     </div>
 
+    <div
+      v-if="tradieStatus"
+      :class="[
+        'bs-account-status mt-4 p-5 rounded-2xl border',
+        tradieStatus.tone === 'warn' && 'bs-account-status--warn',
+        tradieStatus.tone === 'info' && 'bs-account-status--info',
+        tradieStatus.tone === 'error' && 'bs-account-status--error',
+        tradieStatus.tone === 'success' && 'bs-account-status--success',
+      ]"
+    >
+      <div class="flex items-start justify-between gap-3 flex-wrap">
+        <div class="min-w-0">
+          <h2 class="text-lg font-semibold">Tradesperson application</h2>
+          <div class="mt-1 inline-flex items-center gap-2">
+            <span class="bs-account-status__dot" aria-hidden="true"></span>
+            <span class="text-sm font-semibold">{{ tradieStatus.label }}</span>
+          </div>
+          <p class="mt-2 text-sm text-[color:var(--bs-text)]/85">
+            {{ tradieStatus.description }}
+          </p>
+        </div>
+        <RouterLink v-if="tradieStatus.cta" :to="tradieStatus.cta.to" class="shrink-0">
+          <Button :label="tradieStatus.cta.label" icon="pi pi-arrow-right" icon-pos="right" />
+        </RouterLink>
+      </div>
+    </div>
+
+    <TradieDocsManager
+      v-if="auth.hasTradieRole && auth.fbUser"
+      :tradie-uid="auth.fbUser.uid"
+    />
+
     <PortfolioEditor
       v-if="auth.hasTradieRole && auth.fbUser"
       :tradie-uid="auth.fbUser.uid"
@@ -639,3 +735,40 @@ async function grantAdminAllRoles() {
     </Dialog>
   </section>
 </template>
+
+<style scoped>
+.bs-account-status__dot {
+  display: inline-block;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+}
+.bs-account-status--info {
+  background: #eaf5fc;
+  border-color: #bfdcee;
+}
+.bs-account-status--info .bs-account-status__dot {
+  background: var(--bs-blue);
+}
+.bs-account-status--warn {
+  background: #fff5e6;
+  border-color: #f4d6a4;
+}
+.bs-account-status--warn .bs-account-status__dot {
+  background: #d97706;
+}
+.bs-account-status--error {
+  background: #fdecec;
+  border-color: #f5b3b3;
+}
+.bs-account-status--error .bs-account-status__dot {
+  background: #b91c1c;
+}
+.bs-account-status--success {
+  background: #eaf7ee;
+  border-color: #b7e0c2;
+}
+.bs-account-status--success .bs-account-status__dot {
+  background: #15803d;
+}
+</style>

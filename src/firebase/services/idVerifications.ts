@@ -1,4 +1,4 @@
-import { doc, getDoc, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
+import { deleteDoc, doc, getDoc, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/firebase/config";
 import type { IdDocType, IdVerificationDoc, WithId } from "@/firebase/interfaces";
 import { typedConverter } from "@/firebase/converters";
@@ -42,4 +42,16 @@ export async function rejectId(uid: string, adminUid: string, reason: string): P
     reviewedAt: serverTimestamp(),
     rejectionReason: reason,
   });
+}
+
+/**
+ * Withdraw a still-pending ID submission so the owner can re-upload. Admin-side
+ * gating is in firestore.rules — this call will fail with permission-denied
+ * for approved / rejected IDs (admin handles those cases manually).
+ *
+ * The Storage file is intentionally left in place; a periodic Cloud Function
+ * can sweep orphans. The doc itself is the source-of-truth for status.
+ */
+export async function deleteIdVerification(uid: string): Promise<void> {
+  await deleteDoc(doc(db, "idVerifications", uid));
 }

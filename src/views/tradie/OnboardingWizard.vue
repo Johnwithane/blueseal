@@ -22,12 +22,18 @@ import {
   setLocation,
   emptyAvailability,
 } from "@/firebase/services/tradespeople";
-import { createCertification, listCertsFor } from "@/firebase/services/certifications";
 import {
+  createCertification,
+  deleteCertification,
+  listCertsFor,
+  updateCertification,
+} from "@/firebase/services/certifications";
+import {
+  deleteIdVerification,
   getIdVerification,
   submitIdVerification,
 } from "@/firebase/services/idVerifications";
-import { uploadFile, makeStoragePath } from "@/firebase/services/storage";
+import { uploadFile, uploadFileNoUrl, makeStoragePath } from "@/firebase/services/storage";
 import { submitForVetting } from "@/firebase/services/admin";
 
 import { TRADES } from "@/data/trades";
@@ -107,18 +113,39 @@ const allCertsUploaded = computed(() =>
   tradesToCert.value.every((t) => certifiedTradeKeys.value.has(t)),
 );
 
+const stepCompleted = computed<boolean[]>(() => {
+  // Index matches step value 1..8 → array index 0..7. Step 8 (submit) is
+  // never "complete" while the user is still editing the draft.
+  const bioOk = bio.value.length >= 20;
+  const tradesOk = !!primaryTrade.value;
+  const pricingOk =
+    pricingModel.value === "quote" ||
+    (hourlyRateDollars.value != null && hourlyRateDollars.value > 0);
+  const areaOk =
+    !!location.value.label && location.value.lat != null && location.value.lng != null;
+  const availabilityOk = Object.values(availability.value).some(
+    (slots) => Array.isArray(slots) && slots.length > 0,
+  );
+  const certsOk = tradesToCert.value.length > 0 && allCertsUploaded.value;
+  const idOk = idStatus.value !== "none";
+  return [bioOk, tradesOk, pricingOk, areaOk, availabilityOk, certsOk, idOk, false];
+});
+
 const canSubmit = computed(
   () =>
-    !!primaryTrade.value &&
-    bio.value.length >= 20 &&
-    !!location.value.label &&
-    location.value.lat != null &&
-    location.value.lng != null &&
-    allCertsUploaded.value &&
-    idStatus.value !== "none" &&
-    (pricingModel.value === "quote" ||
-      (hourlyRateDollars.value != null && hourlyRateDollars.value > 0)),
+    stepCompleted.value[0] &&
+    stepCompleted.value[1] &&
+    stepCompleted.value[2] &&
+    stepCompleted.value[3] &&
+    stepCompleted.value[5] &&
+    stepCompleted.value[6],
 );
+
+function firstIncompleteStep(): string {
+  const idx = stepCompleted.value.slice(0, 7).findIndex((done) => !done);
+  // All seven editable steps complete → land on Submit.
+  return String(idx === -1 ? 8 : idx + 1);
+}
 
 onMounted(async () => {
   if (!auth.fbUser) return;
@@ -149,6 +176,9 @@ onMounted(async () => {
   existingCerts.value = await listCertsFor(auth.fbUser.uid);
   const idDoc = await getIdVerification(auth.fbUser.uid);
   idStatus.value = idDoc ? idDoc.status : "none";
+  // Jump straight to the first step the user hasn't finished yet so a
+  // returning tradesperson doesn't have to click through completed steps.
+  step.value = firstIncompleteStep();
   // Mark hydrated last so the watch below doesn't fire on initial load.
   hydrated.value = true;
 });
@@ -157,8 +187,13 @@ function trades(): string[] {
   return [primaryTrade.value, ...secondaryTrades.value].filter(Boolean);
 }
 
-async function saveDraft(): Promise<void> {
+async function saveDraft(opts: { silent?: boolean } = {}): Promise<void> {
   if (!auth.fbUser) return;
+  // Cancel any pending debounced save — we're saving now.
+  if (autoSaveTimer) {
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = null;
+  }
   saving.value = true;
   error.value = null;
   try {
@@ -188,7 +223,9 @@ async function saveDraft(): Promise<void> {
     if (locLat != null && locLng != null) {
       await setLocation(auth.fbUser.uid, locLat, locLng);
     }
-    toast.success("Draft saved");
+    lastSavedAt.value = new Date();
+    dirty.value = false;
+    if (!opts.silent) toast.success("Draft saved");
   } catch (e) {
     error.value = (e as Error).message;
   } finally {
@@ -196,21 +233,94 @@ async function saveDraft(): Promise<void> {
   }
 }
 
+function saveDraftManual() {
+  void saveDraft();
+}
+
+// Flush any pending autosave, persist current state, then bounce home. The
+// wizard rehydrates from the draft on next visit so the user can pick up
+// exactly where they left off. Going to "/" (not the tradie dashboard)
+// because the dashboard's empty state nudges unsubmitted tradies back to
+// onboarding, which would defeat the "let me finish this later" intent.
+async function saveAndExit() {
+  try {
+    await saveDraft({ silent: true });
+  } catch {
+    // Saving failed — still let them leave; the autosave will retry next visit.
+  }
+  router.push("/");
+}
+
+function scheduleAutoSave() {
+  if (!hydrated.value) return;
+  dirty.value = true;
+  if (autoSaveTimer) clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(() => {
+    autoSaveTimer = null;
+    void saveDraft({ silent: true });
+  }, AUTO_SAVE_DELAY_MS);
+}
+
+watch(
+  [
+    bio,
+    primaryTrade,
+    secondaryTrades,
+    yearsByTrade,
+    pricingModel,
+    hourlyRateDollars,
+    providesFreeQuotes,
+    location,
+    availability,
+    paymentInstructions,
+  ],
+  () => scheduleAutoSave(),
+  { deep: true },
+);
+
+const saveStatus = computed<string>(() => {
+  if (saving.value) return "Saving…";
+  if (dirty.value) return "Unsaved changes";
+  if (lastSavedAt.value) return `Saved ${relativeTime(lastSavedAt.value)}`;
+  return "";
+});
+
+// Flush any pending auto-save when leaving the route, so a user who clicks
+// "back" mid-edit doesn't lose the last few seconds of typing.
+onBeforeRouteLeave(async () => {
+  if (autoSaveTimer || dirty.value) {
+    await saveDraft({ silent: true });
+  }
+});
+
+onBeforeUnmount(() => {
+  if (autoSaveTimer) {
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = null;
+  }
+});
+
 async function onCertUploaded(opts: {
   trade: string;
-  file: File;
+  file: File | null;
   issuingBody: string;
   certNumber: string;
   expiresAt: string | null;
 }) {
   if (!auth.fbUser) return;
-  const path = makeStoragePath({
-    scope: "tradespeople",
-    id: auth.fbUser.uid,
-    bucket: "certs",
-    filename: opts.file.name,
-  });
-  const fileUrl = await uploadFile(path, opts.file);
+  // `file === null` means the tradesperson declared they don't have a
+  // formal certification for this trade — we still write a CertificationDoc
+  // so the vetting admin sees it in the queue, but with an empty fileUrl.
+  let fileUrl = "";
+  if (opts.file) {
+    const path = makeStoragePath({
+      scope: "tradespeople",
+      id: auth.fbUser.uid,
+      bucket: "certs",
+      filename: opts.file.name,
+    });
+    fileUrl = await uploadFile(path, opts.file);
+  }
   await createCertification({
     tradespersonId: auth.fbUser.uid,
     trade: opts.trade,
@@ -220,7 +330,30 @@ async function onCertUploaded(opts: {
     fileUrl,
   });
   existingCerts.value = await listCertsFor(auth.fbUser.uid);
-  toast.success("Certification uploaded");
+  toast.success(opts.file ? "Certification uploaded" : "Declaration recorded");
+}
+
+async function onCertDeleted(certId: string) {
+  if (!auth.fbUser) return;
+  await deleteCertification(certId);
+  existingCerts.value = await listCertsFor(auth.fbUser.uid);
+  toast.success("Certification removed");
+}
+
+async function onCertUpdated(opts: {
+  certId: string;
+  issuingBody: string;
+  certNumber: string;
+  expiresAt: string | null;
+}) {
+  if (!auth.fbUser) return;
+  await updateCertification(opts.certId, {
+    issuingBody: opts.issuingBody,
+    certNumber: opts.certNumber,
+    expiresAt: opts.expiresAt ? new Date(opts.expiresAt) : null,
+  });
+  existingCerts.value = await listCertsFor(auth.fbUser.uid);
+  toast.success("Certification updated");
 }
 
 async function onIdUploaded(opts: { file: File; documentType: IdDocType }) {
@@ -231,10 +364,20 @@ async function onIdUploaded(opts: { file: File; documentType: IdDocType }) {
     bucket: "id",
     filename: opts.file.name,
   });
-  const fileUrl = await uploadFile(path, opts.file);
-  await submitIdVerification(auth.fbUser.uid, fileUrl, opts.documentType);
+  // ID storage is admin-read-only, so we cannot call `getDownloadURL` after
+  // upload (the owner would 403). Store the storage path instead and let
+  // the admin client resolve a download URL when reviewing.
+  const storagePath = await uploadFileNoUrl(path, opts.file);
+  await submitIdVerification(auth.fbUser.uid, storagePath, opts.documentType);
   idStatus.value = "pending";
   toast.success("ID uploaded");
+}
+
+async function onIdRemoved() {
+  if (!auth.fbUser) return;
+  await deleteIdVerification(auth.fbUser.uid);
+  idStatus.value = "none";
+  toast.success("ID removed");
 }
 
 async function submitApplication() {
@@ -244,7 +387,7 @@ async function submitApplication() {
   }
   submitting.value = true;
   try {
-    await saveDraft();
+    await saveDraft({ silent: true });
     await submitForVetting({});
     toast.success("Application submitted", "We'll review within 1–2 business days.");
     router.replace({ name: "TradieDashboard" });
@@ -265,20 +408,56 @@ async function submitApplication() {
         </div>
         <h1 class="text-2xl font-bold">Build your verified profile</h1>
       </div>
-      <Button label="Save draft" icon="pi pi-save" outlined :loading="saving" @click="saveDraft" />
+      <div class="flex items-center gap-2 sm:gap-3">
+        <span
+          v-if="saveStatus"
+          class="text-xs text-[color:var(--bs-muted)] hidden sm:inline"
+          aria-live="polite"
+        >
+          {{ saveStatus }}
+        </span>
+        <Button
+          label="Save & exit"
+          icon="pi pi-arrow-left"
+          text
+          :loading="saving"
+          @click="saveAndExit"
+        />
+        <Button
+          label="Save draft"
+          icon="pi pi-save"
+          outlined
+          :loading="saving"
+          @click="saveDraftManual"
+        />
+      </div>
     </header>
 
     <Message v-if="error" severity="error" :closable="false" class="mb-3">{{ error }}</Message>
 
-    <Stepper v-model:value="step" linear class="bs-card">
+    <Stepper v-model:value="step" class="bs-card">
       <StepList>
-        <Step value="1">About you</Step>
-        <Step value="2">Trades</Step>
-        <Step value="3">Pricing</Step>
-        <Step value="4">Service area</Step>
-        <Step value="5">Availability</Step>
-        <Step value="6">Certifications</Step>
-        <Step value="7">ID</Step>
+        <Step value="1">
+          <i v-if="stepCompleted[0]" class="pi pi-check-circle text-[color:var(--bs-blue)] mr-1" />About you
+        </Step>
+        <Step value="2">
+          <i v-if="stepCompleted[1]" class="pi pi-check-circle text-[color:var(--bs-blue)] mr-1" />Trades
+        </Step>
+        <Step value="3">
+          <i v-if="stepCompleted[2]" class="pi pi-check-circle text-[color:var(--bs-blue)] mr-1" />Pricing
+        </Step>
+        <Step value="4">
+          <i v-if="stepCompleted[3]" class="pi pi-check-circle text-[color:var(--bs-blue)] mr-1" />Service area
+        </Step>
+        <Step value="5">
+          <i v-if="stepCompleted[4]" class="pi pi-check-circle text-[color:var(--bs-blue)] mr-1" />Availability
+        </Step>
+        <Step value="6">
+          <i v-if="stepCompleted[5]" class="pi pi-check-circle text-[color:var(--bs-blue)] mr-1" />Certifications
+        </Step>
+        <Step value="7">
+          <i v-if="stepCompleted[6]" class="pi pi-check-circle text-[color:var(--bs-blue)] mr-1" />ID
+        </Step>
         <Step value="8">Submit</Step>
       </StepList>
 
@@ -419,6 +598,8 @@ async function submitApplication() {
                 :trade="t"
                 :existing="existingCerts.find((c) => c.trade === t) ?? null"
                 @uploaded="onCertUploaded"
+                @deleted="onCertDeleted"
+                @updated="onCertUpdated"
               />
             </div>
             <div class="flex justify-between">
@@ -435,7 +616,11 @@ async function submitApplication() {
             <p class="text-sm text-[color:var(--bs-muted)]">
               Your ID is stored under strict admin-only access and auto-deleted 90 days after approval.
             </p>
-            <IdUploadCard :status="idStatus" @uploaded="onIdUploaded" />
+            <IdUploadCard
+              :status="idStatus"
+              @uploaded="onIdUploaded"
+              @removed="onIdRemoved"
+            />
             <div class="flex justify-between">
               <Button label="Back" outlined @click="activateCallback('6')" />
               <Button label="Next" icon="pi pi-arrow-right" icon-pos="right" :disabled="idStatus === 'none'" @click="activateCallback('8')" />

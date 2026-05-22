@@ -163,7 +163,12 @@ service cloud.firestore {
                        && request.resource.data.reviewedBy == resource.data.reviewedBy
                        && request.resource.data.reviewedAt == resource.data.reviewedAt)
                     || isAdmin();
-      allow delete: if isAdmin();
+      // Owner can withdraw a still-pending submission (e.g. wrong file, wrong
+      // trade) so they can re-upload without admin intervention. Approved /
+      // rejected certs are immutable from the owner side — admin only.
+      allow delete: if (isOwner(resource.data.tradespersonId)
+                       && resource.data.status == 'pending')
+                    || isAdmin();
     }
 
     // ---------- idVerifications (admin-only read; never world-readable) ----------
@@ -179,7 +184,10 @@ service cloud.firestore {
                        && request.resource.data.reviewedBy == resource.data.reviewedBy
                        && request.resource.data.reviewedAt == resource.data.reviewedAt)
                     || isAdmin();
-      allow delete: if isAdmin();
+      // Owner can withdraw a still-pending ID so they can re-upload (e.g. wrong
+      // document, bad photo). Once approved/rejected the doc is admin-only.
+      allow delete: if (isOwner(tradieId) && resource.data.status == 'pending')
+                    || isAdmin();
     }
 
     // ---------- insuranceVerifications (general-liability proof) ----------
