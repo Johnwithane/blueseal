@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { onMounted, ref, computed } from "vue";
-import { useRouter } from "vue-router";
+import { onMounted, onBeforeUnmount, ref, computed, watch } from "vue";
+import { useRouter, onBeforeRouteLeave } from "vue-router";
 import { GeoPoint } from "firebase/firestore";
 import Button from "primevue/button";
 import Stepper from "primevue/stepper";
@@ -44,15 +44,24 @@ import CertUploadCard from "@/components/CertUploadCard.vue";
 import IdUploadCard from "@/components/IdUploadCard.vue";
 import LocationPicker, { type LocationValue } from "@/components/LocationPicker.vue";
 import { useToast } from "@/composables/useToast";
+import { useFormatters } from "@/composables/useFormatters";
 
 const auth = useAuthStore();
 const router = useRouter();
 const toast = useToast();
+const { relativeTime } = useFormatters();
 
 const step = ref<string>("1");
 const saving = ref(false);
 const submitting = ref(false);
 const error = ref<string | null>(null);
+
+// Auto-save state
+const hydrated = ref(false);
+const dirty = ref(false);
+const lastSavedAt = ref<Date | null>(null);
+let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+const AUTO_SAVE_DELAY_MS = 1500;
 
 // Profile basics
 const bio = ref("");
@@ -113,6 +122,11 @@ const canSubmit = computed(
 
 onMounted(async () => {
   if (!auth.fbUser) return;
+  // Refresh the ID token so the `tradesperson` custom claim (set by the
+  // `setRoleOnSignup` Firestore trigger) is on the token used for the
+  // cert/ID Firestore writes below. Without this, a session whose token
+  // was cached before the trigger ran fails with `permission-denied`.
+  await auth.fbUser.getIdToken(true);
   const t = await getTradesperson(auth.fbUser.uid);
   if (t) {
     bio.value = t.bio;
@@ -135,6 +149,8 @@ onMounted(async () => {
   existingCerts.value = await listCertsFor(auth.fbUser.uid);
   const idDoc = await getIdVerification(auth.fbUser.uid);
   idStatus.value = idDoc ? idDoc.status : "none";
+  // Mark hydrated last so the watch below doesn't fire on initial load.
+  hydrated.value = true;
 });
 
 function trades(): string[] {
