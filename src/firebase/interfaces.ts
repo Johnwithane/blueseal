@@ -35,6 +35,16 @@ export interface UserDoc {
   // timestamp. Recovery within the grace window goes via support — there's
   // no self-serve un-delete to keep the deletion path deliberate.
   deletedAt: Timestamp | null;
+  // Per-channel notification opt-outs. notify() reads these before fanning
+  // to email/WhatsApp; the in-app inbox is always written regardless (it's
+  // the source-of-truth audit log). Missing = default-enabled so legacy
+  // users (pre-this-field) keep getting notifications until they opt out.
+  notificationPrefs: NotificationPrefs;
+}
+
+export interface NotificationPrefs {
+  emailEnabled: boolean;
+  whatsappEnabled: boolean;
 }
 
 // ---------------------------------------------------------------------------

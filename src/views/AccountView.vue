@@ -8,12 +8,14 @@ import Message from "primevue/message";
 import Avatar from "primevue/avatar";
 import Dialog from "primevue/dialog";
 import Textarea from "primevue/textarea";
+import ToggleSwitch from "primevue/toggleswitch";
 import { useAuthStore } from "@/stores/auth";
 import {
   exportMyData,
   getUser,
   grantAllRolesForAdminTesting,
   requestAccountDeletion,
+  updateNotificationPrefs,
   updateUserProfile,
   updateUserPhoto,
 } from "@/firebase/services/users";
@@ -52,6 +54,12 @@ const deleting = ref(false);
 const exporting = ref(false);
 const exportUrl = ref<string | null>(null);
 
+// Notification preference state. Defaults match the notify() helper's
+// missing-field behavior so legacy users aren't silently opted out.
+const emailEnabled = ref(true);
+const whatsappEnabled = ref(true);
+const savingPrefs = ref(false);
+
 onMounted(async () => {
   if (!auth.fbUser) return;
   const u = await getUser(auth.fbUser.uid);
@@ -61,6 +69,10 @@ onMounted(async () => {
   photoURL.value = u.photoURL;
   email.value = u.email;
   createdAt.value = u.createdAt;
+  // Legacy users may not have prefs yet — default to "everything on" so
+  // we don't silently change their notification behavior.
+  emailEnabled.value = u.notificationPrefs?.emailEnabled ?? true;
+  whatsappEnabled.value = u.notificationPrefs?.whatsappEnabled ?? true;
 });
 
 async function saveProfile() {
@@ -176,6 +188,29 @@ async function switchView(role: "client" | "tradesperson" | "admin") {
     router.push("/dashboard");
   } catch (e) {
     error.value = humanizeError(e);
+  }
+}
+
+async function savePrefs() {
+  if (!auth.fbUser) return;
+  savingPrefs.value = true;
+  error.value = null;
+  try {
+    await updateNotificationPrefs(auth.fbUser.uid, {
+      emailEnabled: emailEnabled.value,
+      whatsappEnabled: whatsappEnabled.value,
+    });
+    if (auth.user) {
+      auth.user.notificationPrefs = {
+        emailEnabled: emailEnabled.value,
+        whatsappEnabled: whatsappEnabled.value,
+      };
+    }
+    toast.success("Notification preferences saved");
+  } catch (e) {
+    error.value = humanizeError(e);
+  } finally {
+    savingPrefs.value = false;
   }
 }
 
@@ -453,6 +488,50 @@ async function grantAdminAllRoles() {
       :tradie-uid="auth.fbUser.uid"
       class="mt-4"
     />
+
+    <div class="bs-card mt-4 p-5">
+      <h2 class="text-lg font-semibold">Notifications</h2>
+      <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
+        The in-app inbox always shows new activity. Choose how you'd like
+        to be reached for important events outside the app.
+      </p>
+
+      <div class="mt-4 space-y-3">
+        <div
+          class="flex items-start justify-between gap-3 rounded-lg border border-[color:var(--bs-border)] p-3"
+        >
+          <div>
+            <div class="font-medium">Email</div>
+            <p class="text-xs text-[color:var(--bs-muted)] mt-0.5">
+              For most events. Time-critical ones also send WhatsApp if enabled.
+            </p>
+          </div>
+          <ToggleSwitch v-model="emailEnabled" />
+        </div>
+
+        <div
+          class="flex items-start justify-between gap-3 rounded-lg border border-[color:var(--bs-border)] p-3"
+        >
+          <div>
+            <div class="font-medium">WhatsApp</div>
+            <p class="text-xs text-[color:var(--bs-muted)] mt-0.5">
+              For time-critical events (new job request, vetting decision,
+              accepted application). Uses the phone number on your profile.
+            </p>
+          </div>
+          <ToggleSwitch v-model="whatsappEnabled" />
+        </div>
+      </div>
+
+      <div class="mt-4 flex justify-end">
+        <Button
+          label="Save preferences"
+          icon="pi pi-save"
+          :loading="savingPrefs"
+          @click="savePrefs"
+        />
+      </div>
+    </div>
 
     <div class="bs-card mt-4 p-5">
       <h2 class="text-lg font-semibold">Privacy &amp; your data</h2>

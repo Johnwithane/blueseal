@@ -39,6 +39,12 @@ Two rules of thumb to keep cost + spam down:
 - **Default to `normal`** unless you have a reason to escalate. WhatsApp's free tier covers ~1,000 service conversations/month per Meta; beyond that, Meta charges ~$0.005–0.10 per conversation. A typo cascade can blow through the free tier in a day.
 - **If the caller already emails directly** (e.g. `sendInvoice` calls `enqueueMail` separately to ship the PDF), set the notify priority to `low` to avoid a second email from the same event. Two emails for one action looks broken.
 
+### User opt-outs
+
+Users can disable email and WhatsApp independently from [src/views/AccountView.vue](../src/views/AccountView.vue) → Notifications. The `notify()` helper reads `users/{uid}.notificationPrefs.emailEnabled` + `whatsappEnabled` before each fan-out; missing fields (legacy users) default to enabled so we don't silently change anyone's notification behavior. The in-app inbox is **always** written regardless — it's the source-of-truth audit log, and disabling it would break the bell badge as a re-engagement signal.
+
+If you add a third channel (FCM push, SMS-as-fallback, etc.), add a matching `xyzEnabled: boolean` to the `NotificationPrefs` interface and gate the channel in `notify()` the same way.
+
 ### Why WhatsApp instead of SMS for high priority?
 
 WhatsApp via Meta Cloud API has a free tier (~1,000 service conversations/month per business); SMS via Twilio is metered per message (~$0.0079 CAD per text to Canada) with no free tier. For a launch-stage product where the founder asked specifically for "essentially free", WhatsApp is the better default. The SMS code in [functions/src/lib/sms.ts](../functions/src/lib/sms.ts) is dormant — kept in the repo for a future preferences UI that would let users pick SMS over WhatsApp (e.g. because they don't use WhatsApp). Setup steps for both live in [HUMANTASKS.md](../HUMANTASKS.md).

@@ -45,7 +45,7 @@ service cloud.firestore {
             'hasActiveSubscription','stripeCustomerId',
             'clientRatingAvg','clientRatingCount',
             'termsAcceptedAt','termsAcceptedVersion',
-            'deletedAt'
+            'deletedAt','notificationPrefs'
           ])
           || request.resource.data.keys().hasOnly([
             'role','displayName','email','photoURL','phone',
@@ -53,7 +53,7 @@ service cloud.firestore {
             'hasActiveSubscription','stripeCustomerId',
             'clientRatingAvg','clientRatingCount',
             'termsAcceptedAt','termsAcceptedVersion',
-            'deletedAt'
+            'deletedAt','notificationPrefs'
           ])
         )
         && (

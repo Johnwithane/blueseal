@@ -81,7 +81,16 @@ export async function createUser(opts: {
     termsAcceptedAt: serverTimestamp() as never,
     termsAcceptedVersion: opts.termsAcceptedVersion,
     deletedAt: null,
+    notificationPrefs: { emailEnabled: true, whatsappEnabled: true },
   });
+}
+
+/** Save per-channel notification opt-outs. Owner-writable per Firestore rules. */
+export async function updateNotificationPrefs(
+  uid: string,
+  prefs: { emailEnabled: boolean; whatsappEnabled: boolean },
+): Promise<void> {
+  await updateDoc(doc(db, "users", uid), { notificationPrefs: prefs });
 }
 
 /**

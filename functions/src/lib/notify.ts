@@ -59,19 +59,33 @@ export interface NotifyInput {
 interface UserContact {
   email: string | null;
   phone: string | null;
+  emailEnabled: boolean;
+  whatsappEnabled: boolean;
 }
 
 async function getUserContact(uid: string): Promise<UserContact> {
   try {
     const snap = await db.doc(`users/${uid}`).get();
-    const data = snap.data() as { email?: string; phone?: string } | undefined;
+    const data = snap.data() as
+      | {
+          email?: string;
+          phone?: string;
+          notificationPrefs?: { emailEnabled?: boolean; whatsappEnabled?: boolean };
+        }
+      | undefined;
+    // Missing-pref = enabled. Legacy users (created before this field
+    // existed) keep getting notifications until they explicitly opt out
+    // — turning them off retroactively without consent would be worse.
+    const prefs = data?.notificationPrefs ?? {};
     return {
       email: data?.email ?? null,
       phone: data?.phone ?? null,
+      emailEnabled: prefs.emailEnabled !== false,
+      whatsappEnabled: prefs.whatsappEnabled !== false,
     };
   } catch (err) {
     logger.warn("notify: failed to load user contact", { uid, err });
-    return { email: null, phone: null };
+    return { email: null, phone: null, emailEnabled: true, whatsappEnabled: true };
   }
 }
 
@@ -122,8 +136,8 @@ export async function notify(input: NotifyInput): Promise<void> {
   const url = absoluteUrl(link);
   const cta = url ? `\n\nOpen Blue Seal: ${url}` : "";
 
-  // Email on normal + high.
-  if (contact.email) {
+  // Email on normal + high (unless the user has opted out).
+  if (contact.email && contact.emailEnabled) {
     try {
       await enqueueMail({
         to: contact.email,
@@ -139,11 +153,12 @@ export async function notify(input: NotifyInput): Promise<void> {
     }
   }
 
-  // WhatsApp only on high — and only if the user has a phone on file.
-  // Same phone field as SMS: WhatsApp uses the same E.164 number the
-  // user already gave us. The processWhatsAppMessage trigger flushes the
-  // queue via Meta's Cloud API.
-  if (priority === "high" && contact.phone) {
+  // WhatsApp only on high — and only if the user has a phone on file
+  // AND hasn't opted out. Same phone field as SMS: WhatsApp uses the
+  // same E.164 number the user already gave us. The
+  // processWhatsAppMessage trigger flushes the queue via Meta's Cloud
+  // API.
+  if (priority === "high" && contact.phone && contact.whatsappEnabled) {
     try {
       // Lead with the title so even a truncated preview is meaningful.
       // Templates (recommended for cold-start messages) interpolate this
