@@ -74,6 +74,7 @@ interface JobPayload {
   completedAt: null;
   cancelledAt: null;
   cancelledReason: null;
+  cancelledBy: null;
   chatId: string;
   privateNotes: string;
   sourcePostId: string;
@@ -171,6 +172,7 @@ export const acceptApplication = onCall({ enforceAppCheck: false }, async (req) 
         completedAt: null,
         cancelledAt: null,
         cancelledReason: null,
+        cancelledBy: null,
         chatId: chatRef.id,
         privateNotes: "",
         sourcePostId: postId,

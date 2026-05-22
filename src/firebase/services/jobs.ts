@@ -65,6 +65,7 @@ export async function createJob(input: NewJobInput, chatId: string): Promise<str
     completedAt: null,
     cancelledAt: null,
     cancelledReason: null,
+    cancelledBy: null,
     chatId,
     privateNotes: "",
     sourcePostId: null,

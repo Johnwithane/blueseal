@@ -209,6 +209,11 @@ export interface JobDoc {
   completedAt: Timestamp | null;
   cancelledAt: Timestamp | null;
   cancelledReason: string | null;
+  // uid of the party who cancelled — used by onJobCancelled trigger to pick
+  // the recipient of the notification (always the opposite party). Null
+  // before cancellation, and on pre-existing jobs that were cancelled via
+  // the tradesperson status dropdown before this field existed.
+  cancelledBy: string | null;
   chatId: string;
   privateNotes: string;
   // Set when this job was created via the job-board marketplace conversion.
@@ -438,6 +443,7 @@ export interface AuditLogDoc {
 export type NotificationType =
   | "message_received"
   | "job_requested"
+  | "job_cancelled"
   | "new_application"
   | "application_accepted"
   | "application_rejected"

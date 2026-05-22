@@ -6,9 +6,11 @@ Tasks are grouped by the phase that introduced them so you can see why each one 
 
 ---
 
-## Notifications (added 2026-05-21)
+## Notifications (added 2026-05-21, WhatsApp swap 2026-05-21)
 
-Phase 3 wired email + SMS fan-out into the `notify()` helper. The code writes to two collections (`mail/` and `sms/`) shaped for Firebase Extensions that you need to install and configure. Until the extensions are installed, the docs queue silently and flush retroactively once they are — nothing is lost.
+Phase 3 wired email + WhatsApp fan-out into the `notify()` helper. The code writes to two collections (`mail/` and `whatsapp/`) — `mail/` is shaped for the Firebase Trigger Email extension you install; `whatsapp/` is processed by a function we ship in this repo ([functions/src/messaging/processWhatsAppMessage.ts](functions/src/messaging/processWhatsAppMessage.ts)) that calls Meta's WhatsApp Cloud API. Until the email extension is installed and WhatsApp credentials are set, the queues accumulate silently and flush retroactively once you complete the setup — nothing is lost.
+
+> **About SMS:** Phase 3 originally shipped with SMS-via-Twilio as the high-priority channel. We swapped to WhatsApp on the same day because WhatsApp's free tier (1,000 conversations/month from Meta) makes it cost-effective at launch. SMS code stays dormant in [functions/src/lib/sms.ts](functions/src/lib/sms.ts) and the `sms/` rule remains in [firestore.rules](firestore.rules) — a future preferences UI can let users pick SMS over WhatsApp without re-introducing the schema.
 
 ### [ ] Install "Trigger Email" Firebase extension
 
@@ -19,23 +21,34 @@ Phase 3 wired email + SMS fan-out into the `notify()` helper. The code writes to
   - Default FROM: e.g. `Blue Seal <no-reply@blueseal.app>` (set up domain verification first with the SMTP provider).
 - **Verify:** After install, trigger a test by approving a vetting decision in admin. Check the `mail/` collection in Firestore — new docs should get a `delivery.state: "SUCCESS"` field within a minute.
 
-### [ ] Install "Send SMS with Twilio" Firebase extension
+### [ ] Set up WhatsApp Cloud API (Meta — free tier)
 
-- **Why:** High-priority notifications (vetting approval, new direct-request job, application accepted, new applicant) also fan out via SMS through [functions/src/lib/sms.ts](functions/src/lib/sms.ts). The notify helper writes to `sms/` for these. Without the extension, no texts are sent.
-- **What:**
-  1. Sign up at twilio.com (Canadian phone numbers ~$1.15 CAD/mo + ~$0.0079/SMS to Canada).
-  2. Buy a Canadian phone number from the Twilio console.
-  3. Grab your Account SID + Auth Token from the Twilio console.
-  4. In Firebase console → Extensions → install **Send SMS with Twilio** (by Twilio Labs). When configuring:
-     - Collection path: `sms`  ← **important: don't leave it on the default `messages`, which collides with our chat messages collection**
-     - Twilio Account SID + Auth Token from step 3
-     - Twilio phone number from step 2 (in E.164 format, e.g. `+15875551234`)
-- **Verify:** After install, set a phone number on a test user via the account page, then trigger any high-priority event (admin approval is easiest). The user should receive a text within seconds.
-- **Cost watch:** SMS is metered. The `notify()` helper only sends SMS on `priority: "high"` calls — currently 4 events. If your monthly bill creeps higher than expected, audit the `aiUsage`-style spend in the Twilio dashboard and consider downgrading some types to `priority: "normal"` (email-only).
+High-priority notifications (vetting approval, new direct-request job, application accepted, new applicant) fan out via WhatsApp. Meta gives 1,000 free service conversations/month per business; above that, charges per conversation (24-hour message window) at ~$0.005–0.10 CAD depending on country.
+
+This is a multi-step setup with a ~1–3 day wait for template approval. Until you finish it, queued WhatsApp messages stay in the `whatsapp/` collection unsent — the in-app inbox + email still deliver normally.
+
+**Sub-steps:**
+
+1. **[ ] Create a Meta Business account + WhatsApp Business Account (WABA).** Follow [Meta's WhatsApp Cloud API setup guide](https://developers.facebook.com/docs/whatsapp/cloud-api/get-started). You'll need to verify your business (corporate registration docs) and add a phone number that's not already on consumer WhatsApp.
+2. **[ ] Generate a system user access token + grab the phone number ID.** Both live in the Meta App Dashboard → WhatsApp → API Setup once your WABA is approved. Save these — you'll need them in step 4.
+3. **[ ] Submit a notification template for approval.** Meta requires pre-approved templates for any message sent outside the 24-hour customer-service window — which is most of ours, since users haven't messaged the Blue Seal business number first. Submit a single-parameter "transactional" template:
+   - **Name:** `blue_seal_notification` (or any name; remember it for step 4)
+   - **Language:** `en_US`
+   - **Category:** UTILITY (not MARKETING — utility templates are cheaper and faster to approve)
+   - **Body:** `{{1}}` (just one parameter, which our helper fills with the notification title + body + link)
+   - Approval usually arrives in 24–72 hours.
+4. **[ ] Set three env vars on Cloud Functions:**
+   ```
+   firebase functions:config:set runtime.whatsapp_token="EAAxxxxx..." runtime.whatsapp_phone_id="123456789" runtime.whatsapp_template_name="blue_seal_notification"
+   ```
+   Or in the Google Cloud console → Cloud Functions → `processWhatsAppMessage` → Edit → Runtime environment variables. The processor reads `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`, and optionally `WHATSAPP_TEMPLATE_NAME` + `WHATSAPP_TEMPLATE_LANG` (defaults `en_US`).
+- **Verify:** Set a phone number on a test user via the account page, then trigger any high-priority event (admin approval is easiest). The user should receive a WhatsApp message within seconds. The `whatsapp/{id}` doc's `status` field flips to `sent` (success) or `failed` (with an `error` field — check the Meta response).
+- **If you skip this for now:** Set `WHATSAPP_TOKEN` and `WHATSAPP_PHONE_ID` to empty strings (or just leave them unset). The processor logs and exits without erroring. High-priority notifications still deliver via in-app inbox + email; only the WhatsApp leg is dormant.
+- **Cost watch:** Each delivered notification = one "service conversation" billed for 24 hours. If a user gets 3 WhatsApp notifications in 24h, that's 1 conversation. Watch the Meta Business Manager → WhatsApp Manager → Insights tab.
 
 ### [ ] Set `APP_BASE_URL` env var on Cloud Functions
 
-- **Why:** Email + SMS deep-links need absolute URLs (e.g. `https://blueseal.app/jobs/abc123`). The helper defaults to `https://blueseal.app` if unset — fine for production once you own that domain, wrong for staging. See [functions/src/lib/notify.ts](functions/src/lib/notify.ts) → `absoluteUrl()`.
+- **Why:** Email + WhatsApp deep-links need absolute URLs (e.g. `https://blueseal.app/jobs/abc123`). The helper defaults to `https://blueseal.app` if unset — fine for production once you own that domain, wrong for staging. See [functions/src/lib/notify.ts](functions/src/lib/notify.ts) → `absoluteUrl()`.
 - **What:** From the repo root, with the Firebase CLI authenticated against your project:
   ```
   firebase functions:config:set runtime.app_base_url="https://blueseal.app"
@@ -50,3 +63,9 @@ Phase 3 wired email + SMS fan-out into the `notify()` helper. The code writes to
 - **Why:** Vetting emails are landing in the spam folder per the audit's user research (Marcus's approval email went to spam). Setting up SPF + DKIM authentication for your sending domain dramatically improves deliverability.
 - **What:** Follow your SMTP provider's instructions to add DNS records for your domain. SendGrid, Mailgun, etc. all have step-by-step guides. Usually takes ~30 min plus DNS propagation.
 - **Verify:** Use [mail-tester.com](https://www.mail-tester.com) — send a test from your prod environment to the address they give you, then check the score. Aim for 9+/10.
+
+### [ ] (Optional, future) Install "Send SMS with Twilio" extension if you decide to offer SMS as a paid fallback
+
+- **Why:** Some users won't have WhatsApp (or won't want it for business use). SMS via Twilio still works — the code in [functions/src/lib/sms.ts](functions/src/lib/sms.ts) is intact; you just need to install the extension and wire `notify()` to pick SMS based on a user preference. That preference UI doesn't exist yet (it's a future phase).
+- **What (when you're ready):** See the Twilio setup steps that used to live here — sign up at twilio.com, buy a Canadian number (~$1.15 CAD/mo + $0.0079/SMS to Canada), install the **Send SMS with Twilio** Firebase extension pointed at the `sms` collection (NOT the default `messages`, which collides with chat).
+- **Cost watch:** SMS is metered per message — much more expensive than WhatsApp's per-conversation pricing for high-frequency users.

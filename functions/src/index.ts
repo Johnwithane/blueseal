@@ -47,6 +47,9 @@ export {
 // Seed + ops
 export { seedIntakeSchemas, ping } from "./seed/seedIntakeSchemas";
 
+// Messaging (WhatsApp Cloud API queue processor)
+export { processWhatsAppMessage } from "./messaging/processWhatsAppMessage";
+
 // Job-board marketplace
 export { createJobPost } from "./jobPosts/createJobPost";
 export { submitApplication } from "./jobPosts/submitApplication";

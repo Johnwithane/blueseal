@@ -61,6 +61,10 @@ export const returnToApplicants = onCall({ enforceAppCheck: false }, async (req)
         status: "cancelled",
         cancelledAt: FieldValue.serverTimestamp(),
         cancelledReason: "client returned to applicants",
+        // Sentinel — onJobCancelled (Phase 4 trigger) skips notifying when
+        // cancelledBy === "system" because returnToApplicants already fires
+        // the application_returned notification a few lines below.
+        cancelledBy: "system",
       });
       tx.update(postRef, {
         status: "open",

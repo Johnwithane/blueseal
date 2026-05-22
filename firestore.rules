@@ -403,7 +403,18 @@ service cloud.firestore {
     }
 
     // ---------- sms (Firebase Twilio SMS extension; server-only) ----------
+    // Currently dormant — notify() uses WhatsApp for high-priority fan-out.
+    // Kept in rules + code so the channel can be re-enabled via a future
+    // preferences UI without re-introducing the schema.
     match /sms/{smsId} {
+      allow read, write: if false;
+    }
+
+    // ---------- whatsapp (Meta Cloud API queue; server-only) ----------
+    // Default high-priority channel. Processor lives in
+    // functions/src/messaging/processWhatsAppMessage.ts and reads/writes
+    // status fields on these docs.
+    match /whatsapp/{messageId} {
       allow read, write: if false;
     }
 

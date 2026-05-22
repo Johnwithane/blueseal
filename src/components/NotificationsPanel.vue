@@ -22,6 +22,7 @@ const unreadCount = computed(() => props.items.filter((n) => !n.read).length);
 const ICON: Record<NotificationType, string> = {
   message_received: "pi pi-comment",
   job_requested: "pi pi-briefcase",
+  job_cancelled: "pi pi-ban",
   new_application: "pi pi-send",
   application_accepted: "pi pi-check-circle",
   application_rejected: "pi pi-times-circle",

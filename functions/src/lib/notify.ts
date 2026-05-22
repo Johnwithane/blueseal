@@ -2,7 +2,11 @@ import { FieldValue } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { db } from "./admin";
 import { enqueueMail } from "./mail";
-import { enqueueSms } from "./sms";
+import { enqueueWhatsApp } from "./whatsapp";
+// sms.ts is intentionally not imported here. The SMS queue + helper are
+// kept in the repo as a future opt-in fallback (a preferences UI could
+// let users pick SMS over WhatsApp once we have one), but every notify
+// call routes "high" through WhatsApp by default to keep cost near zero.
 
 // Keep in sync with src/firebase/interfaces.ts → NotificationType.
 // Cross-package boundary means we can't share the type literally; the
@@ -10,6 +14,7 @@ import { enqueueSms } from "./sms";
 export type NotificationType =
   | "message_received"
   | "job_requested"
+  | "job_cancelled"
   | "new_application"
   | "application_accepted"
   | "application_rejected"
@@ -27,10 +32,13 @@ export type NotificationType =
  *  - "low": in-app inbox only. Use for high-volume/low-stakes (e.g. someone
  *    typing in chat — the inbox is enough; we don't want to email them on
  *    every line).
- *  - "normal" (default): in-app + email digest. Standard for things the
- *    user should see today but not be paged about.
- *  - "high": in-app + email + SMS. Reserved for time-critical events —
- *    new job request, application accepted, vetting decision.
+ *  - "normal" (default): in-app + email. Standard for things the user
+ *    should see today but not be paged about.
+ *  - "high": in-app + email + WhatsApp. Reserved for time-critical events —
+ *    new job request, application accepted, vetting decision. WhatsApp is
+ *    the free-tier alternative to SMS (Meta Cloud API: 1,000 conversations
+ *    /mo free, then ~$0.005–0.10 per conversation). SMS is dormant in
+ *    `lib/sms.ts` for a future preferences UI that lets users pick.
  */
 export type NotifyPriority = "low" | "normal" | "high";
 
@@ -129,15 +137,19 @@ export async function notify(input: NotifyInput): Promise<void> {
     }
   }
 
-  // SMS only on high — and only if the user has a phone on file.
+  // WhatsApp only on high — and only if the user has a phone on file.
+  // Same phone field as SMS: WhatsApp uses the same E.164 number the
+  // user already gave us. The processWhatsAppMessage trigger flushes the
+  // queue via Meta's Cloud API.
   if (priority === "high" && contact.phone) {
     try {
-      // SMS body is space-bound; lead with the title so it's useful even
-      // if the carrier truncates. Append the link so the user can act.
-      const smsBody = url ? `${title} — ${url}` : title;
-      await enqueueSms({ to: contact.phone, body: smsBody });
+      // Lead with the title so even a truncated preview is meaningful.
+      // Templates (recommended for cold-start messages) interpolate this
+      // entire body as their {{1}} parameter.
+      const waBody = url ? `${title}\n\n${body}\n\n${url}` : `${title}\n\n${body}`;
+      await enqueueWhatsApp({ to: contact.phone, body: waBody });
     } catch (err) {
-      logger.error("notify: sms enqueue failed", {
+      logger.error("notify: whatsapp enqueue failed", {
         type: input.type,
         userId: input.userId,
         err,

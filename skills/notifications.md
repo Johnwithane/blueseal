@@ -28,16 +28,25 @@ That's it. No interface changes, no rules changes, no service changes. The `noti
 
 Every `notify()` call MUST pick a priority. The default is `normal`. The mapping:
 
-| Priority | In-app inbox | Email | SMS | When to use |
+| Priority | In-app inbox | Email | WhatsApp | When to use |
 |---|---|---|---|---|
 | `low` | ✅ | ❌ | ❌ | High-volume / low-stakes events (chat messages, dupe triggers). The bell badge and inbox are enough. |
-| `normal` | ✅ | ✅ | ❌ | Standard events the user should see today but not be paged about (new applicant — at normal — review received, application rejected). |
-| `high` | ✅ | ✅ | ✅ | Time-critical events where every minute counts: new direct-request job for a tradesperson, vetting approval, application accepted. |
+| `normal` | ✅ | ✅ | ❌ | Standard events the user should see today but not be paged about (new applicant, review received, application rejected). |
+| `high` | ✅ | ✅ | ✅ | Time-critical events where every minute counts: new direct-request job for a tradesperson, vetting approval, application accepted, job cancelled. |
 
 Two rules of thumb to keep cost + spam down:
 
-- **Default to `normal`** unless you have a reason to escalate. SMS is metered (~$0.0079 CAD per message in Canada); a typo cascade can balloon spend.
+- **Default to `normal`** unless you have a reason to escalate. WhatsApp's free tier covers ~1,000 service conversations/month per Meta; beyond that, Meta charges ~$0.005–0.10 per conversation. A typo cascade can blow through the free tier in a day.
 - **If the caller already emails directly** (e.g. `sendInvoice` calls `enqueueMail` separately to ship the PDF), set the notify priority to `low` to avoid a second email from the same event. Two emails for one action looks broken.
+
+### Why WhatsApp instead of SMS for high priority?
+
+WhatsApp via Meta Cloud API has a free tier (~1,000 service conversations/month per business); SMS via Twilio is metered per message (~$0.0079 CAD per text to Canada) with no free tier. For a launch-stage product where the founder asked specifically for "essentially free", WhatsApp is the better default. The SMS code in [functions/src/lib/sms.ts](../functions/src/lib/sms.ts) is dormant — kept in the repo for a future preferences UI that would let users pick SMS over WhatsApp (e.g. because they don't use WhatsApp). Setup steps for both live in [HUMANTASKS.md](../HUMANTASKS.md).
+
+Operational tradeoffs to know:
+- **WhatsApp requires the recipient to have WhatsApp.** ~75% of Canadians have it; not as ubiquitous as it is in Brazil or India.
+- **Cold-start messages require pre-approved templates.** Meta only allows free-form text inside the 24-hour customer-service window (i.e. the user messaged the business first). For notifications, you need an approved UTILITY template — covered in HUMANTASKS.md.
+- **WhatsApp uses the same `phone` field as SMS.** No schema change needed when swapping channels.
 
 ---
 
