@@ -1,17 +1,83 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useRouter, RouterLink } from "vue-router";
 import Button from "primevue/button";
 import Menu from "primevue/menu";
 import Avatar from "primevue/avatar";
+import Popover from "primevue/popover";
 import { useAuthStore } from "@/stores/auth";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
+import NotificationsPanel from "@/components/NotificationsPanel.vue";
+import type { NotificationDoc, WithId } from "@/firebase/interfaces";
+import {
+  markAllRead,
+  markNotificationRead,
+  subscribeMyNotifications,
+} from "@/firebase/services/notifications";
 
 const auth = useAuthStore();
 const router = useRouter();
 const toast = useToast();
 const menu = ref<InstanceType<typeof Menu> | null>(null);
+const notifPopover = ref<InstanceType<typeof Popover> | null>(null);
+
+const notifications = ref<WithId<NotificationDoc>[]>([]);
+const notifLoading = ref(false);
+const unreadCount = computed(() => notifications.value.filter((n) => !n.read).length);
+
+let unsubNotifs: (() => void) | null = null;
+
+function startNotifSubscription() {
+  // Cancel any prior subscription before starting a fresh one — `watch` may
+  // fire on sign-out followed by sign-in and we don't want stale listeners.
+  if (unsubNotifs) {
+    unsubNotifs();
+    unsubNotifs = null;
+  }
+  if (!auth.isAuthenticated) {
+    notifications.value = [];
+    return;
+  }
+  notifLoading.value = true;
+  unsubNotifs = subscribeMyNotifications((items) => {
+    notifications.value = items;
+    notifLoading.value = false;
+  });
+}
+
+// Re-subscribe whenever the signed-in user identity changes.
+watch(() => auth.fbUser?.uid ?? null, startNotifSubscription, { immediate: true });
+
+onBeforeUnmount(() => {
+  if (unsubNotifs) unsubNotifs();
+});
+
+function toggleNotifs(e: Event) {
+  notifPopover.value?.toggle(e);
+}
+
+async function onOpenNotification(item: WithId<NotificationDoc>) {
+  notifPopover.value?.hide();
+  // Fire-and-forget the mark-read — the snapshot listener will reconcile.
+  // Don't await; a slow Firestore round-trip shouldn't delay navigation.
+  if (!item.read) {
+    markNotificationRead(item.id).catch(() => {
+      /* surfaced via UI eventually if write fails persistently */
+    });
+  }
+  if (item.link) router.push(item.link);
+}
+
+async function onMarkAllRead() {
+  const unreadIds = notifications.value.filter((n) => !n.read).map((n) => n.id);
+  if (unreadIds.length === 0) return;
+  try {
+    await markAllRead(unreadIds);
+  } catch (e) {
+    toast.error(humanizeError(e));
+  }
+}
 
 const VIEW_LABEL: Record<string, string> = {
   client: "Client",
@@ -164,6 +230,31 @@ function openMenu(e: Event) {
 
       <div class="flex items-center gap-2">
         <template v-if="auth.isAuthenticated">
+          <button
+            type="button"
+            class="relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--bs-border)] bg-white text-[color:var(--bs-text)] transition-colors hover:bg-[color:var(--bs-surface-alt)]"
+            :aria-label="
+              unreadCount > 0 ? `Notifications (${unreadCount} unread)` : 'Notifications'
+            "
+            @click="toggleNotifs"
+          >
+            <i class="pi pi-bell"></i>
+            <span
+              v-if="unreadCount > 0"
+              class="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[color:var(--bs-blue)] px-1 text-[10px] font-semibold leading-none text-white"
+            >
+              {{ unreadCount > 9 ? "9+" : unreadCount }}
+            </span>
+          </button>
+          <Popover ref="notifPopover">
+            <NotificationsPanel
+              :items="notifications"
+              :loading="notifLoading"
+              @open="onOpenNotification"
+              @mark-all-read="onMarkAllRead"
+            />
+          </Popover>
+
           <button
             type="button"
             class="flex items-center gap-2 rounded-full border border-[color:var(--bs-border)] bg-white px-1.5 py-1 transition-colors hover:bg-[color:var(--bs-surface-alt)]"
