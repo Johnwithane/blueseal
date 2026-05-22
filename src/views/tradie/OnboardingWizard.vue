@@ -8,13 +8,11 @@ import StepList from "primevue/steplist";
 import Step from "primevue/step";
 import StepPanels from "primevue/steppanels";
 import StepPanel from "primevue/steppanel";
-import InputText from "primevue/inputtext";
 import Textarea from "primevue/textarea";
 import InputNumber from "primevue/inputnumber";
 import Select from "primevue/select";
 import MultiSelect from "primevue/multiselect";
 import ToggleSwitch from "primevue/toggleswitch";
-import Slider from "primevue/slider";
 import Message from "primevue/message";
 
 import { useAuthStore } from "@/stores/auth";
@@ -44,6 +42,7 @@ import type {
 import AvailabilityEditor from "@/components/AvailabilityEditor.vue";
 import CertUploadCard from "@/components/CertUploadCard.vue";
 import IdUploadCard from "@/components/IdUploadCard.vue";
+import LocationPicker, { type LocationValue } from "@/components/LocationPicker.vue";
 import { useToast } from "@/composables/useToast";
 
 const auth = useAuthStore();
@@ -69,10 +68,12 @@ const hourlyRateDollars = ref<number | null>(null);
 const providesFreeQuotes = ref(true);
 
 // Service area
-const primaryAddressText = ref("");
-const lat = ref<number | null>(null);
-const lng = ref<number | null>(null);
-const serviceRadiusKm = ref(25);
+const location = ref<LocationValue>({
+  lat: null,
+  lng: null,
+  radiusKm: 25,
+  label: "",
+});
 
 // Availability
 const availability = ref<WeeklyAvailability>(emptyAvailability());
@@ -101,9 +102,9 @@ const canSubmit = computed(
   () =>
     !!primaryTrade.value &&
     bio.value.length >= 20 &&
-    !!primaryAddressText.value &&
-    lat.value != null &&
-    lng.value != null &&
+    !!location.value.label &&
+    location.value.lat != null &&
+    location.value.lng != null &&
     allCertsUploaded.value &&
     idStatus.value !== "none" &&
     (pricingModel.value === "quote" ||
@@ -121,12 +122,13 @@ onMounted(async () => {
     pricingModel.value = t.pricingModel;
     hourlyRateDollars.value = t.hourlyRate ? t.hourlyRate / 100 : null;
     providesFreeQuotes.value = t.providesFreeQuotes;
-    primaryAddressText.value = t.primaryAddressText;
-    if (t.location && t.location.latitude !== 0) {
-      lat.value = t.location.latitude;
-      lng.value = t.location.longitude;
-    }
-    serviceRadiusKm.value = t.serviceRadiusKm || 25;
+    const hasGeo = !!t.location && t.location.latitude !== 0;
+    location.value = {
+      lat: hasGeo ? t.location.latitude : null,
+      lng: hasGeo ? t.location.longitude : null,
+      radiusKm: t.serviceRadiusKm || 25,
+      label: t.primaryAddressText ?? "",
+    };
     availability.value = t.weeklyAvailability ?? emptyAvailability();
     paymentInstructions.value = t.paymentInstructions ?? "";
   }
@@ -152,8 +154,8 @@ async function saveDraft(): Promise<void> {
       hourlyRate:
         hourlyRateDollars.value != null ? Math.round(hourlyRateDollars.value * 100) : null,
       providesFreeQuotes: providesFreeQuotes.value,
-      primaryAddressText: primaryAddressText.value,
-      serviceRadiusKm: serviceRadiusKm.value,
+      primaryAddressText: location.value.label ?? "",
+      serviceRadiusKm: location.value.radiusKm,
       weeklyAvailability: availability.value,
       paymentInstructions: paymentInstructions.value,
       vettingStatus: "draft",
@@ -162,12 +164,13 @@ async function saveDraft(): Promise<void> {
       displayName: auth.user?.displayName ?? auth.fbUser.displayName ?? "",
       photoURL: auth.user?.photoURL ?? auth.fbUser.photoURL ?? null,
     };
-    if (lat.value != null && lng.value != null) {
-      patch.location = new GeoPoint(lat.value, lng.value);
+    const { lat: locLat, lng: locLng } = location.value;
+    if (locLat != null && locLng != null) {
+      patch.location = new GeoPoint(locLat, locLng);
     }
     await createOrUpdateDraft(auth.fbUser.uid, patch);
-    if (lat.value != null && lng.value != null) {
-      await setLocation(auth.fbUser.uid, lat.value, lng.value);
+    if (locLat != null && locLng != null) {
+      await setLocation(auth.fbUser.uid, locLat, locLng);
     }
     toast.success("Draft saved");
   } catch (e) {
@@ -363,31 +366,10 @@ async function submitApplication() {
         <StepPanel v-slot="{ activateCallback }" value="4">
           <div class="bs-form space-y-4 p-2">
             <h2 class="font-semibold">Service area</h2>
-            <div>
-              <label class="text-sm font-medium">Primary address</label>
-              <InputText v-model="primaryAddressText" class="mt-1" placeholder="123 Main St, Kelowna BC" />
-              <small class="text-[color:var(--bs-muted)]">
-                We use this as the center of your service area.
-              </small>
-            </div>
-            <div class="grid sm:grid-cols-2 gap-3">
-              <div>
-                <label class="text-sm font-medium">Latitude</label>
-                <InputNumber v-model="lat" :min-fraction-digits="4" :max-fraction-digits="6" class="mt-1 w-full" />
-              </div>
-              <div>
-                <label class="text-sm font-medium">Longitude</label>
-                <InputNumber v-model="lng" :min-fraction-digits="4" :max-fraction-digits="6" class="mt-1 w-full" />
-              </div>
-            </div>
-            <Message severity="info" :closable="false">
-              Google Maps lookup arrives in a follow-up release — paste your lat/lng for now
-              (find it on Google Maps: right-click your address → copy coordinates).
-            </Message>
-            <div>
-              <label class="text-sm font-medium">Service radius: {{ serviceRadiusKm }} km</label>
-              <Slider v-model="serviceRadiusKm" :min="1" :max="200" class="mt-2" />
-            </div>
+            <p class="text-sm text-[color:var(--bs-muted)]">
+              Search an address or use your current location to set the centre of your service area.
+            </p>
+            <LocationPicker v-model="location" />
             <div class="flex justify-between">
               <Button label="Back" outlined @click="activateCallback('3')" />
               <Button label="Next" icon="pi pi-arrow-right" icon-pos="right" @click="activateCallback('5')" />
@@ -453,7 +435,7 @@ async function submitApplication() {
               <li><strong>Bio:</strong> {{ bio.length }} chars</li>
               <li><strong>Trades:</strong> {{ trades().join(", ") || "—" }}</li>
               <li><strong>Pricing:</strong> {{ pricingModel }}{{ hourlyRateDollars ? ` @ $${hourlyRateDollars}/hr` : "" }}</li>
-              <li><strong>Service area:</strong> {{ primaryAddressText }} ({{ serviceRadiusKm }} km)</li>
+              <li><strong>Service area:</strong> {{ location.label || "—" }} ({{ location.radiusKm }} km)</li>
               <li><strong>Certifications uploaded:</strong> {{ existingCerts.length }} / {{ tradesToCert.length }}</li>
               <li><strong>ID:</strong> {{ idStatus }}</li>
             </ul>
