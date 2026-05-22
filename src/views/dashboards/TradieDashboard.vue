@@ -5,13 +5,20 @@ import Button from "primevue/button";
 import SelectButton from "primevue/selectbutton";
 import Message from "primevue/message";
 import Dialog from "primevue/dialog";
+import DatePicker from "primevue/datepicker";
 import { useAuthStore } from "@/stores/auth";
 import { getTradesperson, setWeeklyAvailability } from "@/firebase/services/tradespeople";
 import { subscribeTradieJobs } from "@/firebase/services/jobs";
+import {
+  createBlock,
+  deleteBooking,
+  subscribeBookings,
+} from "@/firebase/services/bookings";
 import { weeklyAvailabilitySchema } from "@/validation/schemas";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 import type {
+  BookingDoc,
   JobDoc,
   TradespersonDoc,
   WeeklyAvailability,
@@ -37,7 +44,14 @@ const draftAvailability = ref<WeeklyAvailability | null>(null);
 const savingAvailability = ref(false);
 const availabilityError = ref<string | null>(null);
 
+const bookings = ref<WithId<BookingDoc>[]>([]);
+const blockOpen = ref(false);
+const blockRange = ref<Date[] | null>(null);
+const savingBlock = ref(false);
+const blockError = ref<string | null>(null);
+
 let unsub: (() => void) | null = null;
+let unsubBookings: (() => void) | null = null;
 
 onMounted(async () => {
   if (!auth.fbUser) return;
@@ -47,9 +61,13 @@ onMounted(async () => {
     return;
   }
   unsub = subscribeTradieJobs(auth.fbUser.uid, (j) => (jobs.value = j));
+  unsubBookings = subscribeBookings(auth.fbUser.uid, (b) => (bookings.value = b));
 });
 
-onUnmounted(() => unsub?.());
+onUnmounted(() => {
+  unsub?.();
+  unsubBookings?.();
+});
 
 function openAvailabilityEditor() {
   if (!tradie.value) return;
@@ -59,6 +77,45 @@ function openAvailabilityEditor() {
   ) as WeeklyAvailability;
   availabilityError.value = null;
   availabilityOpen.value = true;
+}
+
+function openBlockEditor() {
+  // Default to today as a single-day range.
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  blockRange.value = [today, today];
+  blockError.value = null;
+  blockOpen.value = true;
+}
+
+async function saveBlock() {
+  if (!auth.fbUser || !blockRange.value || blockRange.value.length === 0) return;
+  const [start, end] = blockRange.value;
+  if (!start) {
+    blockError.value = "Pick at least one date.";
+    return;
+  }
+  const finalEnd = end ?? start;
+  savingBlock.value = true;
+  blockError.value = null;
+  try {
+    await createBlock(auth.fbUser.uid, start, finalEnd);
+    toast.success("Block-off saved");
+    blockOpen.value = false;
+  } catch (e) {
+    blockError.value = humanizeError(e);
+  } finally {
+    savingBlock.value = false;
+  }
+}
+
+async function removeBlock(bookingId: string) {
+  try {
+    await deleteBooking(bookingId);
+    toast.success("Block removed");
+  } catch (e) {
+    toast.error(humanizeError(e));
+  }
 }
 
 async function saveAvailability() {
@@ -135,6 +192,13 @@ const banner = computed(() => {
             outlined
             @click="openAvailabilityEditor"
           />
+          <Button
+            label="Block off time"
+            icon="pi pi-ban"
+            outlined
+            severity="danger"
+            @click="openBlockEditor"
+          />
           <RouterLink to="/jobs/browse">
             <Button label="Browse open jobs" icon="pi pi-megaphone" outlined />
           </RouterLink>
@@ -153,7 +217,13 @@ const banner = computed(() => {
     </Message>
 
     <KanbanBoard v-if="view === 'kanban' && tradie?.isVisible" :jobs="jobs" />
-    <CalendarView v-else-if="view === 'calendar' && tradie?.isVisible" :jobs="jobs" :availability="tradie.weeklyAvailability" />
+    <CalendarView
+      v-else-if="view === 'calendar' && tradie?.isVisible"
+      :jobs="jobs"
+      :availability="tradie.weeklyAvailability"
+      :blocks="bookings"
+      @remove-block="removeBlock"
+    />
 
     <div v-if="!tradie?.isVisible && vetting !== 'pending'" class="bs-empty mt-4">
       <i class="pi pi-clock text-3xl mb-2 block"></i>
@@ -195,6 +265,50 @@ const banner = computed(() => {
           icon="pi pi-save"
           :loading="savingAvailability"
           @click="saveAvailability"
+        />
+      </template>
+    </Dialog>
+
+    <Dialog
+      v-model:visible="blockOpen"
+      modal
+      header="Block off time"
+      :style="{ width: '90vw', maxWidth: '28rem' }"
+      :draggable="false"
+    >
+      <p class="mb-3 text-sm text-[color:var(--bs-muted)]">
+        Mark dates as unavailable (vacation, training, anything that should
+        block bookings). Pick a single day or a range.
+      </p>
+      <Message
+        v-if="blockError"
+        severity="error"
+        :closable="false"
+        class="mb-3"
+      >
+        {{ blockError }}
+      </Message>
+      <DatePicker
+        v-model="blockRange"
+        selection-mode="range"
+        :manual-input="false"
+        inline
+        :min-date="new Date()"
+        class="w-full"
+      />
+      <template #footer>
+        <Button
+          label="Cancel"
+          severity="secondary"
+          text
+          @click="blockOpen = false"
+        />
+        <Button
+          label="Save block"
+          icon="pi pi-save"
+          severity="danger"
+          :loading="savingBlock"
+          @click="saveBlock"
         />
       </template>
     </Dialog>

@@ -3,11 +3,20 @@ import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import Button from "primevue/button";
 import SelectButton from "primevue/selectbutton";
-import type { JobDoc, WeeklyAvailability, WithId } from "@/firebase/interfaces";
+import type {
+  BookingDoc,
+  JobDoc,
+  WeeklyAvailability,
+  WithId,
+} from "@/firebase/interfaces";
 
 const props = defineProps<{
   jobs: WithId<JobDoc>[];
   availability: WeeklyAvailability;
+  blocks?: WithId<BookingDoc>[];
+}>();
+const emit = defineEmits<{
+  "remove-block": [bookingId: string];
 }>();
 const router = useRouter();
 
@@ -73,6 +82,20 @@ function dateKey(d: Date): string {
 }
 function jobsForDay(d: Date): WithId<JobDoc>[] {
   return jobsByDateKey.value.get(dateKey(d)) ?? [];
+}
+
+// Blocks are stored as [start, end) ranges. A day is "blocked" if it falls
+// inside any block — we check by day-of-year overlap rather than precise
+// timestamp so a multi-day vacation block highlights every covered cell.
+function blocksForDay(d: Date): WithId<BookingDoc>[] {
+  const dayStart = startOfDay(d).getTime();
+  const dayEnd = dayStart + 86_400_000;
+  return (props.blocks ?? []).filter((b) => {
+    if (b.type !== "blocked") return false;
+    const s = b.start.toDate().getTime();
+    const e = b.end.toDate().getTime();
+    return s < dayEnd && e > dayStart;
+  });
 }
 
 // Week view: 7 consecutive days from weekStart.
@@ -199,6 +222,24 @@ function dayOfWeekKey(d: Date): (typeof days)[number] {
           {{ block.start }} – {{ block.end }}
         </div>
         <article
+          v-for="b in blocksForDay(d)"
+          :key="b.id"
+          class="mt-1 flex items-center justify-between rounded-md bg-red-50 px-2 py-1 text-xs text-red-800"
+        >
+          <span class="flex items-center gap-1">
+            <i class="pi pi-ban text-[10px]"></i>
+            <span>Blocked</span>
+          </span>
+          <button
+            type="button"
+            class="text-red-700 hover:text-red-900"
+            aria-label="Remove block"
+            @click="emit('remove-block', b.id)"
+          >
+            <i class="pi pi-times text-[10px]"></i>
+          </button>
+        </article>
+        <article
           v-for="job in jobsForDay(d)"
           :key="job.id"
           class="mt-2 cursor-pointer rounded-md bg-[color:var(--bs-blue)] p-2 text-xs text-white"
@@ -229,15 +270,23 @@ function dayOfWeekKey(d: Date): (typeof days)[number] {
           :class="{
             'opacity-50': d.getMonth() !== anchor.getMonth(),
             'ring-2 ring-[color:var(--bs-blue)]': isSameDay(d, today),
+            'bg-red-50/50': blocksForDay(d).length > 0,
           }"
         >
           <div class="mb-1 flex items-center justify-between">
             <div class="text-xs font-semibold sm:text-sm">{{ d.getDate() }}</div>
-            <span
-              v-if="props.availability[dayOfWeekKey(d)].length"
-              class="h-1.5 w-1.5 rounded-full bg-[color:var(--bs-blue)]"
-              :title="`${props.availability[dayOfWeekKey(d)].length} availability block(s)`"
-            ></span>
+            <div class="flex items-center gap-1">
+              <i
+                v-if="blocksForDay(d).length > 0"
+                class="pi pi-ban text-[10px] text-red-600"
+                title="Blocked"
+              ></i>
+              <span
+                v-if="props.availability[dayOfWeekKey(d)].length"
+                class="h-1.5 w-1.5 rounded-full bg-[color:var(--bs-blue)]"
+                :title="`${props.availability[dayOfWeekKey(d)].length} availability block(s)`"
+              ></span>
+            </div>
           </div>
           <article
             v-for="job in jobsForDay(d).slice(0, 2)"
