@@ -1,8 +1,19 @@
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, ref } from "vue";
+import { computed, onMounted, onBeforeUnmount, ref } from "vue";
 import { RouterLink } from "vue-router";
 import Button from "primevue/button";
 import { TRADES } from "@/data/trades";
+import { useAuthStore } from "@/stores/auth";
+
+const auth = useAuthStore();
+
+// Hero CTAs branch on the user's active view-mode so a tradesperson sees
+// "go work" actions and everyone else sees "go hire" actions.
+const heroMode = computed<"tradesperson" | "client-or-public">(() =>
+  auth.isAuthenticated && auth.activeRole === "tradesperson"
+    ? "tradesperson"
+    : "client-or-public",
+);
 
 const root = ref<HTMLElement | null>(null);
 let observer: IntersectionObserver | null = null;
@@ -86,30 +97,42 @@ const testimonials = [
             chat, quote, schedule, and review — all in one professional thread.
           </p>
           <div class="mt-8 flex flex-wrap gap-3">
-            <RouterLink to="/search">
-              <Button
-                label="Find a tradesperson"
-                icon="pi pi-search"
-                size="large"
-                class="!bg-white !text-[color:var(--bs-blue-dark)] !border-white hover:!bg-[#eaf5fc]"
-              />
-            </RouterLink>
-            <RouterLink to="/jobs/post">
-              <Button
-                label="Post a job, get bids"
-                icon="pi pi-megaphone"
-                size="large"
-                class="!bg-white !text-[color:var(--bs-blue-dark)] !border-white hover:!bg-[#eaf5fc]"
-              />
-            </RouterLink>
-            <RouterLink to="/sign-up?as=tradesperson">
-              <Button
-                label="I'm a tradesperson"
-                icon="pi pi-wrench"
-                size="large"
-                class="!bg-white/10 hover:!bg-white/20 !text-white !border-white/70 backdrop-blur-sm"
-              />
-            </RouterLink>
+            <template v-if="heroMode === 'tradesperson'">
+              <RouterLink to="/dashboard">
+                <Button
+                  label="Go to your dashboard"
+                  icon="pi pi-home"
+                  size="large"
+                  class="!bg-white !text-[color:var(--bs-blue-dark)] !border-white hover:!bg-[#eaf5fc]"
+                />
+              </RouterLink>
+              <RouterLink to="/jobs/browse">
+                <Button
+                  label="Browse open jobs"
+                  icon="pi pi-megaphone"
+                  size="large"
+                  class="!bg-white/10 hover:!bg-white/20 !text-white !border-white/70 backdrop-blur-sm"
+                />
+              </RouterLink>
+            </template>
+            <template v-else>
+              <RouterLink to="/search">
+                <Button
+                  label="Find a tradesperson"
+                  icon="pi pi-search"
+                  size="large"
+                  class="!bg-white !text-[color:var(--bs-blue-dark)] !border-white hover:!bg-[#eaf5fc]"
+                />
+              </RouterLink>
+              <RouterLink to="/jobs/post">
+                <Button
+                  label="Post a job, get bids"
+                  icon="pi pi-megaphone"
+                  size="large"
+                  class="!bg-white !text-[color:var(--bs-blue-dark)] !border-white hover:!bg-[#eaf5fc]"
+                />
+              </RouterLink>
+            </template>
           </div>
         </div>
 
