@@ -1,6 +1,7 @@
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { FieldValue } from "firebase-admin/firestore";
 import { db } from "../lib/admin";
+import { notify } from "../lib/notify";
 
 interface MessageLike {
   senderId: string;
@@ -11,18 +12,20 @@ interface MessageLike {
 interface ChatLike {
   clientId: string;
   tradespersonId: string;
+  jobId: string;
 }
 
 /**
  * On new chat message: bump lastMessage metadata + increment unreadCount
- * for the *other* party only.
+ * for the *other* party only, and drop a notification in their inbox.
  */
 export const onMessageCreated = onDocumentCreated(
   "chats/{chatId}/messages/{messageId}",
   async (event) => {
     const msg = event.data?.data() as MessageLike | undefined;
     if (!msg?.senderId) return;
-    const chatRef = db.doc(`chats/${event.params.chatId}`);
+    const chatId = event.params.chatId;
+    const chatRef = db.doc(`chats/${chatId}`);
     const chatSnap = await chatRef.get();
     if (!chatSnap.exists) return;
     const chat = chatSnap.data() as ChatLike;
@@ -32,6 +35,23 @@ export const onMessageCreated = onDocumentCreated(
       lastMessageAt: FieldValue.serverTimestamp(),
       lastMessagePreview: preview,
       [`unreadCounts.${recipient}`]: FieldValue.increment(1),
+    });
+    // Pull the sender's display name for a more human notification.
+    const senderSnap = await db.doc(`users/${msg.senderId}`).get();
+    const senderName = (senderSnap.data() as { displayName?: string } | undefined)?.displayName
+      ?? "Someone";
+    await notify({
+      userId: recipient,
+      type: "message_received",
+      title: `New message from ${senderName}`,
+      body: preview,
+      link: `/jobs/${chat.jobId}`,
+      jobId: chat.jobId,
+      chatId,
+      actorUid: msg.senderId,
+      // Chat is high-volume; in-app + bell badge is enough. Email/SMS on
+      // every line would be unbearable.
+      priority: "low",
     });
   },
 );

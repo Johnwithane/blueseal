@@ -26,6 +26,9 @@ export { onClientReviewCreated } from "./reviews/onClientReviewCreated";
 // Chat
 export { onMessageCreated } from "./chat/onMessageCreated";
 
+// Jobs (direct-request notifications; marketplace flows live in jobPosts/)
+export { onJobCreated } from "./jobs/onJobCreated";
+
 // Invoicing
 export { onJobCompleted } from "./invoicing/onJobCompleted";
 export { sendInvoice } from "./invoicing/sendInvoice";

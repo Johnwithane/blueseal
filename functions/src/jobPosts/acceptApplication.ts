@@ -5,7 +5,7 @@ import { z } from "zod";
 import { db, storage } from "../lib/admin";
 import { requireRole } from "../lib/auth";
 import { logAdminAction } from "../lib/audit";
-import { writeNotification } from "./helpers";
+import { notify } from "../lib/notify";
 
 const Input = z.object({
   postId: z.string().min(1).max(128),
@@ -235,13 +235,15 @@ export const acceptApplication = onCall({ enforceAppCheck: false }, async (req) 
 
   // Notify the selected tradie.
   if (post) {
-    await writeNotification({
+    await notify({
       userId: (await appRef.get()).get("tradespersonId") as string,
-      type: "application_selected",
+      type: "application_accepted",
       title: "You were selected!",
       body: `The client chose you for "${post.title}". Open the job to introduce yourself.`,
       link: `/jobs/${jobRef.id}`,
-      metadata: { postId, jobId: jobRef.id },
+      jobId: jobRef.id,
+      actorUid: uid,
+      priority: "high",
     });
   }
 

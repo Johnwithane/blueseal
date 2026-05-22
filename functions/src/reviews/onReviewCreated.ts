@@ -2,9 +2,12 @@ import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { FieldValue } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { db } from "../lib/admin";
+import { notify } from "../lib/notify";
 
 interface ReviewLike {
   tradespersonId: string;
+  clientId?: string;
+  jobId?: string;
   rating: number;
   dimensions?: {
     quality: number;
@@ -78,5 +81,15 @@ export const onReviewCreated = onDocumentCreated("reviews/{reviewId}", async (ev
       ratingDimensions: dims,
       lastReviewAt: FieldValue.serverTimestamp(),
     });
+  });
+
+  await notify({
+    userId: r.tradespersonId,
+    type: "review_received",
+    title: `New ${r.rating}-star review`,
+    body: "A client left you a review. Tap to read it and reply.",
+    link: "/dashboard/tradie",
+    jobId: r.jobId ?? null,
+    actorUid: r.clientId ?? null,
   });
 });

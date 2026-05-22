@@ -52,27 +52,3 @@ export function rateLimitKey(uid: string, action: string): string {
   const today = new Date().toISOString().slice(0, 10);
   return `${action}_${uid}_${today}`;
 }
-
-// Notification helper. Writes to /notifications/{notifId}.
-import { FieldValue } from "firebase-admin/firestore";
-export interface NotificationInput {
-  userId: string;
-  type: string;
-  title: string;
-  body: string;
-  link?: string;
-  metadata?: Record<string, unknown>;
-}
-
-export async function writeNotification(input: NotificationInput): Promise<void> {
-  await db.collection("notifications").add({
-    userId: input.userId,
-    type: input.type,
-    title: input.title,
-    body: input.body,
-    link: input.link ?? null,
-    metadata: input.metadata ?? {},
-    readAt: null,
-    createdAt: FieldValue.serverTimestamp(),
-  });
-}

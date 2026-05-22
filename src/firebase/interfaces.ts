@@ -438,17 +438,16 @@ export interface AuditLogDoc {
 export type NotificationType =
   | "message_received"
   | "job_requested"
+  | "new_application"
   | "application_accepted"
   | "application_rejected"
+  | "application_returned"
   | "vetting_approved"
   | "vetting_rejected"
   | "vetting_info_requested"
   | "cert_approved"
-  | "cert_rejected"
   | "id_approved"
-  | "id_rejected"
   | "invoice_sent"
-  | "invoice_paid"
   | "review_received";
 
 export interface NotificationDoc {

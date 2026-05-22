@@ -402,6 +402,11 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // ---------- sms (Firebase Twilio SMS extension; server-only) ----------
+    match /sms/{smsId} {
+      allow read, write: if false;
+    }
+
     // ---------- canonical static data (trades list, etc.) ----------
     match /catalog/{docId} {
       allow read: if true;

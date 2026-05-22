@@ -5,7 +5,7 @@ import { z } from "zod";
 import { db } from "../lib/admin";
 import { requireRole } from "../lib/auth";
 import { logAdminAction } from "../lib/audit";
-import { writeNotification } from "./helpers";
+import { notify } from "../lib/notify";
 
 const Input = z.object({ postId: z.string().min(1).max(128) });
 
@@ -86,13 +86,13 @@ export const returnToApplicants = onCall({ enforceAppCheck: false }, async (req)
     });
 
     if (result.selectedId) {
-      await writeNotification({
+      await notify({
         userId: result.selectedId,
         type: "application_returned",
         title: "Client reopened the job",
         body: `The client returned to applicants for "${result.postTitle}". Your application is back to pending.`,
         link: `/jobs/posted/${postId}`,
-        metadata: { postId },
+        actorUid: uid,
       });
     }
 

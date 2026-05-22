@@ -5,6 +5,7 @@ import PDFDocument from "pdfkit";
 import { db, storage } from "../lib/admin";
 import { requireAuth } from "../lib/auth";
 import { enqueueMail } from "../lib/mail";
+import { notify } from "../lib/notify";
 
 const Input = z.object({ invoiceId: z.string().min(1) });
 
@@ -109,6 +110,18 @@ export const sendInvoice = onCall({ enforceAppCheck: false }, async (req) => {
       text: `Hi ${clientName},\n\nYour invoice for ${fmtMoney(inv.total, inv.currency)} is attached and available at: ${downloadUrl}\n\nPayment instructions:\n${inv.paymentInstructions || "—"}`,
     });
   }
+
+  // In-app inbox entry for the client. Email is already dispatched above,
+  // so keep this at "low" to avoid a second email from the notify helper.
+  await notify({
+    userId: inv.clientId,
+    type: "invoice_sent",
+    title: `Invoice ${inv.invoiceNumber} from ${tradieName}`,
+    body: `${fmtMoney(inv.total, inv.currency)} due. Tap to view or pay.`,
+    link: `/jobs/${(await db.doc(`invoices/${invoiceId}`).get()).get("jobId")}`,
+    actorUid: inv.tradespersonId,
+    priority: "low",
+  });
 
   return { ok: true, pdfUrl: downloadUrl };
 });

@@ -5,6 +5,7 @@ import { db } from "../lib/admin";
 import { requireAdmin } from "../lib/auth";
 import { logAdminAction } from "../lib/audit";
 import { enqueueMail } from "../lib/mail";
+import { notify } from "../lib/notify";
 import { maybeMarkVisible } from "./visibility";
 
 const ApproveInput = z.object({ tradieUid: z.string().min(1).max(128) });
@@ -39,6 +40,14 @@ export const approveApplication = onCall({ enforceAppCheck: false }, async (req)
     vettingNotes: "",
   });
   await maybeMarkVisible(tradieUid);
+  await notify({
+    userId: tradieUid,
+    type: "vetting_approved",
+    title: "You're approved — welcome to Blue Seal",
+    body: "Your profile is live and discoverable. Start receiving job requests today.",
+    link: "/dashboard/tradie",
+    priority: "high",
+  });
   await logAdminAction({
     actorUid: actor,
     action: "approveApplication",
@@ -67,6 +76,13 @@ export const requestApplicationInfo = onCall({ enforceAppCheck: false }, async (
       text: notes,
     });
   }
+  await notify({
+    userId: tradieUid,
+    type: "vetting_info_requested",
+    title: "We need a bit more info",
+    body: notes,
+    link: "/onboarding",
+  });
   await logAdminAction({
     actorUid: actor,
     action: "requestApplicationInfo",
@@ -98,6 +114,13 @@ export const rejectApplication = onCall({ enforceAppCheck: false }, async (req) 
       text: reason,
     });
   }
+  await notify({
+    userId: tradieUid,
+    type: "vetting_rejected",
+    title: "Application not approved",
+    body: reason,
+    link: "/dashboard/tradie",
+  });
   await logAdminAction({
     actorUid: actor,
     action: "rejectApplication",

@@ -4,7 +4,8 @@ import { logger } from "firebase-functions/v2";
 import { z } from "zod";
 import { db } from "../lib/admin";
 import { requireRole } from "../lib/auth";
-import { requireVisibleTradie, rateLimitKey, writeNotification } from "./helpers";
+import { requireVisibleTradie, rateLimitKey } from "./helpers";
+import { notify } from "../lib/notify";
 
 const Input = z.object({
   postId: z.string().min(1).max(128),
@@ -109,13 +110,14 @@ export const submitApplication = onCall({ enforceAppCheck: false }, async (req) 
     // a brief duplicate.
     const postSnap = await postRef.get();
     const post = postSnap.data() as { clientId: string; title: string };
-    await writeNotification({
+    await notify({
       userId: post.clientId,
       type: "new_application",
       title: "New tradesperson applied",
       body: `Someone applied to your job "${post.title}".`,
       link: `/jobs/posted/${postId}`,
-      metadata: { postId, applicantId: uid },
+      actorUid: uid,
+      priority: "high",
     });
 
     logger.info("submitApplication success", ctx);

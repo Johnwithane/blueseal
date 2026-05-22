@@ -1,6 +1,7 @@
 import { onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { FieldValue } from "firebase-admin/firestore";
 import { db } from "../lib/admin";
+import { notify } from "../lib/notify";
 import { maybeMarkVisible } from "./visibility";
 
 /**
@@ -20,4 +21,12 @@ export const onCertApproved = onDocumentUpdated("certifications/{certId}", async
     verifiedTrades: FieldValue.arrayUnion(after.trade),
   });
   await maybeMarkVisible(after.tradespersonId);
+
+  await notify({
+    userId: after.tradespersonId,
+    type: "cert_approved",
+    title: "Certification approved",
+    body: `Your ${after.trade} certification was verified. It's now showing on your public profile.`,
+    link: "/dashboard/tradie",
+  });
 });

@@ -2,7 +2,7 @@ import { onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { FieldValue } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { db } from "../lib/admin";
-import { writeNotification } from "./helpers";
+import { notify } from "../lib/notify";
 
 interface PostLike {
   status?: string;
@@ -55,7 +55,7 @@ export const onJobPostClosed = onDocumentUpdated(
       await Promise.all(
         snap.docs.map(async (doc) => {
           const app = doc.data() as { tradespersonId: string };
-          await writeNotification({
+          await notify({
             userId: app.tradespersonId,
             type: "application_rejected",
             title: "The client chose another tradesperson",
@@ -64,7 +64,6 @@ export const onJobPostClosed = onDocumentUpdated(
                 ? `Job "${after.title ?? "untitled"}" expired before a tradesperson was picked.`
                 : `Job "${after.title ?? "untitled"}" is no longer open.`,
             link: `/my-applications`,
-            metadata: { postId },
           });
         }),
       );
