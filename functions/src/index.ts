@@ -12,6 +12,8 @@ export { grantAllRolesForAdminTesting } from "./auth/grantAllRolesForAdminTestin
 export { submitForVetting } from "./vetting/submitForVetting";
 export { onCertApproved } from "./vetting/onCertApproved";
 export { onIdApproved } from "./vetting/onIdApproved";
+export { onInsuranceApproved } from "./vetting/onInsuranceApproved";
+export { onWsibApproved } from "./vetting/onWsibApproved";
 export {
   approveApplication,
   requestApplicationInfo,

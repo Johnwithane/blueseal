@@ -89,6 +89,13 @@ export interface TradespersonDoc {
   };
   verifiedTrades: string[];
   idVerified: boolean;
+  // Set by the onInsuranceApproved / onWsibApproved Cloud Function triggers.
+  // Owner cannot edit these directly; they're sourced from the verification
+  // doc in /insuranceVerifications/{uid} or /wsibVerifications/{uid}.
+  insuranceVerified: boolean;
+  insuranceExpiresAt: Timestamp | null;
+  wsibVerified: boolean;
+  wsibExpiresAt: Timestamp | null;
   vettingStatus: VettingStatus;
   vettingNotes: string;
   isVisible: boolean;
@@ -126,6 +133,48 @@ export type IdDocType = "drivers_license" | "passport" | "provincial_id";
 export interface IdVerificationDoc {
   fileUrl: string;
   documentType: IdDocType;
+  status: DocStatus;
+  submittedAt: Timestamp;
+  reviewedBy: string | null;
+  reviewedAt: Timestamp | null;
+  rejectionReason: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// insuranceVerifications/{tradespersonId}
+// General-liability insurance proof. One doc per tradesperson; uploading a
+// new one replaces the prior. Approved → "Insurance Verified" badge on the
+// public profile + sets insuranceVerified/insuranceExpiresAt on the
+// tradesperson doc (via onInsuranceApproved Cloud Function trigger).
+// ---------------------------------------------------------------------------
+export interface InsuranceVerificationDoc {
+  fileUrl: string;
+  insurer: string; // e.g. "Northbridge Insurance", "Zensurance", "APOLLO"
+  policyNumber: string;
+  coverageAmount: number; // cents (200_000_000 = $2M coverage)
+  expiresAt: Timestamp;
+  status: DocStatus;
+  submittedAt: Timestamp;
+  reviewedBy: string | null;
+  reviewedAt: Timestamp | null;
+  rejectionReason: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// wsibVerifications/{tradespersonId}
+// Provincial workers'-compensation clearance certificate (WSIB Ontario,
+// WorkSafeBC, WCB Alberta, etc — naming varies by province but the role is
+// the same). Most cert PDFs expire every 60–90 days; the badge auto-hides
+// when expiresAt passes (frontend filter) but the admin can also re-submit.
+// ---------------------------------------------------------------------------
+export type CanadaProvince =
+  | "ON" | "BC" | "AB" | "QC" | "MB" | "SK" | "NS" | "NB" | "NL" | "PE" | "YT" | "NT" | "NU";
+
+export interface WsibVerificationDoc {
+  fileUrl: string;
+  province: CanadaProvince;
+  clearanceNumber: string;
+  expiresAt: Timestamp;
   status: DocStatus;
   submittedAt: Timestamp;
   reviewedBy: string | null;
@@ -453,6 +502,8 @@ export type NotificationType =
   | "vetting_info_requested"
   | "cert_approved"
   | "id_approved"
+  | "insurance_approved"
+  | "wsib_approved"
   | "invoice_sent"
   | "review_received";
 

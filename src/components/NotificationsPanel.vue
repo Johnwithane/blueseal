@@ -32,6 +32,8 @@ const ICON: Record<NotificationType, string> = {
   vetting_info_requested: "pi pi-info-circle",
   cert_approved: "pi pi-file",
   id_approved: "pi pi-id-card",
+  insurance_approved: "pi pi-verified",
+  wsib_approved: "pi pi-verified",
   invoice_sent: "pi pi-file",
   review_received: "pi pi-star",
 };

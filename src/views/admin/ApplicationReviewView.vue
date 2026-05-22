@@ -9,6 +9,16 @@ import { getTradesperson } from "@/firebase/services/tradespeople";
 import { listCertsFor, approveCertification, rejectCertification } from "@/firebase/services/certifications";
 import { getIdVerification, approveId, rejectId } from "@/firebase/services/idVerifications";
 import {
+  approveInsurance,
+  getInsurance,
+  rejectInsurance,
+} from "@/firebase/services/insuranceVerifications";
+import {
+  approveWsib,
+  getWsib,
+  rejectWsib,
+} from "@/firebase/services/wsibVerifications";
+import {
   approveApplication,
   requestApplicationInfo,
   rejectApplication,
@@ -16,22 +26,28 @@ import {
 import type {
   CertificationDoc,
   IdVerificationDoc,
+  InsuranceVerificationDoc,
   TradespersonDoc,
   WithId,
+  WsibVerificationDoc,
 } from "@/firebase/interfaces";
 import { useAuthStore } from "@/stores/auth";
 import { useToast } from "@/composables/useToast";
 import { tradeLabel } from "@/data/trades";
+import { useFormatters } from "@/composables/useFormatters";
 
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
 const toast = useToast();
+const { date } = useFormatters();
 
 const uid = route.params.uid as string;
 const tradie = ref<WithId<TradespersonDoc> | null>(null);
 const certs = ref<WithId<CertificationDoc>[]>([]);
 const idDoc = ref<WithId<IdVerificationDoc> | null>(null);
+const insurance = ref<WithId<InsuranceVerificationDoc> | null>(null);
+const wsib = ref<WithId<WsibVerificationDoc> | null>(null);
 const loading = ref(true);
 
 const showRequestInfo = ref(false);
@@ -41,14 +57,24 @@ const notesInput = ref("");
 // Per-cert and ID rejection live in modals (no native prompt()).
 const showRejectCert = ref(false);
 const showRejectId = ref(false);
+const showRejectInsurance = ref(false);
+const showRejectWsib = ref(false);
 const rejectCertId = ref<string | null>(null);
 const rejectReason = ref("");
 
 async function load() {
   loading.value = true;
   tradie.value = await getTradesperson(uid);
-  certs.value = await listCertsFor(uid);
-  idDoc.value = await getIdVerification(uid);
+  const [certList, idData, insuranceData, wsibData] = await Promise.all([
+    listCertsFor(uid),
+    getIdVerification(uid),
+    getInsurance(uid),
+    getWsib(uid),
+  ]);
+  certs.value = certList;
+  idDoc.value = idData;
+  insurance.value = insuranceData;
+  wsib.value = wsibData;
   loading.value = false;
 }
 
@@ -97,6 +123,54 @@ async function confirmRejectId() {
     await rejectId(uid, auth.fbUser.uid, rejectReason.value.trim());
     toast.warn("ID rejected");
     showRejectId.value = false;
+    await load();
+  } catch (e) {
+    toast.error("Reject failed", (e as Error).message);
+  }
+}
+
+async function approveInsuranceHere() {
+  if (!auth.fbUser) return;
+  await approveInsurance(uid, auth.fbUser.uid);
+  toast.success("Insurance approved");
+  await load();
+}
+
+function openRejectInsurance() {
+  rejectReason.value = "";
+  showRejectInsurance.value = true;
+}
+
+async function confirmRejectInsurance() {
+  if (!auth.fbUser || !rejectReason.value.trim()) return;
+  try {
+    await rejectInsurance(uid, auth.fbUser.uid, rejectReason.value.trim());
+    toast.warn("Insurance rejected");
+    showRejectInsurance.value = false;
+    await load();
+  } catch (e) {
+    toast.error("Reject failed", (e as Error).message);
+  }
+}
+
+async function approveWsibHere() {
+  if (!auth.fbUser) return;
+  await approveWsib(uid, auth.fbUser.uid);
+  toast.success("WSIB approved");
+  await load();
+}
+
+function openRejectWsib() {
+  rejectReason.value = "";
+  showRejectWsib.value = true;
+}
+
+async function confirmRejectWsib() {
+  if (!auth.fbUser || !rejectReason.value.trim()) return;
+  try {
+    await rejectWsib(uid, auth.fbUser.uid, rejectReason.value.trim());
+    toast.warn("WSIB rejected");
+    showRejectWsib.value = false;
     await load();
   } catch (e) {
     toast.error("Reject failed", (e as Error).message);
@@ -209,6 +283,103 @@ const certSeverity = {
         </section>
       </div>
 
+      <!-- Trust badges (insurance + WSIB). Optional verifications, not gates
+           for approving the application as a whole. -->
+      <div class="grid lg:grid-cols-2 gap-4 mt-4">
+        <section class="bs-card p-4">
+          <div class="flex items-center justify-between mb-2">
+            <h2 class="font-semibold">Insurance verification</h2>
+            <Tag
+              v-if="insurance"
+              :value="insurance.status"
+              :severity="certSeverity[insurance.status]"
+            />
+          </div>
+          <div v-if="!insurance" class="bs-empty">Not submitted (optional).</div>
+          <template v-else>
+            <dl class="text-sm space-y-1">
+              <div><dt class="font-medium inline">Insurer:</dt> {{ insurance.insurer }}</div>
+              <div><dt class="font-medium inline">Policy:</dt> #{{ insurance.policyNumber }}</div>
+              <div>
+                <dt class="font-medium inline">Coverage:</dt>
+                ${{ (insurance.coverageAmount / 100).toLocaleString("en-CA") }}
+              </div>
+              <div><dt class="font-medium inline">Expires:</dt> {{ date(insurance.expiresAt) }}</div>
+            </dl>
+            <a
+              :href="insurance.fileUrl"
+              target="_blank"
+              rel="noopener"
+              class="text-sm block mt-2"
+            >View document →</a>
+            <div v-if="insurance.status === 'pending'" class="flex gap-2 mt-2">
+              <Button
+                label="Approve"
+                icon="pi pi-check"
+                severity="success"
+                size="small"
+                @click="approveInsuranceHere"
+              />
+              <Button
+                label="Reject"
+                icon="pi pi-times"
+                severity="danger"
+                outlined
+                size="small"
+                @click="openRejectInsurance"
+              />
+            </div>
+            <div v-else-if="insurance.rejectionReason" class="text-xs text-red-600 mt-1">
+              {{ insurance.rejectionReason }}
+            </div>
+          </template>
+        </section>
+
+        <section class="bs-card p-4">
+          <div class="flex items-center justify-between mb-2">
+            <h2 class="font-semibold">WSIB / workers' comp</h2>
+            <Tag v-if="wsib" :value="wsib.status" :severity="certSeverity[wsib.status]" />
+          </div>
+          <div v-if="!wsib" class="bs-empty">Not submitted (optional).</div>
+          <template v-else>
+            <dl class="text-sm space-y-1">
+              <div><dt class="font-medium inline">Province:</dt> {{ wsib.province }}</div>
+              <div>
+                <dt class="font-medium inline">Clearance #:</dt>
+                {{ wsib.clearanceNumber }}
+              </div>
+              <div><dt class="font-medium inline">Expires:</dt> {{ date(wsib.expiresAt) }}</div>
+            </dl>
+            <a
+              :href="wsib.fileUrl"
+              target="_blank"
+              rel="noopener"
+              class="text-sm block mt-2"
+            >View document →</a>
+            <div v-if="wsib.status === 'pending'" class="flex gap-2 mt-2">
+              <Button
+                label="Approve"
+                icon="pi pi-check"
+                severity="success"
+                size="small"
+                @click="approveWsibHere"
+              />
+              <Button
+                label="Reject"
+                icon="pi pi-times"
+                severity="danger"
+                outlined
+                size="small"
+                @click="openRejectWsib"
+              />
+            </div>
+            <div v-else-if="wsib.rejectionReason" class="text-xs text-red-600 mt-1">
+              {{ wsib.rejectionReason }}
+            </div>
+          </template>
+        </section>
+      </div>
+
       <!-- Decision bar -->
       <footer class="bs-card p-4 mt-6 flex flex-wrap gap-2 items-center justify-between">
         <div class="text-sm text-[color:var(--bs-muted)]">
@@ -251,6 +422,22 @@ const certSeverity = {
       <template #footer>
         <Button label="Cancel" text @click="showRejectId = false" />
         <Button label="Reject" icon="pi pi-ban" severity="danger" :disabled="!rejectReason.trim()" @click="confirmRejectId" />
+      </template>
+    </Dialog>
+
+    <Dialog v-model:visible="showRejectInsurance" modal header="Reject insurance" :style="{ width: '32rem' }">
+      <Textarea v-model="rejectReason" rows="4" class="w-full" placeholder="Reason for rejection" maxlength="2000" />
+      <template #footer>
+        <Button label="Cancel" text @click="showRejectInsurance = false" />
+        <Button label="Reject" icon="pi pi-ban" severity="danger" :disabled="!rejectReason.trim()" @click="confirmRejectInsurance" />
+      </template>
+    </Dialog>
+
+    <Dialog v-model:visible="showRejectWsib" modal header="Reject WSIB" :style="{ width: '32rem' }">
+      <Textarea v-model="rejectReason" rows="4" class="w-full" placeholder="Reason for rejection" maxlength="2000" />
+      <template #footer>
+        <Button label="Cancel" text @click="showRejectWsib = false" />
+        <Button label="Reject" icon="pi pi-ban" severity="danger" :disabled="!rejectReason.trim()" @click="confirmRejectWsib" />
       </template>
     </Dialog>
   </section>

@@ -117,9 +117,16 @@ service cloud.firestore {
         && request.resource.data.nextInvoiceNumber == 1;
       // Owner update: positive equality checks on server-managed fields,
       // and approved tradies can't yank themselves back into vetting.
+      // The insurance/WSIB flags are set by Cloud Function triggers in
+      // response to admin review of the verification docs — owner cannot
+      // grant themselves these badges.
       allow update: if isOwner(tradieId)
         && request.resource.data.verifiedTrades == resource.data.verifiedTrades
         && request.resource.data.idVerified == resource.data.idVerified
+        && request.resource.data.insuranceVerified == resource.data.insuranceVerified
+        && request.resource.data.insuranceExpiresAt == resource.data.insuranceExpiresAt
+        && request.resource.data.wsibVerified == resource.data.wsibVerified
+        && request.resource.data.wsibExpiresAt == resource.data.wsibExpiresAt
         && request.resource.data.isVisible == resource.data.isVisible
         && request.resource.data.ratingAvg == resource.data.ratingAvg
         && request.resource.data.ratingCount == resource.data.ratingCount
@@ -155,6 +162,44 @@ service cloud.firestore {
 
     // ---------- idVerifications (admin-only read; never world-readable) ----------
     match /idVerifications/{tradieId} {
+      allow read: if isAdmin() || isOwner(tradieId);
+      allow create: if isTradie() && isOwner(tradieId)
+        && request.resource.data.status == 'pending'
+        && request.resource.data.reviewedBy == null
+        && request.resource.data.reviewedAt == null;
+      allow update: if (isOwner(tradieId)
+                       && resource.data.status == 'pending'
+                       && request.resource.data.status == 'pending'
+                       && request.resource.data.reviewedBy == resource.data.reviewedBy
+                       && request.resource.data.reviewedAt == resource.data.reviewedAt)
+                    || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ---------- insuranceVerifications (general-liability proof) ----------
+    // Owner + admin read; owner may upload/replace while pending; admin
+    // writes review decisions. Status flip → onInsuranceApproved trigger
+    // mirrors the badge onto the public tradesperson doc.
+    match /insuranceVerifications/{tradieId} {
+      allow read: if isAdmin() || isOwner(tradieId);
+      allow create: if isTradie() && isOwner(tradieId)
+        && request.resource.data.status == 'pending'
+        && request.resource.data.reviewedBy == null
+        && request.resource.data.reviewedAt == null;
+      allow update: if (isOwner(tradieId)
+                       && resource.data.status == 'pending'
+                       && request.resource.data.status == 'pending'
+                       && request.resource.data.reviewedBy == resource.data.reviewedBy
+                       && request.resource.data.reviewedAt == resource.data.reviewedAt)
+                    || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ---------- wsibVerifications (provincial workers'-comp clearance) ----------
+    // Same shape as insuranceVerifications. Clearance certs typically
+    // expire every 60–90 days; the public badge auto-hides once expiresAt
+    // passes (frontend filter) but the doc itself stays for audit.
+    match /wsibVerifications/{tradieId} {
       allow read: if isAdmin() || isOwner(tradieId);
       allow create: if isTradie() && isOwner(tradieId)
         && request.resource.data.status == 'pending'

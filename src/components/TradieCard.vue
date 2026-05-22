@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { RouterLink } from "vue-router";
 import Tag from "primevue/tag";
 import type { TradespersonDoc, WithId } from "@/firebase/interfaces";
@@ -9,6 +10,22 @@ const props = defineProps<{
   tradie: WithId<TradespersonDoc> & { distanceKm?: number };
 }>();
 const { money } = useFormatters();
+
+// Trust-badge visibility checks. Both auto-hide once expiresAt passes so an
+// admin doesn't need to revoke the badge manually when an insurance policy
+// or WSIB clearance lapses — the tradie just re-uploads and the badge
+// comes back on re-approval.
+const now = Date.now();
+const insuranceLive = computed(() => {
+  if (!props.tradie.insuranceVerified) return false;
+  const exp = props.tradie.insuranceExpiresAt?.toDate?.().getTime();
+  return exp == null || exp > now;
+});
+const wsibLive = computed(() => {
+  if (!props.tradie.wsibVerified) return false;
+  const exp = props.tradie.wsibExpiresAt?.toDate?.().getTime();
+  return exp == null || exp > now;
+});
 </script>
 
 <template>
@@ -24,6 +41,8 @@ const { money } = useFormatters();
         <div class="flex items-center gap-1.5 flex-wrap">
           <span class="font-semibold truncate">{{ tradeLabel(props.tradie.trades[0]) }}</span>
           <Tag v-if="props.tradie.idVerified" value="ID verified" severity="success" />
+          <Tag v-if="insuranceLive" value="Insured" severity="info" />
+          <Tag v-if="wsibLive" value="WSIB" severity="info" />
         </div>
         <div class="text-xs text-[color:var(--bs-muted)] mt-0.5">
           {{ props.tradie.trades.map(tradeLabel).join(" • ") }}

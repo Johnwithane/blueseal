@@ -70,6 +70,18 @@ service firebase.storage {
       allow write: if isOwner(tradieId) && docSizeOk() && isWebpOrPdf();
     }
 
+    // Insurance certificate — owner write, owner + admin read. WebP or PDF.
+    match /tradespeople/{tradieId}/insurance/{file=**} {
+      allow read: if isOwner(tradieId) || isAdmin();
+      allow write: if isOwner(tradieId) && docSizeOk() && isWebpOrPdf();
+    }
+
+    // WSIB / provincial workers'-comp clearance — same shape as insurance.
+    match /tradespeople/{tradieId}/wsib/{file=**} {
+      allow read: if isOwner(tradieId) || isAdmin();
+      allow write: if isOwner(tradieId) && docSizeOk() && isWebpOrPdf();
+    }
+
     // Job intake photos — parties of the job + admin only.
     match /jobs/{jobId}/intake/{file=**} {
       allow read: if isSignedIn() && (jobParty(jobId) || isAdmin());

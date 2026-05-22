@@ -28,6 +28,19 @@ const avatarInitial = computed(() => {
   return source.slice(0, 1).toUpperCase() || "?";
 });
 
+// Trust-badge visibility — auto-hides once expiresAt passes so the badge
+// disappears without admin intervention when a policy or clearance lapses.
+const insuranceLive = computed(() => {
+  if (!tradie.value?.insuranceVerified) return false;
+  const exp = tradie.value.insuranceExpiresAt?.toDate?.().getTime();
+  return exp == null || exp > Date.now();
+});
+const wsibLive = computed(() => {
+  if (!tradie.value?.wsibVerified) return false;
+  const exp = tradie.value.wsibExpiresAt?.toDate?.().getTime();
+  return exp == null || exp > Date.now();
+});
+
 const shareUrl = computed(() => {
   if (typeof window === "undefined") return "";
   return window.location.href;
@@ -96,6 +109,8 @@ onMounted(async () => {
             </div>
             <div class="mt-2 flex flex-wrap items-center gap-1">
               <Tag v-if="tradie.idVerified" value="ID verified" severity="success" />
+              <Tag v-if="insuranceLive" value="Insured" severity="info" icon="pi pi-verified" />
+              <Tag v-if="wsibLive" value="WSIB verified" severity="info" icon="pi pi-shield" />
               <span v-for="t in tradie.verifiedTrades" :key="t" class="bs-pill verified">
                 <i class="pi pi-verified"></i>{{ tradeLabel(t) }}
               </span>

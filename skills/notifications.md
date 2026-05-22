@@ -68,6 +68,8 @@ Keep this table up to date when you add a type.
 | `vetting_info_requested` | `requestApplicationInfo` callable | The applicant | `normal` | Direct them back to `/onboarding` |
 | `cert_approved` | `certifications/{id}.status → "approved"` | The owning tradesperson | `normal` | |
 | `id_approved` | `idVerifications/{tradieId}.status → "approved"` | The tradesperson | `normal` | |
+| `insurance_approved` | `insuranceVerifications/{tradieId}.status → "approved"` | The tradesperson | `normal` | Trigger also mirrors `insuranceVerified` + `insuranceExpiresAt` onto the tradesperson doc for the public badge |
+| `wsib_approved` | `wsibVerifications/{tradieId}.status → "approved"` | The tradesperson | `normal` | Trigger also mirrors `wsibVerified` + `wsibExpiresAt`; badge auto-hides client-side once expiry passes |
 | `invoice_sent` | `sendInvoice` callable | The client | `low` | `sendInvoice` already emails the PDF — don't double-email |
 | `review_received` | `reviews/{id}` created | The reviewed tradesperson | `normal` | |
 

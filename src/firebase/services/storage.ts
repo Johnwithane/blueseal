@@ -14,7 +14,7 @@ export async function deleteFile(path: string): Promise<void> {
 export function makeStoragePath(opts: {
   scope: "users" | "tradespeople" | "jobs" | "chats" | "invoices";
   id: string;
-  bucket?: "profile" | "portfolio" | "certs" | "id" | "intake";
+  bucket?: "profile" | "portfolio" | "certs" | "id" | "intake" | "insurance" | "wsib";
   filename: string;
 }): string {
   const safe = opts.filename.replace(/[^a-zA-Z0-9._-]/g, "_");

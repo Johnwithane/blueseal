@@ -18,6 +18,7 @@ import { compressToWebp } from "@/utils/image";
 import { useToast } from "@/composables/useToast";
 import { useFormatters } from "@/composables/useFormatters";
 import { humanizeError } from "@/utils/errors";
+import TrustBadgesSection from "@/components/TrustBadgesSection.vue";
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -376,6 +377,12 @@ async function grantAdminAllRoles() {
         </div>
       </div>
     </div>
+
+    <TrustBadgesSection
+      v-if="auth.hasTradieRole && auth.fbUser"
+      :tradie-uid="auth.fbUser.uid"
+      class="mt-4"
+    />
 
     <div class="bs-card mt-4 p-5 text-sm text-[color:var(--bs-muted)]">
       <div><strong>Member since:</strong> {{ date(createdAt) }}</div>

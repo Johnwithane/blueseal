@@ -24,6 +24,8 @@ export type NotificationType =
   | "vetting_info_requested"
   | "cert_approved"
   | "id_approved"
+  | "insurance_approved"
+  | "wsib_approved"
   | "invoice_sent"
   | "review_received";
 
