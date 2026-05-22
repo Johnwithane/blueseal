@@ -29,6 +29,12 @@ export interface UserDoc {
   clientRatingCount: number;
   termsAcceptedAt: Timestamp | null;
   termsAcceptedVersion: string | null;
+  // PIPEDA: soft delete. When non-null the user is marked for deletion;
+  // sign-in checks this and refuses to seat the session. A scheduled
+  // function (scheduledHardDelete) wipes the account 30 days after this
+  // timestamp. Recovery within the grace window goes via support — there's
+  // no self-serve un-delete to keep the deletion path deliberate.
+  deletedAt: Timestamp | null;
 }
 
 // ---------------------------------------------------------------------------

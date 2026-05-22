@@ -97,6 +97,23 @@ export const useAuthStore = defineStore("auth", {
               tokenResult.claims as Record<string, unknown>,
             );
             const doc = await getUser(fbUser.uid);
+            // PIPEDA: refuse to seat the session for an account that's been
+            // marked for deletion. Sign-out happens server-side via Firebase
+            // Auth; the scheduledHardDelete sweep wipes the account fully
+            // after the grace period. Recovery within the window is via
+            // support (no self-serve un-delete by design).
+            if (doc?.deletedAt) {
+              this.error =
+                "This account is scheduled for deletion. Reply to your confirmation email to recover it.";
+              await signOut(auth);
+              this.fbUser = null;
+              this.user = null;
+              this.roles = [];
+              this.activeRole = null;
+              this.ready = true;
+              resolve();
+              return;
+            }
             this.user = doc;
             // Doc is authoritative for `roles` (claims can lag), but claims
             // are checked first so a fresh signup before the doc shim runs

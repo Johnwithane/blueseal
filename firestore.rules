@@ -44,14 +44,16 @@ service cloud.firestore {
             'createdAt','lastActiveAt','emailVerified',
             'hasActiveSubscription','stripeCustomerId',
             'clientRatingAvg','clientRatingCount',
-            'termsAcceptedAt','termsAcceptedVersion'
+            'termsAcceptedAt','termsAcceptedVersion',
+            'deletedAt'
           ])
           || request.resource.data.keys().hasOnly([
             'role','displayName','email','photoURL','phone',
             'createdAt','lastActiveAt','emailVerified',
             'hasActiveSubscription','stripeCustomerId',
             'clientRatingAvg','clientRatingCount',
-            'termsAcceptedAt','termsAcceptedVersion'
+            'termsAcceptedAt','termsAcceptedVersion',
+            'deletedAt'
           ])
         )
         && (
@@ -97,7 +99,11 @@ service cloud.firestore {
         && request.resource.data.emailVerified == resource.data.emailVerified
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.termsAcceptedAt == resource.data.termsAcceptedAt
-        && request.resource.data.termsAcceptedVersion == resource.data.termsAcceptedVersion;
+        && request.resource.data.termsAcceptedVersion == resource.data.termsAcceptedVersion
+        // deletedAt is server-managed via the requestAccountDeletion callable
+        // (admin SDK bypasses rules). Owner cannot grant themselves a
+        // deletion or un-do one — keeps the path deliberate and auditable.
+        && request.resource.data.deletedAt == resource.data.deletedAt;
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }

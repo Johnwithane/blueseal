@@ -59,6 +59,30 @@ This is a multi-step setup with a ~1–3 day wait for template approval. Until y
 - **Verify:** Open the Cloud Functions logs after triggering any normal/high-priority notification. The enqueued mail doc in `mail/` should contain links matching the URL you set.
 
 ### [ ] (Optional) Configure SPF / DKIM for your sending domain
+> *Listed under notifications above, repeated here for emphasis since the PIPEDA confirmation + export emails need it most.*
+
+---
+
+## Account deletion + data export (PIPEDA, added 2026-05-21)
+
+Phase 6 added a self-serve "Delete my account" + "Export my data" flow that satisfies PIPEDA's right-to-deletion and right-to-access. The export emails a 30-day signed URL; the deletion goes through a 30-day grace period and then `scheduledHardDelete` wipes the account from Firestore + Storage + Firebase Auth.
+
+### [ ] Confirm `scheduledHardDelete` is running daily
+
+- **Why:** The function is registered (see [functions/src/auth/scheduledHardDelete.ts](functions/src/auth/scheduledHardDelete.ts)) and runs on a cron schedule (`0 3 * * *` = daily at 03:00 UTC). Cloud Scheduler needs to be enabled on the GCP project the first time you deploy. After that it self-manages.
+- **What:** Run `firebase deploy --only functions` once (or use the existing CI deploy). On first deploy, Firebase prompts to enable Cloud Scheduler for your project — accept.
+- **Verify:** In the Google Cloud console → Cloud Scheduler → confirm `firebase-schedule-scheduledHardDelete` exists and shows recent successful runs (after ~24h). Cloud Functions logs (`firebase functions:log --only scheduledHardDelete`) will show "no accounts due" entries on quiet days, which is the right state pre-launch.
+
+### [ ] Set up a monitored support inbox for recovery requests
+
+- **Why:** Users who accidentally delete their account have 30 days to recover by replying to their deletion confirmation email. There's no self-serve un-delete by design — recovery has to be deliberate. If nobody reads the inbox, recoveries fall through.
+- **What:** The confirmation email is sent from your SMTP default-FROM address (set during Trigger Email setup). Make sure that inbox is monitored, ideally daily. Recovery is manual today — an admin sets `users/{uid}.deletedAt = null` via the Firebase console, then `tradespeople/{uid}.isVisible = true` if applicable.
+- **Verify:** Trigger a deletion on a test account, reply to the email, and walk through the recovery steps.
+
+### [ ] (Optional, future) Build admin-side recovery UI
+
+- **Why:** Manual Firebase-console recovery works but is error-prone. A small admin screen at `/admin/users/{uid}` with a "Restore account" button would prevent typos.
+- **What:** Not built yet. Would extend `ApplicationReviewView` or land a new `UserDetailView`. Tracked in the strategic plan as part of the "admin tooling" P0 cluster.
 
 - **Why:** Vetting emails are landing in the spam folder per the audit's user research (Marcus's approval email went to spam). Setting up SPF + DKIM authentication for your sending domain dramatically improves deliverability.
 - **What:** Follow your SMTP provider's instructions to add DNS records for your domain. SendGrid, Mailgun, etc. all have step-by-step guides. Usually takes ~30 min plus DNS propagation.

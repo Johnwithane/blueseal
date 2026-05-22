@@ -52,6 +52,14 @@ service firebase.storage {
       allow write: if isOwner(userId) && smallSizeOk() && isWebp();
     }
 
+    // PIPEDA data exports — server-written (exportMyData callable). Owner
+    // reads via a signed URL we email; direct Storage read is owner-only.
+    // Writes are blocked from clients — the callable uses admin SDK.
+    match /users/{userId}/exports/{file=**} {
+      allow read: if isOwner(userId);
+      allow write: if false;
+    }
+
     // Tradesperson portfolio — owner write, world read (gated by isVisible elsewhere). WebP only.
     match /tradespeople/{tradieId}/portfolio/{file=**} {
       allow read: if true;

@@ -7,6 +7,9 @@ export { setRoleOnSignup } from "./auth/setRoleOnSignup";
 export { setAdminRole } from "./auth/setAdminRole";
 export { addRoleToSelf } from "./auth/addRoleToSelf";
 export { grantAllRolesForAdminTesting } from "./auth/grantAllRolesForAdminTesting";
+export { requestAccountDeletion } from "./auth/requestAccountDeletion";
+export { exportMyData } from "./auth/exportMyData";
+export { scheduledHardDelete } from "./auth/scheduledHardDelete";
 
 // Vetting
 export { submitForVetting } from "./vetting/submitForVetting";

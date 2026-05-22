@@ -6,10 +6,14 @@ import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import Message from "primevue/message";
 import Avatar from "primevue/avatar";
+import Dialog from "primevue/dialog";
+import Textarea from "primevue/textarea";
 import { useAuthStore } from "@/stores/auth";
 import {
+  exportMyData,
   getUser,
   grantAllRolesForAdminTesting,
+  requestAccountDeletion,
   updateUserProfile,
   updateUserPhoto,
 } from "@/firebase/services/users";
@@ -38,6 +42,14 @@ const addingClient = ref(false);
 const grantingAdminAllRoles = ref(false);
 const error = ref<string | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
+
+// Privacy section state (PIPEDA — export + delete)
+const showDeleteDialog = ref(false);
+const deleteConfirmText = ref("");
+const deleteReason = ref("");
+const deleting = ref(false);
+const exporting = ref(false);
+const exportUrl = ref<string | null>(null);
 
 onMounted(async () => {
   if (!auth.fbUser) return;
@@ -163,6 +175,57 @@ async function switchView(role: "client" | "tradesperson" | "admin") {
     router.push("/dashboard");
   } catch (e) {
     error.value = humanizeError(e);
+  }
+}
+
+async function exportData() {
+  exporting.value = true;
+  exportUrl.value = null;
+  error.value = null;
+  try {
+    const { url } = await exportMyData();
+    exportUrl.value = url;
+    toast.success(
+      "Export ready",
+      "We've emailed you the download link. You can also click below.",
+    );
+  } catch (e) {
+    error.value = humanizeError(e);
+  } finally {
+    exporting.value = false;
+  }
+}
+
+function openDeleteDialog() {
+  deleteConfirmText.value = "";
+  deleteReason.value = "";
+  showDeleteDialog.value = true;
+}
+
+async function confirmDelete() {
+  if (deleteConfirmText.value.trim().toUpperCase() !== "DELETE") {
+    toast.warn("Type DELETE to confirm.");
+    return;
+  }
+  deleting.value = true;
+  error.value = null;
+  try {
+    await requestAccountDeletion(deleteReason.value.trim() || undefined);
+    toast.success(
+      "Account scheduled for deletion",
+      "You're being signed out. We'll permanently wipe your data in 30 days.",
+    );
+    showDeleteDialog.value = false;
+    // Brief delay so the toast renders before the auth state flips and
+    // routes us away.
+    setTimeout(async () => {
+      await auth.signOut();
+      router.push({ name: "Home" });
+    }, 600);
+  } catch (e) {
+    error.value = humanizeError(e);
+  } finally {
+    deleting.value = false;
   }
 }
 
@@ -384,9 +447,109 @@ async function grantAdminAllRoles() {
       class="mt-4"
     />
 
+    <div class="bs-card mt-4 p-5">
+      <h2 class="text-lg font-semibold">Privacy &amp; your data</h2>
+      <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
+        Under Canada's PIPEDA you can download your personal data or delete
+        your account at any time.
+      </p>
+
+      <div class="mt-4 rounded-lg border border-[color:var(--bs-border)] p-4">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <h3 class="font-semibold">Download your data</h3>
+            <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
+              We'll bundle every Firestore record you're a party to into a
+              single JSON file and email you a private 30-day download link.
+              Chat messages are excluded for size; you can still read them
+              while signed in.
+            </p>
+          </div>
+          <Button
+            label="Export my data"
+            icon="pi pi-download"
+            outlined
+            :loading="exporting"
+            @click="exportData"
+          />
+        </div>
+        <a
+          v-if="exportUrl"
+          :href="exportUrl"
+          target="_blank"
+          rel="noopener"
+          class="mt-3 inline-block text-sm text-[color:var(--bs-blue)]"
+        >
+          Download now →
+        </a>
+      </div>
+
+      <div class="mt-4 rounded-lg border border-red-200 bg-red-50/30 p-4">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <h3 class="font-semibold text-red-700">Delete my account</h3>
+            <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
+              Marks your account for deletion. You'll be signed out, your
+              profile will be hidden from search immediately, and we'll wipe
+              your data permanently after 30 days. Reply to the confirmation
+              email within that window to recover.
+            </p>
+          </div>
+          <Button
+            label="Delete account"
+            icon="pi pi-trash"
+            severity="danger"
+            outlined
+            @click="openDeleteDialog"
+          />
+        </div>
+      </div>
+    </div>
+
     <div class="bs-card mt-4 p-5 text-sm text-[color:var(--bs-muted)]">
       <div><strong>Member since:</strong> {{ date(createdAt) }}</div>
       <div class="mt-2 break-all"><strong>UID:</strong> <code>{{ auth.fbUser?.uid }}</code></div>
     </div>
+
+    <Dialog
+      v-model:visible="showDeleteDialog"
+      modal
+      header="Delete this account?"
+      :style="{ width: '32rem', maxWidth: '92vw' }"
+    >
+      <p class="text-sm text-[color:var(--bs-text)] mb-3">
+        Your profile will be hidden immediately and your data will be wiped
+        permanently in 30 days. Reply to the confirmation email within that
+        window to recover.
+      </p>
+      <p class="text-sm font-medium mt-3 mb-1">
+        Type <code>DELETE</code> to confirm:
+      </p>
+      <InputText
+        v-model="deleteConfirmText"
+        class="w-full"
+        placeholder="DELETE"
+        autofocus
+      />
+      <p class="text-sm font-medium mt-4 mb-1">Reason (optional)</p>
+      <Textarea
+        v-model="deleteReason"
+        rows="3"
+        class="w-full"
+        placeholder="Helps us improve. Not required."
+        :maxlength="2000"
+      />
+      <template #footer>
+        <Button label="Keep account" text @click="showDeleteDialog = false" />
+        <Button
+          label="Delete my account"
+          icon="pi pi-trash"
+          severity="danger"
+          :loading="deleting"
+          :disabled="deleteConfirmText.trim().toUpperCase() !== 'DELETE'"
+          @click="confirmDelete"
+        />
+      </template>
+    </Dialog>
   </section>
 </template>

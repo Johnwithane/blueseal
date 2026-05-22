@@ -80,7 +80,35 @@ export async function createUser(opts: {
     clientRatingCount: 0,
     termsAcceptedAt: serverTimestamp() as never,
     termsAcceptedVersion: opts.termsAcceptedVersion,
+    deletedAt: null,
   });
+}
+
+/**
+ * PIPEDA: request soft deletion of the signed-in user's account. The
+ * callable runs as admin SDK, sets `deletedAt` on the user doc, and (if
+ * tradesperson) hides their public profile so they stop appearing in
+ * search immediately. Hard delete fires after a 30-day grace period via
+ * the scheduledHardDelete function.
+ */
+export async function requestAccountDeletion(reason?: string): Promise<void> {
+  const callable = httpsCallable<{ reason?: string }, { ok: boolean }>(
+    functions,
+    "requestAccountDeletion",
+  );
+  await callable({ reason });
+}
+
+/**
+ * PIPEDA: trigger a JSON export of all the caller's data. The callable
+ * assembles the export server-side, uploads it to Cloud Storage at
+ * users/{uid}/exports/{ts}.json with a 30-day signed URL, and emails the
+ * link. Returns the URL too so the UI can offer immediate download.
+ */
+export async function exportMyData(): Promise<{ url: string }> {
+  const callable = httpsCallable<unknown, { url: string }>(functions, "exportMyData");
+  const result = await callable({});
+  return result.data;
 }
 
 export async function updateUserProfile(
