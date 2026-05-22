@@ -110,6 +110,15 @@ export async function setWeeklyAvailability(
   await updateDoc(doc(db, "tradespeople", uid), { weeklyAvailability: availability });
 }
 
+// Capped at 12 in the editor UI — the public profile renders them in a
+// 4-column grid which starts to look crowded above that. Bump if the
+// design changes.
+export const PORTFOLIO_MAX = 12;
+
+export async function setPortfolioPhotos(uid: string, photos: string[]): Promise<void> {
+  await updateDoc(doc(db, "tradespeople", uid), { portfolioPhotos: photos });
+}
+
 interface SearchOpts {
   trade?: string;
   centerLat: number;

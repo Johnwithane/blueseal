@@ -23,6 +23,7 @@ import { useToast } from "@/composables/useToast";
 import { useFormatters } from "@/composables/useFormatters";
 import { humanizeError } from "@/utils/errors";
 import TrustBadgesSection from "@/components/TrustBadgesSection.vue";
+import PortfolioEditor from "@/components/PortfolioEditor.vue";
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -440,6 +441,12 @@ async function grantAdminAllRoles() {
         </div>
       </div>
     </div>
+
+    <PortfolioEditor
+      v-if="auth.hasTradieRole && auth.fbUser"
+      :tradie-uid="auth.fbUser.uid"
+      class="mt-4"
+    />
 
     <TrustBadgesSection
       v-if="auth.hasTradieRole && auth.fbUser"
