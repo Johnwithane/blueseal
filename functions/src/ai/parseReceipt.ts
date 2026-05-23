@@ -100,20 +100,9 @@ export const parseReceipt = onCall({ enforceAppCheck: false }, async (req) => {
     throw new HttpsError("permission-denied", "Not your expense.");
   }
 
-  const tradieUserSnap = await db.doc(`users/${uid}`).get();
-  const tradieUser = tradieUserSnap.data() as { hasActiveSubscription?: boolean } | undefined;
-  if (!tradieUser?.hasActiveSubscription) {
-    // Free tier: skip the AI call but flip status so the UI unlocks manual entry.
-    await expenseRef.update({
-      status: "ready",
-      aiParsed: false,
-      updatedAt: FieldValue.serverTimestamp(),
-    });
-    throw new HttpsError(
-      "permission-denied",
-      "Receipt OCR requires an active subscription. Fill the fields in manually.",
-    );
-  }
+  // Receipt OCR is intentionally part of the free tier — the time saved on
+  // every job is the strongest "aha" for a free tradie evaluating the app.
+  // Costs are tracked per-call via the aiUsage write below.
 
   // Fetch the file bytes from Storage. The function's service account has
   // bucket read access; no signed URL needed.
