@@ -98,14 +98,14 @@ export async function pullBillablesFromJob(invoiceId: string): Promise<PullBilla
 }
 
 export async function getInvoiceByJobId(jobId: string): Promise<WithId<InvoiceDoc> | null> {
-  // Must use a query, NOT getDoc(invoices/{jobId}). Even though
-  // onJobCompleted writes invoices/{jobId} deterministically, the direct
-  // getDoc trips a Firestore-rules NPE when the doc doesn't exist yet:
-  // the read rule references resource.data.clientId, but `resource` is
-  // null for missing docs, and Firestore surfaces the null-eval error
-  // to the client as permission-denied — even for users who would
-  // otherwise be allowed. The query path filters server-side and
-  // returns empty for missing docs without tripping the rule evaluator.
+  // onJobCompleted writes invoices/{jobId} deterministically — direct
+  // lookup. Safe because the invoices read rule short-circuits on
+  // `resource == null`, so missing docs return cleanly instead of
+  // tripping a null-value NPE that Firestore would surface as
+  // permission-denied. Falls back to a jobId-where query for legacy
+  // pre-deterministic-id invoices (covered by the same rule).
+  const direct = await getDoc(invRef(jobId));
+  if (direct.exists()) return { id: direct.id, ...direct.data() };
   const q = query(invCol(), where("jobId", "==", jobId), limit(1));
   const snap = await getDocs(q);
   return snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() };

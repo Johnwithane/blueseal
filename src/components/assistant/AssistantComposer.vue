@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { nextTick, ref, useTemplateRef, watch } from "vue";
 import Button from "primevue/button";
 import Textarea from "primevue/textarea";
 import { useAssistantStore } from "@/stores/assistant";
@@ -10,6 +10,22 @@ const store = useAssistantStore();
 const toast = useToast();
 
 const text = ref("");
+const textareaRef = useTemplateRef<InstanceType<typeof Textarea>>("textareaEl");
+
+// Quick-prompt chips set store.draft + bump draftTick — watching the tick
+// (not draft) lets the same chip refill the textarea on a repeat click.
+watch(
+  () => store.draftTick,
+  () => {
+    text.value = store.draft;
+    void nextTick(() => {
+      const el = (textareaRef.value as unknown as { $el?: HTMLTextAreaElement } | null)?.$el;
+      el?.focus();
+      // Move caret to end so the user can keep typing without selecting all.
+      if (el) el.setSelectionRange(el.value.length, el.value.length);
+    });
+  },
+);
 
 async function submit() {
   const value = text.value.trim();
@@ -38,6 +54,7 @@ function onKeydown(e: KeyboardEvent) {
 <template>
   <form class="bs-assistant-composer" @submit.prevent="submit">
     <Textarea
+      ref="textareaEl"
       v-model="text"
       rows="1"
       auto-resize

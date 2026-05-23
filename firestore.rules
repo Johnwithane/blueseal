@@ -498,8 +498,16 @@ service cloud.firestore {
 
     // ---------- invoices ----------
     match /invoices/{invoiceId} {
+      // resource == null short-circuit: invoices are keyed deterministically
+      // by jobId (onJobCompleted creates them), so the natural client flow
+      // is to attempt invoices/{jobId} for any open job and treat missing
+      // as "no invoice yet". Without the null guard the rule evaluator
+      // throws on resource.data.clientId and Firestore reports that to the
+      // client as permission-denied — making "no invoice yet" indistinguishable
+      // from "access denied" and breaking JobDetailView for valid parties.
       allow read: if isSignedIn() && (
-        resource.data.clientId == uid()
+        resource == null
+        || resource.data.clientId == uid()
         || resource.data.tradespersonId == uid()
         || isAdmin()
       );
