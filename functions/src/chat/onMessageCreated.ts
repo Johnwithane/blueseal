@@ -7,6 +7,7 @@ interface MessageLike {
   senderId: string;
   text?: string;
   photoUrl?: string | null;
+  type?: string;
 }
 
 interface ChatLike {
@@ -24,6 +25,11 @@ export const onMessageCreated = onDocumentCreated(
   async (event) => {
     const msg = event.data?.data() as MessageLike | undefined;
     if (!msg?.senderId) return;
+    // System messages (auto-posted by status/schedule/clock triggers) bump
+    // lastMessage metadata in the writer itself; we don't want to notify on
+    // them — both parties are already looking at the event that caused
+    // them, and pinging the bell on every schedule edit is too noisy.
+    if (msg.type === "system" || msg.senderId === "system") return;
     const chatId = event.params.chatId;
     const chatRef = db.doc(`chats/${chatId}`);
     const chatSnap = await chatRef.get();

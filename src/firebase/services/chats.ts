@@ -63,6 +63,8 @@ export async function getChat(id: string): Promise<WithId<ChatDoc> | null> {
 export async function sendMessage(opts: {
   chatId: string;
   senderId: string;
+  senderName: string | null;
+  senderPhotoURL: string | null;
   text: string;
   photoUrl?: string | null;
 }): Promise<void> {
@@ -72,6 +74,11 @@ export async function sendMessage(opts: {
   if (opts.photoUrl && !isAllowedPhotoUrl(opts.photoUrl)) {
     throw new Error("Invalid photo URL.");
   }
+  if (opts.senderPhotoURL && !isAllowedPhotoUrl(opts.senderPhotoURL)) {
+    // Avatar URL came from the user doc, which is owner-writable — same
+    // hosting-allowlist rule as inline photos to keep the chat surface safe.
+    throw new Error("Invalid sender photo URL.");
+  }
   const text = (opts.text ?? "").slice(0, 5000);
   const preview = opts.photoUrl ? "📷 Photo" : text.slice(0, 120);
   await addDoc(msgsCol(opts.chatId), {
@@ -80,6 +87,8 @@ export async function sendMessage(opts: {
     photoUrl: opts.photoUrl ?? null,
     createdAt: serverTimestamp() as never,
     type: opts.photoUrl ? "photo" : "text",
+    senderName: (opts.senderName ?? "").slice(0, 80) || null,
+    senderPhotoURL: opts.senderPhotoURL ?? null,
   });
   // Denormalized chat metadata. Cloud Function recomputes unreadCounts
   // authoritatively; this client-side write keeps the inbox preview snappy.

@@ -4,6 +4,7 @@ import { logger } from "firebase-functions/v2";
 import { z } from "zod";
 import { db } from "../lib/admin";
 import { requireRole } from "../lib/auth";
+import { postSystemMessage } from "../lib/chatSystemMessage";
 
 const Input = z.object({
   jobId: z.string().min(1).max(128),
@@ -34,7 +35,7 @@ export const clockIn = onCall({ enforceAppCheck: false }, async (req) => {
     const [jobSnap, tradieSnap] = await Promise.all([tx.get(jobRef), tx.get(tradieRef)]);
 
     if (!jobSnap.exists) throw new HttpsError("not-found", "Job not found.");
-    const job = jobSnap.data() as { tradespersonId?: string; clientId?: string; status?: string };
+    const job = jobSnap.data() as { tradespersonId?: string; clientId?: string; status?: string; chatId?: string };
     if (job.tradespersonId !== uid) {
       throw new HttpsError("permission-denied", "Only the assigned tradesperson can clock in.");
     }
@@ -76,7 +77,12 @@ export const clockIn = onCall({ enforceAppCheck: false }, async (req) => {
     });
 
     logger.info("clockIn", { jobId, tradespersonId: uid, entryId: entryRef.id, rate });
-    return { entryId: entryRef.id };
+    return { entryId: entryRef.id, chatId: job.chatId ?? null };
+  }).then(async (res) => {
+    // Post-commit side effect: a chat write failure shouldn't roll back the
+    // time entry. postSystemMessage already swallows its own errors.
+    if (res.chatId) await postSystemMessage(res.chatId, "Tradesperson clocked in");
+    return { entryId: res.entryId };
   });
 });
 

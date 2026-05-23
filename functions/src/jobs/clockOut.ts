@@ -4,6 +4,7 @@ import { logger } from "firebase-functions/v2";
 import { z } from "zod";
 import { db } from "../lib/admin";
 import { requireRole } from "../lib/auth";
+import { postSystemMessage } from "../lib/chatSystemMessage";
 
 const Input = z.object({
   jobId: z.string().min(1).max(128),
@@ -26,9 +27,10 @@ export const clockOut = onCall({ enforceAppCheck: false }, async (req) => {
 
   const { jobId, entryId } = parsed.data;
   const entryRef = db.doc(`jobs/${jobId}/timeEntries/${entryId}`);
+  const jobRef = db.doc(`jobs/${jobId}`);
 
-  const { elapsedMinutes, billedAmount } = await db.runTransaction(async (tx) => {
-    const snap = await tx.get(entryRef);
+  const { elapsedMinutes, billedAmount, chatId } = await db.runTransaction(async (tx) => {
+    const [snap, jobSnap] = await Promise.all([tx.get(entryRef), tx.get(jobRef)]);
     if (!snap.exists) throw new HttpsError("not-found", "Time entry not found.");
     const e = snap.data() as {
       tradespersonId: string;
@@ -47,9 +49,20 @@ export const clockOut = onCall({ enforceAppCheck: false }, async (req) => {
     const mins = Math.floor(elapsedMs / 60_000);
     const billed = Math.round((elapsedMs / 3_600_000) * e.hourlyRateSnapshot);
     tx.update(entryRef, { endedAt: FieldValue.serverTimestamp() });
-    return { elapsedMinutes: mins, billedAmount: billed };
+    const jobChatId = jobSnap.exists
+      ? ((jobSnap.data() as { chatId?: string }).chatId ?? null)
+      : null;
+    return { elapsedMinutes: mins, billedAmount: billed, chatId: jobChatId };
   });
 
   logger.info("clockOut", { jobId, entryId, tradespersonId: uid, elapsedMinutes, billedAmount });
+  // Post-commit, outside the transaction. Failure here doesn't roll back
+  // the clock-out (best-effort chat log).
+  if (chatId) {
+    const h = Math.floor(elapsedMinutes / 60);
+    const m = elapsedMinutes % 60;
+    const dur = h > 0 ? `${h}h ${m}m` : `${m}m`;
+    await postSystemMessage(chatId, `Tradesperson clocked out — ${dur} logged`);
+  }
   return { entryId, elapsedMinutes, billedAmount };
 });

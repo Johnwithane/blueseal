@@ -434,6 +434,15 @@ service cloud.firestore {
           && request.resource.data.type in ['text', 'photo']
           && request.resource.data.text is string
           && request.resource.data.text.size() <= 5000
+          // Denormalized sender info — string (capped) or null. Users can't
+          // read each other's user docs, so the recipient relies on these
+          // to render the avatar + name without a cross-account lookup.
+          && (request.resource.data.senderName == null
+              || (request.resource.data.senderName is string
+                  && request.resource.data.senderName.size() <= 80))
+          && (request.resource.data.senderPhotoURL == null
+              || (request.resource.data.senderPhotoURL is string
+                  && request.resource.data.senderPhotoURL.size() <= 1024))
           && (
             get(/databases/$(database)/documents/chats/$(chatId)).data.clientId == uid()
             || get(/databases/$(database)/documents/chats/$(chatId)).data.tradespersonId == uid()
