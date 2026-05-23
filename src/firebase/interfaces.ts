@@ -454,6 +454,12 @@ export interface MessageDoc {
   photoUrl: string | null;
   createdAt: Timestamp;
   type: MessageType;
+  // Denormalized at write-time so the recipient can render the sender's
+  // name + avatar without a cross-account user-doc read (users/{uid} is
+  // owner+admin only). System messages set senderId="system" and leave
+  // these as null — the UI renders them centered with no avatar.
+  senderName: string | null;
+  senderPhotoURL: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -557,7 +563,7 @@ export interface InvoiceDoc {
 export interface AiUsageDoc {
   userId: string;
   jobId: string | null;
-  tool: "diagnose" | "quote" | "summary" | "chat";
+  tool: "diagnose" | "quote" | "summary" | "chat" | "suggestReplies";
   tokensIn: number;
   tokensOut: number;
   createdAt: Timestamp;

@@ -136,3 +136,23 @@ export function subscribeAssistantConversations(
 export async function deleteAssistantConversation(conversationId: string): Promise<void> {
   await deleteDoc(doc(db, "assistantConversations", conversationId));
 }
+
+/**
+ * Ask the AI for 2–3 short reply candidates the tradesperson could send
+ * in the job's client↔tradie chat. Tradie-only callable; returns an empty
+ * suggestions array if the most recent message was the tradesperson's own
+ * (saving a Vertex call).
+ */
+export interface AiSuggestRepliesResult {
+  ok: true;
+  suggestions: string[];
+  reason?: string;
+}
+export async function suggestChatReplies(jobId: string): Promise<AiSuggestRepliesResult> {
+  const fn = httpsCallable<{ jobId: string }, AiSuggestRepliesResult>(
+    functions,
+    "aiSuggestReplies",
+  );
+  const { data } = await fn({ jobId });
+  return data;
+}

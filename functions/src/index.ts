@@ -34,6 +34,7 @@ export { onMessageCreated } from "./chat/onMessageCreated";
 // Jobs (direct-request notifications; marketplace flows live in jobPosts/)
 export { onJobCreated } from "./jobs/onJobCreated";
 export { onJobCancelled } from "./jobs/onJobCancelled";
+export { onJobUpdated } from "./jobs/onJobUpdated";
 export { clockIn } from "./jobs/clockIn";
 export { clockOut } from "./jobs/clockOut";
 
@@ -46,6 +47,7 @@ export { pullBillablesFromJob } from "./invoicing/pullBillablesFromJob";
 // AI
 export { aiDiagnose, aiQuote, aiSummarize } from "./ai/tools";
 export { aiChat } from "./ai/chat";
+export { aiSuggestReplies } from "./ai/suggestReplies";
 export { parseReceipt } from "./ai/parseReceipt";
 
 // Payments (stubbed)

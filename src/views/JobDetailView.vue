@@ -378,14 +378,16 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
     </div>
     <template v-else-if="job">
       <header class="flex items-start justify-between gap-3 mt-2 mb-4">
-        <div>
-          <h1 class="text-xl font-bold">{{ job.title }}</h1>
+        <div class="min-w-0 flex-1">
+          <h1 class="text-xl font-bold break-words">{{ job.title }}</h1>
+          <div class="text-xs text-[color:var(--bs-muted)] mt-0.5">
+            {{ tradeLabel(job.trade) }} • Created {{ date(job.createdAt) }}
+          </div>
           <div class="text-xs text-[color:var(--bs-muted)]">
-            {{ tradeLabel(job.trade) }} • Created {{ date(job.createdAt) }} •
             {{ job.address.line1 }}, {{ job.address.city }}
           </div>
         </div>
-        <Tag :value="job.status" :severity="statusColor[job.status]" />
+        <Tag :value="job.status" :severity="statusColor[job.status]" class="shrink-0" />
       </header>
 
       <!-- ACCEPTED-STATUS BANNERS -->
@@ -400,23 +402,20 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
             <p class="text-sm text-[color:var(--bs-muted)] mt-1">
               Fill in the trade-specific details below and submit. The tradesperson can already see your original post and chat with you.
             </p>
-            <RouterLink
-              v-if="job.sourcePostId"
-              :to="{ name: 'JobPostDetail', params: { postId: job.sourcePostId } }"
-              class="text-xs text-[color:var(--bs-muted)] underline mt-2 inline-block"
-            >
-              Changed your mind? You can return to your applicants until you complete the brief.
-            </RouterLink>
-            <Button
-              v-if="job.sourcePostId"
-              label="Return to applicants"
-              icon="pi pi-undo"
-              text
-              size="small"
-              class="ml-2"
-              :loading="returningToApplicants"
-              @click="onReturnToApplicants"
-            />
+            <div v-if="job.sourcePostId" class="mt-3 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+              <Button
+                label="Return to applicants"
+                icon="pi pi-undo"
+                text
+                size="small"
+                :loading="returningToApplicants"
+                class="self-start -ml-2"
+                @click="onReturnToApplicants"
+              />
+              <span class="text-xs text-[color:var(--bs-muted)]">
+                You can still switch until you submit the brief.
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -438,12 +437,16 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
 
       <div class="grid lg:grid-cols-3 gap-4">
         <div class="lg:col-span-2 space-y-4">
-          <ChatThread :chat-id="job.chatId" />
+          <ChatThread
+            :chat-id="job.chatId"
+            :job-id="job.id"
+            :enable-ai-replies="isTradie"
+          />
 
           <div class="bs-card p-4">
             <h3 class="font-semibold text-sm mb-2">Original request</h3>
             <p class="text-sm whitespace-pre-wrap">{{ job.description }}</p>
-            <div v-if="job.intakePhotos.length" class="grid grid-cols-4 gap-2 mt-3">
+            <div v-if="job.intakePhotos.length" class="grid grid-cols-3 sm:grid-cols-4 gap-2 mt-3">
               <a v-for="p in job.intakePhotos" :key="p" :href="p" target="_blank" rel="noopener">
                 <img :src="p" class="aspect-square object-cover rounded" alt="" />
               </a>
@@ -474,18 +477,6 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
               </div>
             </div>
           </div>
-
-          <TimeTrackerCard
-            v-if="isTradie || isClient"
-            :job-id="job.id"
-            :is-tradie="isTradie"
-          />
-
-          <ExpensesCard
-            v-if="isTradie"
-            :job-id="job.id"
-            :client-id="job.clientId"
-          />
 
           <InvoiceEditor v-if="invoiceId" :invoice-id="invoiceId" :can-edit="isTradie" />
         </div>
@@ -537,8 +528,9 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
           </div>
 
           <div v-if="isTradie" class="bs-card p-3">
-            <h3 class="font-semibold text-sm mb-2">Status</h3>
+            <label for="job-status-select" class="block font-semibold text-sm mb-2">Status</label>
             <Select
+              input-id="job-status-select"
               :model-value="job.status"
               :options="statusOptions"
               option-label="label"
@@ -546,6 +538,73 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
               class="w-full"
               @update:model-value="(v) => setStatus(v as JobStatus)"
             />
+          </div>
+
+          <div class="bs-card p-3">
+            <h3 class="font-semibold text-sm mb-2">Schedule</h3>
+            <div v-if="job.scheduledStart" class="text-sm leading-snug">
+              <div>{{ dateTime(job.scheduledStart) }}</div>
+              <div class="text-[color:var(--bs-muted)]">to {{ dateTime(job.scheduledEnd) }}</div>
+            </div>
+            <p
+              v-else-if="!isTradie"
+              class="text-xs text-[color:var(--bs-muted)]"
+            >Not scheduled yet.</p>
+            <template v-if="isTradie">
+              <div class="mt-3 space-y-2">
+                <div>
+                  <label for="job-schedule-start" class="block text-[11px] text-[color:var(--bs-muted)] mb-1">Start</label>
+                  <DatePicker
+                    v-model="scheduledStart"
+                    input-id="job-schedule-start"
+                    show-time
+                    hour-format="24"
+                    class="w-full"
+                    placeholder="Start"
+                  />
+                </div>
+                <div>
+                  <label for="job-schedule-end" class="block text-[11px] text-[color:var(--bs-muted)] mb-1">End</label>
+                  <DatePicker
+                    v-model="scheduledEnd"
+                    input-id="job-schedule-end"
+                    show-time
+                    hour-format="24"
+                    class="w-full"
+                    placeholder="End"
+                  />
+                </div>
+              </div>
+              <Button
+                label="Save schedule"
+                icon="pi pi-calendar"
+                class="mt-3 w-full"
+                outlined
+                :loading="savingSchedule"
+                @click="saveSchedule"
+              />
+            </template>
+          </div>
+
+          <TimeTrackerCard
+            v-if="isTradie || isClient"
+            :job-id="job.id"
+            :is-tradie="isTradie"
+          />
+
+          <ExpensesCard
+            v-if="isTradie"
+            :job-id="job.id"
+            :client-id="job.clientId"
+          />
+
+          <div v-if="isTradie" class="bs-card p-3">
+            <label for="job-private-notes" class="block font-semibold text-sm mb-2">
+              Private notes
+              <span class="font-normal text-[color:var(--bs-muted)]">(tradesperson only)</span>
+            </label>
+            <Textarea id="job-private-notes" v-model="privateNotes" rows="4" class="w-full" />
+            <Button label="Save notes" icon="pi pi-save" outlined size="small" class="mt-2" @click="saveNotes" />
           </div>
 
           <div v-if="canClientCancel" class="bs-card p-3">
@@ -562,31 +621,6 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
               class="w-full"
               @click="openCancelDialog"
             />
-          </div>
-
-          <div class="bs-card p-3">
-            <h3 class="font-semibold text-sm mb-2">Schedule</h3>
-            <div v-if="job.scheduledStart" class="text-sm">
-              {{ dateTime(job.scheduledStart) }} → {{ dateTime(job.scheduledEnd) }}
-            </div>
-            <template v-if="isTradie">
-              <DatePicker v-model="scheduledStart" show-time hour-format="24" class="w-full mt-2" placeholder="Start" />
-              <DatePicker v-model="scheduledEnd" show-time hour-format="24" class="w-full mt-2" placeholder="End" />
-              <Button
-                label="Save schedule"
-                icon="pi pi-calendar"
-                class="mt-2 w-full"
-                outlined
-                :loading="savingSchedule"
-                @click="saveSchedule"
-              />
-            </template>
-          </div>
-
-          <div v-if="isTradie" class="bs-card p-3">
-            <h3 class="font-semibold text-sm mb-2">Private notes (tradesperson only)</h3>
-            <Textarea v-model="privateNotes" rows="4" class="w-full" />
-            <Button label="Save notes" icon="pi pi-save" outlined size="small" class="mt-2" @click="saveNotes" />
           </div>
 
           <div v-if="job.status === 'complete' || job.status === 'reviewed'" class="bs-card p-3">
