@@ -10,5 +10,5 @@ export * from "./idVerifications";
 export * from "./intakeFormSchemas";
 export * from "./reviews";
 export * from "./invoices";
-export * from "./ai";
+export * from "./assistant";
 export * from "./admin";

@@ -27,7 +27,6 @@ import type { JobDoc, JobStatus, TradespersonDoc, WithId } from "@/firebase/inte
 import { useFormatters } from "@/composables/useFormatters";
 import ChatThread from "@/components/ChatThread.vue";
 import IntakeFormRenderer from "@/components/IntakeFormRenderer.vue";
-import AiToolsPanel from "@/components/AiToolsPanel.vue";
 import InvoiceEditor from "@/components/InvoiceEditor.vue";
 import ReviewPrompt from "@/components/ReviewPrompt.vue";
 import TimeTrackerCard from "@/components/TimeTrackerCard.vue";
@@ -50,7 +49,6 @@ const job = ref<WithId<JobDoc> | null>(null);
 const tradieInfo = ref<WithId<TradespersonDoc> | null>(null);
 const intakeFields = ref<IntakeField[]>([]);
 const invoiceId = ref<string | null>(null);
-const subscriptionOn = ref(false);
 const loading = ref(true);
 // When the URL points at a job the signed-in user can't read (notification
 // pointing at a stale or wrong id, deep link from another account) the
@@ -168,14 +166,6 @@ async function load() {
     // marketplace-originated jobs, possibly populated if the client has been
     // editing in another tab.
     intakeDraft.value = { ...(job.value.intakeFormData ?? {}) };
-
-    // Only the tradie needs subscription state (AI tools are tradie-only).
-    // Clients have no reason to read the tradie's user doc.
-    if (isTradie.value && auth.user) {
-      subscriptionOn.value = auth.user.hasActiveSubscription;
-    } else {
-      subscriptionOn.value = false;
-    }
 
     // Clients see a "Your tradesperson" panel — fetch the tradesperson doc
     // so we can render their photo + badges. Read can fail gracefully when
@@ -598,8 +588,6 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
             <Textarea v-model="privateNotes" rows="4" class="w-full" />
             <Button label="Save notes" icon="pi pi-save" outlined size="small" class="mt-2" @click="saveNotes" />
           </div>
-
-          <AiToolsPanel v-if="isTradie" :job-id="job.id" :has-active-subscription="subscriptionOn" />
 
           <div v-if="job.status === 'complete' || job.status === 'reviewed'" class="bs-card p-3">
             <h3 class="font-semibold text-sm mb-2">Reviews</h3>

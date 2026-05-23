@@ -11,7 +11,7 @@
 A two-sided progressive web app for trades work.
 
 - **Clients** (people who need work done) browse verified tradespeople near them, view profiles with ratings and availability, and submit job requests with photos and a trade-specific intake form.
-- **Tradespeople** build a vetted profile, manage their book of business via a kanban + calendar, chat with clients per job, use AI tools to diagnose and quote faster, and get paid via auto-generated invoices.
+- **Tradespeople** build a vetted profile, manage their book of business via a kanban + calendar, chat with clients per job, use the always-on AI assistant to diagnose and quote faster, and get paid via auto-generated invoices.
 - **Admins** vet tradespeople (cert + ID), moderate the platform, and run support.
 
 Defining traits: real verification (cert + ID), mutual ratings (both sides build reputation), and AI woven into the daily workflow rather than bolted on.
@@ -43,7 +43,7 @@ Three tiers gated by Firebase Auth custom claims (`role`).
 - Profile is `isVisible: false` until admin approves both cert(s) and ID
 - Once live: appears in search, manages jobs via kanban + calendar, sees per-job chat
 - Reviews clients privately
-- Subscribes (Stripe) to unlock AI tools
+- Subscribes (Stripe) to unlock the AI assistant
 
 ### 3.3 Admin (`role: "admin"`)
 - Cannot self-signup — promoted via `setAdminRole` callable (first admin via Firebase CLI)
@@ -115,10 +115,7 @@ Once live, the dashboard becomes home base.
 - Original intake form (the structured submission with photos), read-only
 - Schedule controls (date/time picker, syncs to calendar)
 - Private notes (tradie-only)
-- **AI tools button** (subscription-gated):
-  - **Diagnose** — modal pre-loaded with chat context + intake photos; free-form question → structured response (causes, checks, parts)
-  - **Quote Helper** — drafts a structured quote from the job description
-  - **Job Summary** — one-paragraph recap for the records
+- **AI assistant** (subscription-gated; floating bubble bottom-right, slide-in side panel) — sees this job's chat, intake form, and photos as context. Three quick-prompt chips on a fresh job thread pre-fill the composer with templated prompts: **Diagnose** (likely causes, on-site checks, parts to bring), **Quote** (line-item draft in CAD), **Summary** (one-paragraph recap). The user can edit before sending and continue the conversation in the same thread (see §5.9).
 - Invoice section (draft auto-created on Complete; editable line items; Send)
 - Review prompt (after Complete): rate the client (private)
 
@@ -319,7 +316,7 @@ onJobPostClosed trigger handles applicant fanout the same way.
 ### 5.5 Jobs (Project Tracking)
 - Kanban dashboard for tradies (7 columns including "Accepted" for marketplace-originated jobs awaiting client brief)
 - Simple status list for clients
-- Per-job detail panel: chat + intake (editable for marketplace `accepted` status, read-only otherwise) + schedule + AI tools + invoice + private notes
+- Per-job detail panel: chat + intake (editable for marketplace `accepted` status, read-only otherwise) + schedule + invoice + private notes. AI help is in the always-on assistant panel (§5.9), not a per-page widget.
 - Status flow: `accepted → requested → quoted → scheduled → in_progress → awaiting_payment → complete → reviewed → cancelled`
 - `accepted` is the entry status for marketplace-originated jobs (see §4.6); direct-request jobs skip it and start at `requested`.
 
@@ -328,7 +325,7 @@ onJobPostClosed trigger handles applicant fanout the same way.
 - Text + photo (Storage path: `chats/{chatId}/`)
 - Realtime via Firestore `onSnapshot`
 - All messages immutable (legal accountability)
-- AI tools (Diagnose, Quote, Summary) read full chat context
+- The AI assistant reads the full chat transcript as context when scoped to a job (§5.9)
 
 ### 5.7 Reviews (Mutual)
 - **Public** (client → tradie): 1–5 stars overall + per-dimension (quality, punctuality, communication, value) + text. Surfaces on tradie profile.
@@ -346,15 +343,22 @@ onJobPostClosed trigger handles applicant fanout the same way.
 - **MVP:** manual mark-as-paid + payment instructions text on invoice (tradie sets in profile)
 - **v1.1:** Stripe Connect Express for in-app payment via "Pay now" button — platform takes application fee (primary monetization)
 
-### 5.9 AI Tools (Paid — Tradesperson)
-Powered by **Firebase AI Logic** (`firebase/ai` SDK) using `gemini-2.5-flash` for cost/latency. No separate API keys — auth via App Check.
+### 5.9 AI Assistant (Paid — Tradesperson; Free — Admin)
 
-MVP tools, all scoped to a specific job context (chat + intake photos pre-loaded):
-- **Diagnose** — returns likely causes, suggested checks, parts to bring
-- **Quote Helper** — job description → structured line-item quote draft
-- **Job Summary** — chat thread → one-paragraph recap
+A persistent in-app chatbot for tradespeople and admins, surfaced as a floating bubble bottom-right and a slide-in side panel. Powered by **Vertex AI Gemini 2.5 Flash** via the Cloud Function service account (no API keys; one-time `aiplatform.googleapis.com` enable on the GCP project).
 
-All gated by `hasActiveSubscription: true` on the user doc (set by Stripe webhook).
+**Conversation scoping** — one thread per `(userId, scope, jobId)` tuple:
+- `scope: "job"` — auto-binds on `/jobs/:id`. The per-turn system prompt is grounded in the job's intake form data, intake photos, and the last 40 client↔tradesperson chat messages. Both tradies and admins get this when they open a specific job.
+- `scope: "general"` — a rolling thread per tradie for advice not tied to a specific job ("how do I price this kind of work in BC?").
+- `scope: "admin"` — a cross-page thread per admin. The current page route is injected into the per-turn prompt so the bot is aware of what the admin is viewing (vetting queue, user detail, etc.) without spawning a thread per page.
+
+**Quick-prompts** — on a fresh job thread, three chips pre-fill the composer with templated prompts: Diagnose, Quote, Summary. These replace the standalone callables that used to live as buttons in the Job Detail panel; users can edit before sending and continue the conversation in the same thread.
+
+**Subsumed:** the old `aiDiagnose` / `aiQuote` / `aiSummarize` callables and the `AiToolsPanel` UI component (decision 2026-05-22 — single AI surface beats three separate buttons; results are now part of a thread the tradie can follow up in rather than a one-shot modal). The callables remain deployed during the migration window but should be removed once the chatbot has been in production for a couple of weeks with no rollback signal.
+
+**Gating:** the chatbot is intended to require `hasActiveSubscription: true` for tradespeople (admins exempt). The subscription gate ships **off** for development (`REQUIRE_SUBSCRIPTION = false` in `functions/src/ai/chat.ts`) and must be flipped on before launch — see HUMANTASKS.md.
+
+**Data:** conversations live at `assistantConversations/{id}` with a `messages/` subcollection; both turns are persisted server-side by the `aiChat` callable in a single batch so partial conversations never land. `aiUsage` entries are written per turn with `tool: "chat"`.
 
 ### 5.10 Admin Console
 - Pending vetting queue (cert + ID review combined)
@@ -510,7 +514,15 @@ invoices/{invoiceId}
   recurring: { enabled, frequency, nextRunAt } | null
 
 aiUsage/{usageId}                 // analytics + abuse prevention
-  userId, jobId, tool, tokensIn, tokensOut, createdAt
+  userId, jobId (nullable for chat), tool ("diagnose"|"quote"|"summary"|"chat"), tokensIn, tokensOut, createdAt
+
+assistantConversations/{conversationId}    // see §5.9
+  userId, scope ("job"|"general"|"admin"), jobId (nullable),
+  title, lastMessageAt, lastMessagePreview, messageCount, createdAt
+
+assistantConversations/{conversationId}/messages/{messageId}  // subcollection
+  role ("user"|"assistant"), content, createdAt,
+  tokensIn, tokensOut, contextSnapshot (pageRoute, jobId, chatMessagesIncluded)
 
 auditLog/{entryId}                // admin actions, immutable
   actorUid, action, targetType, targetId, reason, metadata, createdAt
@@ -553,7 +565,8 @@ invoices/{invoiceId}.pdf         — generated invoice PDFs
 - Jobs/chats: read/write only by `clientId` or `tradespersonId` involved, plus admin.
 - Public reviews: client can create one per `complete` job they own; world-readable.
 - Private client reviews: tradie can create one per job they completed; readable only by users with `role: "tradesperson"` and admin.
-- AI tools: callable allowed only when `hasActiveSubscription: true` (enforced server-side in callable wrapper).
+- AI assistant (`aiChat`): callable allowed only when `hasActiveSubscription: true` for tradespeople (admins exempt). Enforced server-side; currently off during development (see §5.9 + HUMANTASKS.md).
+- `assistantConversations/{id}` + `/messages/`: owner-only read; all writes go through the `aiChat` callable (admin SDK bypasses rules) so partial conversations never persist.
 - Audit log: write-only via Cloud Function, read by admins only.
 - Intake form schemas: world-readable, admin write only.
 
@@ -586,7 +599,8 @@ Live in `functions/src/`, organized by domain (`auth/`, `vetting/`, `reviews/`, 
 - `createCheckoutSession` — callable; returns Stripe Checkout URL for AI subscription
 
 **AI**
-- `aiDiagnose`, `aiQuote`, `aiSummarize` — callable wrappers around Firebase AI Logic; load full job context (chat + intake), enforce subscription check, log to `aiUsage`
+- `aiChat` — primary callable for the persistent assistant (§5.9). Auto-resolves or creates the conversation per `(userId, scope, jobId)`, loads job context when scope is `job`, replays the prior turns, persists user + assistant turns atomically, logs to `aiUsage` with `tool: "chat"`.
+- `aiDiagnose`, `aiQuote`, `aiSummarize` — legacy one-shot callables, subsumed by `aiChat`'s quick-prompts. Still deployed during the migration window but slated for removal once the chatbot has bedded in.
 
 **Invoicing**
 - `onJobCompleted` — auto-creates draft invoice
@@ -678,10 +692,10 @@ Setup is fully covered in `TECH_STACK_SETUP.md`. Below is the product build sequ
 - Aggregation Cloud Functions
 - Review display on profile + private surfacing on incoming requests
 
-**Phase 8 — Stripe Subscription + AI Tools (2 days)**
+**Phase 8 — Stripe Subscription + AI Assistant (2 days)**
 - Stripe Checkout + webhook for tradesperson AI subscription
-- 3 callable Cloud Functions wrapping Firebase AI Logic (chat-aware)
-- AI tools UI inside the Job Detail panel
+- `aiChat` callable + persistent assistant panel (§5.9), grounded in per-job chat + intake when scoped to a job
+- Floating bubble + side panel mounted in `App.vue`, tradesperson + admin only
 
 **Phase 9 — Invoicing (1–2 days)**
 - Install Firebase "Trigger Email" extension

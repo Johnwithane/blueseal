@@ -44,9 +44,13 @@ const HISTORY_TURNS = 16;
 // Human-chat transcript window, when scope === "job".
 const HUMAN_CHAT_TAIL = 40;
 
+// All optional fields are .nullable() too because the Firebase callable SDK
+// transports `undefined` as `null` on the wire — without this, a missing
+// `conversationId` on the very first turn would fail validation as
+// "expected string, received null".
 const Input = z
   .object({
-    conversationId: z.string().min(1).max(128).optional(),
+    conversationId: z.string().min(1).max(128).nullable().optional(),
     scope: z.enum(["job", "general", "admin"]),
     jobId: z.string().min(1).max(128).nullable().optional(),
     pageRoute: z.string().max(200).nullable().optional(),

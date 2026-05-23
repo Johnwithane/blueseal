@@ -53,10 +53,22 @@ export interface AiChatResult {
  * doc if `conversationId` is omitted and persists both the user message and
  * the assistant reply atomically — so once this resolves, the messages
  * subscription will deliver both turns in order.
+ *
+ * Strips nullish optional fields before sending — the Firebase callable SDK
+ * marshalls `undefined` as `null` on the wire, which the server's Zod schema
+ * would reject for non-nullable optional keys (e.g. conversationId on the
+ * very first turn).
  */
 export async function sendAssistantMessage(input: AiChatInput): Promise<AiChatResult> {
-  const fn = httpsCallable<AiChatInput, AiChatResult>(functions, "aiChat");
-  const { data } = await fn(input);
+  const fn = httpsCallable<Record<string, unknown>, AiChatResult>(functions, "aiChat");
+  const payload: Record<string, unknown> = {
+    scope: input.scope,
+    message: input.message,
+  };
+  if (input.conversationId) payload.conversationId = input.conversationId;
+  if (input.jobId) payload.jobId = input.jobId;
+  if (input.pageRoute) payload.pageRoute = input.pageRoute;
+  const { data } = await fn(payload);
   return data;
 }
 

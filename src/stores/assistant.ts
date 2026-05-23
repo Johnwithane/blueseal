@@ -31,6 +31,12 @@ interface State {
   // stores the most recent failure for inline display.
   sending: boolean;
   error: string | null;
+  // Pending textarea draft pushed by quick-prompt chips. The composer
+  // watches `draftTick` (a monotonically increasing counter) so the same
+  // chip clicked twice still re-fills the textarea — without the tick the
+  // composer wouldn't notice an identical `draft` value the second time.
+  draft: string;
+  draftTick: number;
 }
 
 // Subscription handles. Kept module-scoped (not in state) so they aren't
@@ -59,6 +65,8 @@ export const useAssistantStore = defineStore("assistant", {
     conversations: [],
     sending: false,
     error: null,
+    draft: "",
+    draftTick: 0,
   }),
 
   getters: {
@@ -178,6 +186,17 @@ export const useAssistantStore = defineStore("assistant", {
       }
     },
 
+    /**
+     * Push a prompt into the composer textarea. Used by the quick-prompt
+     * chips so the user can review / tweak before sending. Always opens
+     * the panel so the action has a visible effect from anywhere.
+     */
+    applyQuickPrompt(text: string) {
+      this.draft = text;
+      this.draftTick += 1;
+      this.isOpen = true;
+    },
+
     async deleteCurrentConversation() {
       const id = this.currentConversationId;
       if (!id) return;
@@ -200,6 +219,8 @@ export const useAssistantStore = defineStore("assistant", {
       this.conversations = [];
       this.sending = false;
       this.error = null;
+      this.draft = "";
+      this.draftTick = 0;
     },
   },
 });

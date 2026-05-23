@@ -5,6 +5,7 @@ import { useConfirm } from "primevue/useconfirm";
 import { useAssistantStore } from "@/stores/assistant";
 import AssistantThread from "@/components/assistant/AssistantThread.vue";
 import AssistantComposer from "@/components/assistant/AssistantComposer.vue";
+import AssistantQuickPrompts from "@/components/assistant/AssistantQuickPrompts.vue";
 
 const store = useAssistantStore();
 const confirm = useConfirm();
@@ -72,6 +73,7 @@ function clearThread() {
     </header>
 
     <AssistantThread class="flex-1 min-h-0" />
+    <AssistantQuickPrompts />
     <AssistantComposer />
   </aside>
 </template>
