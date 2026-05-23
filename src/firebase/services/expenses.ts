@@ -9,6 +9,8 @@ import {
   query,
   serverTimestamp,
   updateDoc,
+  where,
+  type FirestoreError,
   type UpdateData,
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
@@ -25,13 +27,26 @@ export const DEFAULT_MARKUP_PERCENT = 15;
 
 export function subscribeJobExpenses(
   jobId: string,
+  tradespersonId: string,
   cb: (rows: WithId<ExpenseDoc>[]) => void,
+  onError?: (err: FirestoreError) => void,
 ): () => void {
-  const q = query(expensesCol(jobId), orderBy("createdAt", "desc"));
+  // Filter on tradespersonId so the listener stays robust to stale expense
+  // rows from an earlier tradie assignment. The rule allows read only when
+  // tradespersonId == uid() || isAdmin(), and one unreadable doc tanks
+  // the whole snapshot.
+  const q = query(
+    expensesCol(jobId),
+    where("tradespersonId", "==", tradespersonId),
+    orderBy("createdAt", "desc"),
+  );
   return onSnapshot(
     q,
     (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
-    (err) => console.warn(`[Firestore] jobs/${jobId}/expenses listener:`, err.code, err.message),
+    (err) => {
+      console.warn(`[Firestore] jobs/${jobId}/expenses listener:`, err.code, err.message);
+      onError?.(err);
+    },
   );
 }
 

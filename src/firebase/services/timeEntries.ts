@@ -8,6 +8,7 @@ import {
   query,
   updateDoc,
   where,
+  type FirestoreError,
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/firebase/config";
@@ -21,13 +22,28 @@ const entryRef = (jobId: string, entryId: string) =>
 
 export function subscribeJobTimeEntries(
   jobId: string,
+  tradespersonId: string,
   cb: (entries: WithId<TimeEntryDoc>[]) => void,
+  onError?: (err: FirestoreError) => void,
 ): () => void {
-  const q = query(entriesCol(jobId), orderBy("startedAt", "asc"));
+  // Filter on tradespersonId so the listener stays robust to stale entries
+  // from an earlier tradie assignment (the rule allows read only when
+  // tradespersonId == uid() || clientId == uid(), and ONE unreadable doc
+  // tanks the whole snapshot). For a normal one-tradie-per-job, this is
+  // a no-op filter; for a job whose tradie was swapped, it scopes results
+  // to the currently-assigned tradie's sessions.
+  const q = query(
+    entriesCol(jobId),
+    where("tradespersonId", "==", tradespersonId),
+    orderBy("startedAt", "asc"),
+  );
   return onSnapshot(
     q,
     (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
-    (err) => console.warn(`[Firestore] jobs/${jobId}/timeEntries listener:`, err.code, err.message),
+    (err) => {
+      console.warn(`[Firestore] jobs/${jobId}/timeEntries listener:`, err.code, err.message);
+      onError?.(err);
+    },
   );
 }
 

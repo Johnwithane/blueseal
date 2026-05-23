@@ -20,6 +20,7 @@ import { humanizeError } from "@/utils/errors";
 
 const props = defineProps<{
   jobId: string;
+  tradespersonId: string;
   isTradie: boolean;
 }>();
 
@@ -28,6 +29,7 @@ const toast = useToast();
 
 const entries = ref<WithId<TimeEntryDoc>[]>([]);
 const loading = ref(true);
+const loadError = ref<string | null>(null);
 const busy = ref(false);
 // Re-render tick so the live timer on the running entry counts up.
 const nowMs = ref(Date.now());
@@ -46,10 +48,24 @@ let unsubscribe: (() => void) | null = null;
 function attach() {
   unsubscribe?.();
   loading.value = true;
-  unsubscribe = subscribeJobTimeEntries(props.jobId, (list) => {
-    entries.value = list;
-    loading.value = false;
-  });
+  loadError.value = null;
+  unsubscribe = subscribeJobTimeEntries(
+    props.jobId,
+    props.tradespersonId,
+    (list) => {
+      entries.value = list;
+      loadError.value = null;
+      loading.value = false;
+    },
+    (err) => {
+      // One bad doc (e.g. a stale entry with a mismatched tradespersonId)
+      // tanks the whole snapshot. Surface it instead of leaving the card
+      // stuck on "Loading…".
+      entries.value = [];
+      loading.value = false;
+      loadError.value = humanizeError(err);
+    },
+  );
 }
 
 onMounted(() => {
@@ -194,6 +210,17 @@ function rateLabel(e: WithId<TimeEntryDoc>): string {
     </div>
 
     <div v-if="loading" class="bs-empty mt-3">Loading…</div>
+    <Message
+      v-else-if="loadError"
+      severity="error"
+      :closable="false"
+      class="mt-3"
+    >
+      <div class="flex items-center justify-between gap-2">
+        <span>Couldn't load time entries — {{ loadError }}</span>
+        <Button label="Retry" text size="small" @click="attach" />
+      </div>
+    </Message>
     <Message
       v-else-if="closedEntries.length === 0 && !runningEntry"
       severity="info"

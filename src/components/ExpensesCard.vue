@@ -25,6 +25,7 @@ import { humanizeError } from "@/utils/errors";
 const props = defineProps<{
   jobId: string;
   clientId: string;
+  tradespersonId: string;
 }>();
 
 const { date, money } = useFormatters();
@@ -32,6 +33,7 @@ const toast = useToast();
 
 const expenses = ref<WithId<ExpenseDoc>[]>([]);
 const loading = ref(true);
+const loadError = ref<string | null>(null);
 const uploading = ref(false);
 const fileInput = ref<HTMLInputElement | null>(null);
 
@@ -52,10 +54,23 @@ let unsubscribe: (() => void) | null = null;
 function attach() {
   unsubscribe?.();
   loading.value = true;
-  unsubscribe = subscribeJobExpenses(props.jobId, (list) => {
-    expenses.value = list;
-    loading.value = false;
-  });
+  loadError.value = null;
+  unsubscribe = subscribeJobExpenses(
+    props.jobId,
+    props.tradespersonId,
+    (list) => {
+      expenses.value = list;
+      loadError.value = null;
+      loading.value = false;
+    },
+    (err) => {
+      // One denied doc tanks the whole snapshot. Surface it instead of
+      // leaving the card stuck on "Loading…".
+      expenses.value = [];
+      loading.value = false;
+      loadError.value = humanizeError(err);
+    },
+  );
 }
 onMounted(attach);
 onBeforeUnmount(() => unsubscribe?.());
