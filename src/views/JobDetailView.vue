@@ -645,6 +645,7 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
           <TimeTrackerCard
             v-if="isTradie || isClient"
             :job-id="job.id"
+            :tradesperson-id="job.tradespersonId"
             :is-tradie="isTradie"
           />
 
@@ -652,6 +653,7 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
             v-if="isTradie"
             :job-id="job.id"
             :client-id="job.clientId"
+            :tradesperson-id="job.tradespersonId"
           />
 
           <div v-if="isTradie" class="bs-card p-3">
