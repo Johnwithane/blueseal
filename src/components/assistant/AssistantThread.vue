@@ -4,20 +4,17 @@ import { marked } from "marked";
 import Avatar from "primevue/avatar";
 import { useAssistantStore } from "@/stores/assistant";
 import { useAuthStore } from "@/stores/auth";
-import { useFormatters } from "@/composables/useFormatters";
 
 const store = useAssistantStore();
 const auth = useAuthStore();
-const { dateTime } = useFormatters();
 
 const scroller = ref<HTMLElement | null>(null);
 
-// Render assistant turns as markdown. The model talks in bullets / numbered
-// lists / **bold** by default, so rendering as plain text loses structure.
-// We disable raw-HTML passthrough by GFM defaults and additionally strip a
-// few high-risk tags as defence in depth — the user is the only consumer of
-// their own conversation so the blast radius is small, but a prompt-injection
-// attack could still try to land XSS on the tradie viewing the reply.
+// Assistant turns render as markdown. The model talks in bullets / numbered
+// lists / **bold** by default; rendering as plain text loses structure. GFM
+// defaults already escape `<` and `>` in non-code text — as defence in
+// depth against a prompt-injected XSS payload we additionally strip a
+// short list of script-y tags from the rendered HTML.
 const DROP_TAGS = /<\/?(?:script|style|iframe|object|embed)[^>]*>/gi;
 function renderMarkdown(text: string): string {
   const html = marked.parse(text, { gfm: true, breaks: true, async: false }) as string;
@@ -28,42 +25,53 @@ interface DisplayMessage {
   key: string;
   role: "user" | "assistant";
   content: string;
-  createdAt: number; // ms, for the meta line
+  createdAt: number; // ms
   pending?: boolean;
+  showAvatar: boolean; // first message of a sender-group → show avatar + name
+  showTime: boolean; // last message of a sender-group → show timestamp
 }
 
+// User identity for the right-hand bubbles.
 const userInitial = computed(() => {
   const name = auth.user?.displayName?.trim() || auth.user?.email?.trim() || "";
   return (name[0] ?? "?").toUpperCase();
 });
-const userName = computed(() => {
-  return auth.user?.displayName?.trim() || auth.user?.email?.split("@")[0] || "You";
-});
+const userName = computed(
+  () => auth.user?.displayName?.trim() || auth.user?.email?.split("@")[0] || "You",
+);
 const userPhoto = computed(() => auth.user?.photoURL ?? null);
 
-// Merge the persisted-from-Firestore messages with any in-flight optimistic
-// user turn. Dedupe: if the optimistic content matches the most-recent real
-// user message, drop the optimistic — that way the brief window between
-// "Vertex replied" and "Firestore listener delivered" doesn't double-render.
+function timestampMs(raw: unknown): number {
+  const tsLike = raw as { toMillis?: () => number } | undefined;
+  return typeof tsLike?.toMillis === "function" ? tsLike.toMillis() : Date.now();
+}
+
+function formatClock(ms: number): string {
+  // "2:34 PM" style — same clock used by iMessage/WhatsApp for grouped
+  // messages. No date here; the panel rarely spans days.
+  return new Date(ms).toLocaleTimeString("en-CA", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+// Merge persisted + optimistic messages into one ordered list, then walk it
+// to compute grouping flags (showAvatar = first of a run from this sender,
+// showTime = last of a run). This is the iMessage pattern — repeated
+// avatars + names + timestamps create huge visual noise on a 440px panel.
 const displayMessages = computed<DisplayMessage[]>(() => {
-  const out: DisplayMessage[] = store.messages.map((m) => ({
+  const raw: Omit<DisplayMessage, "showAvatar" | "showTime">[] = store.messages.map((m) => ({
     key: m.id,
     role: m.role,
     content: m.content,
-    // Firestore Timestamps have .toMillis(); fall back gracefully for the
-    // sub-second window where the listener hasn't fully resolved the field.
-    createdAt:
-      typeof (m.createdAt as { toMillis?: () => number } | undefined)?.toMillis === "function"
-        ? (m.createdAt as { toMillis: () => number }).toMillis()
-        : Date.now(),
+    createdAt: timestampMs(m.createdAt),
     pending: false,
   }));
   const opt = store.optimisticUserMessage;
   if (opt) {
-    const lastUser = [...out].reverse().find((m) => m.role === "user");
-    const alreadyPersisted = lastUser?.content === opt.content;
-    if (!alreadyPersisted) {
-      out.push({
+    const lastUser = [...raw].reverse().find((m) => m.role === "user");
+    if (!lastUser || lastUser.content !== opt.content) {
+      raw.push({
         key: `optimistic-${opt.createdAt}`,
         role: "user",
         content: opt.content,
@@ -72,300 +80,376 @@ const displayMessages = computed<DisplayMessage[]>(() => {
       });
     }
   }
-  return out;
+  return raw.map((m, i) => {
+    const prev = raw[i - 1];
+    const next = raw[i + 1];
+    return {
+      ...m,
+      showAvatar: !prev || prev.role !== m.role,
+      showTime: !next || next.role !== m.role,
+    };
+  });
 });
 
 const hasMessages = computed(() => displayMessages.value.length > 0);
 
-// Auto-scroll to the latest turn on append. Watch length AND the sending
-// flag so the thinking-dots animation also triggers a scroll into view.
 watch(
   [() => displayMessages.value.length, () => store.sending],
   () => {
     void nextTick(() => {
-      scroller.value?.scrollTo({ top: scroller.value.scrollHeight });
+      scroller.value?.scrollTo({ top: scroller.value.scrollHeight, behavior: "smooth" });
     });
   },
 );
 
+const emptyHeadline = computed(() => {
+  if (store.scope === "job") return "How can I help with this job?";
+  if (store.scope === "admin") return "What's on your mind, admin?";
+  return "How can I help today?";
+});
 const emptyHint = computed(() => {
   switch (store.scope) {
     case "job":
-      return "Ask about this job — diagnosis, quoting, what to bring, how to phrase something to the client.";
+      return "I can see this job's intake, photos, and chat history. Try the quick prompts below or ask anything.";
     case "admin":
-      return "Ask about what's on the page — vetting flags, user history, anomalies in the data.";
+      return "I'm aware of the page you're viewing. Ask about flags, anomalies, or summaries.";
     default:
-      return "Ask anything. For job-specific questions, open the job first so I can see the details.";
+      return "Open a specific job for grounded help with diagnosis, quoting, or summaries.";
   }
 });
 </script>
 
 <template>
-  <div ref="scroller" class="bs-assistant-thread">
-    <div v-if="!hasMessages" class="bs-assistant-thread__empty">
-      <img
-        src="/icons/blueseal_logo.png"
-        alt=""
-        class="bs-assistant-thread__empty-logo"
-        aria-hidden="true"
-      />
-      <p class="text-sm text-[color:var(--bs-muted)] max-w-xs">{{ emptyHint }}</p>
+  <div ref="scroller" class="bs-ai-thread">
+    <!-- Empty state — pure AI identity. Big gradient avatar + sparkle, a
+         friendly headline, and a contextual hint. -->
+    <div v-if="!hasMessages" class="bs-ai-thread__empty">
+      <span class="bs-ai-avatar bs-ai-avatar--lg bs-ai-avatar--float" aria-hidden="true">
+        <i class="pi pi-sparkles" />
+      </span>
+      <h3 class="bs-ai-thread__empty-title">{{ emptyHeadline }}</h3>
+      <p class="bs-ai-thread__empty-hint">{{ emptyHint }}</p>
     </div>
 
-    <div v-else class="bs-assistant-thread__list">
+    <div v-else class="bs-ai-thread__list">
       <div
         v-for="m in displayMessages"
         :key="m.key"
         :class="[
-          'bs-assistant-row',
-          m.role === 'user' ? 'bs-assistant-row--user' : 'bs-assistant-row--assistant',
+          'bs-ai-row',
+          m.role === 'user' ? 'bs-ai-row--user' : 'bs-ai-row--assistant',
+          { 'bs-ai-row--tight': !m.showAvatar },
         ]"
       >
-        <!-- Avatar: Blue Seal logo for the assistant, user photo or initial
-             for the tradesperson/admin. Sticks to the bubble's edge so each
-             message reads as "from X". -->
-        <div class="bs-assistant-row__avatar">
-          <template v-if="m.role === 'assistant'">
-            <img
-              src="/icons/blueseal_logo.png"
-              alt="Blue Seal"
-              class="bs-assistant-avatar bs-assistant-avatar--logo"
-            />
+        <!-- Avatar slot — placeholder div keeps grouped messages aligned
+             with their group's lead message. -->
+        <div class="bs-ai-row__avatar">
+          <template v-if="m.showAvatar && m.role === 'assistant'">
+            <span class="bs-ai-avatar bs-ai-avatar--sm" aria-hidden="true">
+              <i class="pi pi-sparkles" />
+            </span>
           </template>
-          <template v-else>
+          <template v-else-if="m.showAvatar && m.role === 'user'">
             <Avatar
               v-if="userPhoto"
               :image="userPhoto"
-              size="normal"
               shape="circle"
-              class="bs-assistant-avatar"
+              class="bs-ai-row__user-avatar"
             />
             <Avatar
               v-else
               :label="userInitial"
-              size="normal"
               shape="circle"
-              class="bs-assistant-avatar"
-              style="background-color: var(--bs-blue); color: white; font-weight: 600;"
+              class="bs-ai-row__user-avatar bs-ai-row__user-avatar--initial"
             />
           </template>
         </div>
 
-        <div class="bs-assistant-row__body">
-          <div class="bs-assistant-row__name">
-            {{ m.role === "assistant" ? "Blue Seal Assistant" : userName }}
+        <div class="bs-ai-row__body">
+          <div v-if="m.showAvatar" class="bs-ai-row__name">
+            {{ m.role === "assistant" ? "Blue Seal AI" : userName }}
           </div>
           <div
             :class="[
-              'bs-assistant-bubble',
-              m.role === 'user' ? 'bs-assistant-bubble--user' : 'bs-assistant-bubble--assistant',
-              { 'bs-assistant-bubble--pending': m.pending },
+              'bs-ai-bubble',
+              m.role === 'user' ? 'bs-ai-bubble--user' : 'bs-ai-bubble--assistant',
+              { 'bs-ai-bubble--pending': m.pending },
             ]"
           >
-            <div v-if="m.role === 'user'" class="whitespace-pre-wrap">{{ m.content }}</div>
-            <!-- Assistant content is model-generated markdown — see
-                 renderMarkdown() for the sanitization policy. -->
+            <!-- User: plain text, whitespace-preserved. -->
+            <div v-if="m.role === 'user'" class="bs-ai-bubble__text">{{ m.content }}</div>
+            <!-- Assistant: rendered markdown (sanitized — see renderMarkdown). -->
             <!-- eslint-disable-next-line vue/no-v-html -->
-            <div v-else class="bs-assistant-md" v-html="renderMarkdown(m.content)" />
+            <div v-else class="bs-ai-bubble__md" v-html="renderMarkdown(m.content)" />
           </div>
-          <div class="bs-assistant-row__meta">
-            <span v-if="m.pending" class="text-[color:var(--bs-muted)]">Sending…</span>
-            <span v-else>{{ dateTime(new Date(m.createdAt)) }}</span>
+          <div v-if="m.showTime" class="bs-ai-row__time">
+            <template v-if="m.pending">Sending…</template>
+            <template v-else>{{ formatClock(m.createdAt) }}</template>
           </div>
         </div>
       </div>
 
-      <div v-if="store.sending" class="bs-assistant-row bs-assistant-row--assistant">
-        <div class="bs-assistant-row__avatar">
-          <img
-            src="/icons/blueseal_logo.png"
-            alt=""
-            class="bs-assistant-avatar bs-assistant-avatar--logo"
-          />
+      <!-- Thinking placeholder while Vertex is replying. -->
+      <div v-if="store.sending" class="bs-ai-row bs-ai-row--assistant">
+        <div class="bs-ai-row__avatar">
+          <span class="bs-ai-avatar bs-ai-avatar--sm" aria-hidden="true">
+            <i class="pi pi-sparkles" />
+          </span>
         </div>
-        <div class="bs-assistant-row__body">
-          <div class="bs-assistant-row__name">Blue Seal Assistant</div>
-          <div class="bs-assistant-bubble bs-assistant-bubble--assistant bs-assistant-bubble--thinking">
-            <span class="bs-assistant-dot" /><span class="bs-assistant-dot" /><span class="bs-assistant-dot" />
+        <div class="bs-ai-row__body">
+          <div class="bs-ai-row__name">Blue Seal AI</div>
+          <div class="bs-ai-bubble bs-ai-bubble--assistant bs-ai-bubble--thinking">
+            <span class="bs-ai-dot" /><span class="bs-ai-dot" /><span class="bs-ai-dot" />
           </div>
         </div>
       </div>
     </div>
 
-    <div v-if="store.error" class="bs-assistant-thread__error">
+    <div v-if="store.error" class="bs-ai-thread__error">
       {{ store.error }}
     </div>
   </div>
 </template>
 
 <style scoped>
-.bs-assistant-thread {
+.bs-ai-thread {
   overflow-y: auto;
-  padding: 1rem;
-  background: #f9fafb;
+  padding: 1.25rem 1rem 1rem;
+  background: #f6f8fb;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
 }
-.bs-assistant-thread__empty {
+
+/* -------- Empty state -------- */
+.bs-ai-thread__empty {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 2rem 1rem;
-  gap: 0.75rem;
+  padding: 2.5rem 1.25rem;
+  gap: 0.5rem;
 }
-.bs-assistant-thread__empty-logo {
-  width: 3rem;
-  height: auto;
-  opacity: 0.9;
+.bs-ai-thread__empty-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0.4rem 0 0;
+  color: var(--bs-text);
+  letter-spacing: -0.01em;
 }
-.bs-assistant-thread__list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+.bs-ai-thread__empty-hint {
+  font-size: 0.85rem;
+  color: var(--bs-muted);
+  max-width: 18rem;
+  line-height: 1.5;
+  margin: 0;
 }
-.bs-assistant-thread__error {
-  margin-top: 0.75rem;
-  padding: 0.5rem 0.75rem;
+.bs-ai-avatar--float {
+  animation: bs-ai-float 4s ease-in-out infinite;
+}
+@keyframes bs-ai-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+/* -------- Error -------- */
+.bs-ai-thread__error {
+  margin-top: 0.5rem;
+  padding: 0.55rem 0.75rem;
   border-radius: 0.5rem;
   background: #fef2f2;
   color: #991b1b;
   font-size: 0.8125rem;
+  border: 1px solid #fecaca;
 }
 
-/* Row layout: avatar + body. Reversed for the user so their avatar sits on
-   the right and the bubble aligns with the user side. */
-.bs-assistant-row {
+/* -------- Message rows -------- */
+.bs-ai-thread__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.bs-ai-row {
   display: flex;
   align-items: flex-start;
-  gap: 0.5rem;
-  max-width: 100%;
+  gap: 0.55rem;
+  margin-top: 0.85rem;
 }
-.bs-assistant-row--user {
+.bs-ai-row--user {
   flex-direction: row-reverse;
 }
-.bs-assistant-row__avatar {
+/* Grouped (non-leading) messages snug up to their predecessor + skip the
+   avatar/name to reduce visual noise — same pattern iMessage uses. */
+.bs-ai-row--tight {
+  margin-top: 0.15rem;
+}
+
+.bs-ai-row__avatar {
+  width: 1.65rem;
   flex-shrink: 0;
-  width: 2rem;
-  height: 2rem;
+  display: flex;
+  justify-content: center;
 }
-.bs-assistant-avatar {
-  width: 2rem !important;
-  height: 2rem !important;
+.bs-ai-row__user-avatar {
+  width: 1.65rem !important;
+  height: 1.65rem !important;
+  font-size: 0.75rem !important;
 }
-.bs-assistant-avatar--logo {
-  border-radius: 9999px;
-  background: white;
-  border: 1px solid var(--bs-border);
-  padding: 0.2rem;
-  object-fit: contain;
+.bs-ai-row__user-avatar--initial {
+  background-color: var(--bs-blue) !important;
+  color: white !important;
+  font-weight: 600;
 }
-.bs-assistant-row__body {
+
+.bs-ai-row__body {
   min-width: 0;
   max-width: calc(100% - 2.5rem);
   display: flex;
   flex-direction: column;
 }
-.bs-assistant-row--user .bs-assistant-row__body {
+.bs-ai-row--user .bs-ai-row__body {
   align-items: flex-end;
 }
-.bs-assistant-row__name {
+.bs-ai-row__name {
   font-size: 0.7rem;
   font-weight: 600;
   color: var(--bs-muted);
-  margin-bottom: 0.2rem;
-  padding-inline: 0.25rem;
+  letter-spacing: 0.01em;
+  margin: 0 0.35rem 0.25rem;
 }
-.bs-assistant-row__meta {
-  font-size: 0.625rem;
-  opacity: 0.75;
-  margin-top: 0.2rem;
-  padding-inline: 0.25rem;
+.bs-ai-row__time {
+  font-size: 0.65rem;
+  color: var(--bs-muted);
+  margin: 0.2rem 0.35rem 0;
 }
-.bs-assistant-row--user .bs-assistant-row__meta {
+.bs-ai-row--user .bs-ai-row__time {
   text-align: right;
 }
 
-.bs-assistant-bubble {
-  border-radius: 1rem;
-  padding: 0.55rem 0.85rem;
-  font-size: 0.875rem;
-  line-height: 1.45;
+/* -------- Bubbles -------- */
+.bs-ai-bubble {
+  border-radius: 1.1rem;
+  padding: 0.6rem 0.9rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
   word-wrap: break-word;
   overflow-wrap: anywhere;
+  max-width: 100%;
 }
-.bs-assistant-bubble--user {
-  background: var(--bs-blue);
-  color: white;
-  border-bottom-right-radius: 0.375rem;
-}
-.bs-assistant-bubble--assistant {
+.bs-ai-bubble--assistant {
   background: white;
   border: 1px solid var(--bs-border);
-  border-bottom-left-radius: 0.375rem;
+  border-bottom-left-radius: 0.45rem;
+  color: var(--bs-text);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
-.bs-assistant-bubble--pending {
-  opacity: 0.65;
+.bs-ai-bubble--user {
+  background: linear-gradient(135deg, #59b0e0 0%, #3a8cc0 100%);
+  color: white;
+  border-bottom-right-radius: 0.45rem;
+  box-shadow: 0 1px 2px rgba(29, 64, 106, 0.15);
+}
+.bs-ai-bubble--pending {
+  opacity: 0.7;
+}
+.bs-ai-bubble__text {
+  white-space: pre-wrap;
 }
 
-/* Assistant markdown body. */
-.bs-assistant-md :deep(p) {
-  margin: 0 0 0.5rem 0;
+/* Assistant markdown — clean, generous spacing, no jarring code blocks. */
+.bs-ai-bubble__md :deep(p) {
+  margin: 0 0 0.55rem 0;
 }
-.bs-assistant-md :deep(p:last-child) {
+.bs-ai-bubble__md :deep(p:last-child) {
   margin-bottom: 0;
 }
-.bs-assistant-md :deep(ul),
-.bs-assistant-md :deep(ol) {
+.bs-ai-bubble__md :deep(ul),
+.bs-ai-bubble__md :deep(ol) {
   padding-left: 1.25rem;
-  margin: 0 0 0.5rem 0;
+  margin: 0 0 0.55rem 0;
 }
-.bs-assistant-md :deep(li) {
-  margin-bottom: 0.125rem;
+.bs-ai-bubble__md :deep(ul:last-child),
+.bs-ai-bubble__md :deep(ol:last-child) {
+  margin-bottom: 0;
 }
-.bs-assistant-md :deep(strong) {
+.bs-ai-bubble__md :deep(li) {
+  margin-bottom: 0.2rem;
+}
+.bs-ai-bubble__md :deep(li:last-child) {
+  margin-bottom: 0;
+}
+.bs-ai-bubble__md :deep(strong) {
   font-weight: 600;
 }
-.bs-assistant-md :deep(code) {
-  background: rgba(0, 0, 0, 0.06);
-  padding: 0.05rem 0.25rem;
-  border-radius: 0.25rem;
-  font-size: 0.85em;
+.bs-ai-bubble__md :deep(em) {
+  font-style: italic;
 }
-.bs-assistant-md :deep(pre) {
-  background: rgba(0, 0, 0, 0.05);
-  padding: 0.5rem 0.75rem;
-  border-radius: 0.5rem;
+.bs-ai-bubble__md :deep(code) {
+  background: rgba(15, 23, 42, 0.07);
+  padding: 0.05rem 0.3rem;
+  border-radius: 0.3rem;
+  font-size: 0.85em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.bs-ai-bubble__md :deep(pre) {
+  background: rgba(15, 23, 42, 0.06);
+  padding: 0.6rem 0.8rem;
+  border-radius: 0.55rem;
   overflow-x: auto;
   font-size: 0.8125rem;
+  margin: 0 0 0.55rem 0;
 }
-.bs-assistant-md :deep(a) {
+.bs-ai-bubble__md :deep(pre code) {
+  background: transparent;
+  padding: 0;
+}
+.bs-ai-bubble__md :deep(a) {
   color: var(--bs-blue-dark);
   text-decoration: underline;
 }
-
-.bs-assistant-bubble--thinking {
-  display: inline-flex;
-  gap: 0.25rem;
-  padding: 0.75rem 0.9rem;
+.bs-ai-bubble__md :deep(h1),
+.bs-ai-bubble__md :deep(h2),
+.bs-ai-bubble__md :deep(h3) {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0.35rem 0 0.25rem;
+  letter-spacing: -0.01em;
 }
-.bs-assistant-dot {
-  width: 0.4rem;
-  height: 0.4rem;
+.bs-ai-bubble__md :deep(blockquote) {
+  border-left: 3px solid var(--bs-blue-light);
+  padding-left: 0.65rem;
+  margin: 0 0 0.55rem;
+  color: var(--bs-muted);
+}
+.bs-ai-bubble__md :deep(hr) {
+  border: 0;
+  border-top: 1px solid var(--bs-border);
+  margin: 0.55rem 0;
+}
+
+/* -------- Thinking dots -------- */
+.bs-ai-bubble--thinking {
+  display: inline-flex;
+  gap: 0.3rem;
+  padding: 0.85rem 1rem;
+  align-items: center;
+}
+.bs-ai-dot {
+  width: 0.45rem;
+  height: 0.45rem;
   border-radius: 9999px;
   background: var(--bs-muted);
-  animation: bs-assistant-dot 1.1s infinite ease-in-out;
+  animation: bs-ai-dot 1.2s infinite ease-in-out;
 }
-.bs-assistant-dot:nth-child(2) {
+.bs-ai-dot:nth-child(2) {
   animation-delay: 0.15s;
 }
-.bs-assistant-dot:nth-child(3) {
+.bs-ai-dot:nth-child(3) {
   animation-delay: 0.3s;
 }
-@keyframes bs-assistant-dot {
+@keyframes bs-ai-dot {
   0%, 80%, 100% { opacity: 0.3; transform: translateY(0); }
   40% { opacity: 1; transform: translateY(-2px); }
 }

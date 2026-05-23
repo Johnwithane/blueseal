@@ -22,21 +22,13 @@ const hiddenOnThisRoute = computed(() =>
 const shouldRender = computed(() => visible.value && !hiddenOnThisRoute.value);
 
 function deriveScopeAndJobId(): { scope: AssistantScope; jobId: string | null } {
-  // /jobs/:id → job scope (both tradies and admins get a per-job thread when
-  // they're inside a specific job).
   if (route.name === "JobDetail" && typeof route.params.id === "string") {
     return { scope: "job", jobId: route.params.id };
   }
-  // Anywhere else: admins get the cross-page admin thread; tradies get a
-  // rolling general thread. The current page injects into the per-turn
-  // prompt (set via store.setContext below) so the bot knows what the user
-  // is looking at without spawning a thread per page.
   if (auth.isAdmin) return { scope: "admin", jobId: null };
   return { scope: "general", jobId: null };
 }
 
-// Keep the store's context in sync with the route + role. Runs immediately so
-// the very first send carries the right scope.
 watch(
   [() => route.fullPath, () => auth.activeRole, () => auth.fbUser?.uid ?? null],
   () => {
@@ -52,9 +44,6 @@ watch(
   { immediate: true },
 );
 
-// Sign-out: drop subscriptions + close panel. We don't watch auth.fbUser
-// alone because role-only changes (admin → tradie via switcher) also matter
-// — those are covered by the watcher above re-binding the scope.
 watch(
   () => auth.isAuthenticated,
   (isAuth) => {
@@ -63,8 +52,6 @@ watch(
 );
 
 onBeforeUnmount(() => store.reset());
-
-const unreadHint = computed(() => store.messages.length > 0 && !store.isOpen);
 </script>
 
 <template>
@@ -72,57 +59,71 @@ const unreadHint = computed(() => store.messages.length > 0 && !store.isOpen);
     <button
       v-if="!store.isOpen"
       type="button"
-      class="bs-assistant-bubble"
-      :aria-label="'Open assistant'"
+      class="bs-ai-fab"
+      aria-label="Open AI assistant"
+      title="Ask Blue Seal AI"
       @click="store.open()"
     >
-      <i class="pi pi-comments" aria-hidden="true" />
-      <span v-if="unreadHint" class="bs-assistant-bubble__dot" aria-hidden="true" />
+      <span class="bs-ai-fab__glyph" aria-hidden="true">
+        <i class="pi pi-sparkles" />
+      </span>
+      <span class="bs-ai-fab__label">AI</span>
     </button>
     <AssistantPanel v-if="store.isOpen" />
   </template>
 </template>
 
 <style scoped>
-.bs-assistant-bubble {
+.bs-ai-fab {
   position: fixed;
   bottom: 1rem;
   right: 1rem;
   z-index: 40;
-  width: 3.25rem;
   height: 3.25rem;
-  border-radius: 9999px;
-  background: var(--bs-blue);
-  color: white;
+  padding: 0 1rem 0 0.55rem;
   border: none;
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.18);
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: white;
+  font-weight: 600;
+  font-size: 0.875rem;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  /* Brand-aligned blue gradient — distinctly "AI" without going full
+     Gemini-rainbow. The deep-blue end keeps it readable on light pages. */
+  background: linear-gradient(135deg, #6dd5ed 0%, #49a1d3 45%, #1d406a 100%);
+  box-shadow:
+    0 8px 24px rgba(29, 64, 106, 0.28),
+    0 1px 0 rgba(255, 255, 255, 0.35) inset;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.bs-ai-fab:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 12px 28px rgba(29, 64, 106, 0.32),
+    0 1px 0 rgba(255, 255, 255, 0.4) inset;
+}
+.bs-ai-fab:focus-visible {
+  outline: 2px solid var(--bs-blue-dark);
+  outline-offset: 3px;
+}
+.bs-ai-fab__glyph {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.18);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.4rem;
-  cursor: pointer;
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  font-size: 1rem;
 }
-.bs-assistant-bubble:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.22);
-}
-.bs-assistant-bubble:focus-visible {
-  outline: 2px solid var(--bs-blue-dark);
-  outline-offset: 2px;
-}
-.bs-assistant-bubble__dot {
-  position: absolute;
-  top: 0.4rem;
-  right: 0.4rem;
-  width: 0.65rem;
-  height: 0.65rem;
-  border-radius: 9999px;
-  background: var(--bs-amber);
-  border: 2px solid white;
+.bs-ai-fab__label {
+  padding-right: 0.25rem;
 }
 @media (min-width: 640px) {
-  .bs-assistant-bubble {
+  .bs-ai-fab {
     bottom: 1.5rem;
     right: 1.5rem;
   }

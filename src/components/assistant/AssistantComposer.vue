@@ -77,10 +77,36 @@ function onKeydown(e: KeyboardEvent) {
 <style scoped>
 .bs-assistant-composer {
   border-top: 1px solid var(--bs-border);
-  padding: 0.625rem 0.75rem;
+  padding: 0.7rem 0.85rem 0.85rem;
   display: flex;
   align-items: flex-end;
   gap: 0.5rem;
   background: white;
+}
+/* Soften the textarea border so the composer reads as a single surface
+   with the panel rather than two competing rectangles. */
+.bs-assistant-composer :deep(.p-textarea) {
+  font-size: 0.9rem;
+  border-radius: 0.75rem;
+  border-color: var(--bs-border);
+}
+.bs-assistant-composer :deep(.p-textarea:focus) {
+  border-color: var(--bs-blue);
+  box-shadow: 0 0 0 3px rgba(73, 161, 211, 0.18);
+}
+.bs-assistant-composer :deep(.p-button) {
+  border-radius: 9999px;
+  width: 2.4rem;
+  height: 2.4rem;
+  background: linear-gradient(135deg, #59b0e0 0%, #3a8cc0 100%);
+  border: none;
+  color: white;
+}
+.bs-assistant-composer :deep(.p-button:hover) {
+  filter: brightness(1.05);
+}
+.bs-assistant-composer :deep(.p-button:disabled) {
+  opacity: 0.5;
+  background: var(--bs-muted);
 }
 </style>

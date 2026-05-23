@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import Button from "primevue/button";
 import { useAssistantStore } from "@/stores/assistant";
 
 /**
@@ -16,9 +15,6 @@ import { useAssistantStore } from "@/stores/assistant";
 const store = useAssistantStore();
 
 const visible = computed(() => store.scope === "job");
-// Only show on a fresh thread — once a conversation has started, the chips
-// would just compete with whatever the tradie is mid-typing.
-const showCompact = computed(() => store.messages.length === 0);
 
 const PROMPTS = [
   {
@@ -50,32 +46,56 @@ function applyPrompt(text: string) {
 </script>
 
 <template>
-  <div v-if="visible" :class="['bs-assistant-quickprompts', { 'is-compact': !showCompact }]">
-    <Button
+  <div v-if="visible" class="bs-ai-chips" role="toolbar" aria-label="Quick prompts">
+    <button
       v-for="p in PROMPTS"
       :key="p.key"
-      :label="p.label"
-      :icon="p.icon"
-      size="small"
-      outlined
-      severity="secondary"
+      type="button"
+      class="bs-ai-chip"
       @click="applyPrompt(p.prompt)"
-    />
+    >
+      <i :class="p.icon" aria-hidden="true" />
+      <span>{{ p.label }}</span>
+    </button>
   </div>
 </template>
 
 <style scoped>
-.bs-assistant-quickprompts {
+.bs-ai-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem;
-  padding: 0.625rem 0.75rem;
+  gap: 0.45rem;
+  padding: 0.55rem 0.85rem;
   border-top: 1px solid var(--bs-border);
   background: white;
 }
-.bs-assistant-quickprompts.is-compact {
-  /* Once a thread has started, dim + tighten so the chips feel like a
-     toolbar rather than the primary affordance. */
-  opacity: 0.85;
+.bs-ai-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 9999px;
+  border: 1px solid var(--bs-border);
+  background: white;
+  color: var(--bs-text);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease, transform 0.12s ease;
+}
+.bs-ai-chip:hover {
+  background: #f0f7fc;
+  border-color: var(--bs-blue-light);
+}
+.bs-ai-chip:active {
+  transform: scale(0.98);
+}
+.bs-ai-chip:focus-visible {
+  outline: 2px solid var(--bs-blue);
+  outline-offset: 2px;
+}
+.bs-ai-chip i {
+  color: var(--bs-blue);
+  font-size: 0.78rem;
 }
 </style>
