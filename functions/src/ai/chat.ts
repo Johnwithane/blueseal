@@ -1,5 +1,5 @@
 import { onCall, HttpsError, type CallableRequest } from "firebase-functions/v2/https";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { z } from "zod";
 import { VertexAI, type Content } from "@google-cloud/vertexai";
@@ -323,6 +323,17 @@ export const aiChat = onCall({ enforceAppCheck: false }, async (req) => {
   }
 
   // Persist both turns + bump conversation metadata atomically.
+  //
+  // Ordering note: the user turn must sort earlier than the assistant turn.
+  // If both use FieldValue.serverTimestamp() in a single batch, Firestore
+  // resolves them to the same instant and the secondary tiebreaker is
+  // document id (random), which makes the panel render them out of order.
+  // We stamp the user turn with the Cloud Function's clock at request start
+  // and let the assistant turn use the batch-commit serverTimestamp() —
+  // which is naturally seconds later because the Vertex call sits between
+  // them. The small clock skew between the Functions runtime and Firestore
+  // is acceptable for in-thread ordering.
+  const userCreatedAt = Timestamp.now();
   const batch = db.batch();
   const msgsCol = db.collection(`assistantConversations/${conversationId}/messages`);
   const userMsgRef = msgsCol.doc();
@@ -332,7 +343,7 @@ export const aiChat = onCall({ enforceAppCheck: false }, async (req) => {
   batch.set(userMsgRef, {
     role: "user",
     content: input.message,
-    createdAt: FieldValue.serverTimestamp(),
+    createdAt: userCreatedAt,
     tokensIn: null,
     tokensOut: null,
     contextSnapshot: {

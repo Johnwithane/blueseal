@@ -47,7 +47,13 @@ function clearThread() {
     aria-modal="false"
   >
     <header class="bs-assistant-panel__header">
-      <div class="min-w-0">
+      <img
+        src="/icons/blueseal_logo.png"
+        alt=""
+        class="bs-assistant-panel__logo"
+        aria-hidden="true"
+      />
+      <div class="min-w-0 flex-1">
         <h2 class="text-base font-semibold truncate">{{ store.threadTitle }}</h2>
         <p class="text-xs text-[color:var(--bs-muted)] truncate">{{ subtitle }}</p>
       </div>
@@ -101,11 +107,20 @@ function clearThread() {
 .bs-assistant-panel__header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 0.75rem;
   padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--bs-border);
   background: white;
+}
+.bs-assistant-panel__logo {
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  background: white;
+  border: 1px solid var(--bs-border);
+  padding: 0.2rem;
+  object-fit: contain;
 }
 @media (min-width: 640px) {
   .bs-assistant-panel {

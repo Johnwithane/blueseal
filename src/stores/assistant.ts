@@ -37,6 +37,11 @@ interface State {
   // composer wouldn't notice an identical `draft` value the second time.
   draft: string;
   draftTick: number;
+  // Local-only echo of the message the user just sent, shown immediately
+  // so the panel doesn't sit silent for the ~2s it takes Vertex to reply.
+  // The Firestore listener delivers the canonical persisted version once
+  // the batch commits; the thread component dedupes on content.
+  optimisticUserMessage: { content: string; createdAt: number } | null;
 }
 
 // Subscription handles. Kept module-scoped (not in state) so they aren't
@@ -67,6 +72,7 @@ export const useAssistantStore = defineStore("assistant", {
     error: null,
     draft: "",
     draftTick: 0,
+    optimisticUserMessage: null,
   }),
 
   getters: {
@@ -108,6 +114,9 @@ export const useAssistantStore = defineStore("assistant", {
       this.pageRoute = opts.pageRoute;
 
       if (!scopeChanged) return;
+      // Different thread now — any optimistic message in flight belongs to
+      // the prior context and shouldn't bleed in.
+      this.optimisticUserMessage = null;
       if (!opts.userId) {
         this.currentConversationId = null;
         this.messages = [];
@@ -162,6 +171,9 @@ export const useAssistantStore = defineStore("assistant", {
       if (this.sending) return;
       const trimmed = message.trim();
       if (!trimmed) return;
+      // Show the user's turn immediately — the round-trip to Vertex takes
+      // ~2s and the panel should never feel like it ate the message.
+      this.optimisticUserMessage = { content: trimmed, createdAt: Date.now() };
       this.sending = true;
       this.error = null;
       try {
@@ -173,16 +185,21 @@ export const useAssistantStore = defineStore("assistant", {
           message: trimmed,
         };
         const res = await sendAssistantMessage(input);
-        // On first send the backend assigns the conversation id — attach so
-        // we start seeing live updates. On subsequent sends this is a no-op.
         if (res.conversationId !== this.currentConversationId) {
           this.attachToConversation(res.conversationId);
         }
       } catch (e) {
         this.error = (e as Error).message;
+        // Re-throw so the composer can restore the typed text — and drop
+        // the optimistic bubble since the message didn't actually land.
+        this.optimisticUserMessage = null;
         throw e;
       } finally {
         this.sending = false;
+        // The Firestore listener has now (or imminently will) deliver the
+        // canonical user message; the dedupe in AssistantThread keeps us
+        // from briefly showing it twice.
+        this.optimisticUserMessage = null;
       }
     },
 
@@ -221,6 +238,7 @@ export const useAssistantStore = defineStore("assistant", {
       this.error = null;
       this.draft = "";
       this.draftTick = 0;
+      this.optimisticUserMessage = null;
     },
   },
 });
