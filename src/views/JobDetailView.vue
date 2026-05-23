@@ -30,6 +30,7 @@ import IntakeFormRenderer from "@/components/IntakeFormRenderer.vue";
 import AiToolsPanel from "@/components/AiToolsPanel.vue";
 import InvoiceEditor from "@/components/InvoiceEditor.vue";
 import ReviewPrompt from "@/components/ReviewPrompt.vue";
+import TimeTrackerCard from "@/components/TimeTrackerCard.vue";
 import { SEED_INTAKE_SCHEMAS } from "@/data/intakeSchemas";
 import { getIntakeSchema } from "@/firebase/services/intakeFormSchemas";
 import type { IntakeField } from "@/firebase/interfaces";
@@ -484,6 +485,12 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
               </div>
             </div>
           </div>
+
+          <TimeTrackerCard
+            v-if="isTradie || isClient"
+            :job-id="job.id"
+            :is-tradie="isTradie"
+          />
 
           <InvoiceEditor v-if="invoiceId" :invoice-id="invoiceId" :can-edit="isTradie" />
         </div>

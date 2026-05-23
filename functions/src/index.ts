@@ -34,6 +34,8 @@ export { onMessageCreated } from "./chat/onMessageCreated";
 // Jobs (direct-request notifications; marketplace flows live in jobPosts/)
 export { onJobCreated } from "./jobs/onJobCreated";
 export { onJobCancelled } from "./jobs/onJobCancelled";
+export { clockIn } from "./jobs/clockIn";
+export { clockOut } from "./jobs/clockOut";
 
 // Invoicing
 export { onJobCompleted } from "./invoicing/onJobCompleted";

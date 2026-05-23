@@ -96,6 +96,21 @@ service firebase.storage {
       allow write: if isSignedIn() && jobParty(jobId) && smallSizeOk() && isWebp();
     }
 
+    // Job expense receipts — tradie + admin only. Critically NOT readable
+    // by the client, even though they're a party of the job: receipts
+    // disclose the tradie's cost basis and supplier choices, which the
+    // markup model is designed to hide. The client only ever sees the
+    // resulting line item on the invoice. WebP (photo of receipt) or
+    // PDF (digital receipt).
+    function isJobTradie(jobId) {
+      return firestore.exists(/databases/(default)/documents/jobs/$(jobId))
+        && firestore.get(/databases/(default)/documents/jobs/$(jobId)).data.tradespersonId == uid();
+    }
+    match /jobs/{jobId}/receipts/{file=**} {
+      allow read: if isSignedIn() && (isJobTradie(jobId) || isAdmin());
+      allow write: if isSignedIn() && isJobTradie(jobId) && docSizeOk() && isWebpOrPdf();
+    }
+
     // Job-post photos — uploaded before the post doc exists (client picks a
     // temp uuid client-side), so we can't gate writes on Firestore parties.
     // Any signed-in user can write WebP; the createJobPost callable is the

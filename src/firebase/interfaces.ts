@@ -293,6 +293,68 @@ export interface JobDoc {
 }
 
 // ---------------------------------------------------------------------------
+// jobs/{jobId}/timeEntries/{entryId}
+// One row per clock-in / clock-out session. Tradie writes; both parties +
+// admin read (the client sees a running timer + the session log, so they
+// can sanity-check what they'll be billed for).
+//
+// `hourlyRateSnapshot` is frozen at clock-in time — a later profile rate
+// change doesn't retroactively re-price billed work.
+// `endedAt == null` ⇒ the session is currently running. The clockIn
+// callable enforces "at most one running entry per job per tradie"
+// transactionally; rules can't enforce uniqueness across docs.
+// ---------------------------------------------------------------------------
+export interface TimeEntryDoc {
+  tradespersonId: string; // duplicated so rules don't need a job lookup
+  clientId: string; // duplicated so rules don't need a job lookup
+  startedAt: Timestamp;
+  endedAt: Timestamp | null;
+  hourlyRateSnapshot: number; // cents
+  notes: string;
+  source: "clock" | "manual";
+  invoicedAt: Timestamp | null;
+}
+
+// ---------------------------------------------------------------------------
+// jobs/{jobId}/expenses/{expenseId}
+// Tradie-uploaded receipt with markup → invoice line. Receipts are
+// considered sensitive (cost-basis, supplier names) — the doc AND the
+// underlying file are tradie + admin only. The client only ever sees the
+// resulting line item on the invoice once the tradie pulls it in.
+//
+// `totalCost` is what the tradie paid; `billedAmount` is what the client
+// pays (totalCost × (1 + markupPercent/100), rounded; tradie can override).
+// `status`: "parsing" while the OCR callable is running, "ready" once
+// fields are usable, "invoiced" once pulled into an invoice line item.
+// ---------------------------------------------------------------------------
+export type ExpenseCategory =
+  | "materials"
+  | "fuel"
+  | "disposal"
+  | "parking"
+  | "other";
+
+export type ExpenseStatus = "parsing" | "ready" | "invoiced";
+
+export interface ExpenseDoc {
+  tradespersonId: string;
+  clientId: string;
+  description: string;
+  vendor: string | null;
+  spentAt: Timestamp | null;
+  totalCost: number; // cents, what the tradie paid
+  markupPercent: number; // 0-200; UI default 15
+  billedAmount: number; // cents, line-item amount the client will see
+  category: ExpenseCategory | null;
+  receiptStoragePath: string; // jobs/{jobId}/receipts/{uuid}.{ext}
+  status: ExpenseStatus;
+  aiParsed: boolean;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+  invoicedAt: Timestamp | null;
+}
+
+// ---------------------------------------------------------------------------
 // jobPosts/{postId} — public-ish posting on the job-board marketplace.
 // Vetted tradies can read posts where status === "open"; the post owner
 // (client) can always read their own. Exact address, applicationCount, and
@@ -484,14 +546,63 @@ export interface InvoiceDoc {
 
 // ---------------------------------------------------------------------------
 // aiUsage/{usageId}
+// jobId is nullable now that the assistant chatbot ("chat" tool) can be
+// invoked from non-job pages — the older diagnose/quote/summary tools
+// always carry a jobId.
 // ---------------------------------------------------------------------------
 export interface AiUsageDoc {
   userId: string;
-  jobId: string;
-  tool: "diagnose" | "quote" | "summary";
+  jobId: string | null;
+  tool: "diagnose" | "quote" | "summary" | "chat";
   tokensIn: number;
   tokensOut: number;
   createdAt: Timestamp;
+}
+
+// ---------------------------------------------------------------------------
+// assistantConversations/{conversationId}
+// Per-user AI-assistant threads. One thread per (userId, jobId) when the
+// tradesperson is inside a job; one "general" thread per user for advice
+// not tied to a specific job; one "admin" thread per admin for cross-page
+// admin help (current-page context is injected per-turn into the prompt,
+// not into the thread scope).
+//
+// Writes are server-only via the aiChat callable — both user and assistant
+// turns persist together so the conversation history is always coherent.
+// Clients read directly for live updates.
+// ---------------------------------------------------------------------------
+export type AssistantScope = "job" | "general" | "admin";
+
+export interface AssistantConversationDoc {
+  userId: string;
+  scope: AssistantScope;
+  jobId: string | null; // present iff scope === "job"
+  title: string; // auto-derived ("General", job title, "Admin assistant")
+  lastMessageAt: Timestamp | null;
+  lastMessagePreview: string;
+  messageCount: number;
+  createdAt: Timestamp;
+}
+
+export type AssistantMessageRole = "user" | "assistant";
+
+// What context the assistant turn was generated against. Persisted on the
+// user turn so we can audit / debug / replay later (and so the UI can show
+// "answered using N messages of job chat as context" if we want to surface
+// that). Null on assistant turns.
+export interface AssistantContextSnapshot {
+  pageRoute: string | null;
+  jobId: string | null;
+  chatMessagesIncluded: number;
+}
+
+export interface AssistantMessageDoc {
+  role: AssistantMessageRole;
+  content: string;
+  createdAt: Timestamp;
+  tokensIn: number | null; // only set on assistant turns
+  tokensOut: number | null;
+  contextSnapshot: AssistantContextSnapshot | null;
 }
 
 // ---------------------------------------------------------------------------

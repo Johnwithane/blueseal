@@ -264,6 +264,83 @@ service cloud.firestore {
           || request.resource.data.privateNotes == resource.data.privateNotes
         );
       allow delete: if isAdmin();
+
+      // ---------- jobs/{jobId}/timeEntries (clock-in sessions) ----------
+      // Tradie writes; the client + tradie + admin can read (the client
+      // sees a live timer + session log so the eventual invoice is
+      // unsurprising). Uniqueness of "one running entry per tradie per
+      // job" is enforced transactionally by the clockIn callable — rules
+      // can't enforce uniqueness across docs. The denormalised
+      // tradespersonId/clientId on the row let rules avoid an extra
+      // parent-job lookup on every read.
+      match /timeEntries/{entryId} {
+        function isJobParty() {
+          return isSignedIn() && (
+            resource.data.tradespersonId == uid()
+            || resource.data.clientId == uid()
+          );
+        }
+        allow read: if isJobParty() || isAdmin();
+        // Create allowed for the assigned tradie; identity + parent-job
+        // ids must match the parent job. invoicedAt locked null on create
+        // so a freshly-clocked entry can't claim it's already billed.
+        allow create: if isTradie()
+          && request.resource.data.tradespersonId == uid()
+          && request.resource.data.tradespersonId == jobDoc(jobId).data.tradespersonId
+          && request.resource.data.clientId == jobDoc(jobId).data.clientId
+          && request.resource.data.invoicedAt == null
+          && request.resource.data.source in ['clock', 'manual']
+          && request.resource.data.hourlyRateSnapshot is int
+          && request.resource.data.hourlyRateSnapshot >= 0;
+        // Update: tradie can edit notes + end an open entry. Identity,
+        // startedAt, rate snapshot, source, invoicedAt are all locked.
+        // Admin may correct anything.
+        allow update: if (isOwner(resource.data.tradespersonId)
+                         && request.resource.data.tradespersonId == resource.data.tradespersonId
+                         && request.resource.data.clientId == resource.data.clientId
+                         && request.resource.data.startedAt == resource.data.startedAt
+                         && request.resource.data.hourlyRateSnapshot == resource.data.hourlyRateSnapshot
+                         && request.resource.data.source == resource.data.source
+                         && request.resource.data.invoicedAt == resource.data.invoicedAt)
+                      || isAdmin();
+        // Tradie can delete only their own, only while not yet invoiced.
+        allow delete: if (isOwner(resource.data.tradespersonId)
+                         && resource.data.invoicedAt == null)
+                      || isAdmin();
+      }
+
+      // ---------- jobs/{jobId}/expenses (tradie-only; client never reads) ----------
+      // Cost-basis + supplier names are private to the tradie. The client
+      // only ever sees the resulting line item once the tradie pulls the
+      // expense into an invoice. Receipt files in Storage are restricted
+      // the same way (see storage.rules).
+      match /expenses/{expenseId} {
+        allow read: if isSignedIn()
+          && (resource.data.tradespersonId == uid() || isAdmin());
+        allow create: if isTradie()
+          && request.resource.data.tradespersonId == uid()
+          && request.resource.data.tradespersonId == jobDoc(jobId).data.tradespersonId
+          && request.resource.data.clientId == jobDoc(jobId).data.clientId
+          && request.resource.data.invoicedAt == null
+          && request.resource.data.status in ['parsing', 'ready']
+          && request.resource.data.totalCost is int
+          && request.resource.data.totalCost >= 0
+          && request.resource.data.billedAmount is int
+          && request.resource.data.billedAmount >= 0
+          && request.resource.data.markupPercent is number
+          && request.resource.data.markupPercent >= 0
+          && request.resource.data.markupPercent <= 1000;
+        allow update: if (isOwner(resource.data.tradespersonId)
+                         && request.resource.data.tradespersonId == resource.data.tradespersonId
+                         && request.resource.data.clientId == resource.data.clientId
+                         && request.resource.data.receiptStoragePath == resource.data.receiptStoragePath
+                         && request.resource.data.createdAt == resource.data.createdAt
+                         && request.resource.data.invoicedAt == resource.data.invoicedAt)
+                      || isAdmin();
+        allow delete: if (isOwner(resource.data.tradespersonId)
+                         && resource.data.invoicedAt == null)
+                      || isAdmin();
+      }
     }
 
     // ---------- jobPosts (job-board marketplace) ----------
