@@ -230,3 +230,20 @@ export async function listPendingApplications(): Promise<WithId<TradespersonDoc>
   const snap = await getDocs(q);
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
+
+/**
+ * Apps where the admin approved the application but isVisible is still
+ * false — meaning ID or at least one cert isn't approved yet, so the
+ * profile isn't actually live. These would otherwise vanish from the
+ * vetting queue and trap the tradesperson in purgatory.
+ */
+export async function listIncompleteApprovals(): Promise<WithId<TradespersonDoc>[]> {
+  const q = query(
+    tradiesCol(),
+    where("vettingStatus", "==", "approved"),
+    where("isVisible", "==", false),
+    fbLimit(100),
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}

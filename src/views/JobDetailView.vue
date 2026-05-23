@@ -126,80 +126,77 @@ const tradieWsibLive = computed(() => {
 async function load() {
   loading.value = true;
   loadError.value = null;
-  // Auth-state race: when the user lands here via a direct URL (notification
-  // click on cold cache, refresh, deep-link from email) the Firestore client
-  // can fire the read before it has the auth token attached, so the rule
-  // sees request.auth==null and denies. Wait for the store's auth init AND
-  // for an authoritative fbUser before reading.
-  if (!auth.ready) await auth.init();
-  // Belt + suspenders: also refresh the ID token so Firestore picks up
-  // any role-claim updates that landed since the page was last opened.
-  if (auth.fbUser) {
-    try {
-      await auth.fbUser.getIdToken(true);
-    } catch {
-      /* token refresh failure isn't fatal — getJob will throw and we show
-         the error empty state below */
-    }
-  }
-  const id = route.params.id as string;
   try {
-    job.value = await getJob(id);
-  } catch (e) {
-    // Most likely permission-denied from a notification link pointing at a
-    // job the signed-in user isn't a party to (e.g. wrong account active, or
-    // stale notification from before a role change). Show a proper empty
-    // state — don't leave the view spinning forever.
-    loadError.value = humanizeError(e);
-    job.value = null;
-    loading.value = false;
-    return;
-  }
-  if (!job.value) {
-    loading.value = false;
-    return;
-  }
-  // Parallel: intake schema + invoice lookup.
-  const [remote, invoice] = await Promise.all([
-    getIntakeSchema(job.value.trade),
-    getInvoiceByJobId(id),
-  ]);
-  intakeFields.value = remote?.fields ?? SEED_INTAKE_SCHEMAS[job.value.trade] ?? [];
-  invoiceId.value = invoice?.id ?? null;
-
-  // Hydrate local form copies
-  scheduledStart.value = job.value.scheduledStart?.toDate() ?? null;
-  scheduledEnd.value = job.value.scheduledEnd?.toDate() ?? null;
-  privateNotes.value = job.value.privateNotes ?? "";
-  // Start the intake draft from whatever's already on the doc — empty {} on
-  // marketplace-originated jobs, possibly populated if the client has been
-  // editing in another tab.
-  intakeDraft.value = { ...(job.value.intakeFormData ?? {}) };
-
-  // Only the tradie needs subscription state (AI tools are tradie-only).
-  // Clients have no reason to read the tradie's user doc.
-  if (isTradie.value && auth.user) {
-    subscriptionOn.value = auth.user.hasActiveSubscription;
-  } else {
-    subscriptionOn.value = false;
-  }
-
-  // Clients see a "Your tradesperson" panel — fetch the tradesperson doc
-  // so we can render their photo + badges. Read can fail gracefully when
-  // the tradie has gone invisible (suspended/de-listed): rules require
-  // isVisible:true for non-owners. The panel falls back to a generic
-  // "your tradesperson" display when tradieInfo stays null.
-  if (isClient.value && job.value) {
+    // Auth-state race: when the user lands here via a direct URL (notification
+    // click on cold cache, refresh, deep-link from email) the Firestore client
+    // can fire the read before it has the auth token attached, so the rule
+    // sees request.auth==null and denies. Wait for the store's auth init AND
+    // refresh the ID token so Firestore picks up any role-claim updates
+    // before reading. Both swallowed — getJob will throw on the actual
+    // permission-denied path and we surface that.
     try {
-      tradieInfo.value = await getTradesperson(job.value.tradespersonId);
+      if (!auth.ready) await auth.init();
     } catch {
+      /* auth init can reject if the startup user-doc read races; harmless
+         here — keep going. */
+    }
+    if (auth.fbUser) {
+      try {
+        await auth.fbUser.getIdToken(true);
+      } catch {
+        /* token refresh failure isn't fatal */
+      }
+    }
+    const id = route.params.id as string;
+    job.value = await getJob(id);
+    if (!job.value) return;
+    // Parallel: intake schema + invoice lookup.
+    const [remote, invoice] = await Promise.all([
+      getIntakeSchema(job.value.trade),
+      getInvoiceByJobId(id),
+    ]);
+    intakeFields.value = remote?.fields ?? SEED_INTAKE_SCHEMAS[job.value.trade] ?? [];
+    invoiceId.value = invoice?.id ?? null;
+
+    // Hydrate local form copies
+    scheduledStart.value = job.value.scheduledStart?.toDate() ?? null;
+    scheduledEnd.value = job.value.scheduledEnd?.toDate() ?? null;
+    privateNotes.value = job.value.privateNotes ?? "";
+    // Start the intake draft from whatever's already on the doc — empty {} on
+    // marketplace-originated jobs, possibly populated if the client has been
+    // editing in another tab.
+    intakeDraft.value = { ...(job.value.intakeFormData ?? {}) };
+
+    // Only the tradie needs subscription state (AI tools are tradie-only).
+    // Clients have no reason to read the tradie's user doc.
+    if (isTradie.value && auth.user) {
+      subscriptionOn.value = auth.user.hasActiveSubscription;
+    } else {
+      subscriptionOn.value = false;
+    }
+
+    // Clients see a "Your tradesperson" panel — fetch the tradesperson doc
+    // so we can render their photo + badges. Read can fail gracefully when
+    // the tradie has gone invisible (suspended/de-listed): rules require
+    // isVisible:true for non-owners. The panel falls back to a generic
+    // "your tradesperson" display when tradieInfo stays null.
+    if (isClient.value && job.value) {
+      try {
+        tradieInfo.value = await getTradesperson(job.value.tradespersonId);
+      } catch {
+        tradieInfo.value = null;
+      }
+    } else {
       tradieInfo.value = null;
     }
-  } else {
-    tradieInfo.value = null;
+  } catch (e) {
+    // Permission-denied or any other read failure: show the error empty
+    // state instead of leaving the view stuck on "Loading…".
+    loadError.value = humanizeError(e);
+    job.value = null;
+  } finally {
+    loading.value = false;
   }
-
-  loading.value = false;
 }
 
 onMounted(load);

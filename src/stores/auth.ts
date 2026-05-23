@@ -118,7 +118,17 @@ export const useAuthStore = defineStore("auth", {
         const claimRoles = rolesFromClaims(
           tokenResult.claims as Record<string, unknown>,
         );
-        const doc = await getUser(fbUser.uid);
+        // getUser() can throw permission-denied during the Firestore auth
+        // handshake (the SDK's auth listener hasn't yet attached the token
+        // when we fire the first request). Don't let that break init —
+        // leave the user doc null and proceed; subsequent reads from views
+        // will succeed once auth has fully propagated.
+        let doc: WithId<UserDoc> | null = null;
+        try {
+          doc = await getUser(fbUser.uid);
+        } catch {
+          doc = null;
+        }
         // PIPEDA: refuse to seat the session for an account that's been
         // marked for deletion. Sign-out happens server-side via Firebase
         // Auth; the scheduledHardDelete sweep wipes the account fully
