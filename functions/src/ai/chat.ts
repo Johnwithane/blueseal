@@ -2,9 +2,10 @@ import { onCall, HttpsError, type CallableRequest } from "firebase-functions/v2/
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { z } from "zod";
-import { VertexAI, type Content } from "@google-cloud/vertexai";
+import { VertexAI, type Content, type Part } from "@google-cloud/vertexai";
 import { db } from "../lib/admin";
 import { requireAuth } from "../lib/auth";
+import { JOB_TOOLS, executeTool, type ToolContext } from "./chatTools";
 
 /**
  * aiChat — persistent multi-turn assistant for tradespeople + admins.
@@ -106,6 +107,8 @@ function buildSystemPrompt(opts: {
   scope: "job" | "general" | "admin";
   pageRoute: string | null;
   jobContext: { job: JobDoc; chatTranscript: string[] } | null;
+  toolsEnabled: boolean;
+  nowISO: string;
 }): string {
   const tradieBase =
     "You are Blue Seal's in-app assistant for tradespeople in Canada. " +
@@ -124,8 +127,10 @@ function buildSystemPrompt(opts: {
 
   const lines: string[] = [opts.isAdmin ? adminBase : tradieBase];
 
+  lines.push(`\nThe current time is ${opts.nowISO}.`);
+
   if (opts.pageRoute) {
-    lines.push(`\nThe user is currently viewing the route: ${opts.pageRoute}.`);
+    lines.push(`The user is currently viewing the route: ${opts.pageRoute}.`);
   }
 
   if (opts.scope === "job" && opts.jobContext) {
@@ -150,6 +155,26 @@ function buildSystemPrompt(opts: {
     lines.push(
       "\nThis is a general thread — the user isn't asking about a specific job. " +
         "If their question is clearly about a particular job, ask which one.",
+    );
+  }
+
+  if (opts.toolsEnabled) {
+    lines.push(
+      "\n--- Actions you can take ---",
+      "You have a small set of tools you can call to act on this job for the tradesperson:",
+      "- getJobStatus: refresh the job's title/status/schedule/notes/timer state.",
+      "- getCurrentTimer: check whether a time-tracking session is running and for how long.",
+      "- appendPrivateNote: add a timestamped line to the tradesperson's private notes.",
+      "- setSchedule: set/update the job's scheduled start (and optional end) times.",
+      "- clockIn / clockOut: start or stop the on-the-clock timer for this job.",
+      "",
+      "Rules for using tools:",
+      "1. Only take actions the user explicitly asked for — never schedule, clock, or write notes off your own initiative.",
+      "2. If a request is ambiguous (\"schedule it for tomorrow\"), ask one clarifying question before acting (\"tomorrow at what time?\").",
+      "3. After taking an action, confirm what you did in your reply in one short line (e.g. \"Clocked you in at 2:34 PM\" or \"Added a note: arrived on site\").",
+      "4. If a tool returns ok:false, tell the user the reason plainly — don't retry the same call.",
+      "5. Stay read-only when the user is using a quick-prompt (Diagnose / Quote / Summary) — those messages explicitly say \"do not call any tools\".",
+      "--- End actions ---",
     );
   }
 
@@ -279,11 +304,21 @@ export const aiChat = onCall({ enforceAppCheck: false }, async (req) => {
     .get();
   const priorTurns = priorSnap.docs.map((d) => d.data() as { role: string; content: string });
 
+  // Tools are exposed when the user is on a job thread AND owns the job
+  // (admins can read but not act through the assistant; cross-user actions
+  // go through dedicated admin callables with explicit audit trails).
+  const toolsEnabled =
+    conversation.scope === "job" &&
+    !!jobContext &&
+    jobContext.job.tradespersonId === uid;
+
   const systemPrompt = buildSystemPrompt({
     isAdmin,
     scope: conversation.scope,
     pageRoute: input.pageRoute ?? null,
     jobContext,
+    toolsEnabled,
+    nowISO: new Date().toISOString(),
   });
 
   const contents: Content[] = [];
@@ -296,6 +331,19 @@ export const aiChat = onCall({ enforceAppCheck: false }, async (req) => {
   }
   contents.push({ role: "user", parts: [{ text: input.message }] });
 
+  // Dispatch loop: each iteration sends the running `contents` to Gemini.
+  // If the response contains tool calls we execute them, append their
+  // results as a "user" (functionResponse) turn, and loop. If the
+  // response is pure text we're done. Cap iterations so a misbehaving
+  // model can't burn unbounded tokens — five rounds is plenty for the
+  // 5-tool surface this commit ships.
+  const MAX_TOOL_ITERATIONS = 5;
+  const toolCtx: ToolContext = {
+    jobId: conversation.jobId ?? "",
+    uid,
+    isAdmin,
+  };
+
   let assistantText = "";
   let tokensIn = 0;
   let tokensOut = 0;
@@ -303,14 +351,62 @@ export const aiChat = onCall({ enforceAppCheck: false }, async (req) => {
     const model = client().getGenerativeModel({
       model: MODEL,
       systemInstruction: { role: "system", parts: [{ text: systemPrompt }] },
+      tools: toolsEnabled ? [JOB_TOOLS] : undefined,
     });
-    const res = await model.generateContent({ contents });
-    assistantText =
-      res.response.candidates?.[0]?.content?.parts
-        ?.map((p) => ("text" in p ? p.text : ""))
-        .join("") ?? "";
-    tokensIn = res.response.usageMetadata?.promptTokenCount ?? 0;
-    tokensOut = res.response.usageMetadata?.candidatesTokenCount ?? 0;
+
+    for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter++) {
+      const res = await model.generateContent({ contents });
+      const candidate = res.response.candidates?.[0];
+      const parts: Part[] = candidate?.content?.parts ?? [];
+      tokensIn += res.response.usageMetadata?.promptTokenCount ?? 0;
+      tokensOut += res.response.usageMetadata?.candidatesTokenCount ?? 0;
+
+      const functionCallParts = parts.filter(
+        (p): p is Part & { functionCall: { name: string; args?: Record<string, unknown> } } =>
+          "functionCall" in p && p.functionCall != null,
+      );
+      const textParts = parts
+        .map((p) => ("text" in p && typeof p.text === "string" ? p.text : ""))
+        .filter(Boolean)
+        .join("");
+
+      if (functionCallParts.length === 0) {
+        assistantText = textParts;
+        break;
+      }
+
+      // Add the model's turn (with the function-call parts) to history so
+      // the next iteration can see what it asked for.
+      contents.push({ role: "model", parts });
+
+      // Execute each call and bundle the responses as the user's next turn.
+      const responseParts: Part[] = [];
+      for (const fc of functionCallParts) {
+        const args = (fc.functionCall.args ?? {}) as Record<string, unknown>;
+        logger.info("aiChat tool call", {
+          ...logCtx,
+          tool: fc.functionCall.name,
+          iter,
+        });
+        const result = await executeTool(fc.functionCall.name, args, toolCtx);
+        responseParts.push({
+          functionResponse: {
+            name: fc.functionCall.name,
+            response: result,
+          },
+        });
+      }
+      contents.push({ role: "user", parts: responseParts });
+
+      // Last iteration with still-pending tool calls → bail with whatever
+      // text we have (likely empty). The model gets logged so we can tune.
+      if (iter === MAX_TOOL_ITERATIONS - 1) {
+        logger.warn("aiChat: tool loop hit max iterations", { ...logCtx });
+        assistantText =
+          textParts ||
+          "I tried to take some actions but ran out of time. Please ask again or take the steps yourself.";
+      }
+    }
   } catch (err) {
     logger.error("aiChat: Vertex call failed", { ...logCtx, err: (err as Error).message });
     // Never leak raw provider errors — they can contain project IDs / hosts.

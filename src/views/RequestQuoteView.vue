@@ -219,6 +219,8 @@ async function submit() {
     await sendMessage({
       chatId,
       senderId: auth.fbUser.uid,
+      senderName: auth.user?.displayName ?? null,
+      senderPhotoURL: auth.user?.photoURL ?? null,
       text: `New request: ${parsed.data.title}`,
     });
 
