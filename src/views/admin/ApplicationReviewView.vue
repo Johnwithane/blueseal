@@ -36,6 +36,7 @@ import { useAuthStore } from "@/stores/auth";
 import { useToast } from "@/composables/useToast";
 import { tradeLabel } from "@/data/trades";
 import { useFormatters } from "@/composables/useFormatters";
+import { registryForIssuingBody } from "@/utils/certRegistries";
 
 const route = useRoute();
 const router = useRouter();
@@ -227,6 +228,15 @@ const certSeverity = {
   rejected: "danger" as const,
 };
 
+async function copyCertNumber(certNumber: string) {
+  try {
+    await navigator.clipboard.writeText(certNumber);
+    toast.info("Copied", `Cert # ${certNumber} copied to clipboard.`);
+  } catch {
+    toast.error("Copy failed", "Select and copy the cert # manually.");
+  }
+}
+
 // "Approve everything" is the one-click happy path: flips every pending cert
 // + the pending ID + the application all in one callable, then makes the
 // profile live. Per-item approve/reject buttons remain for cases where the
@@ -279,6 +289,47 @@ const approveBlockerHint = computed(() => {
             </div>
             <div class="text-xs text-[color:var(--bs-muted)]">
               {{ c.issuingBody }} • #{{ c.certNumber }}
+            </div>
+            <!-- Verify-on-registry helper. Direct link for jurisdictions with
+                 public lookup tools (AB/BC/ON-compulsory); Red Seal hub for
+                 Red Seal endorsements (province-issued); hidden when there's
+                 no known registry to point at. -->
+            <div
+              v-if="registryForIssuingBody(c.issuingBody)"
+              class="mt-2 rounded border border-slate-200 bg-slate-50 p-2 text-xs"
+            >
+              <div class="flex items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <div class="font-medium text-slate-700">
+                    Verify with {{ registryForIssuingBody(c.issuingBody)?.province }}
+                  </div>
+                  <div class="text-slate-600">
+                    {{ registryForIssuingBody(c.issuingBody)?.registryName }}
+                  </div>
+                  <div
+                    v-if="registryForIssuingBody(c.issuingBody)?.notes"
+                    class="mt-1 text-[11px] text-slate-500"
+                  >
+                    {{ registryForIssuingBody(c.issuingBody)?.notes }}
+                  </div>
+                </div>
+                <a
+                  :href="registryForIssuingBody(c.issuingBody)?.url"
+                  target="_blank"
+                  rel="noopener"
+                  class="shrink-0 text-blue-700 underline"
+                >
+                  Open ↗
+                </a>
+              </div>
+              <Button
+                label="Copy cert #"
+                icon="pi pi-copy"
+                text
+                size="small"
+                class="mt-1 !p-0 !text-xs"
+                @click="copyCertNumber(c.certNumber)"
+              />
             </div>
             <Button
               icon="pi pi-eye"
