@@ -191,7 +191,16 @@ async function load() {
     }
   } catch (e) {
     // Permission-denied or any other read failure: show the error empty
-    // state instead of leaving the view stuck on "Loading…".
+    // state instead of leaving the view stuck on "Loading…". Log the
+    // current auth UID so when two tabs disagree (Firebase Auth state is
+    // shared across tabs on the same origin — last-signed-in wins) the
+    // mismatch is visible in the console.
+    // eslint-disable-next-line no-console
+    console.warn(
+      "[JobDetailView] read failed",
+      { jobId: route.params.id, signedInAs: auth.fbUser?.uid ?? null },
+      e,
+    );
     loadError.value = humanizeError(e);
     job.value = null;
   } finally {
