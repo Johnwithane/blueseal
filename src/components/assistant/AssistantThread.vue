@@ -60,7 +60,13 @@ function formatClock(ms: number): string {
 // showTime = last of a run). This is the iMessage pattern — repeated
 // avatars + names + timestamps create huge visual noise on a 440px panel.
 const displayMessages = computed<DisplayMessage[]>(() => {
-  const raw: Omit<DisplayMessage, "showAvatar" | "showTime">[] = store.messages.map((m) => ({
+  // Filter out quick-prompt messages — those are persisted so the model
+  // has follow-up context, but the user clicked a chip and shouldn't see
+  // the templated prompt come back at them.
+  const visible = store.messages.filter(
+    (m) => m.contextSnapshot?.source !== "quick-prompt",
+  );
+  const raw: Omit<DisplayMessage, "showAvatar" | "showTime">[] = visible.map((m) => ({
     key: m.id,
     role: m.role,
     content: m.content,

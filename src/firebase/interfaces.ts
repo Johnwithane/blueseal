@@ -598,6 +598,10 @@ export interface AssistantContextSnapshot {
   pageRoute: string | null;
   jobId: string | null;
   chatMessagesIncluded: number;
+  // "user"      → typed in the composer, render normally
+  // "quick-prompt" → fired by a Diagnose/Quote/Summary chip; hidden from
+  //                  the thread UI but kept in history for follow-ups
+  source?: "user" | "quick-prompt";
 }
 
 export interface AssistantMessageDoc {

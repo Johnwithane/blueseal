@@ -36,6 +36,11 @@ export interface AiChatInput {
   jobId?: string | null;
   pageRoute?: string | null;
   message: string;
+  // When true the user-side message isn't rendered in the thread — used by
+  // the quick-prompt chips so clicking "Summarize" feels like a one-click
+  // command instead of typing a templated prompt. The message still
+  // persists server-side so the model keeps context across follow-ups.
+  hidden?: boolean;
 }
 
 export interface AiChatResult {
@@ -68,6 +73,7 @@ export async function sendAssistantMessage(input: AiChatInput): Promise<AiChatRe
   if (input.conversationId) payload.conversationId = input.conversationId;
   if (input.jobId) payload.jobId = input.jobId;
   if (input.pageRoute) payload.pageRoute = input.pageRoute;
+  if (input.hidden) payload.hidden = true;
   const { data } = await fn(payload);
   return data;
 }

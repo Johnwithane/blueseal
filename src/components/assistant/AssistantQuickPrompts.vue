@@ -1,47 +1,61 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useAssistantStore } from "@/stores/assistant";
+import { useToast } from "@/composables/useToast";
+import { humanizeError } from "@/utils/errors";
 
 /**
  * Quick-prompt chips for the three job-scoped AI tasks that used to be
  * standalone callables (aiDiagnose / aiQuote / aiSummarize, design.md §5.9).
- * Clicking a chip pre-fills the composer so the tradesperson can review or
- * tweak before sending — single-keystroke send if they're happy with the
- * default. We don't auto-send because the old one-shot tools used to
- * surface results in a modal; here the same prompt becomes part of an
- * ongoing thread the tradie can follow up in.
+ * Clicking a chip fires the request immediately and hides the templated
+ * prompt from the thread — the tradesperson just sees the AI's reply, the
+ * same one-click feel as the old buttons but with the result landing in a
+ * thread they can follow up in.
  */
 
 const store = useAssistantStore();
+const toast = useToast();
 
 const visible = computed(() => store.scope === "job");
+// Disable while a turn is in flight — otherwise rapid double-tapping fires
+// duplicate calls (Vertex bills each one).
+const disabled = computed(() => store.sending);
 
+// The prompts double as instructions to the model — they include the
+// "don't take any actions" boundary so a Summarize click can't trip the
+// tool-use path that other free-form messages can.
 const PROMPTS = [
   {
     key: "diagnose",
     label: "Diagnose",
     icon: "pi pi-bolt",
     prompt:
-      "Help me diagnose what's likely going on with this job. Give me three things, each as a numbered list: (1) the most likely causes, most likely first, (2) checks I should run on-site, and (3) parts or tools to bring.",
+      "Diagnose what's likely going on with this job. Give me three things, each as a numbered list: (1) the most likely causes, most likely first, (2) checks I should run on-site, and (3) parts or tools to bring. This is a read-only request — do not call any tools or change anything on the job.",
   },
   {
     key: "quote",
     label: "Quote",
     icon: "pi pi-dollar",
     prompt:
-      "Draft a quote for this job as a bulleted list of line items — description, estimated qty or hours, and ballpark unit price in CAD. End with a one-line caveat that final pricing depends on on-site inspection.",
+      "Draft a quote for this job as a bulleted list of line items — description, estimated qty or hours, and ballpark unit price in CAD. End with a one-line caveat that final pricing depends on on-site inspection. This is a read-only request — do not call any tools or change anything on the job.",
   },
   {
     key: "summary",
     label: "Summary",
     icon: "pi pi-file",
     prompt:
-      "Summarise this job in one short paragraph (about 5 sentences) suitable for my records.",
+      "Summarise this job in one short paragraph (about 5 sentences) suitable for my records. This is a read-only request — do not call any tools or change anything on the job.",
   },
 ] as const;
 
-function applyPrompt(text: string) {
-  store.applyQuickPrompt(text);
+async function runPrompt(text: string) {
+  if (disabled.value) return;
+  store.open();
+  try {
+    await store.send(text, { hidden: true });
+  } catch (err) {
+    toast.error("Couldn't reach the assistant", humanizeError(err));
+  }
 }
 </script>
 
@@ -52,7 +66,8 @@ function applyPrompt(text: string) {
       :key="p.key"
       type="button"
       class="bs-ai-chip"
-      @click="applyPrompt(p.prompt)"
+      :disabled="disabled"
+      @click="runPrompt(p.prompt)"
     >
       <i :class="p.icon" aria-hidden="true" />
       <span>{{ p.label }}</span>
@@ -93,6 +108,10 @@ function applyPrompt(text: string) {
 .bs-ai-chip:focus-visible {
   outline: 2px solid var(--bs-blue);
   outline-offset: 2px;
+}
+.bs-ai-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .bs-ai-chip i {
   color: var(--bs-blue);

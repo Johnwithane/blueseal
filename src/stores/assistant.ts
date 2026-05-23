@@ -166,14 +166,24 @@ export const useAssistantStore = defineStore("assistant", {
       });
     },
 
-    /** Send a message in the current context. */
-    async send(message: string) {
+    /**
+     * Send a message in the current context.
+     *
+     * Pass `{ hidden: true }` to mark this as a one-click quick-prompt
+     * action — the user-side bubble is suppressed in the thread, only the
+     * AI's reply is shown. The user turn still persists server-side so the
+     * model retains context for follow-up messages.
+     */
+    async send(message: string, opts: { hidden?: boolean } = {}) {
       if (this.sending) return;
       const trimmed = message.trim();
       if (!trimmed) return;
-      // Show the user's turn immediately — the round-trip to Vertex takes
-      // ~2s and the panel should never feel like it ate the message.
-      this.optimisticUserMessage = { content: trimmed, createdAt: Date.now() };
+      // Optimistic echo — only for visible sends. Hidden quick-prompts use
+      // the thinking-dots placeholder instead so the panel doesn't briefly
+      // flash a bubble that's about to vanish.
+      if (!opts.hidden) {
+        this.optimisticUserMessage = { content: trimmed, createdAt: Date.now() };
+      }
       this.sending = true;
       this.error = null;
       try {
@@ -183,6 +193,7 @@ export const useAssistantStore = defineStore("assistant", {
           jobId: this.jobId,
           pageRoute: this.pageRoute,
           message: trimmed,
+          hidden: opts.hidden,
         };
         const res = await sendAssistantMessage(input);
         if (res.conversationId !== this.currentConversationId) {
@@ -190,15 +201,10 @@ export const useAssistantStore = defineStore("assistant", {
         }
       } catch (e) {
         this.error = (e as Error).message;
-        // Re-throw so the composer can restore the typed text — and drop
-        // the optimistic bubble since the message didn't actually land.
         this.optimisticUserMessage = null;
         throw e;
       } finally {
         this.sending = false;
-        // The Firestore listener has now (or imminently will) deliver the
-        // canonical user message; the dedupe in AssistantThread keeps us
-        // from briefly showing it twice.
         this.optimisticUserMessage = null;
       }
     },

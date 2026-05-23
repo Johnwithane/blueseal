@@ -55,6 +55,7 @@ const Input = z
     jobId: z.string().min(1).max(128).nullable().optional(),
     pageRoute: z.string().max(200).nullable().optional(),
     message: z.string().trim().min(1).max(4000),
+    hidden: z.boolean().nullable().optional(),
   })
   .refine(
     (v) => v.scope !== "job" || (typeof v.jobId === "string" && v.jobId.length > 0),
@@ -350,6 +351,9 @@ export const aiChat = onCall({ enforceAppCheck: false }, async (req) => {
       pageRoute: input.pageRoute ?? null,
       jobId: conversation.jobId,
       chatMessagesIncluded: jobContext?.chatTranscript.length ?? 0,
+      // "quick-prompt" → hidden from the thread UI but kept in history so
+      // the model can answer follow-ups like "redo that summary".
+      source: input.hidden ? "quick-prompt" : "user",
     },
   });
   batch.set(asstMsgRef, {

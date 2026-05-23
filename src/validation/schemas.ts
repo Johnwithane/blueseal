@@ -285,6 +285,10 @@ export const aiChatInputSchema = z
     // page state.
     pageRoute: z.string().max(200).nullable().optional(),
     message: z.string().trim().min(1).max(4000),
+    // Quick-prompt actions (Diagnose/Quote/Summary chips) set this so the
+    // user-side bubble is suppressed in the thread UI. The message still
+    // persists so the model has context for follow-ups.
+    hidden: z.boolean().optional(),
   })
   .refine(
     (v) =>
