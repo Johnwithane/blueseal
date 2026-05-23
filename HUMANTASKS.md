@@ -6,6 +6,30 @@ Tasks are grouped by the phase that introduced them so you can see why each one 
 
 ---
 
+## AI assistant chatbot (added 2026-05-22)
+
+Floating-panel assistant for tradespeople + admins. Backend lives in [functions/src/ai/chat.ts](functions/src/ai/chat.ts), conversations persist under `assistantConversations/{id}/messages/`. Runs on Vertex AI Gemini 2.5 Flash (same auth path as the existing `aiDiagnose` tools — no API keys needed once the API is enabled).
+
+### [ ] Re-enable the subscription gate before launch
+
+- **Why:** [functions/src/ai/chat.ts](functions/src/ai/chat.ts) has `REQUIRE_SUBSCRIPTION = false` at the top so we can dogfood the assistant during development. design.md §5.9 says AI tools require an active subscription — the chatbot is the new primary AI surface, so it should respect the same gate before paying users see it.
+- **What:** Flip `REQUIRE_SUBSCRIPTION` to `true` (or promote it to a Cloud Functions env var if you want staging vs prod control), then redeploy. The check already exists below the flag — tradespeople without `users/{uid}.hasActiveSubscription === true` will get a `permission-denied` error and the UI shows a paywall.
+- **Verify:** Sign in as a tradie with `hasActiveSubscription === false` and try to send a message — should fail with the gate message. Flip the flag on the user doc, refresh token, retry — should work.
+
+### [ ] (Optional, future) Stand up Firestore rules tests
+
+- **Why:** CLAUDE.md mandates an allow + deny rules test for every collection, but the repo has no test harness yet — every new collection (this one included) ships without rules tests. Backstopping this properly means adding `@firebase/rules-unit-testing`, a `tests/rules/` folder, and CI wiring.
+- **What:** Install `@firebase/rules-unit-testing` as a devDep, scaffold `tests/rules/setup.ts` + one spec per collection (start with `chats`, `assistantConversations`, `jobs` — the ones with non-trivial rules), and add `test:rules` to package.json. The emulator hosts the rules being tested; no production project is touched.
+- **Verify:** `npm run test:rules` runs locally; CI runs it on PRs.
+
+### [ ] Confirm Vertex AI API is enabled on the GCP project
+
+- **Why:** The chatbot reuses the existing Vertex AI plumbing from [functions/src/ai/tools.ts](functions/src/ai/tools.ts). If the API was already enabled for `aiDiagnose`, nothing more to do — this task is just a checkpoint so it's not forgotten on a fresh staging project.
+- **What:** `gcloud services enable aiplatform.googleapis.com --project blueseal-762af` (or whichever project), or click Enable in Cloud Console → APIs & Services.
+- **Verify:** Send a message from any tradesperson account; the function logs `aiChat: success` and the `aiUsage` collection gets a new doc with `tool: "chat"`.
+
+---
+
 ## Notifications (added 2026-05-21, WhatsApp swap 2026-05-21)
 
 Phase 3 wired email + WhatsApp fan-out into the `notify()` helper. The code writes to two collections (`mail/` and `whatsapp/`) — `mail/` is shaped for the Firebase Trigger Email extension you install; `whatsapp/` is processed by a function we ship in this repo ([functions/src/messaging/processWhatsAppMessage.ts](functions/src/messaging/processWhatsAppMessage.ts)) that calls Meta's WhatsApp Cloud API. Until the email extension is installed and WhatsApp credentials are set, the queues accumulate silently and flush retroactively once you complete the setup — nothing is lost.

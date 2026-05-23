@@ -44,6 +44,7 @@ export { markInvoiceOverdue } from "./invoicing/scheduledOverdue";
 
 // AI
 export { aiDiagnose, aiQuote, aiSummarize } from "./ai/tools";
+export { aiChat } from "./ai/chat";
 export { parseReceipt } from "./ai/parseReceipt";
 
 // Payments (stubbed)

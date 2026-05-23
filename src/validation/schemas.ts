@@ -262,3 +262,31 @@ export const cancelJobPostSchema = z.object({
 export const withdrawApplicationSchema = z.object({
   postId: z.string().min(1).max(128),
 });
+
+// ---------------------------------------------------------------------------
+// AI assistant chatbot
+// Input shape for the aiChat callable. The Cloud Function re-validates with
+// its own copy of this schema to keep callable inputs locked in even if a
+// future refactor diverges the client-side schema.
+// ---------------------------------------------------------------------------
+export const aiChatInputSchema = z
+  .object({
+    // Omit to auto-resolve by (userId, scope, jobId) — backend creates one
+    // if no matching conversation exists.
+    conversationId: z.string().min(1).max(128).optional(),
+    scope: z.enum(["job", "general", "admin"]),
+    jobId: z.string().min(1).max(128).nullable().optional(),
+    // Current route the user is on (e.g. "/dashboard/tradie"). Injected
+    // into the per-turn system prompt so the assistant knows where the
+    // user is. Cap modestly — the route is enough; we don't accept full
+    // page state.
+    pageRoute: z.string().max(200).nullable().optional(),
+    message: z.string().trim().min(1).max(4000),
+  })
+  .refine(
+    (v) =>
+      v.scope !== "job" ||
+      (typeof v.jobId === "string" && v.jobId.length > 0),
+    { message: "scope=job requires a jobId", path: ["jobId"] },
+  );
+export type AiChatInput = z.infer<typeof aiChatInputSchema>;
