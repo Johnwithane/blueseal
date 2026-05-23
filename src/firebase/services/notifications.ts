@@ -33,7 +33,12 @@ export function subscribeMyNotifications(
     orderBy("createdAt", "desc"),
     limit(options?.max ?? 30),
   );
-  return onSnapshot(q, (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
+  return onSnapshot(
+    q,
+    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+    (err) =>
+      console.warn(`[Firestore] notifications(userId=${uid}) listener:`, err.code, err.message),
+  );
 }
 
 /** Mark a single notification as read (idempotent). */

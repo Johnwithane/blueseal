@@ -107,7 +107,11 @@ export function subscribeMessages(
   const q = options?.tail
     ? query(msgsCol(chatId), orderBy("createdAt", "asc"), limitToLast(options.tail))
     : query(msgsCol(chatId), orderBy("createdAt", "asc"), limitToLast(200));
-  return onSnapshot(q, (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
+  return onSnapshot(
+    q,
+    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+    (err) => console.warn(`[Firestore] chats/${chatId}/messages listener:`, err.code, err.message),
+  );
 }
 
 /** Clear unread badge for the *current* user only. UID always comes from auth. */

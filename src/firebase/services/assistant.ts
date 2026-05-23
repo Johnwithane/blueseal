@@ -112,7 +112,16 @@ export function subscribeAssistantMessages(
   cb: (messages: WithId<AssistantMessageDoc>[]) => void,
 ): () => void {
   const q = query(messagesCol(conversationId), orderBy("createdAt", "asc"), limitToLast(200));
-  return onSnapshot(q, (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
+  return onSnapshot(
+    q,
+    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+    (err) =>
+      console.warn(
+        `[Firestore] assistantConversations/${conversationId}/messages listener:`,
+        err.code,
+        err.message,
+      ),
+  );
 }
 
 /**
@@ -129,7 +138,16 @@ export function subscribeAssistantConversations(
     orderBy("lastMessageAt", "desc"),
     limit(50),
   );
-  return onSnapshot(q, (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
+  return onSnapshot(
+    q,
+    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+    (err) =>
+      console.warn(
+        `[Firestore] assistantConversations(userId=${userId}) listener:`,
+        err.code,
+        err.message,
+      ),
+  );
 }
 
 /** Owner-only delete. Rules also enforce this server-side. */

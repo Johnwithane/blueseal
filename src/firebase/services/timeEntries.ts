@@ -24,7 +24,11 @@ export function subscribeJobTimeEntries(
   cb: (entries: WithId<TimeEntryDoc>[]) => void,
 ): () => void {
   const q = query(entriesCol(jobId), orderBy("startedAt", "asc"));
-  return onSnapshot(q, (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
+  return onSnapshot(
+    q,
+    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+    (err) => console.warn(`[Firestore] jobs/${jobId}/timeEntries listener:`, err.code, err.message),
+  );
 }
 
 export async function listJobTimeEntries(jobId: string): Promise<WithId<TimeEntryDoc>[]> {

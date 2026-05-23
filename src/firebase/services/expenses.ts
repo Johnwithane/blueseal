@@ -28,7 +28,11 @@ export function subscribeJobExpenses(
   cb: (rows: WithId<ExpenseDoc>[]) => void,
 ): () => void {
   const q = query(expensesCol(jobId), orderBy("createdAt", "desc"));
-  return onSnapshot(q, (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
+  return onSnapshot(
+    q,
+    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+    (err) => console.warn(`[Firestore] jobs/${jobId}/expenses listener:`, err.code, err.message),
+  );
 }
 
 export async function listJobExpenses(jobId: string): Promise<WithId<ExpenseDoc>[]> {

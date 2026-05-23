@@ -46,9 +46,13 @@ export function subscribeTradesperson(
   uid: string,
   cb: (tradie: WithId<TradespersonDoc> | null) => void,
 ): () => void {
-  return onSnapshot(tradieRef(uid), (snap) => {
-    cb(snap.exists() ? { id: snap.id, ...snap.data() } : null);
-  });
+  return onSnapshot(
+    tradieRef(uid),
+    (snap) => {
+      cb(snap.exists() ? { id: snap.id, ...snap.data() } : null);
+    },
+    (err) => console.warn(`[Firestore] tradespeople/${uid} listener:`, err.code, err.message),
+  );
 }
 
 export async function createOrUpdateDraft(
