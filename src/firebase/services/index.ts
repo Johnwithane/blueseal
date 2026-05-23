@@ -2,6 +2,7 @@ export * from "./users";
 export * from "./tradespeople";
 export * from "./jobs";
 export * from "./timeEntries";
+export * from "./expenses";
 export * from "./chats";
 export * from "./storage";
 export * from "./certifications";
