@@ -44,14 +44,21 @@ export function humanizeError(e: unknown): string {
   if (e == null) return "Something went wrong. Please try again.";
   const err = e as FirebaseLikeError;
   const code = typeof err.code === "string" ? err.code : "";
+  const rawMsg = (err.message ?? "").replace(/^Firebase:\s*/, "").trim();
+  // Auth errors get the canned copy — Firebase's own messages leak internals
+  // and security-sensitive distinctions (e.g. wrong-password vs user-not-found).
   if (code && FIREBASE_AUTH_MAP[code]) return FIREBASE_AUTH_MAP[code];
-  if (code && FUNCTIONS_CODE_MAP[code]) return FUNCTIONS_CODE_MAP[code];
-  // Functions errors arrive as "functions/<code>"; auth errors as "auth/<code>".
   const tail = code.split("/").pop() ?? "";
-  if (tail && FUNCTIONS_CODE_MAP[tail]) return FUNCTIONS_CODE_MAP[tail];
   if (tail && FIREBASE_AUTH_MAP[`auth/${tail}`]) return FIREBASE_AUTH_MAP[`auth/${tail}`];
-  // Last resort: a short, sanitized message. Strip "Firebase: " prefix.
-  const msg = (err.message ?? "").replace(/^Firebase:\s*/, "").trim();
-  if (msg && msg.length < 200) return msg;
+  // Callable functions errors (`functions/<code>`) author their own message
+  // — prefer it over the generic per-code copy so subscription gates, quota
+  // hints, etc. reach the user instead of a flat "permission denied".
+  if (code.startsWith("functions/")) {
+    if (rawMsg && rawMsg.length < 200) return rawMsg;
+    if (FUNCTIONS_CODE_MAP[tail]) return FUNCTIONS_CODE_MAP[tail];
+  }
+  if (code && FUNCTIONS_CODE_MAP[code]) return FUNCTIONS_CODE_MAP[code];
+  if (tail && FUNCTIONS_CODE_MAP[tail]) return FUNCTIONS_CODE_MAP[tail];
+  if (rawMsg && rawMsg.length < 200) return rawMsg;
   return "Something went wrong. Please try again.";
 }
