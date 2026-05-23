@@ -5,8 +5,13 @@ import Textarea from "primevue/textarea";
 import InputNumber from "primevue/inputnumber";
 import Select from "primevue/select";
 import MultiSelect from "primevue/multiselect";
-import ToggleSwitch from "primevue/toggleswitch";
+import SelectButton from "primevue/selectbutton";
 import DatePicker from "primevue/datepicker";
+
+const YES_NO_OPTIONS = [
+  { label: "Yes", value: true },
+  { label: "No", value: false },
+];
 import type { IntakeField } from "@/firebase/interfaces";
 
 const props = defineProps<{
@@ -23,6 +28,10 @@ const safe = computed({
 
 function setVal(key: string, v: unknown) {
   safe.value = { ...safe.value, [key]: v };
+}
+
+function booleanValue(v: unknown): boolean | undefined {
+  return typeof v === "boolean" ? v : undefined;
 }
 </script>
 
@@ -88,13 +97,16 @@ function setVal(key: string, v: unknown) {
       </template>
 
       <template v-else-if="f.type === 'boolean'">
-        <div class="mt-1">
-          <ToggleSwitch
-            :model-value="!!safe[f.key]"
-            :disabled="props.readonly"
-            @update:model-value="(v) => setVal(f.key, v)"
-          />
-        </div>
+        <SelectButton
+          :model-value="booleanValue(safe[f.key])"
+          :options="YES_NO_OPTIONS"
+          option-label="label"
+          option-value="value"
+          :allow-empty="false"
+          :disabled="props.readonly"
+          class="mt-1"
+          @update:model-value="(v) => setVal(f.key, v)"
+        />
       </template>
 
       <template v-else-if="f.type === 'date'">
