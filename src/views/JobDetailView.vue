@@ -50,6 +50,11 @@ const intakeFields = ref<IntakeField[]>([]);
 const invoiceId = ref<string | null>(null);
 const subscriptionOn = ref(false);
 const loading = ref(true);
+// When the URL points at a job the signed-in user can't read (notification
+// pointing at a stale or wrong id, deep link from another account) the
+// service throws permission-denied. Catch it here so the view shows a
+// useful empty state instead of hanging on "Loading…" forever.
+const loadError = ref<string | null>(null);
 
 const scheduledStart = ref<Date | null>(null);
 const scheduledEnd = ref<Date | null>(null);
@@ -120,8 +125,36 @@ const tradieWsibLive = computed(() => {
 
 async function load() {
   loading.value = true;
+  loadError.value = null;
+  // Auth-state race: when the user lands here via a direct URL (notification
+  // click on cold cache, refresh, deep-link from email) the Firestore client
+  // can fire the read before it has the auth token attached, so the rule
+  // sees request.auth==null and denies. Wait for the store's auth init AND
+  // for an authoritative fbUser before reading.
+  if (!auth.ready) await auth.init();
+  // Belt + suspenders: also refresh the ID token so Firestore picks up
+  // any role-claim updates that landed since the page was last opened.
+  if (auth.fbUser) {
+    try {
+      await auth.fbUser.getIdToken(true);
+    } catch {
+      /* token refresh failure isn't fatal — getJob will throw and we show
+         the error empty state below */
+    }
+  }
   const id = route.params.id as string;
-  job.value = await getJob(id);
+  try {
+    job.value = await getJob(id);
+  } catch (e) {
+    // Most likely permission-denied from a notification link pointing at a
+    // job the signed-in user isn't a party to (e.g. wrong account active, or
+    // stale notification from before a role change). Show a proper empty
+    // state — don't leave the view spinning forever.
+    loadError.value = humanizeError(e);
+    job.value = null;
+    loading.value = false;
+    return;
+  }
   if (!job.value) {
     loading.value = false;
     return;
@@ -330,6 +363,23 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
     <RouterLink to="/dashboard" class="text-xs text-[color:var(--bs-muted)]">← Dashboard</RouterLink>
 
     <div v-if="loading" class="bs-empty mt-4">Loading…</div>
+    <div v-else-if="loadError" class="bs-empty mt-4">
+      <i class="pi pi-exclamation-circle text-3xl mb-2 block text-amber-600"></i>
+      <p class="font-medium">We couldn't open this job.</p>
+      <p class="text-sm text-[color:var(--bs-muted)] mt-1">
+        The link may be stale, or this job belongs to a different account.
+      </p>
+      <RouterLink to="/dashboard" class="inline-block mt-3">
+        <Button label="Back to dashboard" icon="pi pi-arrow-left" outlined />
+      </RouterLink>
+    </div>
+    <div v-else-if="!job" class="bs-empty mt-4">
+      <i class="pi pi-question-circle text-3xl mb-2 block text-[color:var(--bs-muted)]"></i>
+      <p class="font-medium">Job not found.</p>
+      <RouterLink to="/dashboard" class="inline-block mt-3">
+        <Button label="Back to dashboard" icon="pi pi-arrow-left" outlined />
+      </RouterLink>
+    </div>
     <template v-else-if="job">
       <header class="flex items-start justify-between gap-3 mt-2 mb-4">
         <div>

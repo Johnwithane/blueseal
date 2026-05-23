@@ -33,37 +33,91 @@ export const approveApplication = onCall({ enforceAppCheck: false }, async (req)
   const parsed = ApproveInput.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);
   const { tradieUid } = parsed.data;
-  // Eligibility precheck: an approved application without approved ID + at
-  // least one approved cert lands the tradesperson in a half-state where
-  // isVisible never flips and submitForVetting refuses to re-submit. Block
-  // approval until those are done so they only get the "you're live" email
-  // when they're actually live.
+  // Single-click "approve everything": flips every PENDING cert + the pending
+  // ID to approved, marks the application approved, and writes the
+  // denormalized idVerified/verifiedTrades on the tradie doc so isVisible
+  // flips immediately (without waiting for the per-doc triggers to fire).
+  // Already-rejected items are NOT un-rejected — admin must explicitly
+  // un-reject if they changed their mind.
+  const tradieRef = db.doc(`tradespeople/${tradieUid}`);
+  const idRef = db.doc(`idVerifications/${tradieUid}`);
   const [tradieSnap, idSnap, certsSnap] = await Promise.all([
-    db.doc(`tradespeople/${tradieUid}`).get(),
-    db.doc(`idVerifications/${tradieUid}`).get(),
+    tradieRef.get(),
+    idRef.get(),
     db.collection("certifications").where("tradespersonId", "==", tradieUid).get(),
   ]);
   if (!tradieSnap.exists) throw new HttpsError("not-found", "Tradesperson not found.");
-  const idStatus = (idSnap.data() as { status?: string } | undefined)?.status;
-  if (idStatus !== "approved") {
-    throw new HttpsError(
-      "failed-precondition",
-      "Approve the ID verification before approving the application.",
-    );
+  if (!idSnap.exists) {
+    throw new HttpsError("failed-precondition", "No ID document on file.");
   }
-  const hasApprovedCert = certsSnap.docs.some(
-    (d) => (d.data() as { status?: string }).status === "approved",
-  );
-  if (!hasApprovedCert) {
+  if (certsSnap.empty) {
+    throw new HttpsError("failed-precondition", "No certifications on file.");
+  }
+
+  const idStatus = (idSnap.data() as { status?: string }).status;
+  if (idStatus === "rejected") {
     throw new HttpsError(
       "failed-precondition",
-      "Approve at least one certification before approving the application.",
+      "ID has been rejected — un-reject it before approving.",
     );
   }
 
-  await db.doc(`tradespeople/${tradieUid}`).update({
+  // Collect every cert that's pending or already approved — these are the
+  // trades the user will be verified for. Rejected certs are excluded.
+  const certsToApprove: FirebaseFirestore.DocumentSnapshot[] = [];
+  const verifiedTrades = new Set<string>();
+  for (const certDoc of certsSnap.docs) {
+    const c = certDoc.data() as { status?: string; trade?: string };
+    if (!c.trade) continue;
+    if (c.status === "pending") {
+      certsToApprove.push(certDoc);
+      verifiedTrades.add(c.trade);
+    } else if (c.status === "approved") {
+      verifiedTrades.add(c.trade);
+    }
+  }
+  if (verifiedTrades.size === 0) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Every certification on file is rejected — un-reject at least one before approving.",
+    );
+  }
+
+  const now = FieldValue.serverTimestamp();
+
+  // Flip pending certs to approved. Batch so partial-failure can't leave
+  // half-approved state.
+  if (certsToApprove.length > 0) {
+    const batch = db.batch();
+    for (const certDoc of certsToApprove) {
+      batch.update(certDoc.ref, {
+        status: "approved",
+        reviewedBy: actor,
+        reviewedAt: now,
+        rejectionReason: null,
+      });
+    }
+    await batch.commit();
+  }
+
+  // Flip ID to approved if it's still pending.
+  if (idStatus === "pending") {
+    await idRef.update({
+      status: "approved",
+      reviewedBy: actor,
+      reviewedAt: now,
+      rejectionReason: null,
+    });
+  }
+
+  // Tradie doc: write the denormalized verified state directly so isVisible
+  // can flip on the next line without waiting for the per-doc triggers.
+  // The triggers will still fire and idempotently re-apply these writes.
+  await tradieRef.update({
     vettingStatus: "approved",
     vettingNotes: "",
+    idVerified: true,
+    verifiedTrades: FieldValue.arrayUnion(...Array.from(verifiedTrades)),
   });
   await maybeMarkVisible(tradieUid);
   await notify({

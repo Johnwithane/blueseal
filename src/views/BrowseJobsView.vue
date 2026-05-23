@@ -121,13 +121,13 @@ function urgencyLabel(u: string): string {
       class="mt-6"
     >
       <strong>Application approved.</strong>
-      We're finishing
+      Our team still needs to verify your
       <template v-if="!tradie?.idVerified && (tradie?.verifiedTrades?.length ?? 0) === 0">
-        ID verification and certification approval
+        ID and at least one certification
       </template>
-      <template v-else-if="!tradie?.idVerified">ID verification</template>
-      <template v-else>certification approval</template>
-      — you'll be able to browse and apply automatically once that's done.
+      <template v-else-if="!tradie?.idVerified">ID</template>
+      <template v-else>certification</template>
+      before your profile goes live. You'll get a notification when it's done — no further action needed from you.
     </Message>
 
     <Message v-else-if="!tradie?.isVisible" severity="info" :closable="false" class="mt-6">

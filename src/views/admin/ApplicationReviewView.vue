@@ -227,18 +227,19 @@ const certSeverity = {
   rejected: "danger" as const,
 };
 
-// Mirrors the server-side precondition in approveApplication — disable the
-// "Approve all" button until the gates are met so the admin doesn't get a
-// toast error instead of an outcome.
-const idApproved = computed(() => idDoc.value?.status === "approved");
-const hasApprovedCert = computed(() => certs.value.some((c) => c.status === "approved"));
-const canApproveApplication = computed(() => idApproved.value && hasApprovedCert.value);
+// "Approve everything" is the one-click happy path: flips every pending cert
+// + the pending ID + the application all in one callable, then makes the
+// profile live. Per-item approve/reject buttons remain for cases where the
+// admin wants to selectively reject before bulk-approving the rest.
+// Disabled only if there's nothing on file to approve.
+const canApproveApplication = computed(
+  () => !!idDoc.value && certs.value.length > 0,
+);
 const approveBlockerHint = computed(() => {
-  if (idApproved.value && hasApprovedCert.value) return "";
-  const missing: string[] = [];
-  if (!idApproved.value) missing.push("ID");
-  if (!hasApprovedCert.value) missing.push("a certification");
-  return `Approve ${missing.join(" and ")} first.`;
+  if (!idDoc.value && certs.value.length === 0) return "No ID or certifications on file yet.";
+  if (!idDoc.value) return "No ID document on file yet.";
+  if (certs.value.length === 0) return "No certifications on file yet.";
+  return "";
 });
 </script>
 
@@ -431,7 +432,7 @@ const approveBlockerHint = computed(() => {
       <footer class="bs-card p-4 mt-6 flex flex-wrap gap-2 items-center justify-between">
         <div class="text-sm text-[color:var(--bs-muted)]">
           <template v-if="canApproveApplication">
-            Approving will set their profile <strong>live</strong> and email them.
+            One click approves every pending cert + ID and sets their profile <strong>live</strong>.
           </template>
           <template v-else>
             {{ approveBlockerHint }}
@@ -441,7 +442,7 @@ const approveBlockerHint = computed(() => {
           <Button label="Request info" icon="pi pi-question-circle" outlined @click="showRequestInfo = true; notesInput = ''" />
           <Button label="Reject" icon="pi pi-ban" severity="danger" outlined @click="showReject = true; notesInput = ''" />
           <Button
-            label="Approve all"
+            label="Approve everything"
             icon="pi pi-check"
             severity="success"
             :disabled="!canApproveApplication"

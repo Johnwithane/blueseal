@@ -225,10 +225,10 @@ const awaitingVerification = computed(
 );
 const awaitingVerificationMessage = computed(() => {
   const missing: string[] = [];
-  if (!idApproved.value) missing.push("ID verification");
+  if (!idApproved.value) missing.push("ID");
   if (!hasApprovedTrade.value) missing.push("at least one certification");
   if (missing.length === 0) return "";
-  return `Your application is approved. We're finishing ${missing.join(" and ")} — you'll go live automatically once that's done.`;
+  return `Your application is approved — our team still needs to verify your ${missing.join(" and ")} before your profile goes live. You'll get a notification when it's done; nothing more for you to do right now.`;
 });
 </script>
 
