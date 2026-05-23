@@ -65,7 +65,7 @@ onBeforeUnmount(() => store.reset());
       @click="store.open()"
     >
       <span class="bs-ai-fab__glyph" aria-hidden="true">
-        <i class="pi pi-sparkles" />
+        <img src="/icons/blueseal_logo.png" alt="" />
       </span>
       <span class="bs-ai-fab__label">AI</span>
     </button>
@@ -113,11 +113,18 @@ onBeforeUnmount(() => store.reset());
   width: 2.25rem;
   height: 2.25rem;
   border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.18);
+  background: white;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 1rem;
+  padding: 0.25rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12) inset;
+}
+.bs-ai-fab__glyph img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
 }
 .bs-ai-fab__label {
   padding-right: 0.25rem;

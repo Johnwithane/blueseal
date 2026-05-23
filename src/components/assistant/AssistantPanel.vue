@@ -55,7 +55,7 @@ function clearThread() {
   >
     <header class="bs-ai-panel__header">
       <span class="bs-ai-avatar bs-ai-avatar--md" aria-hidden="true">
-        <i class="pi pi-sparkles" />
+        <img src="/icons/blueseal_logo.png" alt="" />
       </span>
       <div class="bs-ai-panel__heading">
         <h2 class="bs-ai-panel__title">{{ headerTitle }}</h2>
