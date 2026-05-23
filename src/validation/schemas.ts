@@ -160,6 +160,9 @@ export const clientReviewSchema = z.object({
 });
 
 export const lineItemSchema = z.object({
+  // Stable id when the row was pulled in from a time entry or expense,
+  // so the pull-billables flow can detect re-pulls. Manual rows omit it.
+  id: z.string().min(1).max(128).optional(),
   description: z.string().trim().min(1).max(300),
   quantity: z.number().positive().max(10_000),
   // Cents. $100,000 cap.

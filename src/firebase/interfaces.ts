@@ -516,6 +516,10 @@ export type InvoiceStatus =
   | "void";
 
 export interface LineItem {
+  // Stable id for lines pulled in from a time entry or expense, so the
+  // pull-billables flow can avoid double-pulling the same source row.
+  // Manually-typed line items leave it undefined.
+  id?: string;
   description: string;
   quantity: number;
   unitPrice: number; // cents

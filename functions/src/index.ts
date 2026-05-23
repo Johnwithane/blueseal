@@ -41,6 +41,7 @@ export { clockOut } from "./jobs/clockOut";
 export { onJobCompleted } from "./invoicing/onJobCompleted";
 export { sendInvoice } from "./invoicing/sendInvoice";
 export { markInvoiceOverdue } from "./invoicing/scheduledOverdue";
+export { pullBillablesFromJob } from "./invoicing/pullBillablesFromJob";
 
 // AI
 export { aiDiagnose, aiQuote, aiSummarize } from "./ai/tools";

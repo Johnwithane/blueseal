@@ -4,7 +4,13 @@ import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import InputNumber from "primevue/inputnumber";
 import Tag from "primevue/tag";
-import { getInvoice, updateInvoiceLineItems, markInvoicePaid, recomputeTotals } from "@/firebase/services/invoices";
+import {
+  getInvoice,
+  updateInvoiceLineItems,
+  markInvoicePaid,
+  pullBillablesFromJob,
+  recomputeTotals,
+} from "@/firebase/services/invoices";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/firebase/config";
 import type { InvoiceDoc, LineItem, WithId } from "@/firebase/interfaces";
@@ -21,8 +27,11 @@ const props = defineProps<{
 
 const invoice = ref<WithId<InvoiceDoc> | null>(null);
 // UI rows: same shape as LineItem but `unitPrice` is in DOLLARS for InputNumber
-// currency mode to render correctly. Converted to cents on save.
+// currency mode to render correctly. Converted to cents on save. `id` is
+// preserved end-to-end so pulled-in entries/expenses don't get re-pulled
+// on the next pull-billables click.
 interface UiLineItem {
+  id?: string;
   description: string;
   quantity: number;
   unitPriceDollars: number;
@@ -51,6 +60,7 @@ async function load() {
   loading.value = true;
   invoice.value = await getInvoice(props.invoiceId);
   items.value = (invoice.value?.lineItems ?? []).map((li) => ({
+    id: li.id,
     description: li.description,
     quantity: li.quantity,
     unitPriceDollars: (li.unitPrice ?? 0) / 100,
@@ -65,8 +75,29 @@ watch(() => props.invoiceId, load);
 function addItem() {
   items.value = [
     ...items.value,
-    { description: "", quantity: 1, unitPriceDollars: 0, taxRate: 0 },
+    { id: undefined, description: "", quantity: 1, unitPriceDollars: 0, taxRate: 0 },
   ];
+}
+
+async function pullBillables() {
+  if (saving.value) return;
+  saving.value = true;
+  try {
+    const res = await pullBillablesFromJob(props.invoiceId);
+    if (res.added === 0) {
+      toast.info("Nothing to pull", "No new time entries or expenses since the last pull.");
+    } else {
+      toast.success(
+        "Pulled into invoice",
+        `${res.added} new line${res.added === 1 ? "" : "s"} added.`,
+      );
+    }
+    await load();
+  } catch (e) {
+    toast.error("Couldn't pull billables", humanizeError(e));
+  } finally {
+    saving.value = false;
+  }
 }
 
 function removeItem(i: number) {
@@ -75,6 +106,7 @@ function removeItem(i: number) {
 
 function snapshotForSave(): LineItem[] {
   return items.value.map((li) => ({
+    ...(li.id ? { id: li.id } : {}),
     description: li.description.trim(),
     quantity: li.quantity,
     unitPrice: cents(li.unitPriceDollars ?? 0),
@@ -209,6 +241,16 @@ async function markPaid() {
 
       <div v-if="props.canEdit" class="flex flex-wrap items-center gap-2 mt-3">
         <Button label="Add line" icon="pi pi-plus" outlined size="small" @click="addItem" />
+        <Button
+          v-if="invoice && invoice.status !== 'paid' && invoice.status !== 'void'"
+          label="Pull from job"
+          icon="pi pi-download"
+          outlined
+          size="small"
+          :loading="saving"
+          :disabled="saving"
+          @click="pullBillables"
+        />
         <span class="flex-1"></span>
         <Button label="Save" icon="pi pi-save" outlined :loading="saving" :disabled="saving" @click="save" />
         <Button

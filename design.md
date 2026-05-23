@@ -776,7 +776,8 @@ Setup is fully covered in `TECH_STACK_SETUP.md`. Below is the product build sequ
 - ✅ MVP — Auto-draft invoice, PDF gen, email, manual mark-as-paid
 - 🟡 v1.1 — Stripe Connect Express + in-app pay button (platform fee)
 - 🟡 v1.1 — Tax handling (GST/PST/HST), recurring invoices, deposits
-- 🔵 Backlog — Quote → invoice conversion, expense tracking, tax export
+- ✅ MVP — Per-job time tracking (clock in/out) + receipt-OCR expenses with markup, pulled into invoice via "Pull from job" button
+- 🔵 Backlog — Quote → invoice conversion, tax export
 
 ### Reviews & Reputation
 - ✅ MVP — Mutual reviews (public client→tradie, private tradie→client)

@@ -11,7 +11,8 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
-import { db } from "@/firebase/config";
+import { httpsCallable } from "firebase/functions";
+import { db, functions } from "@/firebase/config";
 import type { InvoiceDoc, LineItem, WithId } from "@/firebase/interfaces";
 import { typedConverter } from "@/firebase/converters";
 
@@ -76,12 +77,35 @@ export async function listClientInvoices(clientUid: string): Promise<WithId<Invo
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
+export interface PullBillablesResult {
+  added: number;
+  lineItemsCount: number;
+}
+
+/**
+ * Pull all un-invoiced, closed time entries + un-invoiced expenses on the
+ * job into the invoice as new line items. Idempotent: a second click
+ * does nothing if nothing new accrued. Callable enforces the
+ * "tradie-owns-this-invoice" + "invoice not paid" checks.
+ */
+export async function pullBillablesFromJob(invoiceId: string): Promise<PullBillablesResult> {
+  const fn = httpsCallable<{ invoiceId: string }, PullBillablesResult>(
+    functions,
+    "pullBillablesFromJob",
+  );
+  const res = await fn({ invoiceId });
+  return res.data;
+}
+
 export async function getInvoiceByJobId(jobId: string): Promise<WithId<InvoiceDoc> | null> {
-  // onJobCompleted writes invoices/{jobId} deterministically, so this is a
-  // direct lookup. Falls back to the jobId-where query for legacy invoices
-  // that pre-date the deterministic ID.
-  const direct = await getDoc(invRef(jobId));
-  if (direct.exists()) return { id: direct.id, ...direct.data() };
+  // Must use a query, NOT getDoc(invoices/{jobId}). Even though
+  // onJobCompleted writes invoices/{jobId} deterministically, the direct
+  // getDoc trips a Firestore-rules NPE when the doc doesn't exist yet:
+  // the read rule references resource.data.clientId, but `resource` is
+  // null for missing docs, and Firestore surfaces the null-eval error
+  // to the client as permission-denied — even for users who would
+  // otherwise be allowed. The query path filters server-side and
+  // returns empty for missing docs without tripping the rule evaluator.
   const q = query(invCol(), where("jobId", "==", jobId), limit(1));
   const snap = await getDocs(q);
   return snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() };
