@@ -98,15 +98,24 @@ export async function pullBillablesFromJob(invoiceId: string): Promise<PullBilla
 }
 
 export async function getInvoiceByJobId(jobId: string): Promise<WithId<InvoiceDoc> | null> {
-  // onJobCompleted writes invoices/{jobId} deterministically — direct
-  // lookup. Safe because the invoices read rule short-circuits on
-  // `resource == null`, so missing docs return cleanly instead of
-  // tripping a null-value NPE that Firestore would surface as
-  // permission-denied. Falls back to a jobId-where query for legacy
-  // pre-deterministic-id invoices (covered by the same rule).
-  const direct = await getDoc(invRef(jobId));
-  if (direct.exists()) return { id: direct.id, ...direct.data() };
-  const q = query(invCol(), where("jobId", "==", jobId), limit(1));
-  const snap = await getDocs(q);
-  return snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() };
+  // Try the deterministic ID first (onJobCompleted writes invoices/{jobId}).
+  // Both reads are wrapped in try/catch because Firestore returns
+  // permission-denied — NOT not-found — when the rule evaluator NPEs on a
+  // missing doc (resource.data.X with resource==null), which is the common
+  // case for jobs that aren't completed yet. Treat any read failure as
+  // "no invoice exists for the caller" — the caller wants nullable, not
+  // throwable, and the underlying rule still protects actual access.
+  try {
+    const direct = await getDoc(invRef(jobId));
+    if (direct.exists()) return { id: direct.id, ...direct.data() };
+  } catch {
+    /* fall through */
+  }
+  try {
+    const q = query(invCol(), where("jobId", "==", jobId), limit(1));
+    const snap = await getDocs(q);
+    return snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() };
+  } catch {
+    return null;
+  }
 }
