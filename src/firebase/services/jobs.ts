@@ -69,6 +69,7 @@ export async function createJob(input: NewJobInput, chatId: string): Promise<str
     chatId,
     privateNotes: "",
     sourcePostId: null,
+    privateNotesLastAutoUpdateAt: null,
   });
   return docRef.id;
 }

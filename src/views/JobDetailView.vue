@@ -18,6 +18,7 @@ import {
   saveJobIntakeAndAdvance,
 } from "@/firebase/services/jobs";
 import { returnToApplicants } from "@/firebase/services/jobPosts";
+import { updateJobLog } from "@/firebase/services/assistant";
 import { getTradesperson } from "@/firebase/services/tradespeople";
 import { findCollisions, type Collision } from "@/firebase/services/bookings";
 import { useConfirm } from "primevue/useconfirm";
@@ -59,6 +60,11 @@ const loadError = ref<string | null>(null);
 const scheduledStart = ref<Date | null>(null);
 const scheduledEnd = ref<Date | null>(null);
 const privateNotes = ref("");
+
+// AI auto-log state. Manual trigger forces a Vertex call even if the
+// server's 1-hour cooldown hasn't elapsed; auto-trigger on mount lets the
+// server short-circuit silently.
+const updatingLog = ref(false);
 
 // Marketplace-originated jobs land in status="accepted". The client completes
 // the trade intake here before the standard flow begins.
@@ -196,6 +202,9 @@ async function load() {
   } finally {
     loading.value = false;
   }
+  // Fire-and-forget auto-log scan once the page has loaded. The server
+  // enforces a 1-hour cooldown so this is cheap on repeat visits.
+  void maybeAutoUpdateLog();
 }
 
 onMounted(load);
@@ -261,6 +270,53 @@ async function saveNotes() {
     toast.success("Notes saved");
   } catch (e) {
     toast.error("Couldn't save notes", humanizeError(e));
+  }
+}
+
+/** Manual "Update log" button: forces past the server-side cooldown. */
+async function updateLogManually() {
+  if (!job.value || updatingLog.value) return;
+  updatingLog.value = true;
+  try {
+    const res = await updateJobLog(job.value.id, { force: true });
+    if (res.appended) {
+      // Reload the job so the notes textarea picks up the new entry.
+      const fresh = await getJob(job.value.id);
+      if (fresh) {
+        job.value = fresh;
+        privateNotes.value = fresh.privateNotes ?? "";
+      }
+      toast.success("Log updated", "Added a new entry from recent client activity.");
+    } else {
+      toast.info("Nothing new to log", "No action-relevant client messages since the last update.");
+    }
+  } catch (e) {
+    toast.error("Couldn't update log", humanizeError(e));
+  } finally {
+    updatingLog.value = false;
+  }
+}
+
+/**
+ * Auto-trigger on first job-load. Server-side cooldown (1h) silently
+ * short-circuits repeated page loads; on the rare run that actually
+ * appends, we refresh the local notes copy. All other errors are swallowed
+ * — auto-log failing shouldn't block the page.
+ */
+async function maybeAutoUpdateLog() {
+  if (!job.value || !isTradie.value) return;
+  try {
+    const res = await updateJobLog(job.value.id);
+    if (res.appended) {
+      const fresh = await getJob(job.value.id);
+      if (fresh) {
+        job.value = fresh;
+        privateNotes.value = fresh.privateNotes ?? "";
+      }
+    }
+  } catch (e) {
+    // Swallow — failed auto-log shouldn't pop a toast on every page load.
+    console.warn("auto-log failed", e);
   }
 }
 
@@ -599,11 +655,25 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
           />
 
           <div v-if="isTradie" class="bs-card p-3">
-            <label for="job-private-notes" class="block font-semibold text-sm mb-2">
-              Private notes
-              <span class="font-normal text-[color:var(--bs-muted)]">(tradesperson only)</span>
-            </label>
-            <Textarea id="job-private-notes" v-model="privateNotes" rows="4" class="w-full" />
+            <div class="flex items-start justify-between gap-2 mb-2">
+              <label for="job-private-notes" class="block font-semibold text-sm">
+                Private notes
+                <span class="font-normal text-[color:var(--bs-muted)]">(tradesperson only)</span>
+              </label>
+              <!-- AI auto-log button — appends a summary of new client
+                   chat activity to the notes. Server bypasses its cooldown
+                   for this manual trigger. -->
+              <Button
+                icon="pi pi-sparkles"
+                label="Update log"
+                size="small"
+                outlined
+                :loading="updatingLog"
+                title="Have AI summarise recent client messages into a new log entry"
+                @click="updateLogManually"
+              />
+            </div>
+            <Textarea id="job-private-notes" v-model="privateNotes" rows="6" class="w-full" />
             <Button label="Save notes" icon="pi pi-save" outlined size="small" class="mt-2" @click="saveNotes" />
           </div>
 

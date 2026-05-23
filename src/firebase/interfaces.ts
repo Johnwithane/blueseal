@@ -290,6 +290,12 @@ export interface JobDoc {
   privateNotes: string;
   // Set when this job was created via the job-board marketplace conversion.
   sourcePostId: string | null;
+  // Watermark for the auto-log feature (aiUpdateJobLog). Updated each time
+  // the AI scans new client chat activity and either appends a note or
+  // confirms there was nothing log-worthy. The auto-trigger on
+  // JobDetailView short-circuits server-side when this is within a 1-hour
+  // cooldown.
+  privateNotesLastAutoUpdateAt: Timestamp | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -563,7 +569,7 @@ export interface InvoiceDoc {
 export interface AiUsageDoc {
   userId: string;
   jobId: string | null;
-  tool: "diagnose" | "quote" | "summary" | "chat" | "suggestReplies";
+  tool: "diagnose" | "quote" | "summary" | "chat" | "suggestReplies" | "updateJobLog";
   tokensIn: number;
   tokensOut: number;
   createdAt: Timestamp;

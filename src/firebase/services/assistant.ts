@@ -156,3 +156,33 @@ export async function suggestChatReplies(jobId: string): Promise<AiSuggestReplie
   const { data } = await fn({ jobId });
   return data;
 }
+
+/**
+ * Ask the AI to scan new client chat activity since the last log update
+ * and append a one-line entry to the job's privateNotes (if there's
+ * anything action-relevant to log). Tradie-only.
+ *
+ * `force: true` bypasses the server-side cooldown (used by the manual
+ * "Update log" button). Omit or pass false for the automatic trigger on
+ * JobDetailView mount — the server short-circuits on cooldown and
+ * returns `{skipped: true, reason: "cooldown"}` cheaply.
+ */
+export interface AiUpdateJobLogResult {
+  ok: true;
+  skipped: boolean;
+  appended: string | null;
+  reason: string | null;
+}
+export async function updateJobLog(
+  jobId: string,
+  opts: { force?: boolean } = {},
+): Promise<AiUpdateJobLogResult> {
+  const fn = httpsCallable<
+    { jobId: string; force?: boolean },
+    AiUpdateJobLogResult
+  >(functions, "aiUpdateJobLog");
+  const payload: { jobId: string; force?: boolean } = { jobId };
+  if (opts.force) payload.force = true;
+  const { data } = await fn(payload);
+  return data;
+}
