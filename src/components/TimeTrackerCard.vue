@@ -123,11 +123,11 @@ function rateLabel(e: WithId<TimeEntryDoc>): string {
 </script>
 
 <template>
-  <div class="bs-card p-4">
-    <header class="flex items-center justify-between mb-2">
-      <div>
-        <h3 class="font-semibold">Time</h3>
-        <div class="text-xs text-[color:var(--bs-muted)]">
+  <div class="bs-card p-3">
+    <header class="flex items-start justify-between gap-2 mb-2">
+      <div class="min-w-0 flex-1">
+        <h3 class="font-semibold text-sm">Time</h3>
+        <div class="text-xs text-[color:var(--bs-muted)] mt-0.5">
           <template v-if="totalElapsedMs > 0">
             {{ formatElapsed(totalElapsedMs) }} logged
             <template v-if="totalBilled > 0"> • {{ money(totalBilled) }}</template>
@@ -135,7 +135,13 @@ function rateLabel(e: WithId<TimeEntryDoc>): string {
           <template v-else>No time logged yet</template>
         </div>
       </div>
-      <Tag v-if="runningEntry" value="Live" severity="success" icon="pi pi-circle-fill" />
+      <Tag
+        v-if="runningEntry"
+        value="Live"
+        severity="success"
+        icon="pi pi-circle-fill"
+        class="shrink-0"
+      />
     </header>
 
     <!-- Big clock button (tradie only) -->
@@ -151,12 +157,12 @@ function rateLabel(e: WithId<TimeEntryDoc>): string {
       />
       <div v-else class="rounded-lg border border-[color:var(--bs-border)] p-3">
         <div class="flex items-center justify-between gap-3">
-          <div>
+          <div class="min-w-0">
             <div class="text-xs text-[color:var(--bs-muted)]">In progress</div>
             <div class="font-mono text-2xl font-bold tabular-nums">
               {{ liveElapsedLabel(runningEntry) }}
             </div>
-            <div class="text-xs text-[color:var(--bs-muted)] mt-0.5">
+            <div class="text-xs text-[color:var(--bs-muted)] mt-0.5 truncate">
               {{ rateLabel(runningEntry) }} • {{ liveBilledLabel(runningEntry) }}
             </div>
           </div>
@@ -164,6 +170,7 @@ function rateLabel(e: WithId<TimeEntryDoc>): string {
             label="Stop"
             icon="pi pi-stop"
             severity="danger"
+            class="shrink-0"
             :loading="busy"
             :disabled="busy"
             @click="onClockOut"
@@ -211,18 +218,20 @@ function rateLabel(e: WithId<TimeEntryDoc>): string {
       >
         <div class="flex items-start justify-between gap-2">
           <div class="min-w-0 flex-1">
-            <div class="text-sm font-medium">
-              {{ dateTime(e.startedAt) }} → {{ dateTime(e.endedAt) }}
+            <div class="text-sm font-medium leading-snug">
+              <div>{{ dateTime(e.startedAt) }}</div>
+              <div class="text-[color:var(--bs-muted)] text-xs">to {{ dateTime(e.endedAt) }}</div>
             </div>
-            <div class="text-xs text-[color:var(--bs-muted)] mt-0.5">
-              {{ formatElapsed(entryBillable(e, nowMs).elapsedMs) }} •
-              {{ rateLabel(e) }} •
-              {{ money(entryBillable(e, nowMs).billedAmount) }}
+            <div class="text-xs text-[color:var(--bs-muted)] mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+              <span>{{ formatElapsed(entryBillable(e, nowMs).elapsedMs) }}</span>
+              <span>·</span>
+              <span>{{ rateLabel(e) }}</span>
+              <span>·</span>
+              <span class="font-medium text-[color:var(--bs-text)]">{{ money(entryBillable(e, nowMs).billedAmount) }}</span>
               <Tag
                 v-if="e.invoicedAt"
                 value="Invoiced"
                 severity="secondary"
-                class="ml-2"
               />
             </div>
           </div>
@@ -232,6 +241,7 @@ function rateLabel(e: WithId<TimeEntryDoc>): string {
             icon="pi pi-times"
             size="small"
             severity="danger"
+            class="shrink-0 -mr-2 -mt-1"
             aria-label="Delete entry"
             @click="remove(e)"
           />

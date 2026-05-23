@@ -152,18 +152,17 @@ function statusTagSeverity(s: ExpenseDoc["status"]): "info" | "warn" | "success"
 </script>
 
 <template>
-  <div class="bs-card p-4">
-    <header class="flex items-center justify-between mb-2">
-      <div>
-        <h3 class="font-semibold">Expenses</h3>
-        <div class="text-xs text-[color:var(--bs-muted)]">
+  <div class="bs-card p-3">
+    <header class="flex items-start justify-between gap-2 mb-2">
+      <div class="min-w-0 flex-1">
+        <h3 class="font-semibold text-sm">Expenses</h3>
+        <div class="text-xs text-[color:var(--bs-muted)] mt-0.5">
           <template v-if="expenses.length">
             Paid {{ money(totalCost) }} • Billing {{ money(totalBilled) }}
           </template>
           <template v-else>Upload receipts to bill them through with markup</template>
         </div>
       </div>
-      <Tag value="Tradesperson only" severity="secondary" />
     </header>
 
     <input
@@ -181,9 +180,8 @@ function statusTagSeverity(s: ExpenseDoc["status"]): "info" | "warn" | "success"
       :disabled="uploading"
       @click="pickFile"
     />
-    <p class="text-[11px] text-[color:var(--bs-muted)] mt-1.5">
-      Photos or PDFs. We'll auto-read the total + vendor + date. Receipts stay private — your
-      client only sees the marked-up line item on the invoice.
+    <p class="text-[11px] text-[color:var(--bs-muted)] mt-1.5 leading-snug">
+      Photos or PDFs — we'll auto-read the total, vendor and date. Receipts stay private; the client only sees the marked-up line item.
     </p>
 
     <div v-if="loading" class="bs-empty mt-3">Loading…</div>
@@ -225,7 +223,7 @@ function statusTagSeverity(s: ExpenseDoc["status"]): "info" | "warn" | "success"
           @blur="(ev) => patchField(e, { description: (ev.target as HTMLInputElement).value })"
         />
 
-        <div class="grid grid-cols-3 gap-2 mt-2">
+        <div class="grid grid-cols-2 gap-2 mt-2">
           <div>
             <label class="block text-[11px] text-[color:var(--bs-muted)]">You paid</label>
             <InputNumber
@@ -252,39 +250,38 @@ function statusTagSeverity(s: ExpenseDoc["status"]): "info" | "warn" | "success"
               @update:model-value="(v) => changeMarkup(e, v as number | null)"
             />
           </div>
-          <div>
-            <label class="block text-[11px] text-[color:var(--bs-muted)]">Client pays</label>
-            <InputNumber
-              :model-value="(e.billedAmount ?? 0) / 100"
-              mode="currency"
-              currency="CAD"
-              :min="0"
-              :max-fraction-digits="2"
-              :input-class="'text-sm w-full font-semibold'"
-              fluid
-              @update:model-value="(v) => changeBilled(e, v as number | null)"
-            />
-          </div>
+        </div>
+        <div class="mt-2">
+          <label class="block text-[11px] text-[color:var(--bs-muted)]">Client pays</label>
+          <InputNumber
+            :model-value="(e.billedAmount ?? 0) / 100"
+            mode="currency"
+            currency="CAD"
+            :min="0"
+            :max-fraction-digits="2"
+            :input-class="'text-sm w-full font-semibold'"
+            fluid
+            @update:model-value="(v) => changeBilled(e, v as number | null)"
+          />
         </div>
 
-        <div class="flex items-center gap-2 mt-2">
+        <div class="flex flex-wrap items-center gap-2 mt-2">
           <Select
             :model-value="e.category"
             :options="CATEGORY_OPTIONS"
             option-label="label"
             option-value="value"
             placeholder="Category"
-            class="text-sm"
+            class="text-sm flex-1 min-w-[8rem]"
             @update:model-value="(v) => patchField(e, { category: v as ExpenseCategory | null })"
           />
           <Button
-            label="View receipt"
+            label="Receipt"
             icon="pi pi-external-link"
             text
             size="small"
             @click="viewReceipt(e)"
           />
-          <span class="flex-1"></span>
           <Button
             v-if="!e.invoicedAt"
             text
