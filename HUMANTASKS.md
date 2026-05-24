@@ -16,11 +16,12 @@ Floating-panel assistant for tradespeople + admins. Backend lives in [functions/
 - **What:** Flip `REQUIRE_SUBSCRIPTION` to `true` (or promote it to a Cloud Functions env var if you want staging vs prod control), then redeploy. The check already exists below the flag — tradespeople without `users/{uid}.hasActiveSubscription === true` will get a `permission-denied` error and the UI shows a paywall.
 - **Verify:** Sign in as a tradie with `hasActiveSubscription === false` and try to send a message — should fail with the gate message. Flip the flag on the user doc, refresh token, retry — should work.
 
-### [ ] (Optional, future) Stand up Firestore rules tests
+### [x] Stand up Firestore rules tests (done 2026-05-24)
 
-- **Why:** CLAUDE.md mandates an allow + deny rules test for every collection, but the repo has no test harness yet — every new collection (this one included) ships without rules tests. Backstopping this properly means adding `@firebase/rules-unit-testing`, a `tests/rules/` folder, and CI wiring.
-- **What:** Install `@firebase/rules-unit-testing` as a devDep, scaffold `tests/rules/setup.ts` + one spec per collection (start with `chats`, `assistantConversations`, `jobs` — the ones with non-trivial rules), and add `test:rules` to package.json. The emulator hosts the rules being tested; no production project is touched.
-- **Verify:** `npm run test:rules` runs locally; CI runs it on PRs.
+- **Why:** CLAUDE.md mandates an allow + deny rules test for every collection, but the repo had no test harness — every new collection shipped without rules tests.
+- **Done:** `@firebase/rules-unit-testing@^4` + `firebase-tools@^15` installed as devDeps. Harness lives at [tests/rules/setup.ts](tests/rules/setup.ts), separate vitest config at [vitest.rules.config.ts](vitest.rules.config.ts), runner script `npm run test:rules` wraps `firebase emulators:exec --only firestore` so the emulator starts/stops around the test command. Initial specs cover the four touch-points from the monetization-pivot Phase A schema commit (`payouts/`, `webhookEvents/`, `tradespeople` server-managed field locks, `invoices.payment` field lock). Future rules changes are expected to ship with matching tests in the same folder.
+- **Outstanding:** Backfill specs for existing collections (`chats`, `jobs`, `jobPosts`, `assistantConversations`, etc.) — non-blocking. Add the script to CI as a separate job (needs Java in the runner image).
+- **Verify:** `npm run test:rules` passes locally. Needs `firebase-tools` (devDep, ✓) + Java 11+ on the runner (CI runner image needs `openjdk-jre`).
 
 ### [ ] Confirm Vertex AI API is enabled on the GCP project
 

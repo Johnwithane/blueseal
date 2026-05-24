@@ -140,13 +140,19 @@ service cloud.firestore {
         && request.resource.data.nextInvoiceNumber == resource.data.nextInvoiceNumber
         && request.resource.data.approvedAt == resource.data.approvedAt
         // Stripe Connect state + verified-earnings stats are server-managed
-        // (webhook dispatcher + payment_intent.succeeded handler). On
-        // pre-cutover docs the field is absent on both sides → equality
-        // holds. Post-cutover any owner-side write that touches them is
-        // rejected.
-        && request.resource.data.payouts == resource.data.payouts
-        && request.resource.data.paidJobsCount == resource.data.paidJobsCount
-        && request.resource.data.paidLifetimeCents == resource.data.paidLifetimeCents
+        // (webhook dispatcher + payment_intent.succeeded handler). Use
+        // `.get(field, null)` for safe access — `resource.data.foo` throws
+        // "Property foo is undefined" on legacy docs that pre-date the
+        // monetization-pivot schema, which would otherwise lock out every
+        // existing tradesperson from editing their profile. With the
+        // default, missing-on-both-sides compares equal, owner writes that
+        // touch the field don't.
+        && request.resource.data.get('payouts', null)
+             == resource.data.get('payouts', null)
+        && request.resource.data.get('paidJobsCount', null)
+             == resource.data.get('paidJobsCount', null)
+        && request.resource.data.get('paidLifetimeCents', null)
+             == resource.data.get('paidLifetimeCents', null)
         && (resource.data.vettingStatus == 'approved'
             ? request.resource.data.vettingStatus == 'approved'
             : request.resource.data.vettingStatus in ['draft','pending','info_requested']);
@@ -543,11 +549,14 @@ service cloud.firestore {
         && request.resource.data.jobId == resource.data.jobId
         // Stripe payment state is server-managed (createInvoicePaymentIntent
         // callable + webhook dispatcher). Owner can't tamper with the
-        // PaymentIntent / refunds / dispute mirror. Pre-cutover legacy
-        // invoices don't have the field on either side → equality holds.
+        // PaymentIntent / refunds / dispute mirror. `.get(field, null)` is
+        // needed for safe access on pre-cutover invoices where `payment`
+        // is absent — without the default, `resource.data.payment` throws
+        // "Property payment is undefined" and blocks every legacy update.
         // The broader "lineItems/total immutable once sent" tightening
         // lands with the Phase B sendInvoice rewrite.
-        && request.resource.data.payment == resource.data.payment
+        && request.resource.data.get('payment', null)
+             == resource.data.get('payment', null)
         && resource.data.status != 'paid';
       allow update: if isAdmin();
       allow delete: if isAdmin();
