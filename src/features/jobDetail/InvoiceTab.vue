@@ -12,6 +12,11 @@ defineProps<{
   isClient: boolean;
   isTradie: boolean;
   invoiceId: string | null;
+  // True only when the invoice was sent through the Stripe Connect
+  // pipeline (clientSecret available). Legacy "mark paid" / manual
+  // invoices have no in-app pay or receipt page, so the CTAs below
+  // gate on this in addition to invoiceId.
+  invoicePayable: boolean;
   markingPaid: boolean;
 }>();
 
@@ -54,7 +59,7 @@ const emit = defineEmits<{
          client has no in-app payment affordance and ends up hunting
          for an email link. -->
     <div
-      v-if="isClient && job.status === 'awaiting_payment' && invoiceId"
+      v-if="isClient && job.status === 'awaiting_payment' && invoiceId && invoicePayable"
       class="bs-card p-3 border-l-4 border-l-emerald-500"
     >
       <h3 class="font-semibold text-sm mb-1 flex items-center gap-2">
@@ -78,7 +83,7 @@ const emit = defineEmits<{
          shows the line items, but the receipt view is the cleaner
          shareable artifact. -->
     <div
-      v-if="isClient && (job.status === 'complete' || job.status === 'reviewed') && invoiceId"
+      v-if="isClient && (job.status === 'complete' || job.status === 'reviewed') && invoiceId && invoicePayable"
       class="bs-card p-3"
     >
       <RouterLink :to="`/invoices/${invoiceId}/receipt`" class="block">

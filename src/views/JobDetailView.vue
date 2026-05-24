@@ -76,6 +76,14 @@ const job = ref<WithId<JobDoc> | null>(null);
 const tradieInfo = ref<WithId<TradespersonDoc> | null>(null);
 const intakeFields = ref<IntakeField[]>([]);
 const invoiceId = ref<string | null>(null);
+// True only for invoices sent through the Stripe Connect pipeline (i.e.
+// `payment.clientSecret` is set). Legacy "mark paid" / manual-flow
+// invoices have no client-side pay path, so the InvoiceTab's pay /
+// receipt CTAs must not link to /invoices/:id/pay — those would just
+// surface a "re-send it from their dashboard" error. Pre-launch the
+// difference is moot (no legacy invoices in prod), but during the
+// rollout window stale jobs may exist and shouldn't break.
+const invoicePayable = ref(false);
 const loading = ref(true);
 // When the URL points at a job the signed-in user can't read (notification
 // pointing at a stale or wrong id, deep link from another account) the
@@ -246,6 +254,7 @@ async function load() {
     ]);
     intakeFields.value = remote?.fields ?? SEED_INTAKE_SCHEMAS[job.value.trade] ?? [];
     invoiceId.value = invoice?.id ?? null;
+    invoicePayable.value = !!invoice?.payment?.clientSecret;
 
     scheduledStart.value = job.value.scheduledStart?.toDate() ?? null;
     scheduledEnd.value = job.value.scheduledEnd?.toDate() ?? null;
@@ -645,6 +654,7 @@ function onReturnToApplicants() {
           :is-client="isClient"
           :is-tradie="isTradie"
           :invoice-id="invoiceId"
+          :invoice-payable="invoicePayable"
           :marking-paid="markingPaid"
           @mark-paid="onMarkPaid"
           @revise-quote="showQuoteSheet = true"
