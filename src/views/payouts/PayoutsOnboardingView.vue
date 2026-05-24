@@ -10,9 +10,11 @@ import {
   createConnectAccount,
   createConnectLoginLink,
   createConnectOnboardingLink,
+  subscribePayouts,
   subscribePayoutsState,
 } from "@/firebase/services/payoutsService";
-import type { PayoutsState } from "@/firebase/interfaces";
+import { useFormatters } from "@/composables/useFormatters";
+import type { PayoutDoc, PayoutsState, WithId } from "@/firebase/interfaces";
 
 // The single payouts entry point for tradespeople. Three routes (named
 // `Payouts`, `PayoutsReturn`, `PayoutsRefresh`) all mount this component
@@ -27,18 +29,28 @@ const toast = useToast();
 const state = ref<PayoutsState | null>(null);
 const loadingState = ref(true);
 const busy = ref<null | "create" | "onboard" | "login">(null);
-let unsub: (() => void) | null = null;
+const payouts = ref<WithId<PayoutDoc>[]>([]);
+let unsubState: (() => void) | null = null;
+let unsubPayouts: (() => void) | null = null;
+
+const { relativeTime } = useFormatters();
 
 onMounted(() => {
   if (!auth.fbUser) return;
-  unsub = subscribePayoutsState(auth.fbUser.uid, (s) => {
+  const uid = auth.fbUser.uid;
+  unsubState = subscribePayoutsState(uid, (s) => {
     state.value = s;
     loadingState.value = false;
   });
+  // Payout history subscription runs unconditionally — the query returns
+  // an empty array for tradies who haven't received payouts yet, which is
+  // what we want (the history card hides when nothing's there).
+  unsubPayouts = subscribePayouts(uid, (p) => (payouts.value = p));
 });
 
 onBeforeUnmount(() => {
-  unsub?.();
+  unsubState?.();
+  unsubPayouts?.();
 });
 
 // One-time toast for the Stripe return / refresh sub-routes. Stripe sets
@@ -129,6 +141,32 @@ async function openDashboard() {
 }
 
 const pendingItems = computed(() => state.value?.pendingRequirements ?? []);
+
+function fmtMoney(cents: number, currency: string): string {
+  return new Intl.NumberFormat("en-CA", { style: "currency", currency }).format(
+    cents / 100,
+  );
+}
+
+function statusLabel(s: PayoutDoc["status"]): {
+  label: string;
+  severity: "info" | "warn" | "error" | "success";
+} {
+  switch (s) {
+    case "paid":
+      return { label: "Paid", severity: "success" };
+    case "in_transit":
+      return { label: "In transit", severity: "info" };
+    case "pending":
+      return { label: "Pending", severity: "info" };
+    case "failed":
+      return { label: "Failed", severity: "error" };
+    case "canceled":
+      return { label: "Canceled", severity: "warn" };
+    default:
+      return { label: s, severity: "info" };
+  }
+}
 
 function prettyRequirement(req: string): string {
   // Stripe returns requirement codes like "individual.verification.document"
@@ -257,6 +295,60 @@ function prettyRequirement(req: string): string {
             dashboard — accessible from this page once you're enabled.
           </li>
         </ul>
+      </div>
+
+      <!-- Payout history — only renders once the tradie has received at
+           least one payout. The Stripe Express dashboard is the canonical
+           place for per-charge breakdowns + downloadable statements; the
+           in-app list is for at-a-glance "where's my money?". -->
+      <div v-if="payouts.length > 0" class="bs-card p-5">
+        <div class="flex items-start justify-between">
+          <h3 class="text-base font-semibold">Recent payouts</h3>
+          <span class="text-xs text-[color:var(--bs-muted)]">
+            Last {{ payouts.length }}
+          </span>
+        </div>
+        <ul class="mt-3 divide-y divide-[color:var(--bs-border)]">
+          <li
+            v-for="p in payouts"
+            :key="p.id"
+            class="flex items-center justify-between gap-3 py-3"
+          >
+            <div class="min-w-0 flex-1">
+              <div class="font-medium tabular-nums">
+                {{ fmtMoney(p.amount, p.currency) }}
+              </div>
+              <div class="text-xs text-[color:var(--bs-muted)]">
+                Arriving {{ relativeTime(p.arrivalDate) }}
+                <span
+                  v-if="p.status === 'failed' && p.failureMessage"
+                  class="block text-[color:var(--bs-error,#b91c1c)] mt-0.5"
+                >
+                  {{ p.failureMessage }}
+                </span>
+              </div>
+            </div>
+            <span
+              :class="[
+                'text-xs font-medium rounded-full px-2 py-0.5',
+                statusLabel(p.status).severity === 'success' &&
+                  'bg-green-100 text-green-800',
+                statusLabel(p.status).severity === 'info' &&
+                  'bg-blue-100 text-blue-800',
+                statusLabel(p.status).severity === 'warn' &&
+                  'bg-amber-100 text-amber-800',
+                statusLabel(p.status).severity === 'error' &&
+                  'bg-red-100 text-red-800',
+              ]"
+            >
+              {{ statusLabel(p.status).label }}
+            </span>
+          </li>
+        </ul>
+        <p class="mt-3 text-xs text-[color:var(--bs-muted)]">
+          For per-charge breakdowns and downloadable statements, open the
+          Stripe dashboard above.
+        </p>
       </div>
     </div>
   </section>

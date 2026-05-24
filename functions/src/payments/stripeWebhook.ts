@@ -35,12 +35,18 @@ import {
   handleChargeDisputeClosed,
   handleChargeDisputeCreated,
 } from "./handlers/chargeDispute";
+import {
+  handlePayoutCreated,
+  handlePayoutFailed,
+  handlePayoutPaid,
+} from "./handlers/payout";
 import type {
   StripeAccount,
   StripeCharge,
   StripeDispute,
   StripeEvent,
   StripePaymentIntent,
+  StripePayout,
 } from "./handlers/shared";
 
 export const stripeWebhook = onRequest(
@@ -136,9 +142,27 @@ export const stripeWebhook = onRequest(
             event.id,
           );
           break;
-        // Follow-up: payout.created / .paid / .failed (the latter writes
-        // /payouts/{po_…}) — deferred until the tradesperson payout-history
-        // view is built.
+        case "payout.created":
+          await handlePayoutCreated(
+            event.data.object as StripePayout,
+            event.account ?? null,
+            event.id,
+          );
+          break;
+        case "payout.paid":
+          await handlePayoutPaid(
+            event.data.object as StripePayout,
+            event.account ?? null,
+            event.id,
+          );
+          break;
+        case "payout.failed":
+          await handlePayoutFailed(
+            event.data.object as StripePayout,
+            event.account ?? null,
+            event.id,
+          );
+          break;
         default:
           logger.info("stripeWebhook: unhandled event type (200 to stop retry)", {
             eventId: event.id,

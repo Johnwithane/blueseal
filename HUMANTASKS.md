@@ -44,7 +44,7 @@ See `PROFESSIONAL_TASKS.md` for the parallel lawyer + accountant work that gates
      - **Phase A (Connect)**: `account.updated`
      - **Phase B (payments) — wired**: `payment_intent.processing`, `payment_intent.succeeded`, `payment_intent.payment_failed`, `charge.refunded`
      - **Disputes — wired**: `charge.dispute.created`, `charge.dispute.closed`
-     - **Phase B follow-up (not yet wired)**: `payout.created`, `payout.paid`, `payout.failed`
+     - **Payouts — wired**: `payout.created`, `payout.paid`, `payout.failed` (these are Connect events delivered with `event.account = acct_…`; ensure the webhook endpoint is registered to receive Connect events, not just platform events)
   3. After creating the endpoint, Stripe reveals its **signing secret** (`whsec_…`). Use that as the value when running `firebase functions:secrets:set STRIPE_WEBHOOK_SECRET`. Redeploy `stripeWebhook` so it picks up the new secret.
 - **Verify:** From the dashboard's webhook detail view, click "Send test webhook" → choose `account.updated` → check that the response is 200 and that the `webhookEvents/` Firestore collection has a new doc with `status: "processed"`.
 

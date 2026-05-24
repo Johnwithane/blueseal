@@ -68,8 +68,27 @@ export interface StripeDispute {
   metadata?: Record<string, string> | null;
 }
 
+export interface StripePayout {
+  id: string;
+  amount: number;
+  currency: string;
+  status: string;
+  // Unix timestamp (seconds) of when the payout is expected to land in
+  // the destination bank account. Stripe sets this on `payout.created` and
+  // doesn't change it once the payout completes.
+  arrival_date: number;
+  failure_code?: string | null;
+  failure_message?: string | null;
+  metadata?: Record<string, string> | null;
+}
+
 export interface StripeEvent {
   id: string;
   type: string;
+  // Set on events delivered for connected accounts (Connect direct webhook
+  // or Connect-platform webhook with the event scoped to a sub-account).
+  // Platform-level events (e.g. payment_intent on a destination charge)
+  // don't carry this — they live on the platform's own account.
+  account?: string | null;
   data: { object: unknown };
 }

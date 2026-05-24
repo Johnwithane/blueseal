@@ -3,10 +3,23 @@
 // httpsCallable directly (per CLAUDE.md service pattern) — they go through
 // this file so callable names + response shapes stay in one place.
 
-import { doc, onSnapshot } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  limit,
+  onSnapshot,
+  orderBy,
+  query,
+  where,
+} from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/firebase/config";
-import type { PayoutsState, TradespersonDoc } from "@/firebase/interfaces";
+import type {
+  PayoutDoc,
+  PayoutsState,
+  TradespersonDoc,
+  WithId,
+} from "@/firebase/interfaces";
 import { typedConverter } from "@/firebase/converters";
 
 const tradieRef = (uid: string) =>
@@ -76,4 +89,25 @@ export function subscribePayoutsState(
     }
     cb(snap.data().payouts ?? null);
   });
+}
+
+const payoutsCol = () =>
+  collection(db, "payouts").withConverter(typedConverter<PayoutDoc>());
+
+// Live history list for a single tradesperson, newest payout first by
+// arrival date. Limited to the most recent 50 — the Stripe Express
+// dashboard covers anything deeper.
+export function subscribePayouts(
+  uid: string,
+  cb: (payouts: WithId<PayoutDoc>[]) => void,
+): () => void {
+  const q = query(
+    payoutsCol(),
+    where("tradespersonId", "==", uid),
+    orderBy("arrivalDate", "desc"),
+    limit(50),
+  );
+  return onSnapshot(q, (snap) =>
+    cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+  );
 }
