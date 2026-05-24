@@ -170,7 +170,7 @@ router.beforeEach(async (to) => {
   const requiredRole = (to.meta.role as RoleGuard | undefined) ?? "any";
 
   if (requiresAuth && !auth.isAuthenticated) {
-    return { name: "SignIn", query: { redirect: to.fullPath } };
+    return { name: "Home" };
   }
   if (requiresAuth && requiredRole !== "any") {
     // Multi-role: gate on "do you have this role at all?", not "is it active?".
@@ -178,7 +178,7 @@ router.beforeEach(async (to) => {
     // flip the active role automatically so the page they navigated to renders
     // in the right context (Airbnb-style auto-switch).
     if (!auth.roles.includes(requiredRole as Role)) {
-      return { name: "Dashboard" };
+      return { name: "Home" };
     }
     if (auth.activeRole !== requiredRole) {
       await auth.switchActiveRole(requiredRole as Role).catch(() => {});

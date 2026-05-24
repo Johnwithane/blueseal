@@ -5,6 +5,7 @@ import type { JobDoc, JobStatus, WithId } from "@/firebase/interfaces";
 import { updateJobStatus } from "@/firebase/services/jobs";
 import { useToast } from "@/composables/useToast";
 import { useFormatters } from "@/composables/useFormatters";
+import JobCounterparty from "@/components/JobCounterparty.vue";
 
 const props = defineProps<{ jobs: WithId<JobDoc>[] }>();
 const router = useRouter();
@@ -110,6 +111,14 @@ function onDrop(e: DragEvent, target: JobStatus) {
           <div v-if="job.scheduledStart" class="text-xs mt-1 text-[color:var(--bs-blue)]">
             <i class="pi pi-calendar text-[10px]"></i>
             Scheduled
+          </div>
+          <div class="mt-2 pt-2 border-t border-[color:var(--bs-border)]">
+            <JobCounterparty
+              role="client"
+              size="small"
+              :name="job.clientName"
+              :photo-url="job.clientPhotoURL"
+            />
           </div>
         </article>
       </section>

@@ -248,6 +248,8 @@ service cloud.firestore {
         && request.resource.data.privateNotes == '';
       // Updates: identity + creation fields immutable. Status transitions are
       // permitted but the doc cannot be reassigned to a different client/tradie/chat.
+      // Counterparty display fields (denormalized at create) are also immutable
+      // so a party can't tamper with the name/avatar shown to the other side.
       allow update: if isSignedIn()
         && (resource.data.clientId == uid()
             || resource.data.tradespersonId == uid()
@@ -257,6 +259,14 @@ service cloud.firestore {
         && request.resource.data.chatId == resource.data.chatId
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.trade == resource.data.trade
+        && request.resource.data.get('clientName', null)
+            == resource.data.get('clientName', null)
+        && request.resource.data.get('clientPhotoURL', null)
+            == resource.data.get('clientPhotoURL', null)
+        && request.resource.data.get('tradespersonName', null)
+            == resource.data.get('tradespersonName', null)
+        && request.resource.data.get('tradespersonPhotoURL', null)
+            == resource.data.get('tradespersonPhotoURL', null)
         && (
           // Tradie can edit privateNotes; client must not touch them.
           resource.data.tradespersonId == uid()

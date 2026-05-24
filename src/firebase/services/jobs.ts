@@ -32,6 +32,13 @@ const jobRef = (id: string) => doc(db, "jobs", id).withConverter(typedConverter<
 export interface NewJobInput {
   clientId: string;
   tradespersonId: string;
+  // Denormalized counterparty display fields written at create time so each
+  // party can render the other on dashboard cards without a cross-account
+  // user-doc read. Null is acceptable (photo not set yet).
+  clientName: string;
+  clientPhotoURL: string | null;
+  tradespersonName: string;
+  tradespersonPhotoURL: string | null;
   trade: string;
   title: string;
   description: string;
@@ -50,6 +57,10 @@ export async function createJob(input: NewJobInput, chatId: string): Promise<str
   const docRef = await addDoc(jobsCol(), {
     clientId: input.clientId,
     tradespersonId: input.tradespersonId,
+    clientName: input.clientName,
+    clientPhotoURL: input.clientPhotoURL,
+    tradespersonName: input.tradespersonName,
+    tradespersonPhotoURL: input.tradespersonPhotoURL,
     status: "requested",
     trade: input.trade,
     title: input.title,

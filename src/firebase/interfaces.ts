@@ -283,6 +283,15 @@ export interface JobAddress {
 export interface JobDoc {
   clientId: string;
   tradespersonId: string;
+  // Denormalized at job-creation time so each party can render the
+  // counterparty's name + avatar on dashboard cards without a cross-account
+  // user-doc read (users/{uid} is owner+admin only). Optional — jobs created
+  // before this field was added leave them undefined; the UI falls back to a
+  // generic label + initial-circle avatar.
+  clientName?: string | null;
+  clientPhotoURL?: string | null;
+  tradespersonName?: string | null;
+  tradespersonPhotoURL?: string | null;
   status: JobStatus;
   trade: string;
   title: string;

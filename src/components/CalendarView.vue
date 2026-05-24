@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import Button from "primevue/button";
 import SelectButton from "primevue/selectbutton";
+import JobCounterparty from "@/components/JobCounterparty.vue";
 import type {
   BookingDoc,
   JobDoc,
@@ -247,6 +248,14 @@ function dayOfWeekKey(d: Date): (typeof days)[number] {
         >
           <div class="line-clamp-1 font-medium">{{ job.title }}</div>
           <div class="line-clamp-1 opacity-80">{{ job.trade }}</div>
+          <div class="mt-1.5 text-white">
+            <JobCounterparty
+              role="client"
+              size="small"
+              :name="job.clientName"
+              :photo-url="job.clientPhotoURL"
+            />
+          </div>
         </article>
       </div>
     </div>
