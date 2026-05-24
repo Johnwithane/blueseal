@@ -187,6 +187,18 @@ const routes: RouteRecordRaw[] = [
     component: () => import("@/views/admin/AdminUserSearchView.vue"),
     meta: { requiresAuth: true, role: "admin" as RoleGuard },
   },
+  {
+    path: "/admin/disputes",
+    name: "AdminDisputes",
+    component: () => import("@/views/admin/DisputesQueueView.vue"),
+    meta: { requiresAuth: true, role: "admin" as RoleGuard },
+  },
+  {
+    path: "/admin/disputes/:id",
+    name: "AdminDisputeDetail",
+    component: () => import("@/views/admin/DisputeDetailView.vue"),
+    meta: { requiresAuth: true, role: "admin" as RoleGuard },
+  },
 
   // 404
   {

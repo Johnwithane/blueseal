@@ -43,6 +43,14 @@ onMounted(async () => {
         <RouterLink to="/admin/site-content">
           <Button label="Site content" icon="pi pi-pencil" outlined />
         </RouterLink>
+        <RouterLink to="/admin/disputes">
+          <Button
+            label="Disputes"
+            icon="pi pi-exclamation-triangle"
+            outlined
+            severity="warn"
+          />
+        </RouterLink>
         <RouterLink to="/admin/vetting">
           <Button label="Open vetting queue" icon="pi pi-arrow-right" />
         </RouterLink>

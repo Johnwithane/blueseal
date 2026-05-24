@@ -30,6 +30,7 @@ export type NotificationType =
   | "invoice_paid"
   | "invoice_payment_failed"
   | "invoice_refunded"
+  | "dispute_opened"
   | "review_received";
 
 /**

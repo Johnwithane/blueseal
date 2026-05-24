@@ -38,6 +38,7 @@ const ICON: Record<NotificationType, string> = {
   invoice_paid: "pi pi-check-circle",
   invoice_payment_failed: "pi pi-exclamation-triangle",
   invoice_refunded: "pi pi-replay",
+  dispute_opened: "pi pi-exclamation-triangle",
   review_received: "pi pi-star",
 };
 

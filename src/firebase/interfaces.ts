@@ -657,6 +657,37 @@ export interface InvoiceDoc {
 }
 
 // ---------------------------------------------------------------------------
+// disputes/{disputeId}
+// Doc id == Stripe `dp_…` dispute id. Created by the `charge.dispute.created`
+// webhook, updated by `charge.dispute.closed`. Mirrored locally (rather than
+// hitting the Stripe API every time the admin queue renders) so the queue
+// is a single Firestore query and parties can subscribe in real time.
+// `evidenceDueBy` is sourced from Stripe's `evidence_details.due_by` so the
+// admin queue can sort by urgency. Evidence submission itself happens in
+// the Stripe Dashboard — Blue Seal's role is awareness + coordination.
+// ---------------------------------------------------------------------------
+export interface DisputeDoc {
+  invoiceId: string;
+  jobId: string | null;
+  tradespersonId: string;
+  clientId: string;
+  chargeId: string;
+  paymentIntentId: string;
+  amount: number; // cents
+  currency: string;
+  // Raw Stripe values — we surface humanized versions in the UI but keep the
+  // raw codes here so a UI change doesn't lose information.
+  reason: string;
+  status: string;
+  // null while the dispute is still open; one of `won` / `lost` /
+  // `warning_closed` when `charge.dispute.closed` fires.
+  outcome: string | null;
+  evidenceDueBy: Timestamp | null;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+// ---------------------------------------------------------------------------
 // aiUsage/{usageId}
 // jobId is nullable now that the assistant chatbot ("chat" tool) can be
 // invoked from non-job pages — the older diagnose/quote/summary tools
@@ -831,6 +862,7 @@ export type NotificationType =
   | "invoice_paid"
   | "invoice_payment_failed"
   | "invoice_refunded"
+  | "dispute_opened"
   | "review_received";
 
 export interface NotificationDoc {

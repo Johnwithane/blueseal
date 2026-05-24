@@ -42,8 +42,9 @@ See `PROFESSIONAL_TASKS.md` for the parallel lawyer + accountant work that gates
   1. Deploy Functions once so the URL exists: `firebase deploy --only functions:stripeWebhook`. Note the URL Firebase prints (looks like `https://stripewebhook-xxxxxx-uc.a.run.app`).
   2. Stripe Dashboard → Developers → Webhooks → Add endpoint. URL = the deployed function URL. Events to listen for:
      - **Phase A (Connect)**: `account.updated`
-     - **Phase B (payments) — now wired**: `payment_intent.processing`, `payment_intent.succeeded`, `payment_intent.payment_failed`, `charge.refunded`
-     - **Phase B follow-up (not yet wired)**: `charge.dispute.created`, `charge.dispute.closed`, `payout.created`, `payout.paid`, `payout.failed`
+     - **Phase B (payments) — wired**: `payment_intent.processing`, `payment_intent.succeeded`, `payment_intent.payment_failed`, `charge.refunded`
+     - **Disputes — wired**: `charge.dispute.created`, `charge.dispute.closed`
+     - **Phase B follow-up (not yet wired)**: `payout.created`, `payout.paid`, `payout.failed`
   3. After creating the endpoint, Stripe reveals its **signing secret** (`whsec_…`). Use that as the value when running `firebase functions:secrets:set STRIPE_WEBHOOK_SECRET`. Redeploy `stripeWebhook` so it picks up the new secret.
 - **Verify:** From the dashboard's webhook detail view, click "Send test webhook" → choose `account.updated` → check that the response is 200 and that the `webhookEvents/` Firestore collection has a new doc with `status: "processed"`.
 

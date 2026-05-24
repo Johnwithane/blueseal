@@ -570,6 +570,19 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ---------- disputes (Stripe chargeback / inquiry mirror; server-only writes) ----------
+    // Doc id == Stripe `dp_…` dispute id. Written by the
+    // `charge.dispute.created|closed` handlers in the webhook dispatcher.
+    // Admin reads across all disputes (for the queue); the tradesperson +
+    // client on the underlying invoice read their own. No client writes —
+    // evidence submission happens in the Stripe Dashboard.
+    match /disputes/{disputeId} {
+      allow read: if isAdmin()
+        || (isSignedIn() && resource.data.tradespersonId == uid())
+        || (isSignedIn() && resource.data.clientId == uid());
+      allow create, update, delete: if false;
+    }
+
     // ---------- payouts (Stripe Connect payout ledger; server-only writes) ----------
     // Doc id == Stripe `po_…` payout id; created/updated by the webhook
     // dispatcher in response to `payout.created|paid|failed` events. The

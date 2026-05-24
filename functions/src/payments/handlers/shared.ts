@@ -53,6 +53,21 @@ export interface StripeCharge {
   metadata?: Record<string, string> | null;
 }
 
+export interface StripeDispute {
+  id: string;
+  amount: number;
+  currency: string;
+  charge: string | { id: string };
+  payment_intent?: string | { id: string } | null;
+  reason: string;
+  status: string;
+  // Stripe's evidence-submission deadline as a unix timestamp (seconds).
+  // Present on every dispute status that requires action; null on inquiries
+  // and closed disputes.
+  evidence_details?: { due_by?: number | null } | null;
+  metadata?: Record<string, string> | null;
+}
+
 export interface StripeEvent {
   id: string;
   type: string;
