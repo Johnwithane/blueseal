@@ -8,6 +8,7 @@ import { postSystemMessage } from "../lib/chatSystemMessage";
 import { notify } from "../lib/notify";
 
 const LineItemSchema = z.object({
+  kind: z.enum(["hourly", "labour", "materials"]).optional(),
   description: z.string().min(1).max(200),
   quantity: z.number().min(0).max(10_000),
   unitPrice: z.number().int().min(0).max(100_000_000),
@@ -39,6 +40,7 @@ interface JobData {
 }
 
 interface LineItem {
+  kind?: "hourly" | "labour" | "materials";
   description: string;
   quantity: number;
   unitPrice: number;

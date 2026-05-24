@@ -6,9 +6,12 @@ import InputText from "primevue/inputtext";
 import InputNumber from "primevue/inputnumber";
 import Textarea from "primevue/textarea";
 import SelectButton from "primevue/selectbutton";
+import Message from "primevue/message";
 import { submitQuote, getQuoteByJobId } from "@/firebase/services/quotes";
 import { recomputeTotals } from "@/firebase/services/invoices";
-import type { InvoiceDiscount, LineItem } from "@/firebase/interfaces";
+import { getTradesperson } from "@/firebase/services/tradespeople";
+import { useAuthStore } from "@/stores/auth";
+import type { InvoiceDiscount, LineItem, LineItemKind } from "@/firebase/interfaces";
 import { useFormatters } from "@/composables/useFormatters";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
@@ -25,14 +28,25 @@ const emit = defineEmits<{
 
 const { money, date } = useFormatters();
 const toast = useToast();
+const auth = useAuthStore();
 
+// Per-row local state. Both `hoursInput` and `amountDollars` are kept
+// alongside `kind` so a tradesperson can flip between types without
+// losing their typing — the row just renders the matching input.
 interface UiLine {
+  kind: LineItemKind;
   description: string;
-  quantity: number;
-  unitPriceDollars: number;
+  hoursInput: number;          // only used when kind === "hourly"
+  amountDollars: number;       // only used when kind === "labour" | "materials"
   taxRate: number;
 }
 const lines = ref<UiLine[]>([]);
+
+const kindOptions: { label: string; value: LineItemKind; icon: string }[] = [
+  { label: "Hourly", value: "hourly", icon: "pi pi-clock" },
+  { label: "Labour", value: "labour", icon: "pi pi-wrench" },
+  { label: "Materials", value: "materials", icon: "pi pi-box" },
+];
 
 type DiscountMode = "off" | "percent" | "fixed";
 const discountMode = ref<DiscountMode>("off");
@@ -44,7 +58,6 @@ const discountModeOptions = [
   { label: "Fixed $", value: "fixed" },
 ];
 
-const estimatedHours = ref<number | null>(null);
 const validUntilDays = ref<number>(14);
 const terms = ref<string>("");
 const noteToClient = ref<string>("");
@@ -53,18 +66,55 @@ const submitting = ref(false);
 const priorDeclinedReason = ref<string | null>(null);
 const isResend = ref(false);
 
+// Tradesperson's stored hourly rate (cents/hr). Auto-applied to every
+// hourly line. Null when not yet set — hourly rows show a warning + are
+// excluded from the previewed totals.
+const hourlyRateCents = ref<number | null>(null);
+const loadingRate = ref(false);
+
 const centsFromDollars = (d: number) => Math.round((d ?? 0) * 100);
 
-const previewLines = computed<LineItem[]>(() =>
-  lines.value
-    .filter((l) => l.description.trim() && centsFromDollars(l.unitPriceDollars) > 0)
-    .map((l) => ({
-      description: l.description.trim(),
-      quantity: l.quantity || 1,
-      unitPrice: centsFromDollars(l.unitPriceDollars),
-      taxRate: l.taxRate ?? 0,
-    })),
+const hasHourlyLineWithoutRate = computed(() =>
+  lines.value.some((l) => l.kind === "hourly") && hourlyRateCents.value == null,
 );
+
+// Turn the UI rows into LineItem[] for the totals preview AND the submit
+// payload. Hourly rows expand to quantity = hours, unitPrice = rate;
+// labour / materials rows expand to quantity = 1, unitPrice = amount.
+// Drops rows the tradesperson hasn't filled in yet so the preview total
+// stays sensible while editing.
+function buildLineItems(): LineItem[] {
+  const out: LineItem[] = [];
+  for (const l of lines.value) {
+    const desc = l.description.trim();
+    if (!desc) continue;
+    if (l.kind === "hourly") {
+      const rate = hourlyRateCents.value;
+      if (rate == null || rate <= 0) continue;
+      if (!l.hoursInput || l.hoursInput <= 0) continue;
+      out.push({
+        kind: "hourly",
+        description: desc,
+        quantity: l.hoursInput,
+        unitPrice: rate,
+        taxRate: l.taxRate ?? 0,
+      });
+    } else {
+      const amount = centsFromDollars(l.amountDollars);
+      if (amount <= 0) continue;
+      out.push({
+        kind: l.kind,
+        description: desc,
+        quantity: 1,
+        unitPrice: amount,
+        taxRate: l.taxRate ?? 0,
+      });
+    }
+  }
+  return out;
+}
+
+const previewLines = computed<LineItem[]>(() => buildLineItems());
 
 const discountForCallable = computed<InvoiceDiscount | null>(() => {
   if (discountMode.value === "off") return null;
@@ -92,14 +142,28 @@ const validUntilPreview = computed(() => {
   return date(d);
 });
 
+function emptyLine(kind: LineItemKind): UiLine {
+  return {
+    kind,
+    description: "",
+    hoursInput: 0,
+    amountDollars: 0,
+    taxRate: 0.13,
+  };
+}
+
+// Pick the sensible default kind for a brand-new row: hourly when the
+// tradesperson has a rate on file, labour otherwise (the most common
+// fallback). The user can toggle per-row from there.
+function defaultKind(): LineItemKind {
+  return hourlyRateCents.value != null && hourlyRateCents.value > 0 ? "hourly" : "labour";
+}
+
 function resetForm() {
-  lines.value = [
-    { description: "", quantity: 1, unitPriceDollars: 0, taxRate: 0.13 },
-  ];
+  lines.value = [emptyLine(defaultKind())];
   discountMode.value = "off";
   discountValue.value = 0;
   discountLabel.value = "";
-  estimatedHours.value = null;
   validUntilDays.value = 14;
   terms.value = "";
   noteToClient.value = "";
@@ -107,30 +171,58 @@ function resetForm() {
   isResend.value = false;
 }
 
+// Best-effort rate fetch on open. Failure leaves the rate null and the
+// hourly rows surface a "set your rate" warning — they're skipped from
+// the totals preview so the submit button stays accurate.
+async function loadRate() {
+  const uid = auth.fbUser?.uid;
+  if (!uid) return;
+  loadingRate.value = true;
+  try {
+    const me = await getTradesperson(uid);
+    hourlyRateCents.value = me?.hourlyRate ?? null;
+  } catch {
+    hourlyRateCents.value = null;
+  } finally {
+    loadingRate.value = false;
+  }
+}
+
 // Hydrate from existing quote (resend / edit-after-decline) when the sheet
 // opens. Read-once is fine — the sheet is for editing a snapshot, not for
-// live collaboration.
+// live collaboration. Maps legacy lines without `kind` to a sensible
+// fallback so re-sending an older quote doesn't lose data.
 async function hydrateFromExisting() {
   const existing = await getQuoteByJobId(props.jobId);
   if (!existing) return;
   isResend.value = true;
   priorDeclinedReason.value = existing.declinedReason ?? null;
-  lines.value = (existing.lineItems ?? []).map((li) => ({
-    description: li.description,
-    quantity: li.quantity,
-    unitPriceDollars: (li.unitPrice ?? 0) / 100,
-    taxRate: li.taxRate ?? 0,
-  }));
-  if (lines.value.length === 0) {
-    lines.value = [{ description: "", quantity: 1, unitPriceDollars: 0, taxRate: 0.13 }];
-  }
+  lines.value = (existing.lineItems ?? []).map((li): UiLine => {
+    const kind: LineItemKind = li.kind ?? "labour";
+    if (kind === "hourly") {
+      return {
+        kind: "hourly",
+        description: li.description,
+        hoursInput: li.quantity,
+        amountDollars: 0,
+        taxRate: li.taxRate ?? 0,
+      };
+    }
+    return {
+      kind,
+      description: li.description,
+      hoursInput: 0,
+      amountDollars: (li.unitPrice ?? 0) / 100,
+      taxRate: li.taxRate ?? 0,
+    };
+  });
+  if (lines.value.length === 0) lines.value = [emptyLine(defaultKind())];
   const d = existing.discount ?? null;
   if (d) {
     discountMode.value = d.type;
     discountValue.value = d.type === "fixed" ? d.value / 100 : d.value;
     discountLabel.value = d.label ?? "";
   }
-  estimatedHours.value = existing.estimatedHours ?? null;
   terms.value = existing.terms ?? "";
   noteToClient.value = existing.noteToClient ?? "";
 }
@@ -140,16 +232,14 @@ watch(
   async (v) => {
     if (v) {
       resetForm();
+      await loadRate();
       await hydrateFromExisting();
     }
   },
 );
 
 function addLine() {
-  lines.value = [
-    ...lines.value,
-    { description: "", quantity: 1, unitPriceDollars: 0, taxRate: 0.13 },
-  ];
+  lines.value = [...lines.value, emptyLine(defaultKind())];
   void nextTick(() => {
     const inputs = document.querySelectorAll<HTMLInputElement>(
       ".quote-sheet-line-description input",
@@ -160,11 +250,37 @@ function addLine() {
 
 function removeLine(i: number) {
   lines.value = lines.value.filter((_, idx) => idx !== i);
-  if (lines.value.length === 0) addLine();
+  if (lines.value.length === 0) lines.value = [emptyLine(defaultKind())];
 }
+
+// Toggle row kind without losing the description / tax rate the
+// tradesperson has already typed. Hours / amount stay in their own
+// fields so flipping back and forth doesn't lose typing.
+function setLineKind(i: number, kind: LineItemKind) {
+  lines.value = lines.value.map((l, idx) => (idx === i ? { ...l, kind } : l));
+}
+
+// Derived total hours from hourly rows. Replaces the old standalone
+// estimatedHours input — the sum of hourly quantities IS the estimate,
+// so we just pass it through for the doc + the rendered "X hours total"
+// hint on the client side.
+const totalHourlyHours = computed(() => {
+  let h = 0;
+  for (const li of previewLines.value) {
+    if (li.kind === "hourly") h += li.quantity;
+  }
+  return h > 0 ? h : null;
+});
 
 async function onSubmit() {
   if (!canSubmit.value) return;
+  if (hasHourlyLineWithoutRate.value) {
+    toast.error(
+      "Set your hourly rate first",
+      "Hourly lines need a rate on your profile. Open your profile to add one.",
+    );
+    return;
+  }
   const items: LineItem[] = previewLines.value;
   if (items.length === 0) {
     toast.error("Add at least one line", "A quote needs something to bill.");
@@ -176,7 +292,7 @@ async function onSubmit() {
       jobId: props.jobId,
       lineItems: items,
       discount: discountForCallable.value,
-      estimatedHours: estimatedHours.value,
+      estimatedHours: totalHourlyHours.value,
       validUntilDays: validUntilDays.value,
       terms: terms.value.trim(),
       noteToClient: noteToClient.value.trim(),
@@ -244,67 +360,137 @@ function close() {
           />
         </header>
         <p class="text-xs text-[color:var(--bs-muted)] mb-2">
-          One line per item or task. Description + price. Tax defaults to HST 13%
-          per line — adjust per row if needed.
+          Mix hourly time, flat-rate labour, and parts/materials. Hourly uses your
+          profile rate ({{ hourlyRateCents ? money(hourlyRateCents) + "/hr" : "not set" }}).
         </p>
-        <ul class="space-y-2">
+
+        <Message
+          v-if="hasHourlyLineWithoutRate"
+          severity="warn"
+          :closable="false"
+          class="mb-3 text-xs"
+        >
+          You've got an Hourly line but no rate on your profile yet. Open your
+          profile to set one, or switch those rows to Labour.
+        </Message>
+
+        <ul class="space-y-3">
           <li
             v-for="(l, i) in lines"
             :key="i"
-            class="grid grid-cols-[1fr_5rem_8rem_auto] gap-2 items-start"
+            class="rounded-lg border border-[color:var(--bs-border)] p-3"
           >
+            <!-- Kind chips + remove button on the same row so the line type is
+                 the first decision and visually frames the inputs below. -->
+            <div class="flex items-center justify-between gap-2 mb-2">
+              <div class="flex items-center gap-1 flex-wrap">
+                <button
+                  v-for="opt in kindOptions"
+                  :key="opt.value"
+                  type="button"
+                  class="quote-kind-chip"
+                  :class="{ 'quote-kind-chip--active': l.kind === opt.value }"
+                  @click="setLineKind(i, opt.value)"
+                >
+                  <i :class="opt.icon"></i>
+                  {{ opt.label }}
+                </button>
+              </div>
+              <Button
+                text
+                icon="pi pi-times"
+                size="small"
+                severity="danger"
+                aria-label="Remove line"
+                @click="removeLine(i)"
+              />
+            </div>
+
+            <!-- Description: same for all kinds. Hint text adapts per kind so
+                 the user knows what to write. -->
+            <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">
+              Description
+            </label>
             <InputText
               v-model="l.description"
-              placeholder="e.g. Install new shower mixer"
+              :placeholder="
+                l.kind === 'hourly'
+                  ? 'e.g. On-site diagnostics'
+                  : l.kind === 'materials'
+                  ? 'e.g. Pipe + fittings'
+                  : 'e.g. Install new shower mixer'
+              "
               maxlength="200"
               class="quote-sheet-line-description w-full text-sm"
             />
-            <InputNumber
-              v-model="l.quantity"
-              :min="0"
-              :max-fraction-digits="2"
-              :input-class="'text-sm w-full text-right'"
-              fluid
-            />
-            <InputNumber
-              v-model="l.unitPriceDollars"
-              mode="currency"
-              currency="CAD"
-              :min="0"
-              :max-fraction-digits="2"
-              :input-class="'text-sm w-full text-right'"
-              fluid
-            />
-            <Button
-              text
-              icon="pi pi-times"
-              size="small"
-              severity="danger"
-              aria-label="Remove line"
-              @click="removeLine(i)"
-            />
+
+            <!-- Hourly: hours input + read-only rate display, with a clear
+                 "X hrs × $Y = $Z" computed preview so the math is obvious. -->
+            <div v-if="l.kind === 'hourly'" class="grid grid-cols-[1fr_auto] gap-2 mt-2 items-end">
+              <div>
+                <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">Hours</label>
+                <InputNumber
+                  v-model="l.hoursInput"
+                  :min="0"
+                  :max-fraction-digits="2"
+                  suffix=" hrs"
+                  :input-class="'text-sm w-full'"
+                  fluid
+                />
+              </div>
+              <div class="text-right text-xs text-[color:var(--bs-muted)] pb-2">
+                <div>
+                  Rate:
+                  <span class="font-medium text-[color:var(--bs-text)]">
+                    {{ hourlyRateCents ? money(hourlyRateCents) + "/hr" : "—" }}
+                  </span>
+                </div>
+                <div v-if="hourlyRateCents && l.hoursInput > 0">
+                  Line:
+                  <span class="font-semibold text-[color:var(--bs-text)]">
+                    {{ money(Math.round(l.hoursInput * hourlyRateCents)) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Labour / Materials: single amount input. quantity stays 1
+                 server-side; the tradesperson types the full line total. -->
+            <div v-else class="mt-2">
+              <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">
+                {{ l.kind === "materials" ? "Cost to client" : "Amount" }}
+              </label>
+              <InputNumber
+                v-model="l.amountDollars"
+                mode="currency"
+                currency="CAD"
+                :min="0"
+                :max-fraction-digits="2"
+                :input-class="'text-sm w-full font-semibold'"
+                fluid
+              />
+            </div>
+
+            <!-- Tax per line. Defaults HST 13% so the user rarely has to
+                 think about it. -->
+            <div class="grid grid-cols-2 gap-2 mt-2">
+              <div>
+                <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">
+                  Tax rate
+                </label>
+                <InputNumber
+                  v-model="l.taxRate"
+                  :min="0"
+                  :max="0.5"
+                  :max-fraction-digits="3"
+                  :step="0.01"
+                  :input-class="'text-sm w-full'"
+                  fluid
+                />
+              </div>
+            </div>
           </li>
         </ul>
-      </section>
-
-      <!-- Estimated hours -->
-      <section class="rounded-lg border border-[color:var(--bs-border)] p-3">
-        <label class="font-semibold text-sm flex items-center gap-2 mb-2">
-          <i class="pi pi-clock text-[color:var(--bs-blue)]"></i>
-          Estimated hours <span class="font-normal text-[color:var(--bs-muted)]">(optional)</span>
-        </label>
-        <InputNumber
-          v-model="estimatedHours"
-          :min="0"
-          :max-fraction-digits="1"
-          suffix=" hours"
-          placeholder="e.g. 4"
-          :input-class="'text-sm w-full'"
-          fluid
-        />
-        <p class="text-[11px] text-[color:var(--bs-muted)] mt-1">
-          Hint for the client — useful for hourly-style quotes. Not used in the total.
-        </p>
       </section>
 
       <!-- Discount -->
@@ -490,5 +676,34 @@ function close() {
     max-height: 100vh;
     border-radius: 0;
   }
+}
+
+/* Line-kind segmented chips. Soft pill style so a row of three reads as
+   "pick one" without competing with the primary form inputs below. */
+.quote-kind-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid var(--bs-border);
+  background: white;
+  color: var(--bs-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s, color 0.1s;
+}
+.quote-kind-chip:hover {
+  border-color: var(--bs-blue);
+  color: var(--bs-blue);
+}
+.quote-kind-chip--active {
+  background: var(--bs-blue);
+  border-color: var(--bs-blue);
+  color: white;
+}
+.quote-kind-chip--active:hover {
+  color: white;
 }
 </style>

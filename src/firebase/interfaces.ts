@@ -553,11 +553,26 @@ export type InvoiceStatus =
   | "overdue"
   | "void";
 
+// Classification of a line item — drives how the editor row collects input
+// and how the rendered invoice/quote labels it. Optional/legacy lines that
+// predate this field render with no badge and behave like the historical
+// quantity × unitPrice shape (which is exactly what every kind reduces to
+// when totaled).
+//
+//   hourly:    quantity = hours, unitPrice = hourly rate (cents/hr).
+//              Total line = hours × rate. Auto-pulled time entries also
+//              carry this kind.
+//   labour:    flat-fee labour. quantity = 1, unitPrice = total.
+//   materials: parts / receipts / supplies. quantity = 1, unitPrice = total.
+//              Auto-pulled expense rows carry this kind.
+export type LineItemKind = "hourly" | "labour" | "materials";
+
 export interface LineItem {
   // Stable id for lines pulled in from a time entry or expense, so the
   // pull-billables flow can avoid double-pulling the same source row.
   // Manually-typed line items leave it undefined.
   id?: string;
+  kind?: LineItemKind;
   description: string;
   quantity: number;
   unitPrice: number; // cents

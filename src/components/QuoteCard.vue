@@ -3,7 +3,7 @@ import { onBeforeUnmount, ref, watch } from "vue";
 import Button from "primevue/button";
 import Tag from "primevue/tag";
 import { subscribeQuote, getQuoteByJobId, markQuoteViewed } from "@/firebase/services/quotes";
-import type { QuoteDoc, QuoteStatus, WithId } from "@/firebase/interfaces";
+import type { LineItemKind, QuoteDoc, QuoteStatus, WithId } from "@/firebase/interfaces";
 import { useFormatters } from "@/composables/useFormatters";
 
 const props = defineProps<{
@@ -82,6 +82,17 @@ const STATUS_LABEL: Record<QuoteStatus, string> = {
   expired: "Expired",
   withdrawn: "Withdrawn",
 };
+
+const KIND_LABEL: Record<LineItemKind, string> = {
+  hourly: "Hourly",
+  labour: "Labour",
+  materials: "Materials",
+};
+const KIND_ICON: Record<LineItemKind, string> = {
+  hourly: "pi-clock",
+  labour: "pi-wrench",
+  materials: "pi-box",
+};
 </script>
 
 <template>
@@ -108,30 +119,53 @@ const STATUS_LABEL: Record<QuoteStatus, string> = {
     <table class="w-full text-sm border-t">
       <thead>
         <tr class="text-left text-[color:var(--bs-muted)]">
-          <th class="py-1 font-medium">Description</th>
-          <th class="py-1 font-medium w-16 text-right">Qty</th>
-          <th class="py-1 font-medium w-28 text-right">Unit</th>
+          <th class="py-1 font-medium">Item</th>
+          <th class="py-1 font-medium w-32 text-right hidden sm:table-cell">Detail</th>
           <th class="py-1 font-medium w-28 text-right">Line</th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="(li, i) in quote.lineItems" :key="i" class="border-t align-top">
-          <td class="py-1.5">{{ li.description }}</td>
-          <td class="py-1.5 text-right">{{ li.quantity }}</td>
-          <td class="py-1.5 text-right">{{ money(li.unitPrice) }}</td>
+          <td class="py-1.5">
+            <div class="flex items-start gap-2">
+              <span
+                v-if="li.kind"
+                class="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded shrink-0 mt-0.5"
+                :class="
+                  li.kind === 'hourly'
+                    ? 'bg-blue-100 text-blue-700'
+                    : li.kind === 'materials'
+                    ? 'bg-amber-100 text-amber-700'
+                    : 'bg-slate-100 text-slate-700'
+                "
+              >
+                <i :class="['pi', 'text-[9px]', KIND_ICON[li.kind]]"></i>
+                {{ KIND_LABEL[li.kind] }}
+              </span>
+              <span class="min-w-0">{{ li.description }}</span>
+            </div>
+          </td>
+          <td class="py-1.5 text-right text-xs text-[color:var(--bs-muted)]">
+            <template v-if="li.kind === 'hourly'">
+              {{ li.quantity }}h × {{ money(li.unitPrice) }}/hr
+            </template>
+            <template v-else-if="li.quantity !== 1">
+              {{ li.quantity }} × {{ money(li.unitPrice) }}
+            </template>
+          </td>
           <td class="py-1.5 text-right">{{ money(li.quantity * li.unitPrice) }}</td>
         </tr>
       </tbody>
       <tfoot class="border-t">
         <tr>
-          <td colspan="3" class="py-1 text-right text-[color:var(--bs-muted)]">Subtotal</td>
+          <td colspan="2" class="py-1 text-right text-[color:var(--bs-muted)]">Subtotal</td>
           <td class="py-1 text-right">{{ money(quote.subtotal) }}</td>
         </tr>
         <tr
           v-if="quote.discountAmount > 0"
           class="text-[color:var(--bs-blue)]"
         >
-          <td colspan="3" class="py-1 text-right">
+          <td colspan="2" class="py-1 text-right">
             Discount
             <span
               v-if="quote.discount?.label"
@@ -141,11 +175,11 @@ const STATUS_LABEL: Record<QuoteStatus, string> = {
           <td class="py-1 text-right">−{{ money(quote.discountAmount) }}</td>
         </tr>
         <tr>
-          <td colspan="3" class="py-1 text-right text-[color:var(--bs-muted)]">Tax</td>
+          <td colspan="2" class="py-1 text-right text-[color:var(--bs-muted)]">Tax</td>
           <td class="py-1 text-right">{{ money(quote.taxTotal) }}</td>
         </tr>
         <tr>
-          <td colspan="3" class="py-1 text-right font-semibold">Total</td>
+          <td colspan="2" class="py-1 text-right font-semibold">Total</td>
           <td class="py-1 text-right font-bold">{{ money(quote.total) }}</td>
         </tr>
       </tfoot>

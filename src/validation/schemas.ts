@@ -163,6 +163,9 @@ export const lineItemSchema = z.object({
   // Stable id when the row was pulled in from a time entry or expense,
   // so the pull-billables flow can detect re-pulls. Manual rows omit it.
   id: z.string().min(1).max(128).optional(),
+  // Classification — drives editor input shape + render label. Optional
+  // so legacy/free-form lines keep working.
+  kind: z.enum(["hourly", "labour", "materials"]).optional(),
   description: z.string().trim().min(1).max(300),
   quantity: z.number().positive().max(10_000),
   // Cents. $100,000 cap.
