@@ -36,6 +36,7 @@ export const onJobCreated = onDocumentCreated("jobs/{jobId}", async (event) => {
       link: `/jobs/${jobId}`,
       jobId,
       actorUid: job.clientId ?? null,
+      recipientRole: "tradesperson",
       // High priority: tradespeople churn fast when leads sit unseen.
       priority: "high",
     });

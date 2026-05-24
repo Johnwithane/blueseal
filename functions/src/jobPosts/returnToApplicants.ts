@@ -97,6 +97,7 @@ export const returnToApplicants = onCall({ enforceAppCheck: false }, async (req)
         body: `The client returned to applicants for "${result.postTitle}". Your application is back to pending.`,
         link: `/jobs/posted/${postId}`,
         actorUid: uid,
+        recipientRole: "tradesperson",
       });
     }
 

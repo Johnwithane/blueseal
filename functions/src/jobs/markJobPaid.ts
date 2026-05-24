@@ -94,6 +94,7 @@ export const markJobPaid = onCall({ enforceAppCheck: false }, async (req) => {
     actorUid: uid,
     jobId,
     chatId: result.chatId ?? null,
+    recipientRole: "client",
     priority: "normal",
   });
 

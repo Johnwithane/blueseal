@@ -20,5 +20,6 @@ export const onIdApproved = onDocumentUpdated("idVerifications/{tradieId}", asyn
     title: "ID verified",
     body: "Your government ID was approved. One step closer to going live.",
     link: "/dashboard/tradie",
+    recipientRole: "tradesperson",
   });
 });

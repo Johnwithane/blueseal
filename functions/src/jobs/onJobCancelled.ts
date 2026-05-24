@@ -63,6 +63,7 @@ export const onJobCancelled = onDocumentUpdated("jobs/{jobId}", async (event) =>
         link: `/jobs/${jobId}`,
         jobId,
         actorUid: cancelledBy ?? null,
+        recipientRole: userId === clientId ? "client" : "tradesperson",
         // High priority: the other party may be relying on this — a tradie
         // could be en route, a client may have blocked off the day. The
         // bell, email, and WhatsApp together make sure they catch it.

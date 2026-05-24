@@ -91,5 +91,6 @@ export const onReviewCreated = onDocumentCreated("reviews/{reviewId}", async (ev
     link: "/dashboard/tradie",
     jobId: r.jobId ?? null,
     actorUid: r.clientId ?? null,
+    recipientRole: "tradesperson",
   });
 });

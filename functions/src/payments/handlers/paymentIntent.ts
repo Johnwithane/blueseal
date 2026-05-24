@@ -212,6 +212,7 @@ export async function handlePaymentIntentSucceeded(
       body: `${fmtMoney(result.total, result.currency)} just paid out — funds will land in your bank in 2 business days.`,
       link: result.jobId ? `/jobs/${result.jobId}` : null,
       actorUid: result.clientId,
+      recipientRole: "tradesperson",
       priority: "high",
     }),
     notify({
@@ -221,6 +222,7 @@ export async function handlePaymentIntentSucceeded(
       body: `Thanks — your ${fmtMoney(result.total, result.currency)} payment cleared.`,
       link: result.jobId ? `/jobs/${result.jobId}` : null,
       actorUid: result.tradespersonId,
+      recipientRole: "client",
       priority: "low",
     }),
   ]);
@@ -288,6 +290,7 @@ export async function handlePaymentIntentCanceled(
     body: "The client didn't complete payment in time. The invoice has been reset so they can try again from the job page.",
     link: result.jobId ? `/jobs/${result.jobId}` : null,
     actorUid: null,
+    recipientRole: "tradesperson",
     priority: "normal",
   });
 }
@@ -333,6 +336,7 @@ export async function handlePaymentIntentFailed(
     body: errorMessage,
     link: data.jobId ? `/jobs/${data.jobId}` : null,
     actorUid: data.tradespersonId ?? null,
+    recipientRole: "client",
     priority: "high",
   });
 }

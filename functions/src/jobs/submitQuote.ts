@@ -233,6 +233,7 @@ export const submitQuote = onCall({ enforceAppCheck: false }, async (req) => {
     actorUid: uid,
     jobId,
     chatId: job.chatId ?? null,
+    recipientRole: "client",
     priority: "high",
   });
 

@@ -74,6 +74,7 @@ export const clientRequestChanges = onCall({ enforceAppCheck: false }, async (re
     actorUid: uid,
     jobId,
     chatId: result.chatId ?? null,
+    recipientRole: "tradesperson",
     priority: "high",
   });
 

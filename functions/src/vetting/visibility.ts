@@ -52,6 +52,7 @@ export async function maybeMarkVisible(tradieUid: string): Promise<void> {
       body: "Your profile is now visible to clients. Set up payouts at /payouts so you can collect payments, then browse open jobs.",
       link: "/jobs/browse",
       actorUid: null,
+      recipientRole: "tradesperson",
       priority: "high",
     });
   } catch {
