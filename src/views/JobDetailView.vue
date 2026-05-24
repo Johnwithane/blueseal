@@ -12,6 +12,7 @@ import {
   CANCELLABLE_STATUSES,
   cancelJob,
   getJob,
+  markJobPaid,
   scheduleJob,
   updateJobStatus,
   updatePrivateNotes,
@@ -32,6 +33,7 @@ import InvoiceEditor from "@/components/InvoiceEditor.vue";
 import ReviewPrompt from "@/components/ReviewPrompt.vue";
 import TimeTrackerCard from "@/components/TimeTrackerCard.vue";
 import ExpensesCard from "@/components/ExpensesCard.vue";
+import FinishJobSheet from "@/components/FinishJobSheet.vue";
 import { SEED_INTAKE_SCHEMAS } from "@/data/intakeSchemas";
 import { getIntakeSchema } from "@/firebase/services/intakeFormSchemas";
 import type { IntakeField } from "@/firebase/interfaces";
@@ -85,6 +87,15 @@ const cancelling = ref(false);
 const collisions = ref<Collision[]>([]);
 const showCollisionDialog = ref(false);
 const savingSchedule = ref(false);
+
+// Finish-job wrap-up sheet (tradie only, in_progress only). Opens via the
+// sticky bottom CTA. Submit posts to submitJobForApproval — the sheet
+// itself handles state + toasts; we just re-load on success.
+const showFinishSheet = ref(false);
+// Mark-paid action (tradie only, awaiting_payment only). Routes through
+// the markJobPaid callable which atomically flips invoice → paid AND job
+// → complete so the two never drift.
+const markingPaid = ref(false);
 
 const statusOptions: { label: string; value: JobStatus }[] = [
   { label: "Accepted", value: "accepted" },
@@ -347,6 +358,31 @@ async function submitBrief() {
   }
 }
 
+async function onMarkPaid() {
+  if (!job.value || markingPaid.value) return;
+  confirmDialog.require({
+    message:
+      "Confirm you've received payment for this job? This marks the invoice paid and closes out the job.",
+    header: "Mark as paid?",
+    icon: "pi pi-check-circle",
+    acceptLabel: "Yes, mark paid",
+    rejectLabel: "Not yet",
+    accept: async () => {
+      if (!job.value) return;
+      markingPaid.value = true;
+      try {
+        await markJobPaid(job.value.id);
+        toast.success("Marked paid", "Job complete. Leave the client a review when you can.");
+        await load();
+      } catch (e) {
+        toast.error("Couldn't mark paid", humanizeError(e));
+      } finally {
+        markingPaid.value = false;
+      }
+    },
+  });
+}
+
 function openCancelDialog() {
   cancelReason.value = "";
   showCancelDialog.value = true;
@@ -413,7 +449,10 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
 </script>
 
 <template>
-  <section class="bs-container py-6">
+  <section
+    class="bs-container py-6"
+    :class="{ 'pb-28': job && isTradie && job.status === 'in_progress' }"
+  >
     <RouterLink to="/dashboard" class="text-xs text-[color:var(--bs-muted)]">← Dashboard</RouterLink>
 
     <div v-if="loading" class="bs-empty mt-4">Loading…</div>
@@ -585,6 +624,47 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
             >View full profile →</RouterLink>
           </div>
 
+          <!-- Awaiting-payment CTA — promoted to top of sidebar so the
+               tradie can settle up in one tap once the client has paid. -->
+          <div
+            v-if="isTradie && job.status === 'awaiting_payment'"
+            class="bs-card p-3 border-l-4 border-l-emerald-500"
+          >
+            <h3 class="font-semibold text-sm mb-1 flex items-center gap-2">
+              <i class="pi pi-wallet text-emerald-600"></i>
+              Payment received?
+            </h3>
+            <p class="text-xs text-[color:var(--bs-muted)] mb-3">
+              Mark the invoice paid to close out the job. The client gets a receipt and the
+              review prompt appears.
+            </p>
+            <Button
+              label="Mark as paid"
+              icon="pi pi-check"
+              severity="success"
+              class="w-full"
+              :loading="markingPaid"
+              @click="onMarkPaid"
+            />
+          </div>
+
+          <!-- Awaiting-client-approval status banner — read-only for the
+               tradie; they've already done the wrap-up and the client now
+               owns the next move. -->
+          <div
+            v-if="isTradie && job.status === 'awaiting_client_approval'"
+            class="bs-card p-3 border-l-4 border-l-amber-500"
+          >
+            <h3 class="font-semibold text-sm mb-1 flex items-center gap-2">
+              <i class="pi pi-hourglass text-amber-600"></i>
+              Awaiting client approval
+            </h3>
+            <p class="text-xs text-[color:var(--bs-muted)]">
+              The client has the wrap-up. They'll approve the work or request changes —
+              you'll get a notification either way.
+            </p>
+          </div>
+
           <div v-if="isTradie" class="bs-card p-3">
             <label for="job-status-select" class="block font-semibold text-sm mb-2">Status</label>
             <Select
@@ -596,6 +676,10 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
               class="w-full"
               @update:model-value="(v) => setStatus(v as JobStatus)"
             />
+            <p class="text-[11px] text-[color:var(--bs-muted)] mt-2 leading-snug">
+              Use this for one-off corrections only. The normal flow is the
+              "Finish job" button below and the client's approve/pay actions.
+            </p>
           </div>
 
           <div class="bs-card p-3">
@@ -708,6 +792,33 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
         </aside>
       </div>
     </template>
+
+    <!-- Sticky bottom CTA: tradie's primary action while in_progress.
+         Replaces the buried status-dropdown "complete" route — clear,
+         unmissable, and routed through the proper approval-flow callable. -->
+    <div
+      v-if="job && isTradie && job.status === 'in_progress'"
+      class="fixed inset-x-0 bottom-0 z-30 border-t border-[color:var(--bs-border)] bg-white/95 backdrop-blur p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-2px_8px_rgba(0,0,0,0.04)]"
+    >
+      <div class="bs-container">
+        <Button
+          label="Finish job & prepare invoice"
+          icon="pi pi-check-circle"
+          class="w-full"
+          size="large"
+          @click="showFinishSheet = true"
+        />
+      </div>
+    </div>
+
+    <FinishJobSheet
+      v-if="job && isTradie"
+      v-model:visible="showFinishSheet"
+      :job-id="job.id"
+      :tradesperson-id="job.tradespersonId"
+      :client-id="job.clientId"
+      @submitted="load"
+    />
 
     <Dialog
       v-model:visible="showCollisionDialog"

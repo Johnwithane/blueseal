@@ -3,13 +3,11 @@ import { computed } from "vue";
 import { useRouter } from "vue-router";
 import type { JobDoc, JobStatus, WithId } from "@/firebase/interfaces";
 import { updateJobStatus } from "@/firebase/services/jobs";
-import { useConfirm } from "primevue/useconfirm";
 import { useToast } from "@/composables/useToast";
 import { useFormatters } from "@/composables/useFormatters";
 
 const props = defineProps<{ jobs: WithId<JobDoc>[] }>();
 const router = useRouter();
-const confirm = useConfirm();
 const toast = useToast();
 const { relativeTime } = useFormatters();
 
@@ -45,25 +43,31 @@ function onDragStart(e: DragEvent, jobId: string) {
   e.dataTransfer!.effectAllowed = "move";
 }
 
+// Status transitions managed by the finish-job / approval / payment
+// callables (which do server-side state checks, invoice writes, chat
+// system messages, and notifications). Dragging into one of these
+// columns has to route through the job page so the proper UI handles
+// it — silently flipping the status here would skip invoice creation,
+// the client-approval gate, and the atomic invoice→paid + job→complete
+// transition.
+const CALLABLE_ONLY_TARGETS: ReadonlySet<JobStatus> = new Set([
+  "awaiting_client_approval",
+  "awaiting_payment",
+  "complete",
+]);
+
 function onDrop(e: DragEvent, target: JobStatus) {
   e.preventDefault();
   const id = e.dataTransfer?.getData("text/plain");
   if (!id) return;
   const job = props.jobs.find((j) => j.id === id);
   if (!job || job.status === target) return;
-  // Moving to Complete triggers invoice draft via Cloud Function — confirm first.
-  if (target === "complete") {
-    confirm.require({
-      message: "Mark this job complete? A draft invoice will be created automatically.",
-      header: "Mark complete",
-      icon: "pi pi-check",
-      acceptLabel: "Mark complete",
-      rejectLabel: "Cancel",
-      accept: async () => {
-        await updateJobStatus(id, target);
-        toast.success("Job moved", "Draft invoice created.");
-      },
-    });
+  if (CALLABLE_ONLY_TARGETS.has(target)) {
+    toast.info(
+      "Open the job to continue",
+      "This step needs the Finish-job or Mark-paid action on the job page.",
+    );
+    router.push({ name: "JobDetail", params: { id } });
     return;
   }
   updateJobStatus(id, target);
