@@ -124,6 +124,10 @@ export interface TradespersonDoc {
   isVisible: boolean;
   weeklyAvailability: WeeklyAvailability;
   nextInvoiceNumber: number;
+  // Mirrors nextInvoiceNumber for the quotes collection. Lazily backfilled
+  // by submitQuote (defaults to 1) so pre-existing tradesperson docs that
+  // predate the quote flow keep working.
+  nextQuoteNumber?: number;
   paymentInstructions: string;
   submittedAt: Timestamp | null;
   approvedAt: Timestamp | null;
@@ -248,10 +252,16 @@ export interface IntakeFormSchemaDoc {
 // (→ in_progress + reason posted in chat). Both transitions go through
 // callables (submitJobForApproval / clientApproveJob / clientRequestChanges)
 // so the invoice doc + chat system message stay in lockstep with the status.
+//
+// "quote_accepted" sits between "quoted" and "scheduled": the client has
+// accepted the quote (via clientAcceptQuote) and the tradesperson now needs
+// to pick a date. Schedule write transitions the job into "scheduled" via
+// the existing scheduleJob flow.
 export type JobStatus =
   | "accepted"
   | "requested"
   | "quoted"
+  | "quote_accepted"
   | "scheduled"
   | "in_progress"
   | "awaiting_client_approval"
@@ -589,6 +599,73 @@ export interface InvoiceDoc {
   paymentInstructions: string;
   paymentMethod: "manual" | "stripe";
   recurring: { enabled: boolean; frequency: string; nextRunAt: Timestamp | null } | null;
+}
+
+// ---------------------------------------------------------------------------
+// quotes/{quoteId}
+// Tradesperson-authored estimate sent to the client *before* work starts.
+// Shape mirrors InvoiceDoc (same LineItem / InvoiceDiscount types, same
+// totals math via recomputeTotals) so the editor + sheet UIs stay
+// near-identical to their invoice counterparts. Deterministic id = jobId
+// keeps the create idempotent.
+//
+// status timeline:
+//   draft   — tradesperson is building, never shown to client
+//   sent    — client now sees it; awaiting their decision
+//   viewed  — client opened the job page after sent (soft signal)
+//   accepted — client clicked Accept; job flips to "quote_accepted"
+//   declined — client clicked Discuss/Decline; job stays "quoted" so the
+//              tradesperson can revise and re-send (status flips back to
+//              "sent" on next submitQuote call)
+//   expired  — validUntil passed without a decision; scheduled function
+//              (future) sets this and re-prompts the tradesperson
+//   withdrawn — admin-only; reserved for support intervention
+// ---------------------------------------------------------------------------
+export type QuoteStatus =
+  | "draft"
+  | "sent"
+  | "viewed"
+  | "accepted"
+  | "declined"
+  | "expired"
+  | "withdrawn";
+
+export interface QuoteDoc {
+  tradespersonId: string;
+  clientId: string;
+  jobId: string;
+  quoteNumber: string;
+  status: QuoteStatus;
+  lineItems: LineItem[];
+  subtotal: number;
+  discount: InvoiceDiscount | null;
+  discountAmount: number;
+  taxTotal: number;
+  total: number;
+  currency: string;
+  // Optional estimate hint shown alongside the totals — useful for hourly
+  // ranges ("about 4-6 hours"). Free-form so tradies can write whatever
+  // qualifier fits.
+  estimatedHours: number | null;
+  // Quote expiry. Defaults to issuedAt + 14 days when the sheet submits.
+  // The client banner shows "valid until {date}"; a (future) scheduled
+  // function flips expired status past this date.
+  validUntil: Timestamp | null;
+  // Scope/exclusions/assumptions — free text shown verbatim on the quote.
+  terms: string;
+  // Short cover note rendered above the quote and surfaced in the chat
+  // system-message preview when the quote is sent.
+  noteToClient: string;
+  // Optional rejection reason from clientDeclineQuote — preserved across
+  // resends so the tradesperson can see "they declined with: X" while
+  // revising.
+  declinedReason: string | null;
+  issuedAt: Timestamp | null;
+  sentAt: Timestamp | null;
+  viewedAt: Timestamp | null;
+  acceptedAt: Timestamp | null;
+  declinedAt: Timestamp | null;
+  pdfUrl: string | null;
 }
 
 // ---------------------------------------------------------------------------

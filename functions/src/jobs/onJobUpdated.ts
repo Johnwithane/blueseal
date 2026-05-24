@@ -18,6 +18,7 @@ const STATUS_LABEL: Record<string, string> = {
   accepted: "Accepted",
   requested: "Requested",
   quoted: "Quoted",
+  quote_accepted: "Quote accepted — pick a date",
   scheduled: "Scheduled",
   in_progress: "In progress",
   awaiting_client_approval: "Awaiting your approval",
@@ -38,7 +39,12 @@ function isApprovalFlowTransition(before: string | undefined, after: string | un
     pair === "in_progress->awaiting_client_approval" ||
     pair === "awaiting_client_approval->awaiting_payment" ||
     pair === "awaiting_client_approval->in_progress" ||
-    pair === "awaiting_payment->complete"
+    pair === "awaiting_payment->complete" ||
+    // Quote-flow transitions covered by submitQuote / clientAcceptQuote.
+    // Any source → quoted is the submit/resubmit path. quoted →
+    // quote_accepted is the client-accept path.
+    after === "quoted" ||
+    pair === "quoted->quote_accepted"
   );
 }
 

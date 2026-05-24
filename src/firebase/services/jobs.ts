@@ -101,10 +101,13 @@ export async function updateJobStatus(id: string, status: JobStatus): Promise<vo
 // Statuses where either party can still cancel. Once work has started
 // ("in_progress") or money is owed ("awaiting_payment"/"complete"/
 // "reviewed"), cancellation has to go through a dispute or admin instead.
+// quote_accepted is still safe to cancel — nothing's been done yet, the
+// tradesperson just hasn't picked a date.
 export const CANCELLABLE_STATUSES: readonly JobStatus[] = [
   "accepted",
   "requested",
   "quoted",
+  "quote_accepted",
   "scheduled",
 ] as const;
 

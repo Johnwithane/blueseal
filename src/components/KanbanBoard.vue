@@ -21,6 +21,7 @@ const columns: Column[] = [
   { key: "accepted", label: "Accepted (awaiting brief)", color: "#a0d6f1" },
   { key: "requested", label: "Inbox", color: "#0ea5e9" },
   { key: "quoted", label: "Quoted", color: "#f59e0b" },
+  { key: "quote_accepted", label: "Quote accepted", color: "#10b981" },
   { key: "scheduled", label: "Scheduled", color: "#16a34a" },
   { key: "in_progress", label: "In progress", color: "#0d47a1" },
   { key: "awaiting_client_approval", label: "Awaiting approval", color: "#f97316" },
@@ -51,6 +52,8 @@ function onDragStart(e: DragEvent, jobId: string) {
 // the client-approval gate, and the atomic invoice→paid + job→complete
 // transition.
 const CALLABLE_ONLY_TARGETS: ReadonlySet<JobStatus> = new Set([
+  "quoted",
+  "quote_accepted",
   "awaiting_client_approval",
   "awaiting_payment",
   "complete",
@@ -76,7 +79,7 @@ function onDrop(e: DragEvent, target: JobStatus) {
 
 <template>
   <div class="overflow-x-auto -mx-4 px-4 pb-2">
-    <div class="grid grid-cols-[repeat(8,minmax(240px,1fr))] gap-3 min-w-[1920px]">
+    <div class="grid grid-cols-[repeat(9,minmax(240px,1fr))] gap-3 min-w-[2160px]">
       <section
         v-for="col in columns"
         :key="col.key"

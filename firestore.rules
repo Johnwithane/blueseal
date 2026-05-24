@@ -505,6 +505,60 @@ service cloud.firestore {
       allow delete: if isTradie() && resource.data.tradespersonId == uid();
     }
 
+    // ---------- quotes ----------
+    // Tradesperson-authored estimates. Shape + flow mirrors invoices —
+    // deterministic id == jobId, creates flow through the submitQuote
+    // callable (admin SDK bypass), tradesperson edits their own draft via
+    // updateQuoteLineItems / updateQuoteDiscount, client can only flip
+    // sent → viewed for the read-receipt signal.
+    match /quotes/{quoteId} {
+      // resource == null short-circuit: quotes are keyed by jobId (same
+      // pattern as invoices) so the client probes quotes/{jobId} and
+      // treats missing as "no quote yet". Without the null guard the
+      // rule evaluator throws on resource.data.X and Firestore reports
+      // permission-denied — masking "no quote" as "access denied".
+      allow read: if isSignedIn() && (
+        resource == null
+        || resource.data.clientId == uid()
+        || resource.data.tradespersonId == uid()
+        || isAdmin()
+      );
+      // Creates always via submitQuote (admin SDK bypasses rules).
+      allow create: if false;
+      // Tradesperson can edit their own quote (line items, discount, terms,
+      // etc.) — identity fields locked. Status transitions to accepted /
+      // declined / sent (re-send) go through callables, but a tradesperson
+      // could still flip status via direct write; we don't block that here
+      // because the canonical paths (callables) are unaffected and rule
+      // exhaustiveness on every field would balloon. resource.data.status
+      // != 'accepted' freezes the quote once accepted.
+      allow update: if isSignedIn()
+        && resource.data.tradespersonId == uid()
+        && request.resource.data.quoteNumber == resource.data.quoteNumber
+        && request.resource.data.tradespersonId == resource.data.tradespersonId
+        && request.resource.data.clientId == resource.data.clientId
+        && request.resource.data.jobId == resource.data.jobId
+        && resource.data.status != 'accepted';
+      // Client may flip sent → viewed for the read-receipt signal — all
+      // money + identity fields pinned to their prior value so the client
+      // can't rewrite the quote contents.
+      allow update: if isSignedIn()
+        && resource.data.clientId == uid()
+        && resource.data.status == 'sent'
+        && request.resource.data.status == 'viewed'
+        && request.resource.data.tradespersonId == resource.data.tradespersonId
+        && request.resource.data.clientId == resource.data.clientId
+        && request.resource.data.jobId == resource.data.jobId
+        && request.resource.data.quoteNumber == resource.data.quoteNumber
+        && request.resource.data.lineItems == resource.data.lineItems
+        && request.resource.data.subtotal == resource.data.subtotal
+        && request.resource.data.discount == resource.data.discount
+        && request.resource.data.discountAmount == resource.data.discountAmount
+        && request.resource.data.total == resource.data.total;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
     // ---------- invoices ----------
     match /invoices/{invoiceId} {
       // resource == null short-circuit: invoices are keyed deterministically
