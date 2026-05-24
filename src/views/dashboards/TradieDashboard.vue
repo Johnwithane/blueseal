@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import Button from "primevue/button";
 import SelectButton from "primevue/selectbutton";
+import Menu from "primevue/menu";
 import Message from "primevue/message";
 import Dialog from "primevue/dialog";
 import DatePicker from "primevue/datepicker";
@@ -45,6 +46,33 @@ const viewOptions = [
   { label: "Kanban", value: "kanban" },
   { label: "Calendar", value: "calendar" },
 ];
+
+const moreMenu = ref<InstanceType<typeof Menu> | null>(null);
+const moreMenuItems = computed(() => [
+  {
+    label: "Manage availability",
+    icon: "pi pi-clock",
+    command: openAvailabilityEditor,
+  },
+  {
+    label: "Block off time",
+    icon: "pi pi-ban",
+    command: openBlockEditor,
+  },
+  {
+    label: "Browse open jobs",
+    icon: "pi pi-megaphone",
+    command: () => router.push("/jobs/browse"),
+  },
+  {
+    label: "My applications",
+    icon: "pi pi-send",
+    command: () => router.push("/my-applications"),
+  },
+]);
+function toggleMoreMenu(e: Event) {
+  moreMenu.value?.toggle(e);
+}
 
 const availabilityOpen = ref(false);
 const draftAvailability = ref<WeeklyAvailability | null>(null);
@@ -234,35 +262,48 @@ const awaitingVerificationMessage = computed(() => {
 
 <template>
   <section class="bs-container py-6">
-    <div class="flex items-start justify-between gap-4 mb-4 flex-wrap">
-      <div>
-        <h1 class="text-2xl font-bold">Your jobs</h1>
-        <p class="text-[color:var(--bs-muted)] text-sm">
+    <div class="flex items-start justify-between gap-3 mb-4 flex-wrap">
+      <div class="min-w-0">
+        <h1 class="text-xl sm:text-2xl font-bold">Your jobs</h1>
+        <p class="hidden sm:block text-[color:var(--bs-muted)] text-sm">
           Drag cards between columns to update status.
         </p>
       </div>
       <div class="flex items-center gap-2 flex-wrap">
         <SelectButton v-model="view" :options="viewOptions" option-label="label" option-value="value" />
         <template v-if="tradie?.isVisible">
+          <!-- Desktop: actions inline -->
+          <div class="hidden sm:flex items-center gap-2 flex-wrap">
+            <Button
+              label="Manage availability"
+              icon="pi pi-clock"
+              outlined
+              @click="openAvailabilityEditor"
+            />
+            <Button
+              label="Block off time"
+              icon="pi pi-ban"
+              outlined
+              severity="danger"
+              @click="openBlockEditor"
+            />
+            <RouterLink to="/jobs/browse">
+              <Button label="Browse open jobs" icon="pi pi-megaphone" outlined />
+            </RouterLink>
+            <RouterLink to="/my-applications">
+              <Button label="My applications" icon="pi pi-send" text />
+            </RouterLink>
+          </div>
+          <!-- Mobile: overflow menu -->
           <Button
-            label="Manage availability"
-            icon="pi pi-clock"
+            icon="pi pi-ellipsis-v"
             outlined
-            @click="openAvailabilityEditor"
+            aria-label="More actions"
+            aria-haspopup="true"
+            class="sm:hidden"
+            @click="toggleMoreMenu"
           />
-          <Button
-            label="Block off time"
-            icon="pi pi-ban"
-            outlined
-            severity="danger"
-            @click="openBlockEditor"
-          />
-          <RouterLink to="/jobs/browse">
-            <Button label="Browse open jobs" icon="pi pi-megaphone" outlined />
-          </RouterLink>
-          <RouterLink to="/my-applications">
-            <Button label="My applications" icon="pi pi-send" text />
-          </RouterLink>
+          <Menu ref="moreMenu" :model="moreMenuItems" popup />
         </template>
       </div>
     </div>
