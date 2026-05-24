@@ -19,12 +19,50 @@
       }
       h1 { margin: 0 0 0.5rem; font-size: 1.75rem; }
       p { opacity: 0.85; max-width: 28rem; line-height: 1.5; }
+      button {
+        margin-top: 1.25rem;
+        padding: 0.6rem 1.25rem;
+        font: inherit;
+        background: #fff;
+        color: #0d47a1;
+        border: 0;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      #content { display: none; }
     </style>
   </head>
   <body>
-    <div>
+    <div id="content">
       <h1>You're offline</h1>
       <p>Blue Seal needs an internet connection. Reconnect and refresh to keep going.</p>
+      <button onclick="location.href='/'">Retry</button>
     </div>
+    <script>
+      // Self-recovery: an earlier deploy registered a service worker with
+      // navigateFallback: "/offline.html", which traps anyone with that stale
+      // SW on this page for every direct navigation — including when they're
+      // online. If we're actually online, tear down the old SW + caches and
+      // bounce home so the new SW (navigateFallback: "/index.html") can install.
+      (async function recover() {
+        if (!navigator.onLine) {
+          document.getElementById("content").style.display = "block";
+          return;
+        }
+        try {
+          if ("serviceWorker" in navigator) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(regs.map((r) => r.unregister()));
+          }
+          if ("caches" in window) {
+            const keys = await caches.keys();
+            await Promise.all(keys.map((k) => caches.delete(k)));
+          }
+        } catch {
+          // fall through to redirect regardless
+        }
+        location.replace("/");
+      })();
+    </script>
   </body>
 </html>

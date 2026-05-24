@@ -18,13 +18,35 @@ const STATUS_LABEL: Record<string, string> = {
   accepted: "Accepted",
   requested: "Requested",
   quoted: "Quoted",
+  quote_accepted: "Quote accepted — pick a date",
   scheduled: "Scheduled",
   in_progress: "In progress",
+  awaiting_client_approval: "Awaiting your approval",
   awaiting_payment: "Awaiting payment",
   complete: "Complete",
   reviewed: "Reviewed",
   cancelled: "Cancelled",
 };
+
+// Status transitions handled by the finish-job / approval / payment
+// callables — each posts its own richer chat line (with totals, reason,
+// invoice number) and we'd just double up if we also posted the generic
+// "Status changed to X" message here.
+function isApprovalFlowTransition(before: string | undefined, after: string | undefined): boolean {
+  if (!before || !after) return false;
+  const pair = `${before}->${after}`;
+  return (
+    pair === "in_progress->awaiting_client_approval" ||
+    pair === "awaiting_client_approval->awaiting_payment" ||
+    pair === "awaiting_client_approval->in_progress" ||
+    pair === "awaiting_payment->complete" ||
+    // Quote-flow transitions covered by submitQuote / clientAcceptQuote.
+    // Any source → quoted is the submit/resubmit path. quoted →
+    // quote_accepted is the client-accept path.
+    after === "quoted" ||
+    pair === "quoted->quote_accepted"
+  );
+}
 
 function fmtScheduleRange(start: Timestamp | null | undefined, end: Timestamp | null | undefined): string {
   if (!start || !end) return "";
@@ -89,8 +111,10 @@ export const onJobUpdated = onDocumentUpdated("jobs/{jobId}", async (event) => {
     return;
   }
 
-  // Plain status change.
+  // Plain status change — but skip the ones the approval-flow callables
+  // already covered with a richer message.
   if (statusChanged && after.status) {
+    if (isApprovalFlowTransition(before.status, after.status)) return;
     const label = STATUS_LABEL[after.status] ?? after.status;
     await postSystemMessage(chatId, `Status changed to "${label}"`);
   }

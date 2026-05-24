@@ -1,17 +1,15 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter, RouterLink } from "vue-router";
 import Button from "primevue/button";
 import Tag from "primevue/tag";
-import Avatar from "primevue/avatar";
-import DatePicker from "primevue/datepicker";
 import Textarea from "primevue/textarea";
-import Select from "primevue/select";
 import Dialog from "primevue/dialog";
 import {
   CANCELLABLE_STATUSES,
   cancelJob,
   getJob,
+  markJobPaid,
   scheduleJob,
   updateJobStatus,
   updatePrivateNotes,
@@ -26,25 +24,30 @@ import { getInvoiceByJobId } from "@/firebase/services/invoices";
 import { useAuthStore } from "@/stores/auth";
 import type { JobDoc, JobStatus, TradespersonDoc, WithId } from "@/firebase/interfaces";
 import { useFormatters } from "@/composables/useFormatters";
-import ChatThread from "@/components/ChatThread.vue";
-import IntakeFormRenderer from "@/components/IntakeFormRenderer.vue";
-import InvoiceEditor from "@/components/InvoiceEditor.vue";
-import ReviewPrompt from "@/components/ReviewPrompt.vue";
-import TimeTrackerCard from "@/components/TimeTrackerCard.vue";
-import ExpensesCard from "@/components/ExpensesCard.vue";
+import FinishJobSheet from "@/components/FinishJobSheet.vue";
+import ClientApprovalBanner from "@/components/ClientApprovalBanner.vue";
+import QuoteSheet from "@/components/QuoteSheet.vue";
+import ClientQuoteApprovalBanner from "@/components/ClientQuoteApprovalBanner.vue";
 import { SEED_INTAKE_SCHEMAS } from "@/data/intakeSchemas";
 import { getIntakeSchema } from "@/firebase/services/intakeFormSchemas";
 import type { IntakeField } from "@/firebase/interfaces";
 import { tradeLabel } from "@/data/trades";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
+import { STATUS_LABEL, STATUS_SEVERITY } from "@/utils/jobStatus";
+import JobTabBar, { type JobTab } from "@/features/jobDetail/JobTabBar.vue";
+import BriefTab from "@/features/jobDetail/BriefTab.vue";
+import ScheduleTab from "@/features/jobDetail/ScheduleTab.vue";
+import InvoiceTab from "@/features/jobDetail/InvoiceTab.vue";
+import JobChatButton from "@/features/jobDetail/JobChatButton.vue";
+import JobChatOverlay from "@/features/jobDetail/JobChatOverlay.vue";
 
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
 const toast = useToast();
 const confirmDialog = useConfirm();
-const { date, dateTime } = useFormatters();
+const { dateTime } = useFormatters();
 
 const job = ref<WithId<JobDoc> | null>(null);
 const tradieInfo = ref<WithId<TradespersonDoc> | null>(null);
@@ -61,37 +64,32 @@ const scheduledStart = ref<Date | null>(null);
 const scheduledEnd = ref<Date | null>(null);
 const privateNotes = ref("");
 
-// AI auto-log state. Manual trigger forces a Vertex call even if the
-// server's 1-hour cooldown hasn't elapsed; auto-trigger on mount lets the
-// server short-circuit silently.
 const updatingLog = ref(false);
 
-// Marketplace-originated jobs land in status="accepted". The client completes
-// the trade intake here before the standard flow begins.
 const intakeDraft = ref<Record<string, unknown>>({});
 const savingIntake = ref(false);
 const returningToApplicants = ref(false);
 
-// Client-side cancellation state. The button + dialog are visible to the
-// client only while the job is in a cancellable status — once work starts
-// or money is owed, cancellation goes through a dispute (not built yet).
 const showCancelDialog = ref(false);
 const cancelReason = ref("");
 const cancelling = ref(false);
 
-// Schedule-collision state. Set when saveSchedule detects an overlap;
-// the dialog gives the tradie the choice to schedule anyway (e.g. they
-// just want to override their own block-off) or pick a different time.
 const collisions = ref<Collision[]>([]);
 const showCollisionDialog = ref(false);
 const savingSchedule = ref(false);
+
+const showFinishSheet = ref(false);
+const markingPaid = ref(false);
+const showQuoteSheet = ref(false);
 
 const statusOptions: { label: string; value: JobStatus }[] = [
   { label: "Accepted", value: "accepted" },
   { label: "Requested", value: "requested" },
   { label: "Quoted", value: "quoted" },
+  { label: "Quote accepted", value: "quote_accepted" },
   { label: "Scheduled", value: "scheduled" },
   { label: "In progress", value: "in_progress" },
+  { label: "Awaiting approval", value: "awaiting_client_approval" },
   { label: "Awaiting payment", value: "awaiting_payment" },
   { label: "Complete", value: "complete" },
   { label: "Cancelled", value: "cancelled" },
@@ -107,16 +105,6 @@ const canClientCancel = computed(
     (CANCELLABLE_STATUSES as readonly string[]).includes(job.value.status),
 );
 
-const tradieDisplayName = computed(
-  () => tradieInfo.value?.displayName?.trim() || "Your tradesperson",
-);
-const tradieAvatarInitial = computed(() =>
-  (tradieDisplayName.value || "?").slice(0, 1).toUpperCase(),
-);
-
-// Mirrors the trust-badge expiry checks elsewhere — keeps badges honest
-// even on a long-running job where the underlying coverage may lapse
-// between booking and completion.
 const now = Date.now();
 const tradieInsuranceLive = computed(() => {
   if (!tradieInfo.value?.insuranceVerified) return false;
@@ -129,6 +117,80 @@ const tradieWsibLive = computed(() => {
   return exp == null || exp > now;
 });
 
+// Tab list. Role-aware: Notes is tradie-only. Badges flag a tab where the
+// signed-in user has work to do — the sticky CTA and top banners already
+// surface the primary action, so badges are a quieter "tap here, there's
+// something to settle" hint.
+// Tab list. Chat is NOT a tab — it lives in a bottom-anchored overlay
+// (JobChatButton + JobChatOverlay) so the chat composer never fights the
+// sticky CTA, and the AI assistant shares that surface as a sub-tab.
+const tabs = computed<JobTab[]>(() => {
+  if (!job.value) return [];
+  const s = job.value.status;
+  return [
+    {
+      key: "brief",
+      label: "Brief",
+      icon: "pi-info-circle",
+      badge: isClient.value && s === "accepted" ? "dot" : undefined,
+    },
+    {
+      key: "schedule",
+      label: "Schedule",
+      icon: "pi-calendar",
+      badge: isTradie.value && s === "quote_accepted" ? "dot" : undefined,
+    },
+    {
+      key: "invoice",
+      label: "Invoice",
+      icon: "pi-receipt",
+      badge:
+        s === "awaiting_client_approval" || s === "awaiting_payment" ? "dot" : undefined,
+    },
+  ];
+});
+
+const validTabKeys = computed(() => new Set(tabs.value.map((t) => t.key)));
+
+const activeTab = computed<string>(() => {
+  const q = route.query.tab;
+  const key = typeof q === "string" ? q : "";
+  return validTabKeys.value.has(key) ? key : "brief";
+});
+
+// Chat overlay open state. Driven by the floating JobChatButton; the
+// overlay also handles its own close (backdrop tap / X button).
+const chatOverlayOpen = ref(false);
+
+// Sticky bottom CTA: tradie's primary action for the current status. Drives
+// the bottom padding on the section (so content isn't hidden behind the
+// fixed bar) and the bar's visibility. Stays visible across every tab —
+// the bar gets thinner on mobile so the chat composer can sit comfortably
+// above it.
+const stickyCTAStatuses: ReadonlySet<JobStatus> = new Set([
+  "requested",
+  "quoted",
+  "in_progress",
+]);
+const showStickyCTA = computed(
+  () => job.value != null && isTradie.value && stickyCTAStatuses.has(job.value.status),
+);
+
+function onTabChange(key: string) {
+  // Use replace, not push — back button shouldn't have to walk through every
+  // tab tap to leave the page.
+  router.replace({ query: { ...route.query, tab: key } });
+}
+
+// If the active tab disappears (e.g. role changes), bounce to Brief so the
+// URL stops pointing at nothing.
+watch(validTabKeys, (keys) => {
+  const q = route.query.tab;
+  if (typeof q === "string" && q && !keys.has(q)) {
+    router.replace({ query: { ...route.query, tab: "brief" } });
+  }
+});
+
 async function load() {
   loading.value = true;
   loadError.value = null;
@@ -138,8 +200,7 @@ async function load() {
     // can fire the read before it has the auth token attached, so the rule
     // sees request.auth==null and denies. Wait for the store's auth init AND
     // refresh the ID token so Firestore picks up any role-claim updates
-    // before reading. Both swallowed — getJob will throw on the actual
-    // permission-denied path and we surface that.
+    // before reading.
     try {
       if (!auth.ready) await auth.init();
     } catch {
@@ -156,7 +217,6 @@ async function load() {
     const id = route.params.id as string;
     job.value = await getJob(id);
     if (!job.value) return;
-    // Parallel: intake schema + invoice lookup.
     const [remote, invoice] = await Promise.all([
       getIntakeSchema(job.value.trade),
       getInvoiceByJobId(id),
@@ -164,13 +224,9 @@ async function load() {
     intakeFields.value = remote?.fields ?? SEED_INTAKE_SCHEMAS[job.value.trade] ?? [];
     invoiceId.value = invoice?.id ?? null;
 
-    // Hydrate local form copies
     scheduledStart.value = job.value.scheduledStart?.toDate() ?? null;
     scheduledEnd.value = job.value.scheduledEnd?.toDate() ?? null;
     privateNotes.value = job.value.privateNotes ?? "";
-    // Start the intake draft from whatever's already on the doc — empty {} on
-    // marketplace-originated jobs, possibly populated if the client has been
-    // editing in another tab.
     intakeDraft.value = { ...(job.value.intakeFormData ?? {}) };
 
     // Clients see a "Your tradesperson" panel — fetch the tradesperson doc
@@ -188,10 +244,6 @@ async function load() {
       tradieInfo.value = null;
     }
   } catch (e) {
-    // Permission-denied or any other read failure: show the error empty
-    // state instead of leaving the view stuck on "Loading…". Log the
-    // current auth UID + the failure site so future regressions surface
-    // immediately in the console instead of looking like a rules bug.
     console.warn(
       "[JobDetailView] read failed",
       { jobId: route.params.id, signedInAs: auth.fbUser?.uid ?? null },
@@ -202,8 +254,6 @@ async function load() {
   } finally {
     loading.value = false;
   }
-  // Fire-and-forget auto-log scan once the page has loaded. The server
-  // enforces a 1-hour cooldown so this is cheap on repeat visits.
   void maybeAutoUpdateLog();
 }
 
@@ -250,7 +300,6 @@ async function commitSchedule() {
 
 async function setStatus(s: JobStatus) {
   if (!job.value) return;
-  // Mirror Kanban guard: completing a job triggers an invoice draft.
   if (s === "complete" && !confirm("Mark this job complete? A draft invoice will be created.")) {
     return;
   }
@@ -273,14 +322,12 @@ async function saveNotes() {
   }
 }
 
-/** Manual "Update log" button: forces past the server-side cooldown. */
 async function updateLogManually() {
   if (!job.value || updatingLog.value) return;
   updatingLog.value = true;
   try {
     const res = await updateJobLog(job.value.id, { force: true });
     if (res.appended) {
-      // Reload the job so the notes textarea picks up the new entry.
       const fresh = await getJob(job.value.id);
       if (fresh) {
         job.value = fresh;
@@ -297,12 +344,6 @@ async function updateLogManually() {
   }
 }
 
-/**
- * Auto-trigger on first job-load. Server-side cooldown (1h) silently
- * short-circuits repeated page loads; on the rare run that actually
- * appends, we refresh the local notes copy. All other errors are swallowed
- * — auto-log failing shouldn't block the page.
- */
 async function maybeAutoUpdateLog() {
   if (!job.value || !isTradie.value) return;
   try {
@@ -315,16 +356,12 @@ async function maybeAutoUpdateLog() {
       }
     }
   } catch (e) {
-    // Swallow — failed auto-log shouldn't pop a toast on every page load.
     console.warn("auto-log failed", e);
   }
 }
 
 async function submitBrief() {
   if (!job.value || savingIntake.value) return;
-  // Soft check required intake fields client-side; server-side enforcement
-  // would be a nice follow-up but isn't load-bearing here (client owns the
-  // job and the doc rules already restrict who can update).
   for (const f of intakeFields.value) {
     if (f.required) {
       const v = intakeDraft.value[f.key];
@@ -344,6 +381,31 @@ async function submitBrief() {
   } finally {
     savingIntake.value = false;
   }
+}
+
+async function onMarkPaid() {
+  if (!job.value || markingPaid.value) return;
+  confirmDialog.require({
+    message:
+      "Confirm you've received payment for this job? This marks the invoice paid and closes out the job.",
+    header: "Mark as paid?",
+    icon: "pi pi-check-circle",
+    acceptLabel: "Yes, mark paid",
+    rejectLabel: "Not yet",
+    accept: async () => {
+      if (!job.value) return;
+      markingPaid.value = true;
+      try {
+        await markJobPaid(job.value.id);
+        toast.success("Marked paid", "Job complete. Leave the client a review when you can.");
+        await load();
+      } catch (e) {
+        toast.error("Couldn't mark paid", humanizeError(e));
+      } finally {
+        markingPaid.value = false;
+      }
+    },
+  });
 }
 
 function openCancelDialog() {
@@ -396,22 +458,13 @@ function onReturnToApplicants() {
     },
   });
 }
-
-const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "secondary"> = {
-  accepted: "info",
-  requested: "info",
-  quoted: "warn",
-  scheduled: "success",
-  in_progress: "success",
-  awaiting_payment: "warn",
-  complete: "success",
-  reviewed: "secondary",
-  cancelled: "danger",
-};
 </script>
 
 <template>
-  <section class="bs-container py-6">
+  <section
+    class="bs-container py-3 sm:py-6"
+    :class="{ 'job-detail--cta-on': showStickyCTA }"
+  >
     <RouterLink to="/dashboard" class="text-xs text-[color:var(--bs-muted)]">← Dashboard</RouterLink>
 
     <div v-if="loading" class="bs-empty mt-4">Loading…</div>
@@ -433,20 +486,22 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
       </RouterLink>
     </div>
     <template v-else-if="job">
-      <header class="flex items-start justify-between gap-3 mt-2 mb-4">
+      <header class="flex items-start justify-between gap-2 mt-1 mb-3">
         <div class="min-w-0 flex-1">
-          <h1 class="text-xl font-bold break-words">{{ job.title }}</h1>
-          <div class="text-xs text-[color:var(--bs-muted)] mt-0.5">
-            {{ tradeLabel(job.trade) }} • Created {{ date(job.createdAt) }}
-          </div>
-          <div class="text-xs text-[color:var(--bs-muted)]">
-            {{ job.address.line1 }}, {{ job.address.city }}
+          <h1 class="text-lg font-bold break-words leading-tight">{{ job.title }}</h1>
+          <div class="text-[11px] text-[color:var(--bs-muted)] mt-0.5 truncate">
+            {{ tradeLabel(job.trade) }} · {{ job.address.line1 }}, {{ job.address.city }}
           </div>
         </div>
-        <Tag :value="job.status" :severity="statusColor[job.status]" class="shrink-0" />
+        <Tag
+          :value="STATUS_LABEL[job.status]"
+          :severity="STATUS_SEVERITY[job.status]"
+          class="shrink-0"
+        />
       </header>
 
-      <!-- ACCEPTED-STATUS BANNERS -->
+      <!-- Global banners — always above the tabs so the user can't miss them
+           while browsing tab content. -->
       <div
         v-if="job.status === 'accepted' && isClient"
         class="bs-card p-4 mb-4 border-l-4 border-l-[color:var(--bs-blue)]"
@@ -456,22 +511,9 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
           <div class="flex-1">
             <div class="font-semibold">Complete the brief so they can quote</div>
             <p class="text-sm text-[color:var(--bs-muted)] mt-1">
-              Fill in the trade-specific details below and submit. The tradesperson can already see your original post and chat with you.
+              Open the <span class="font-medium">Brief</span> tab and fill in the trade-specific
+              details. The tradesperson can already see your original post and chat with you.
             </p>
-            <div v-if="job.sourcePostId" class="mt-3 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-              <Button
-                label="Return to applicants"
-                icon="pi pi-undo"
-                text
-                size="small"
-                :loading="returningToApplicants"
-                class="self-start -ml-2"
-                @click="onReturnToApplicants"
-              />
-              <span class="text-xs text-[color:var(--bs-muted)]">
-                You can still switch until you submit the brief.
-              </span>
-            </div>
           </div>
         </div>
       </div>
@@ -485,227 +527,147 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
           <div>
             <div class="font-semibold">Awaiting client details</div>
             <p class="text-sm text-[color:var(--bs-muted)] mt-1">
-              The client is filling in the trade-specific brief. You can introduce yourself in chat in the meantime — they'll see your message.
+              The client is filling in the trade-specific brief. You can introduce
+              yourself in chat in the meantime — they'll see your message.
             </p>
           </div>
         </div>
       </div>
 
-      <div class="grid lg:grid-cols-3 gap-4">
-        <div class="lg:col-span-2 space-y-4">
-          <ChatThread
-            :chat-id="job.chatId"
-            :job-id="job.id"
-            :enable-ai-replies="isTradie"
-          />
+      <ClientQuoteApprovalBanner
+        v-if="isClient && job.status === 'quoted'"
+        :job-id="job.id"
+        class="mb-4"
+        @decided="load"
+      />
 
-          <div class="bs-card p-4">
-            <h3 class="font-semibold text-sm mb-2">Original request</h3>
-            <p class="text-sm whitespace-pre-wrap">{{ job.description }}</p>
-            <div v-if="job.intakePhotos.length" class="grid grid-cols-3 sm:grid-cols-4 gap-2 mt-3">
-              <a v-for="p in job.intakePhotos" :key="p" :href="p" target="_blank" rel="noopener">
-                <img :src="p" class="aspect-square object-cover rounded" alt="" />
-              </a>
-            </div>
-            <div v-if="intakeFields.length" class="mt-4">
-              <h4 class="font-medium text-sm mb-2">Trade-specific details</h4>
-              <!-- Editable for the client when job is in 'accepted' status
-                   (the marketplace flow's intake step); read-only otherwise. -->
-              <IntakeFormRenderer
-                v-if="isClient && job.status === 'accepted'"
-                v-model="intakeDraft"
-                :fields="intakeFields"
-              />
-              <IntakeFormRenderer
-                v-else
-                :model-value="job.intakeFormData"
-                :fields="intakeFields"
-                readonly
-                @update:model-value="() => {}"
-              />
-              <div v-if="isClient && job.status === 'accepted'" class="mt-3">
-                <Button
-                  label="Submit brief"
-                  icon="pi pi-send"
-                  :loading="savingIntake"
-                  @click="submitBrief"
-                />
-              </div>
-            </div>
-          </div>
+      <ClientApprovalBanner
+        v-if="isClient && job.status === 'awaiting_client_approval'"
+        :job-id="job.id"
+        class="mb-4"
+        @decided="load"
+      />
 
-          <InvoiceEditor v-if="invoiceId" :invoice-id="invoiceId" :can-edit="isTradie" />
-        </div>
+      <JobTabBar
+        :tabs="tabs"
+        :model-value="activeTab"
+        @update:model-value="onTabChange"
+      />
 
-        <aside class="space-y-4">
-          <!-- Client-only: who's coming. Uber-style trust signal — the
-               client sees a face + verified badges before the tradesperson
-               shows up at their door. -->
-          <div v-if="isClient" class="bs-card p-3">
-            <h3 class="font-semibold text-sm mb-2">Your tradesperson</h3>
-            <div class="flex items-start gap-3">
-              <Avatar
-                v-if="tradieInfo?.photoURL"
-                :image="tradieInfo.photoURL"
-                size="large"
-                shape="circle"
-              />
-              <Avatar
-                v-else
-                :label="tradieAvatarInitial"
-                size="large"
-                shape="circle"
-                style="background-color: var(--bs-blue); color: white; font-weight: 600;"
-              />
-              <div class="min-w-0 flex-1">
-                <div class="font-semibold text-sm truncate">{{ tradieDisplayName }}</div>
-                <div
-                  v-if="tradieInfo?.ratingCount"
-                  class="text-xs text-[color:var(--bs-muted)] mt-0.5"
-                >
-                  {{ tradieInfo.ratingAvg.toFixed(1) }} ★ ({{ tradieInfo.ratingCount }})
-                </div>
-                <div class="flex flex-wrap items-center gap-1 mt-2">
-                  <Tag
-                    v-if="tradieInfo?.idVerified"
-                    value="ID verified"
-                    severity="success"
-                  />
-                  <Tag v-if="tradieInsuranceLive" value="Insured" severity="info" />
-                  <Tag v-if="tradieWsibLive" value="WSIB" severity="info" />
-                </div>
-              </div>
-            </div>
-            <RouterLink
-              v-if="tradieInfo"
-              :to="{ name: 'TradieProfile', params: { uid: tradieInfo.id } }"
-              class="mt-3 text-xs text-[color:var(--bs-blue)] inline-block"
-            >View full profile →</RouterLink>
-          </div>
-
-          <div v-if="isTradie" class="bs-card p-3">
-            <label for="job-status-select" class="block font-semibold text-sm mb-2">Status</label>
-            <Select
-              input-id="job-status-select"
-              :model-value="job.status"
-              :options="statusOptions"
-              option-label="label"
-              option-value="value"
-              class="w-full"
-              @update:model-value="(v) => setStatus(v as JobStatus)"
-            />
-          </div>
-
-          <div class="bs-card p-3">
-            <h3 class="font-semibold text-sm mb-2">Schedule</h3>
-            <div v-if="job.scheduledStart" class="text-sm leading-snug">
-              <div>{{ dateTime(job.scheduledStart) }}</div>
-              <div class="text-[color:var(--bs-muted)]">to {{ dateTime(job.scheduledEnd) }}</div>
-            </div>
-            <p
-              v-else-if="!isTradie"
-              class="text-xs text-[color:var(--bs-muted)]"
-            >Not scheduled yet.</p>
-            <template v-if="isTradie">
-              <div class="mt-3 space-y-2">
-                <div>
-                  <label for="job-schedule-start" class="block text-[11px] text-[color:var(--bs-muted)] mb-1">Start</label>
-                  <DatePicker
-                    v-model="scheduledStart"
-                    input-id="job-schedule-start"
-                    show-time
-                    hour-format="24"
-                    class="w-full"
-                    placeholder="Start"
-                  />
-                </div>
-                <div>
-                  <label for="job-schedule-end" class="block text-[11px] text-[color:var(--bs-muted)] mb-1">End</label>
-                  <DatePicker
-                    v-model="scheduledEnd"
-                    input-id="job-schedule-end"
-                    show-time
-                    hour-format="24"
-                    class="w-full"
-                    placeholder="End"
-                  />
-                </div>
-              </div>
-              <Button
-                label="Save schedule"
-                icon="pi pi-calendar"
-                class="mt-3 w-full"
-                outlined
-                :loading="savingSchedule"
-                @click="saveSchedule"
-              />
-            </template>
-          </div>
-
-          <TimeTrackerCard
-            v-if="isTradie || isClient"
-            :job-id="job.id"
-            :tradesperson-id="job.tradespersonId"
-            :is-tradie="isTradie"
-          />
-
-          <ExpensesCard
-            v-if="isTradie"
-            :job-id="job.id"
-            :client-id="job.clientId"
-            :tradesperson-id="job.tradespersonId"
-          />
-
-          <div v-if="isTradie" class="bs-card p-3">
-            <div class="flex items-start justify-between gap-2 mb-2">
-              <label for="job-private-notes" class="block font-semibold text-sm">
-                Private notes
-                <span class="font-normal text-[color:var(--bs-muted)]">(tradesperson only)</span>
-              </label>
-              <!-- AI auto-log button — appends a summary of new client
-                   chat activity to the notes. Server bypasses its cooldown
-                   for this manual trigger. -->
-              <Button
-                icon="pi pi-sparkles"
-                label="Update log"
-                size="small"
-                outlined
-                :loading="updatingLog"
-                title="Have AI summarise recent client messages into a new log entry"
-                @click="updateLogManually"
-              />
-            </div>
-            <Textarea id="job-private-notes" v-model="privateNotes" rows="6" class="w-full" />
-            <Button label="Save notes" icon="pi pi-save" outlined size="small" class="mt-2" @click="saveNotes" />
-          </div>
-
-          <div v-if="canClientCancel" class="bs-card p-3">
-            <h3 class="font-semibold text-sm mb-2">Change of plans?</h3>
-            <p class="text-xs text-[color:var(--bs-muted)] mb-2">
-              You can cancel until work starts. The tradesperson will be notified.
-            </p>
-            <Button
-              label="Cancel this job"
-              icon="pi pi-ban"
-              severity="danger"
-              outlined
-              size="small"
-              class="w-full"
-              @click="openCancelDialog"
-            />
-          </div>
-
-          <div v-if="job.status === 'complete' || job.status === 'reviewed'" class="bs-card p-3">
-            <h3 class="font-semibold text-sm mb-2">Reviews</h3>
-            <ReviewPrompt
-              :job="job"
-              :as-role="isClient ? 'client' : 'tradesperson'"
-              @reviewed="load"
-            />
-          </div>
-        </aside>
+      <div>
+        <BriefTab
+          v-if="activeTab === 'brief'"
+          v-model:intake-draft="intakeDraft"
+          v-model:private-notes="privateNotes"
+          :job="job"
+          :is-client="isClient"
+          :is-tradie="isTradie"
+          :intake-fields="intakeFields"
+          :tradie-info="tradieInfo"
+          :tradie-insurance-live="tradieInsuranceLive"
+          :tradie-wsib-live="tradieWsibLive"
+          :saving-intake="savingIntake"
+          :returning-to-applicants="returningToApplicants"
+          :status-options="statusOptions"
+          :updating-log="updatingLog"
+          @submit-brief="submitBrief"
+          @status-change="setStatus"
+          @return-to-applicants="onReturnToApplicants"
+          @save-notes="saveNotes"
+          @update-log="updateLogManually"
+        />
+        <ScheduleTab
+          v-else-if="activeTab === 'schedule'"
+          v-model:scheduled-start="scheduledStart"
+          v-model:scheduled-end="scheduledEnd"
+          :job="job"
+          :is-client="isClient"
+          :is-tradie="isTradie"
+          :saving-schedule="savingSchedule"
+          :can-client-cancel="canClientCancel"
+          @save-schedule="saveSchedule"
+          @open-cancel-dialog="openCancelDialog"
+        />
+        <InvoiceTab
+          v-else-if="activeTab === 'invoice'"
+          :job="job"
+          :is-client="isClient"
+          :is-tradie="isTradie"
+          :invoice-id="invoiceId"
+          :marking-paid="markingPaid"
+          @mark-paid="onMarkPaid"
+          @revise-quote="showQuoteSheet = true"
+          @reviewed="load"
+        />
       </div>
+
+      <!-- Chat + AI lives in a bottom-anchored overlay rather than as a
+           tab. The composer never has to share the bottom edge with the
+           sticky CTA, and the AI assistant rides along as a sub-tab. -->
+      <JobChatButton
+        :chat-id="job.chatId"
+        :lift-for-cta="showStickyCTA"
+        @click="chatOverlayOpen = true"
+      />
+      <JobChatOverlay
+        v-model:visible="chatOverlayOpen"
+        :job="job"
+        :is-tradie="isTradie"
+      />
     </template>
+
+    <!-- Sticky bottom CTA: the tradie's primary action for this status.
+         One slot, status-driven label so the page never offers more than
+         one "next step" at a time. Lives outside the tabs so it persists
+         while the user browses other surfaces. -->
+    <div
+      v-if="showStickyCTA && job"
+      class="fixed inset-x-0 bottom-0 z-30 border-t border-[color:var(--bs-border)] bg-white/95 backdrop-blur p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-2px_8px_rgba(0,0,0,0.04)]"
+    >
+      <div class="bs-container">
+        <Button
+          v-if="job.status === 'requested'"
+          label="Prepare quote"
+          icon="pi pi-file"
+          class="w-full"
+          size="large"
+          @click="showQuoteSheet = true"
+        />
+        <Button
+          v-else-if="job.status === 'quoted'"
+          label="Edit & re-send quote"
+          icon="pi pi-pencil"
+          class="w-full"
+          size="large"
+          outlined
+          @click="showQuoteSheet = true"
+        />
+        <Button
+          v-else-if="job.status === 'in_progress'"
+          label="Finish job & prepare invoice"
+          icon="pi pi-check-circle"
+          class="w-full"
+          size="large"
+          @click="showFinishSheet = true"
+        />
+      </div>
+    </div>
+
+    <FinishJobSheet
+      v-if="job && isTradie"
+      v-model:visible="showFinishSheet"
+      :job-id="job.id"
+      :tradesperson-id="job.tradespersonId"
+      :client-id="job.clientId"
+      @submitted="load"
+    />
+
+    <QuoteSheet
+      v-if="job && isTradie"
+      v-model:visible="showQuoteSheet"
+      :job-id="job.id"
+      @submitted="load"
+    />
 
     <Dialog
       v-model:visible="showCollisionDialog"

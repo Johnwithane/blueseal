@@ -16,9 +16,15 @@ const visible = computed(() => auth.isAuthenticated && (auth.isTradie || auth.is
 // Routes that should hide the bubble even for an eligible role — wizards,
 // auth screens, and anything where a floating overlay would fight the page.
 const HIDDEN_ROUTE_PREFIXES = ["/sign-in", "/sign-up", "/forgot-password", "/onboarding"];
-const hiddenOnThisRoute = computed(() =>
-  HIDDEN_ROUTE_PREFIXES.some((p) => route.path.startsWith(p)),
-);
+// JobDetail has its own combined Chat + AI overlay (JobChatOverlay), so the
+// global bubble would double up. Hide by route name to avoid matching the
+// `/jobs/post` route as well.
+const HIDDEN_ROUTE_NAMES = new Set(["JobDetail"]);
+const hiddenOnThisRoute = computed(() => {
+  if (HIDDEN_ROUTE_PREFIXES.some((p) => route.path.startsWith(p))) return true;
+  if (typeof route.name === "string" && HIDDEN_ROUTE_NAMES.has(route.name)) return true;
+  return false;
+});
 const shouldRender = computed(() => visible.value && !hiddenOnThisRoute.value);
 
 function deriveScopeAndJobId(): { scope: AssistantScope; jobId: string | null } {

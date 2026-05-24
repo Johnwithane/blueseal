@@ -37,6 +37,13 @@ export { onJobCancelled } from "./jobs/onJobCancelled";
 export { onJobUpdated } from "./jobs/onJobUpdated";
 export { clockIn } from "./jobs/clockIn";
 export { clockOut } from "./jobs/clockOut";
+export { submitJobForApproval } from "./jobs/submitJobForApproval";
+export { clientApproveJob } from "./jobs/clientApproveJob";
+export { clientRequestChanges } from "./jobs/clientRequestChanges";
+export { markJobPaid } from "./jobs/markJobPaid";
+export { submitQuote } from "./jobs/submitQuote";
+export { clientAcceptQuote } from "./jobs/clientAcceptQuote";
+export { clientDeclineQuote } from "./jobs/clientDeclineQuote";
 
 // Invoicing
 export { onJobCompleted } from "./invoicing/onJobCompleted";

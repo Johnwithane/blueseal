@@ -180,6 +180,13 @@ async function submit() {
       {
         clientId: auth.fbUser.uid,
         tradespersonId: tradieUid,
+        clientName: auth.user?.displayName ?? auth.fbUser.displayName ?? "Client",
+        clientPhotoURL: auth.user?.photoURL ?? auth.fbUser.photoURL ?? null,
+        tradespersonName:
+          tradie.value?.displayName?.trim() ||
+          tradie.value?.companyName ||
+          "Tradesperson",
+        tradespersonPhotoURL: tradie.value?.photoURL ?? null,
         trade: selectedTrade.value,
         title: parsed.data.title,
         description: parsed.data.description,

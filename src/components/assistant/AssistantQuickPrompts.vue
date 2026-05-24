@@ -30,14 +30,21 @@ const PROMPTS = [
     label: "Diagnose",
     icon: "pi pi-bolt",
     prompt:
-      "Diagnose what's likely going on with this job. Give me three things, each as a numbered list: (1) the most likely causes, most likely first, (2) checks I should run on-site, and (3) parts or tools to bring. This is a read-only request — do not call any tools or change anything on the job.",
+      "Diagnose what's likely going on with this job. Give me two things, each as a numbered list: (1) the most likely causes, most likely first, and (2) checks I should run on-site to confirm. This is a read-only request — do not call any tools or change anything on the job.",
   },
   {
-    key: "quote",
-    label: "Quote",
-    icon: "pi pi-dollar",
+    key: "troubleshoot",
+    label: "Troubleshoot",
+    icon: "pi pi-wrench",
     prompt:
-      "Draft a quote for this job as a bulleted list of line items — description, estimated qty or hours, and ballpark unit price in CAD. End with a one-line caveat that final pricing depends on on-site inspection. This is a read-only request — do not call any tools or change anything on the job.",
+      "I've tried the obvious fix on this job and it didn't resolve it. Give me a troubleshooting plan as a numbered list: less common causes to consider, deeper checks or tests to run, and what to rule out before escalating. This is a read-only request — do not call any tools or change anything on the job.",
+  },
+  {
+    key: "parts",
+    label: "Parts & tools",
+    icon: "pi pi-box",
+    prompt:
+      "List the parts, materials, and tools I should bring to this job. Use two short bulleted lists — one for parts/materials (with typical sizes or specs where relevant) and one for tools. Keep it to what's likely needed, not exhaustive. This is a read-only request — do not call any tools or change anything on the job.",
   },
   {
     key: "summary",
@@ -78,11 +85,17 @@ async function runPrompt(text: string) {
 <style scoped>
 .bs-ai-chips {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.45rem;
   padding: 0.55rem 0.85rem;
   border-top: 1px solid var(--bs-border);
   background: white;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.bs-ai-chips::-webkit-scrollbar {
+  display: none;
 }
 .bs-ai-chip {
   display: inline-flex;
@@ -96,6 +109,8 @@ async function runPrompt(text: string) {
   font-size: 0.78rem;
   font-weight: 500;
   cursor: pointer;
+  white-space: nowrap;
+  flex: 0 0 auto;
   transition: background-color 0.12s ease, border-color 0.12s ease, transform 0.12s ease;
 }
 .bs-ai-chip:hover {

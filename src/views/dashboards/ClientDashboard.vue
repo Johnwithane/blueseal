@@ -4,6 +4,7 @@ import { RouterLink } from "vue-router";
 import Button from "primevue/button";
 import SelectButton from "primevue/selectbutton";
 import Tag from "primevue/tag";
+import JobCounterparty from "@/components/JobCounterparty.vue";
 import { useAuthStore } from "@/stores/auth";
 import { subscribeClientJobs } from "@/firebase/services/jobs";
 import { subscribeMyJobPosts } from "@/firebase/services/jobPosts";
@@ -118,6 +119,13 @@ function formatBudget(min: number, max: number): string {
             <Tag :value="job.status" :severity="statusSeverity[job.status] ?? 'info'" />
           </div>
           <p class="text-sm mt-2 text-[color:var(--bs-muted)] line-clamp-2">{{ job.description }}</p>
+          <div class="mt-3 pt-3 border-t border-[color:var(--bs-border)]">
+            <JobCounterparty
+              role="tradesperson"
+              :name="job.tradespersonName"
+              :photo-url="job.tradespersonPhotoURL"
+            />
+          </div>
         </RouterLink>
       </div>
     </template>

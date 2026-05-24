@@ -10,12 +10,22 @@ import AssistantBubble from "@/components/assistant/AssistantBubble.vue";
 
 const route = useRoute();
 const chromeless = computed(() => route.path === "/onboarding" || route.path.startsWith("/admin"));
+// Mobile-compact routes hide the global chrome below the `sm` breakpoint so
+// content (chat threads, sticky CTAs) can use the full viewport height. The
+// chrome stays on tablet/desktop because the screen has the room.
+const mobileCompact = computed(() => route.meta.mobileCompact === true);
 </script>
 
 <template>
   <div class="min-h-full flex flex-col">
-    <AppHeader v-if="!chromeless" />
-    <TradieStatusBanner v-if="!chromeless" />
+    <AppHeader
+      v-if="!chromeless"
+      :class="{ 'hidden sm:block': mobileCompact }"
+    />
+    <TradieStatusBanner
+      v-if="!chromeless"
+      :class="{ 'hidden sm:block': mobileCompact }"
+    />
     <main class="flex-1">
       <RouterView />
     </main>

@@ -39,6 +39,14 @@ interface ApplicationDoc {
 
 interface TradespersonDoc {
   isVisible?: boolean;
+  displayName?: string | null;
+  photoURL?: string | null;
+  companyName?: string | null;
+}
+
+interface UserDoc {
+  displayName?: string | null;
+  photoURL?: string | null;
 }
 
 interface ChatPayload {
@@ -53,6 +61,10 @@ interface ChatPayload {
 interface JobPayload {
   clientId: string;
   tradespersonId: string;
+  clientName: string;
+  clientPhotoURL: string | null;
+  tradespersonName: string;
+  tradespersonPhotoURL: string | null;
   status: "accepted";
   trade: string;
   title: string;
@@ -129,8 +141,13 @@ export const acceptApplication = onCall({ enforceAppCheck: false }, async (req) 
         );
       }
 
-      // Tradie still has to be approved at acceptance time.
-      const tradieSnap = await tx.get(db.doc(`tradespeople/${app.tradespersonId}`));
+      // Tradie still has to be approved at acceptance time. Also read both
+      // user docs so we can denormalize the counterparty display fields onto
+      // the job (rules block parties from reading each other's user doc).
+      const [tradieSnap, clientUserSnap] = await Promise.all([
+        tx.get(db.doc(`tradespeople/${app.tradespersonId}`)),
+        tx.get(db.doc(`users/${uid}`)),
+      ]);
       const tradie = tradieSnap.data() as TradespersonDoc | undefined;
       if (!tradie?.isVisible) {
         throw new HttpsError(
@@ -138,6 +155,7 @@ export const acceptApplication = onCall({ enforceAppCheck: false }, async (req) 
           "This tradesperson is no longer available. Their account was suspended or de-listed.",
         );
       }
+      const clientUser = clientUserSnap.data() as UserDoc | undefined;
 
       postSnapshot = post;
 
@@ -151,6 +169,13 @@ export const acceptApplication = onCall({ enforceAppCheck: false }, async (req) 
       const jobPayload: JobPayload = {
         clientId: uid,
         tradespersonId: app.tradespersonId,
+        clientName: (clientUser?.displayName ?? "").trim() || "Client",
+        clientPhotoURL: clientUser?.photoURL ?? null,
+        tradespersonName:
+          (tradie.displayName ?? "").trim() ||
+          (tradie.companyName ?? "").trim() ||
+          "Tradesperson",
+        tradespersonPhotoURL: tradie.photoURL ?? null,
         status: "accepted",
         trade: post.trade,
         title: post.title,

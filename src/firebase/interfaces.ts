@@ -153,6 +153,10 @@ export interface TradespersonDoc {
   isVisible: boolean;
   weeklyAvailability: WeeklyAvailability;
   nextInvoiceNumber: number;
+  // Mirrors nextInvoiceNumber for the quotes collection. Lazily backfilled
+  // by submitQuote (defaults to 1) so pre-existing tradesperson docs that
+  // predate the quote flow keep working.
+  nextQuoteNumber?: number;
   paymentInstructions: string;
   submittedAt: Timestamp | null;
   approvedAt: Timestamp | null;
@@ -282,12 +286,27 @@ export interface IntakeFormSchemaDoc {
 // (acceptApplication callable). The client still owes the trade-specific intake
 // form; once submitted the job transitions to "requested" and joins the standard
 // flow. Direct /request/:uid jobs skip "accepted" and start at "requested".
+//
+// "awaiting_client_approval" sits between "in_progress" and "awaiting_payment":
+// the tradesperson has used the Finish-job flow to draft the invoice, and the
+// client is being asked to approve the work before payment is requested. From
+// here the client either approves (→ awaiting_payment) or requests changes
+// (→ in_progress + reason posted in chat). Both transitions go through
+// callables (submitJobForApproval / clientApproveJob / clientRequestChanges)
+// so the invoice doc + chat system message stay in lockstep with the status.
+//
+// "quote_accepted" sits between "quoted" and "scheduled": the client has
+// accepted the quote (via clientAcceptQuote) and the tradesperson now needs
+// to pick a date. Schedule write transitions the job into "scheduled" via
+// the existing scheduleJob flow.
 export type JobStatus =
   | "accepted"
   | "requested"
   | "quoted"
+  | "quote_accepted"
   | "scheduled"
   | "in_progress"
+  | "awaiting_client_approval"
   | "awaiting_payment"
   | "complete"
   | "reviewed"
@@ -306,6 +325,15 @@ export interface JobAddress {
 export interface JobDoc {
   clientId: string;
   tradespersonId: string;
+  // Denormalized at job-creation time so each party can render the
+  // counterparty's name + avatar on dashboard cards without a cross-account
+  // user-doc read (users/{uid} is owner+admin only). Optional — jobs created
+  // before this field was added leave them undefined; the UI falls back to a
+  // generic label + initial-circle avatar.
+  clientName?: string | null;
+  clientPhotoURL?: string | null;
+  tradespersonName?: string | null;
+  tradespersonPhotoURL?: string | null;
   status: JobStatus;
   trade: string;
   title: string;
@@ -321,6 +349,13 @@ export interface JobDoc {
   scheduledEnd: Timestamp | null;
   createdAt: Timestamp;
   completedAt: Timestamp | null;
+  // Set by submitJobForApproval when the tradesperson sends the wrapped-up
+  // job to the client. Cleared back to null on clientRequestChanges so a
+  // subsequent re-submit shows a fresh timestamp.
+  clientApprovalRequestedAt: Timestamp | null;
+  // Set by clientApproveJob — locks in the moment the client signed off so
+  // any later dispute can reference the approval timeline.
+  clientApprovedAt: Timestamp | null;
   cancelledAt: Timestamp | null;
   cancelledReason: string | null;
   // uid of the party who cancelled — used by onJobCancelled trigger to pick
@@ -578,11 +613,26 @@ export type InvoiceStatus =
   | "disputed"
   | "void";
 
+// Classification of a line item — drives how the editor row collects input
+// and how the rendered invoice/quote labels it. Optional/legacy lines that
+// predate this field render with no badge and behave like the historical
+// quantity × unitPrice shape (which is exactly what every kind reduces to
+// when totaled).
+//
+//   hourly:    quantity = hours, unitPrice = hourly rate (cents/hr).
+//              Total line = hours × rate. Auto-pulled time entries also
+//              carry this kind.
+//   labour:    flat-fee labour. quantity = 1, unitPrice = total.
+//   materials: parts / receipts / supplies. quantity = 1, unitPrice = total.
+//              Auto-pulled expense rows carry this kind.
+export type LineItemKind = "hourly" | "labour" | "materials";
+
 export interface LineItem {
   // Stable id for lines pulled in from a time entry or expense, so the
   // pull-billables flow can avoid double-pulling the same source row.
   // Manually-typed line items leave it undefined.
   id?: string;
+  kind?: LineItemKind;
   description: string;
   quantity: number;
   unitPrice: number; // cents
@@ -624,6 +674,19 @@ export interface InvoicePaymentState {
   lastWebhookEventId: string | null;
 }
 
+// Optional whole-invoice discount applied to the subtotal before tax. Stored
+// as a structured value (not a negative line item) so PDFs + the invoice view
+// can render it on its own row and the math stays unambiguous when mixed tax
+// rates are in play. Null when no discount is applied.
+export interface InvoiceDiscount {
+  type: "percent" | "fixed";
+  // For "percent": 0-100 (UI clamps before write). For "fixed": cents.
+  value: number;
+  // Optional human label rendered next to the discount row (e.g.
+  // "Repeat customer", "Veteran"). Null/empty hides the label.
+  label: string | null;
+}
+
 export interface InvoiceDoc {
   tradespersonId: string;
   clientId: string;
@@ -631,9 +694,11 @@ export interface InvoiceDoc {
   invoiceNumber: string;
   status: InvoiceStatus;
   lineItems: LineItem[];
-  subtotal: number;
-  taxTotal: number;
-  total: number;
+  subtotal: number; // pre-discount sum of (quantity × unitPrice) across lines
+  discount: InvoiceDiscount | null;
+  discountAmount: number; // cents subtracted from subtotal; always 0 when discount is null
+  taxTotal: number; // tax computed on the post-discount base, proportionally per line
+  total: number; // subtotal − discountAmount + taxTotal
   currency: string;
   issuedAt: Timestamp | null;
   dueAt: Timestamp | null;
@@ -683,6 +748,73 @@ export interface DisputeDoc {
   evidenceDueBy: Timestamp | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+}
+
+// ---------------------------------------------------------------------------
+// quotes/{quoteId}
+// Tradesperson-authored estimate sent to the client *before* work starts.
+// Shape mirrors InvoiceDoc (same LineItem / InvoiceDiscount types, same
+// totals math via recomputeTotals) so the editor + sheet UIs stay
+// near-identical to their invoice counterparts. Deterministic id = jobId
+// keeps the create idempotent.
+//
+// status timeline:
+//   draft   — tradesperson is building, never shown to client
+//   sent    — client now sees it; awaiting their decision
+//   viewed  — client opened the job page after sent (soft signal)
+//   accepted — client clicked Accept; job flips to "quote_accepted"
+//   declined — client clicked Discuss/Decline; job stays "quoted" so the
+//              tradesperson can revise and re-send (status flips back to
+//              "sent" on next submitQuote call)
+//   expired  — validUntil passed without a decision; scheduled function
+//              (future) sets this and re-prompts the tradesperson
+//   withdrawn — admin-only; reserved for support intervention
+// ---------------------------------------------------------------------------
+export type QuoteStatus =
+  | "draft"
+  | "sent"
+  | "viewed"
+  | "accepted"
+  | "declined"
+  | "expired"
+  | "withdrawn";
+
+export interface QuoteDoc {
+  tradespersonId: string;
+  clientId: string;
+  jobId: string;
+  quoteNumber: string;
+  status: QuoteStatus;
+  lineItems: LineItem[];
+  subtotal: number;
+  discount: InvoiceDiscount | null;
+  discountAmount: number;
+  taxTotal: number;
+  total: number;
+  currency: string;
+  // Optional estimate hint shown alongside the totals — useful for hourly
+  // ranges ("about 4-6 hours"). Free-form so tradies can write whatever
+  // qualifier fits.
+  estimatedHours: number | null;
+  // Quote expiry. Defaults to issuedAt + 14 days when the sheet submits.
+  // The client banner shows "valid until {date}"; a (future) scheduled
+  // function flips expired status past this date.
+  validUntil: Timestamp | null;
+  // Scope/exclusions/assumptions — free text shown verbatim on the quote.
+  terms: string;
+  // Short cover note rendered above the quote and surfaced in the chat
+  // system-message preview when the quote is sent.
+  noteToClient: string;
+  // Optional rejection reason from clientDeclineQuote — preserved across
+  // resends so the tradesperson can see "they declined with: X" while
+  // revising.
+  declinedReason: string | null;
+  issuedAt: Timestamp | null;
+  sentAt: Timestamp | null;
+  viewedAt: Timestamp | null;
+  acceptedAt: Timestamp | null;
+  declinedAt: Timestamp | null;
+  pdfUrl: string | null;
 }
 
 // ---------------------------------------------------------------------------
