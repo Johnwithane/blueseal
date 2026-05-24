@@ -78,6 +78,37 @@ export interface RatingDimension {
   count: number;
 }
 
+// ---------------------------------------------------------------------------
+// Stripe Connect Express payout state. Mirrored from Stripe by the
+// `account.updated` webhook + the `createConnectAccount` callable so search
+// + rules + UI can read it as a single Firestore subscription without
+// round-tripping to Stripe. Server-managed: every field is locked against
+// owner writes by /tradespeople rules.
+//
+// Lifecycle:
+//   not_started → in_progress → restricted | enabled
+//                 (account exists but hasn't completed onboarding)
+// `enabled` is the only state that lets `maybeMarkVisible(uid)` set
+// /tradespeople/{uid}.isVisible = true post-cutover; `restricted` means
+// Stripe needs more info from the tradesperson (pendingRequirements).
+// ---------------------------------------------------------------------------
+export type ConnectOnboardingStatus =
+  | "not_started"
+  | "in_progress"
+  | "restricted"
+  | "enabled";
+
+export interface PayoutsState {
+  stripeAccountId: string | null;
+  onboardingStatus: ConnectOnboardingStatus;
+  chargesEnabled: boolean;
+  payoutsEnabled: boolean;
+  detailsSubmitted: boolean;
+  disabledReason: string | null;
+  pendingRequirements: string[];
+  lastSyncedAt: Timestamp | null;
+}
+
 export interface TradespersonDoc {
   // Denormalized from users/{uid} so the public profile page can show the
   // tradie's name and avatar without needing read access to users (which is
@@ -127,6 +158,19 @@ export interface TradespersonDoc {
   paymentInstructions: string;
   submittedAt: Timestamp | null;
   approvedAt: Timestamp | null;
+  // Stripe Connect Express state — mirrored from Stripe via the
+  // `account.updated` webhook. Optional only while the data-model migration
+  // is rolling out; the `backfillPayoutsField` admin callable seeds the
+  // `not_started` default on every approved tradesperson so post-backfill
+  // every doc has it. Service code reading this should still default-handle
+  // undefined for safety.
+  payouts?: PayoutsState;
+  // Public "verified earnings" stats — server-incremented in the
+  // `payment_intent.succeeded` webhook. Drives a social-proof badge on the
+  // public profile ("$50k+ paid through Blue Seal"). Optional because
+  // pre-cutover docs don't have it; readers should treat undefined as 0.
+  paidJobsCount?: number;
+  paidLifetimeCents?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -518,13 +562,22 @@ export interface BookingDoc {
 
 // ---------------------------------------------------------------------------
 // invoices/{invoiceId}
+// `processing | refunded | partially_refunded | disputed` were added with
+// the Stripe Connect cutover. Pre-cutover invoices only carry the original
+// states; new invoices walk: draft → sent → (processing) → paid →
+// (refunded | partially_refunded | disputed). `void` is reachable from any
+// pre-paid state via the future void-and-reissue callable.
 // ---------------------------------------------------------------------------
 export type InvoiceStatus =
   | "draft"
   | "sent"
   | "viewed"
+  | "processing"
   | "paid"
   | "overdue"
+  | "refunded"
+  | "partially_refunded"
+  | "disputed"
   | "void";
 
 export interface LineItem {
@@ -536,6 +589,41 @@ export interface LineItem {
   quantity: number;
   unitPrice: number; // cents
   taxRate: number; // 0-1
+}
+
+// One refund event on a paid invoice. Appended to InvoicePaymentState.refunds
+// when Stripe delivers a `charge.refunded` webhook; refundedAmount on the
+// parent is the running total. `reason` is the Stripe-provided string
+// ("requested_by_customer" / "duplicate" / "fraudulent") or a freeform
+// admin note when refunded through the admin dashboard.
+export interface InvoiceRefund {
+  refundId: string;
+  amount: number; // cents
+  reason: string | null;
+  createdAt: Timestamp;
+}
+
+// All Stripe-side state for a paid (or in-flight) invoice. Server-managed
+// only: the `payment` field is locked against owner writes by /invoices
+// rules. Created by `createInvoicePaymentIntent` / `sendInvoice`, mutated
+// by the Stripe webhook dispatcher. `applicationFeeBps` is the snapshot of
+// the platform fee BPS at send-time so historical invoices stay auditable
+// even if the platform fee changes later. `lastWebhookEventId` lets the
+// dispatcher short-circuit duplicate events at the per-invoice level on
+// top of the global webhookEvents sentinel.
+export interface InvoicePaymentState {
+  paymentIntentId: string | null;
+  clientSecret: string | null;
+  chargeId: string | null;
+  applicationFeeAmount: number | null; // cents
+  applicationFeeBps: number | null;
+  transferId: string | null;
+  transferDestination: string | null;
+  refundedAmount: number; // cents, running total; 0 if no refunds
+  refunds: InvoiceRefund[];
+  disputeId: string | null;
+  disputeStatus: string | null;
+  lastWebhookEventId: string | null;
 }
 
 export interface InvoiceDoc {
@@ -556,8 +644,16 @@ export interface InvoiceDoc {
   paidAt: Timestamp | null;
   pdfUrl: string | null;
   paymentInstructions: string;
+  // `paymentMethod` is kept for legacy docs but is being phased out — the
+  // Connect cutover makes "stripe" the only valid value. Removed from new
+  // docs in the Phase B sendInvoice rewrite; readers should fall back to
+  // `payment != null ? "stripe" : "manual"`.
   paymentMethod: "manual" | "stripe";
   recurring: { enabled: boolean; frequency: string; nextRunAt: Timestamp | null } | null;
+  // Stripe-side state. Null on legacy invoices created before the Connect
+  // cutover (they continue to support manual "mark paid"). Always set on
+  // invoices created after the cutover. Server-managed.
+  payment?: InvoicePaymentState | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -623,6 +719,61 @@ export interface AssistantMessageDoc {
   tokensIn: number | null; // only set on assistant turns
   tokensOut: number | null;
   contextSnapshot: AssistantContextSnapshot | null;
+}
+
+// ---------------------------------------------------------------------------
+// payouts/{stripePayoutId}
+// Denormalised ledger of Stripe Connect payouts to tradespeople. Doc id is
+// the Stripe `po_…` id so writes from `payout.created|paid|failed` webhook
+// events are naturally idempotent. The tradie's "Payouts" view subscribes
+// here (filtered by `tradespersonId`) instead of round-tripping to Stripe
+// on every render.
+//
+// `invoiceIds[]` is best-effort: the dispatcher resolves it via the
+// balance-transactions linked to the payout. Empty on payouts where the
+// resolution failed or hadn't run yet — those still render with the gross
+// amount, just without a line-item breakdown.
+// ---------------------------------------------------------------------------
+export type PayoutStatus =
+  | "pending"
+  | "in_transit"
+  | "paid"
+  | "failed"
+  | "canceled";
+
+export interface PayoutDoc {
+  tradespersonId: string;
+  stripeAccountId: string;
+  stripePayoutId: string;
+  amount: number; // net cents
+  currency: string;
+  arrivalDate: Timestamp;
+  status: PayoutStatus;
+  failureCode: string | null;
+  failureMessage: string | null;
+  invoiceIds: string[];
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+// ---------------------------------------------------------------------------
+// webhookEvents/{stripeEventId}
+// Idempotency sentinel for the Stripe webhook dispatcher. Doc id is the
+// Stripe event id (`evt_…`). The dispatcher does `create()` first (fails if
+// already exists), then performs side-effects, then flips status to
+// `processed`. Stripe retries deliver the same event id, so the second
+// attempt sees the existing doc and exits without re-running side-effects.
+// `status: "failed"` flags an event for ops — manual replay = delete the
+// sentinel and let Stripe redeliver, or trigger from the Stripe dashboard.
+// ---------------------------------------------------------------------------
+export type WebhookEventStatus = "processing" | "processed" | "failed";
+
+export interface WebhookEventDoc {
+  type: string;
+  receivedAt: Timestamp;
+  processedAt: Timestamp | null;
+  status: WebhookEventStatus;
+  errorMessage: string | null;
 }
 
 // ---------------------------------------------------------------------------

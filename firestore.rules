@@ -139,6 +139,14 @@ service cloud.firestore {
         && request.resource.data.ratingDimensions == resource.data.ratingDimensions
         && request.resource.data.nextInvoiceNumber == resource.data.nextInvoiceNumber
         && request.resource.data.approvedAt == resource.data.approvedAt
+        // Stripe Connect state + verified-earnings stats are server-managed
+        // (webhook dispatcher + payment_intent.succeeded handler). On
+        // pre-cutover docs the field is absent on both sides → equality
+        // holds. Post-cutover any owner-side write that touches them is
+        // rejected.
+        && request.resource.data.payouts == resource.data.payouts
+        && request.resource.data.paidJobsCount == resource.data.paidJobsCount
+        && request.resource.data.paidLifetimeCents == resource.data.paidLifetimeCents
         && (resource.data.vettingStatus == 'approved'
             ? request.resource.data.vettingStatus == 'approved'
             : request.resource.data.vettingStatus in ['draft','pending','info_requested']);
@@ -533,9 +541,36 @@ service cloud.firestore {
         && request.resource.data.tradespersonId == resource.data.tradespersonId
         && request.resource.data.clientId == resource.data.clientId
         && request.resource.data.jobId == resource.data.jobId
+        // Stripe payment state is server-managed (createInvoicePaymentIntent
+        // callable + webhook dispatcher). Owner can't tamper with the
+        // PaymentIntent / refunds / dispute mirror. Pre-cutover legacy
+        // invoices don't have the field on either side → equality holds.
+        // The broader "lineItems/total immutable once sent" tightening
+        // lands with the Phase B sendInvoice rewrite.
+        && request.resource.data.payment == resource.data.payment
         && resource.data.status != 'paid';
       allow update: if isAdmin();
       allow delete: if isAdmin();
+    }
+
+    // ---------- payouts (Stripe Connect payout ledger; server-only writes) ----------
+    // Doc id == Stripe `po_…` payout id; created/updated by the webhook
+    // dispatcher in response to `payout.created|paid|failed` events. The
+    // tradesperson subscribes to their own payouts for the in-app Payouts
+    // view; admins can read across tradies. No client-side writes — the
+    // dispatcher uses the Admin SDK which bypasses rules.
+    match /payouts/{payoutId} {
+      allow read: if isAdmin()
+        || (isSignedIn() && resource.data.tradespersonId == uid());
+      allow create, update, delete: if false;
+    }
+
+    // ---------- webhookEvents (Stripe webhook idempotency sentinel; server-only) ----------
+    // Doc id == Stripe `evt_…` event id. Dispatcher creates the sentinel
+    // before doing any side-effect work, so retried deliveries become
+    // no-ops. Never readable from the client — internal infra.
+    match /webhookEvents/{eventId} {
+      allow read, write: if false;
     }
 
     // ---------- ai usage (write via Cloud Function; admin/owner read) ----------
