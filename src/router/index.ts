@@ -84,6 +84,28 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, role: "tradesperson" as RoleGuard },
   },
 
+  // Payouts (Stripe Connect onboarding + dashboard link). /return + /refresh
+  // mirror the redirect targets Stripe sends users to after the hosted form;
+  // all three resolve to the same view (it shows a toast + replaces the URL).
+  {
+    path: "/payouts",
+    name: "Payouts",
+    component: () => import("@/views/payouts/PayoutsOnboardingView.vue"),
+    meta: { requiresAuth: true, role: "tradesperson" as RoleGuard },
+  },
+  {
+    path: "/payouts/return",
+    name: "PayoutsReturn",
+    component: () => import("@/views/payouts/PayoutsOnboardingView.vue"),
+    meta: { requiresAuth: true, role: "tradesperson" as RoleGuard },
+  },
+  {
+    path: "/payouts/refresh",
+    name: "PayoutsRefresh",
+    component: () => import("@/views/payouts/PayoutsOnboardingView.vue"),
+    meta: { requiresAuth: true, role: "tradesperson" as RoleGuard },
+  },
+
   // Job detail (tradies + clients)
   {
     path: "/jobs/:id",

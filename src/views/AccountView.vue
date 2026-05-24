@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import { RouterLink, useRouter } from "vue-router";
 import { updateProfile } from "firebase/auth";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
@@ -490,6 +490,30 @@ async function grantAdminAllRoles() {
       :tradie-uid="auth.fbUser.uid"
       class="mt-4"
     />
+
+    <!-- Tradesperson-only payouts shortcut. State + actions live on /payouts;
+         this card is just a stable, discoverable entry point from Account. -->
+    <div v-if="auth.hasTradieRole" class="bs-card mt-4 p-5 flex items-start gap-3">
+      <i
+        class="pi pi-credit-card text-2xl mt-0.5 text-[color:var(--bs-blue)]"
+        aria-hidden="true"
+      ></i>
+      <div class="flex-1 min-w-0">
+        <h2 class="text-lg font-semibold">Payouts</h2>
+        <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
+          Connect or manage the bank account where Blue Seal pays out your
+          invoices through Stripe.
+        </p>
+      </div>
+      <RouterLink to="/payouts" class="shrink-0">
+        <Button
+          label="Manage payouts"
+          icon="pi pi-arrow-right"
+          icon-pos="right"
+          outlined
+        />
+      </RouterLink>
+    </div>
 
     <div class="bs-card mt-4 p-5">
       <h2 class="text-lg font-semibold">Password</h2>

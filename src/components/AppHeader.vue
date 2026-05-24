@@ -159,6 +159,17 @@ const items = computed(() => {
     },
   );
 
+  // Payouts is tradesperson-only; lives in the dropdown rather than the
+  // inline header nav to keep the bar uncluttered. The status banner +
+  // dashboard CTA give the other discovery paths.
+  if (auth.hasTradieRole && auth.activeRole === "tradesperson") {
+    list.push({
+      label: "Payouts",
+      icon: "pi pi-credit-card",
+      command: () => router.push({ name: "Payouts" }),
+    });
+  }
+
   if (auth.canSwitchRole) {
     list.push({ separator: true });
     if (auth.hasClientRole && auth.activeRole !== "client") {
