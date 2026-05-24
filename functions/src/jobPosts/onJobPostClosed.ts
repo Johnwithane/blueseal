@@ -64,6 +64,7 @@ export const onJobPostClosed = onDocumentUpdated(
                 ? `Job "${after.title ?? "untitled"}" expired before a tradesperson was picked.`
                 : `Job "${after.title ?? "untitled"}" is no longer open.`,
             link: `/my-applications`,
+            recipientRole: "tradesperson",
           });
         }),
       );

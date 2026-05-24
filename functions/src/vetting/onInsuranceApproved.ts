@@ -33,6 +33,7 @@ export const onInsuranceApproved = onDocumentUpdated(
       body:
         "Your insurance proof was approved. The 'Insurance Verified' badge is now showing on your public profile.",
       link: "/dashboard/tradie",
+      recipientRole: "tradesperson",
     });
   },
 );

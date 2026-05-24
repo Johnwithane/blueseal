@@ -55,6 +55,9 @@ export const onMessageCreated = onDocumentCreated(
       jobId: chat.jobId,
       chatId,
       actorUid: msg.senderId,
+      // Sender is on the chat (clientId or tradespersonId), so the
+      // recipient role is the opposite seat at the table.
+      recipientRole: recipient === chat.clientId ? "client" : "tradesperson",
       // Chat is high-volume; in-app + bell badge is enough. Email/SMS on
       // every line would be unbearable.
       priority: "low",

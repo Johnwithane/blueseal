@@ -156,6 +156,7 @@ export async function handleChargeDisputeCreated(
         body: `Reason: ${dispute.reason.replace(/_/g, " ")}. Open the disputes queue to coordinate evidence.`,
         link: `/admin/disputes/${dispute.id}`,
         actorUid: null,
+        recipientRole: "admin",
         priority: "high",
       });
     } else {
@@ -178,6 +179,7 @@ export async function handleChargeDisputeCreated(
       body: `Invoice ${(invData.invoiceNumber as string) ?? ""} is under dispute (reason: ${dispute.reason.replace(/_/g, " ")}). Our team is handling it — no action needed from you.`,
       link: invData.jobId ? `/jobs/${invData.jobId}` : null,
       actorUid: null,
+      recipientRole: "tradesperson",
       priority: "normal",
     });
   }

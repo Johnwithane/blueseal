@@ -117,6 +117,7 @@ export const submitApplication = onCall({ enforceAppCheck: false }, async (req) 
       body: `Someone applied to your job "${post.title}".`,
       link: `/jobs/posted/${postId}`,
       actorUid: uid,
+      recipientRole: "client",
       priority: "high",
     });
 

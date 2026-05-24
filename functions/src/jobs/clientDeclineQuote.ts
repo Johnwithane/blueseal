@@ -101,6 +101,7 @@ export const clientDeclineQuote = onCall({ enforceAppCheck: false }, async (req)
     actorUid: uid,
     jobId,
     chatId: result.chatId ?? null,
+    recipientRole: "tradesperson",
     priority: "high",
   });
 

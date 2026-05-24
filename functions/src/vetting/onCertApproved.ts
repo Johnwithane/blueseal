@@ -28,5 +28,6 @@ export const onCertApproved = onDocumentUpdated("certifications/{certId}", async
     title: "Certification approved",
     body: `Your ${after.trade} certification was verified. It's now showing on your public profile.`,
     link: "/dashboard/tradie",
+    recipientRole: "tradesperson",
   });
 });

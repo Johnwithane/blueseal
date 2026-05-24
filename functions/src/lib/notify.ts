@@ -8,6 +8,9 @@ import { enqueueWhatsApp } from "./whatsapp";
 // let users pick SMS over WhatsApp once we have one), but every notify
 // call routes "high" through WhatsApp by default to keep cost near zero.
 
+// Keep in sync with src/firebase/interfaces.ts → Role.
+export type Role = "client" | "tradesperson" | "admin";
+
 // Keep in sync with src/firebase/interfaces.ts → NotificationType.
 // Cross-package boundary means we can't share the type literally; the
 // NotificationsPanel renderer + service consume the src/ copy.
@@ -58,6 +61,13 @@ export interface NotifyInput {
   chatId?: string | null;
   actorUid?: string | null;
   priority?: NotifyPriority;
+  // The role the recipient should be viewing as for the link to make
+  // sense. The in-app notifications-bell handler reads this and flips
+  // the user's activeRole before navigating, so multi-role accounts
+  // land in the right view. Every call site already knows what role it
+  // is notifying — pass it; null is reserved for ambiguous / role-
+  // agnostic notifications (rare).
+  recipientRole?: Role | null;
 }
 
 interface UserContact {
@@ -129,6 +139,7 @@ export async function notify(input: NotifyInput): Promise<void> {
       jobId: input.jobId ?? null,
       chatId: input.chatId ?? null,
       actorUid: input.actorUid ?? null,
+      recipientRole: input.recipientRole ?? null,
     });
   } catch (err) {
     logger.error("notify: in-app write failed", { type: input.type, userId: input.userId, err });

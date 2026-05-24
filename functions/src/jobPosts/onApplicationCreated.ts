@@ -32,6 +32,7 @@ export const onApplicationCreated = onDocumentCreated(
         body: `Someone applied to your job${post?.title ? ` "${post.title}"` : ""}.`,
         link: `/jobs/posted/${postId}`,
         actorUid: app.tradespersonId,
+        recipientRole: "client",
         // Belt-and-suspenders dupe: submitApplication callable already
         // fanned email + SMS; stay in-app-only here to avoid double-paging.
         priority: "low",

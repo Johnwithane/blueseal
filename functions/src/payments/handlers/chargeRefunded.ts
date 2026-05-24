@@ -135,6 +135,7 @@ export async function handleChargeRefunded(
       body: `${fmtMoney(amount, currency)} refunded to the client. The payout adjustment will show on your Stripe dashboard.`,
       link: jobId ? `/jobs/${jobId}` : null,
       actorUid: data.clientId,
+      recipientRole: "tradesperson",
       priority: "high",
     }),
     notify({
@@ -144,6 +145,7 @@ export async function handleChargeRefunded(
       body: `${fmtMoney(amount, currency)} has been refunded to your original payment method.`,
       link: jobId ? `/jobs/${jobId}` : null,
       actorUid: data.tradespersonId,
+      recipientRole: "client",
       priority: "high",
     }),
   ]);

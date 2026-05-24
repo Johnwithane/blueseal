@@ -15,6 +15,10 @@ import {
   markNotificationRead,
   subscribeMyNotifications,
 } from "@/firebase/services/notifications";
+import {
+  resolveNotificationLink,
+  shouldSwitchRoleForNotification,
+} from "@/utils/notifications";
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -66,7 +70,21 @@ async function onOpenNotification(item: WithId<NotificationDoc>) {
       /* surfaced via UI eventually if write fails persistently */
     });
   }
-  if (item.link) router.push(item.link);
+  const link = resolveNotificationLink(item);
+  if (!link) return;
+
+  // Multi-role accounts: if the notification was raised for the user
+  // wearing a different hat than they're currently wearing, flip the
+  // active role BEFORE navigating so the page renders in the right
+  // context (header chrome, role-gated tabs in JobPostDetailView, etc).
+  if (shouldSwitchRoleForNotification(item, auth.activeRole, auth.roles)) {
+    try {
+      await auth.switchActiveRole(item.recipientRole);
+    } catch {
+      /* persistence failed — push anyway so the user isn't stranded */
+    }
+  }
+  router.push(link);
 }
 
 async function onMarkAllRead() {

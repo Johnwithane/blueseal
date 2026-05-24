@@ -412,7 +412,10 @@ service cloud.firestore {
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.jobId == resource.data.jobId
         && request.resource.data.chatId == resource.data.chatId
-        && request.resource.data.actorUid == resource.data.actorUid;
+        && request.resource.data.actorUid == resource.data.actorUid
+        // .get(..., null) handles legacy docs that pre-date the field —
+        // both sides resolve to null so the equality check holds.
+        && request.resource.data.get('recipientRole', null) == resource.data.get('recipientRole', null);
       allow create, delete: if false;
     }
 

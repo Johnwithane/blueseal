@@ -270,6 +270,7 @@ export const acceptApplication = onCall({ enforceAppCheck: false }, async (req) 
       link: `/jobs/${jobRef.id}`,
       jobId: jobRef.id,
       actorUid: uid,
+      recipientRole: "tradesperson",
       priority: "high",
     });
   }

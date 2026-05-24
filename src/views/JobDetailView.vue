@@ -191,7 +191,24 @@ const activeTab = computed<string>(() => {
 
 // Chat overlay open state. Driven by the floating JobChatButton; the
 // overlay also handles its own close (backdrop tap / X button).
+// Seeded + cleaned up from `?chat=open` so a click on a message_received
+// notification can land the user directly in the chat thread instead of
+// making them hunt for the button after the page loads. `immediate: true`
+// covers the cold-mount case (the watcher otherwise only fires on later
+// route changes); the recursive replace ends after one pass because the
+// `chat` key is gone on the second tick.
 const chatOverlayOpen = ref(false);
+watch(
+  () => route.query.chat,
+  (v) => {
+    if (v !== "open") return;
+    chatOverlayOpen.value = true;
+    const next = { ...route.query };
+    delete next.chat;
+    router.replace({ query: next });
+  },
+  { immediate: true },
+);
 
 // Sticky bottom CTA: tradie's primary action for the current status. Drives
 // the bottom padding on the section (so content isn't hidden behind the

@@ -126,6 +126,7 @@ export const approveApplication = onCall({ enforceAppCheck: false }, async (req)
     title: "You're approved — welcome to Blue Seal",
     body: "Your profile is live and discoverable. Start receiving job requests today.",
     link: "/dashboard/tradie",
+    recipientRole: "tradesperson",
     priority: "high",
   });
   await logAdminAction({
@@ -162,6 +163,7 @@ export const requestApplicationInfo = onCall({ enforceAppCheck: false }, async (
     title: "We need a bit more info",
     body: notes,
     link: "/onboarding",
+    recipientRole: "tradesperson",
   });
   await logAdminAction({
     actorUid: actor,
@@ -200,6 +202,7 @@ export const rejectApplication = onCall({ enforceAppCheck: false }, async (req) 
     title: "Application not approved",
     body: reason,
     link: "/dashboard/tradie",
+    recipientRole: "tradesperson",
   });
   await logAdminAction({
     actorUid: actor,

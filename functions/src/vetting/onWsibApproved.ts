@@ -33,6 +33,7 @@ export const onWsibApproved = onDocumentUpdated(
       body:
         "Your workers'-comp clearance was approved. The 'WSIB Verified' badge is now showing on your public profile.",
       link: "/dashboard/tradie",
+      recipientRole: "tradesperson",
     });
   },
 );

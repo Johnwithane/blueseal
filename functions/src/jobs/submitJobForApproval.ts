@@ -339,6 +339,7 @@ export const submitJobForApproval = onCall({ enforceAppCheck: false }, async (re
     actorUid: uid,
     jobId,
     chatId: job.chatId ?? null,
+    recipientRole: "client",
     priority: "high",
   });
 

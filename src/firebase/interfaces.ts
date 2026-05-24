@@ -1007,4 +1007,13 @@ export interface NotificationDoc {
   jobId: string | null;
   chatId: string | null;
   actorUid: string | null;
+  // Which role the user should be viewing as for the link to make sense.
+  // Set by the Cloud Function that creates the notification — every call
+  // site already knows who it's targeting and why. The notifications-bell
+  // click handler auto-switches activeRole to this before navigating so
+  // multi-role accounts (e.g. someone who's both a client and a
+  // tradesperson) land in the right view instead of seeing the page
+  // through the wrong lens. Null on legacy docs created before the field
+  // existed; the click handler treats null as "don't switch."
+  recipientRole: Role | null;
 }

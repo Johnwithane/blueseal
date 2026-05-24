@@ -152,6 +152,7 @@ export async function handlePayoutPaid(
     body: `${fmtMoney(payout.amount, payout.currency.toUpperCase())} is on its way to your bank account.`,
     link: "/payouts",
     actorUid: null,
+    recipientRole: "tradesperson",
     priority: "low",
   });
 }
@@ -172,6 +173,7 @@ export async function handlePayoutFailed(
       "Stripe couldn't deposit your payout. Open the payouts page and check your bank details.",
     link: "/payouts",
     actorUid: null,
+    recipientRole: "tradesperson",
     priority: "high",
   });
 }

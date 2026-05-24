@@ -304,6 +304,7 @@ export const sendInvoice = onCall(
       body: `${fmtMoney(inv.total, inv.currency)} due. Tap to pay online.`,
       link: `/invoices/${invoiceId}/pay`,
       actorUid: inv.tradespersonId,
+      recipientRole: "client",
       priority: "low",
     });
 
