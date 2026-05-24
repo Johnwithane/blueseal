@@ -9,18 +9,13 @@
 //      we explicitly deduplicate. `db.doc(...).create()` fails with
 //      ALREADY_EXISTS on the second attempt — we treat that as a no-op
 //      success and return 200 so Stripe stops retrying.
-//   3. Dispatch by event type. For Phase A only `account.updated` is
-//      handled — payment / payout / refund / dispute events land in
-//      Phase B alongside the sendInvoice rewrite. Any other event today
-//      logs at info and returns 200 (Stripe stops retrying); when the
-//      dispatcher gets richer the unknown-event arm shrinks.
-//
-// The webhook is unauthenticated by design — Stripe can't sign in as a
-// user. `enforceAppCheck` is false for the same reason. The signature
-// check is the security boundary.
+//   3. Dispatch by event type. Handlers live in handlers/ and operate on
+//      local type slices (see handlers/shared.ts); the dispatcher just
+//      routes + applies the global sentinel. Unknown event types log at
+//      info and 200 so Stripe stops retrying.
 
 import { HttpsError, onRequest } from "firebase-functions/v2/https";
-import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import { Timestamp } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 
 import { db } from "../lib/admin";
@@ -29,117 +24,19 @@ import {
   STRIPE_WEBHOOK_SECRET,
   getStripe,
 } from "./stripeClient";
-
-type ConnectOnboardingStatus =
-  | "not_started"
-  | "in_progress"
-  | "restricted"
-  | "enabled";
-
-// Slice of Stripe.Account / Stripe.Event we depend on. Hand-rolled because
-// stripe@22's CJS types entry doesn't expose the resource namespace (see
-// stripeClient.ts). Stripe's full Account is ~200 mostly-nullable fields;
-// being explicit about what we read is also defensive — schema drift in
-// fields we don't touch can't break us.
-interface StripeAccount {
-  id: string;
-  payouts_enabled?: boolean | null;
-  charges_enabled?: boolean | null;
-  details_submitted?: boolean | null;
-  metadata?: Record<string, string> | null;
-  requirements?: {
-    disabled_reason?: string | null;
-    currently_due?: string[] | null;
-    past_due?: string[] | null;
-  } | null;
-}
-
-interface StripeEvent {
-  id: string;
-  type: string;
-  data: { object: unknown };
-}
-
-interface MirroredPayoutsState {
-  stripeAccountId: string;
-  onboardingStatus: ConnectOnboardingStatus;
-  chargesEnabled: boolean;
-  payoutsEnabled: boolean;
-  detailsSubmitted: boolean;
-  disabledReason: string | null;
-  pendingRequirements: string[];
-  lastSyncedAt: FieldValue;
-}
-
-function deriveStatus(account: StripeAccount): ConnectOnboardingStatus {
-  if (account.payouts_enabled && account.charges_enabled) return "enabled";
-  if (account.requirements?.disabled_reason) return "restricted";
-  if (
-    (account.requirements?.currently_due?.length ?? 0) > 0 ||
-    !account.details_submitted
-  ) {
-    return "in_progress";
-  }
-  return "restricted";
-}
-
-function mirrorAccount(account: StripeAccount): MirroredPayoutsState {
-  return {
-    stripeAccountId: account.id,
-    onboardingStatus: deriveStatus(account),
-    chargesEnabled: Boolean(account.charges_enabled),
-    payoutsEnabled: Boolean(account.payouts_enabled),
-    detailsSubmitted: Boolean(account.details_submitted),
-    disabledReason: account.requirements?.disabled_reason ?? null,
-    pendingRequirements: [
-      ...(account.requirements?.currently_due ?? []),
-      ...(account.requirements?.past_due ?? []),
-    ],
-    lastSyncedAt: FieldValue.serverTimestamp(),
-  };
-}
-
-async function handleAccountUpdated(account: StripeAccount): Promise<void> {
-  // Prefer the metadata round-trip set during `createConnectAccount`. Fall
-  // back to a `where payouts.stripeAccountId == account.id` query so we
-  // still cope with accounts created before the metadata round-trip
-  // existed (legacy / manual creations via the Stripe dashboard).
-  const metaUid = account.metadata?.tradespersonId;
-  let tradieRef = metaUid ? db.doc(`tradespeople/${metaUid}`) : null;
-
-  if (tradieRef) {
-    const snap = await tradieRef.get();
-    if (!snap.exists) {
-      logger.warn("stripeWebhook account.updated: metadata uid missing doc", {
-        accountId: account.id,
-        metaUid,
-      });
-      tradieRef = null;
-    }
-  }
-
-  if (!tradieRef) {
-    const query = await db
-      .collection("tradespeople")
-      .where("payouts.stripeAccountId", "==", account.id)
-      .limit(1)
-      .get();
-    if (query.empty) {
-      logger.warn(
-        "stripeWebhook account.updated: no tradesperson for account",
-        { accountId: account.id },
-      );
-      return;
-    }
-    tradieRef = query.docs[0].ref;
-  }
-
-  await tradieRef.set({ payouts: mirrorAccount(account) }, { merge: true });
-  logger.info("stripeWebhook account.updated: mirrored", {
-    accountId: account.id,
-    uid: tradieRef.id,
-  });
-}
+import { handleAccountUpdated } from "./handlers/accountUpdated";
+import {
+  handlePaymentIntentFailed,
+  handlePaymentIntentProcessing,
+  handlePaymentIntentSucceeded,
+} from "./handlers/paymentIntent";
+import { handleChargeRefunded } from "./handlers/chargeRefunded";
+import type {
+  StripeAccount,
+  StripeCharge,
+  StripeEvent,
+  StripePaymentIntent,
+} from "./handlers/shared";
 
 export const stripeWebhook = onRequest(
   { secrets: [STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET] },
@@ -198,9 +95,32 @@ export const stripeWebhook = onRequest(
         case "account.updated":
           await handleAccountUpdated(event.data.object as StripeAccount);
           break;
-        // Phase B adds: payment_intent.succeeded / processing / payment_failed
-        //               charge.refunded / dispute.created / dispute.closed
-        //               payout.created / paid / failed
+        case "payment_intent.processing":
+          await handlePaymentIntentProcessing(
+            event.data.object as StripePaymentIntent,
+            event.id,
+          );
+          break;
+        case "payment_intent.succeeded":
+          await handlePaymentIntentSucceeded(
+            event.data.object as StripePaymentIntent,
+            event.id,
+          );
+          break;
+        case "payment_intent.payment_failed":
+          await handlePaymentIntentFailed(
+            event.data.object as StripePaymentIntent,
+            event.id,
+          );
+          break;
+        case "charge.refunded":
+          await handleChargeRefunded(
+            event.data.object as StripeCharge,
+            event.id,
+          );
+          break;
+        // Phase B (next chunk) adds: charge.dispute.created / .closed and
+        // payout.created / .paid / .failed (the latter writes /payouts/{po_…}).
         default:
           logger.info("stripeWebhook: unhandled event type (200 to stop retry)", {
             eventId: event.id,

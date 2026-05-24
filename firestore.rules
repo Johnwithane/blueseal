@@ -547,17 +547,25 @@ service cloud.firestore {
         && request.resource.data.tradespersonId == resource.data.tradespersonId
         && request.resource.data.clientId == resource.data.clientId
         && request.resource.data.jobId == resource.data.jobId
-        // Stripe payment state is server-managed (createInvoicePaymentIntent
-        // callable + webhook dispatcher). Owner can't tamper with the
-        // PaymentIntent / refunds / dispute mirror. `.get(field, null)` is
-        // needed for safe access on pre-cutover invoices where `payment`
-        // is absent — without the default, `resource.data.payment` throws
-        // "Property payment is undefined" and blocks every legacy update.
-        // The broader "lineItems/total immutable once sent" tightening
-        // lands with the Phase B sendInvoice rewrite.
+        // Stripe payment state is server-managed (sendInvoice callable +
+        // webhook dispatcher). Owner can't tamper with the PaymentIntent
+        // / refunds / dispute mirror. `.get(field, null)` is needed for
+        // safe access on pre-cutover invoices where `payment` is absent —
+        // without the default, `resource.data.payment` throws "Property
+        // payment is undefined" and blocks every legacy update.
         && request.resource.data.get('payment', null)
              == resource.data.get('payment', null)
-        && resource.data.status != 'paid';
+        // Once the invoice enters any server-managed lifecycle state —
+        // processing (PaymentIntent in flight), paid, refunded / partially
+        // refunded, disputed, or void — the owner can't mutate it. The
+        // webhook dispatcher (admin SDK, bypasses rules) is the only path
+        // that transitions through these states. Pre-cutover invoices
+        // continue to support manual "mark paid" via the legacy paid path
+        // until the cutover commit removes that.
+        && !(resource.data.status in [
+          'processing', 'paid', 'refunded', 'partially_refunded',
+          'disputed', 'void'
+        ]);
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }

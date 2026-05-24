@@ -27,6 +27,9 @@ export type NotificationType =
   | "insurance_approved"
   | "wsib_approved"
   | "invoice_sent"
+  | "invoice_paid"
+  | "invoice_payment_failed"
+  | "invoice_refunded"
   | "review_received";
 
 /**

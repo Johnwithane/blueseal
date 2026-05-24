@@ -106,3 +106,58 @@ describe("invoices — payment field lock", () => {
     );
   });
 });
+
+describe("invoices — server-managed status lock", () => {
+  // Once the webhook dispatcher moves the invoice into any payment-
+  // lifecycle state, the owning tradesperson can no longer mutate it
+  // from the client. Covers each blocked status; pre-cutover statuses
+  // (draft, sent, viewed, overdue) stay editable.
+  async function seedWithStatus(status: string) {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "invoices", INVOICE_ID), {
+        ...baselineInvoice,
+        status,
+      });
+    });
+  }
+
+  const lockedStatuses = [
+    "processing",
+    "paid",
+    "refunded",
+    "partially_refunded",
+    "disputed",
+    "void",
+  ] as const;
+
+  for (const status of lockedStatuses) {
+    it(`tradesperson cannot edit lineItems on a ${status} invoice`, async () => {
+      await seedWithStatus(status);
+      const fs = env
+        .authenticatedContext(TRADIE_UID, TRADIE_CLAIMS)
+        .firestore();
+      await assertFails(
+        updateDoc(doc(fs, "invoices", INVOICE_ID), {
+          lineItems: [
+            {
+              description: "Sneaky edit",
+              quantity: 1,
+              unitPrice: 1,
+              taxRate: 0,
+            },
+          ],
+        }),
+      );
+    });
+  }
+
+  it("tradesperson CAN still edit a sent invoice (not server-managed yet)", async () => {
+    await seedWithStatus("sent");
+    const fs = env.authenticatedContext(TRADIE_UID, TRADIE_CLAIMS).firestore();
+    await assertSucceeds(
+      updateDoc(doc(fs, "invoices", INVOICE_ID), {
+        paymentInstructions: "Updated note",
+      }),
+    );
+  });
+});
