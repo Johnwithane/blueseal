@@ -13,8 +13,17 @@ import {
   where,
   GeoPoint,
 } from "firebase/firestore";
-import { auth as fbAuth, db } from "@/firebase/config";
-import type { JobAddress, JobDoc, JobStatus, WithId, Urgency } from "@/firebase/interfaces";
+import { httpsCallable } from "firebase/functions";
+import { auth as fbAuth, db, functions } from "@/firebase/config";
+import type {
+  InvoiceDiscount,
+  JobAddress,
+  JobDoc,
+  JobStatus,
+  LineItem,
+  WithId,
+  Urgency,
+} from "@/firebase/interfaces";
 import { typedConverter } from "@/firebase/converters";
 
 const jobsCol = () => collection(db, "jobs").withConverter(typedConverter<JobDoc>());
@@ -63,6 +72,8 @@ export async function createJob(input: NewJobInput, chatId: string): Promise<str
     scheduledEnd: null,
     createdAt: serverTimestamp() as never,
     completedAt: null,
+    clientApprovalRequestedAt: null,
+    clientApprovedAt: null,
     cancelledAt: null,
     cancelledReason: null,
     cancelledBy: null,
@@ -168,6 +179,58 @@ export function subscribeClientJobs(
     limit(200),
   );
   return onSnapshot(q, (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
+}
+
+// ---------------------------------------------------------------------------
+// Finish-job / approval flow callables.
+// Each thin wrapper preserves the typed `data` payload so callers don't have
+// to know httpsCallable's generic. Server-side validation + state transitions
+// live in functions/src/jobs/{submit,clientApprove,clientRequestChanges,markJobPaid}.ts.
+// ---------------------------------------------------------------------------
+
+export interface SubmitJobForApprovalInput {
+  jobId: string;
+  /** One-off line items added in the wrap-up sheet (trip charge, sourcing fee, etc.). */
+  extraLineItems?: LineItem[];
+  /** Optional whole-invoice discount applied before tax. */
+  discount?: InvoiceDiscount | null;
+  /** Short message rendered into the system chat line shown to the client. */
+  noteToClient?: string;
+}
+
+export async function submitJobForApproval(
+  input: SubmitJobForApprovalInput,
+): Promise<{ ok: true; total: number; lineItemsCount: number }> {
+  const fn = httpsCallable<SubmitJobForApprovalInput, { ok: true; total: number; lineItemsCount: number }>(
+    functions,
+    "submitJobForApproval",
+  );
+  const res = await fn(input);
+  return res.data;
+}
+
+export async function clientApproveJob(jobId: string): Promise<{ ok: true }> {
+  const fn = httpsCallable<{ jobId: string }, { ok: true }>(functions, "clientApproveJob");
+  const res = await fn({ jobId });
+  return res.data;
+}
+
+export async function clientRequestChanges(
+  jobId: string,
+  reason: string,
+): Promise<{ ok: true }> {
+  const fn = httpsCallable<{ jobId: string; reason: string }, { ok: true }>(
+    functions,
+    "clientRequestChanges",
+  );
+  const res = await fn({ jobId, reason });
+  return res.data;
+}
+
+export async function markJobPaid(jobId: string): Promise<{ ok: true }> {
+  const fn = httpsCallable<{ jobId: string }, { ok: true }>(functions, "markJobPaid");
+  const res = await fn({ jobId });
+  return res.data;
 }
 
 export async function listJobsForTradie(tradieUid: string): Promise<WithId<JobDoc>[]> {

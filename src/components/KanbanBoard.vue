@@ -25,6 +25,7 @@ const columns: Column[] = [
   { key: "quoted", label: "Quoted", color: "#f59e0b" },
   { key: "scheduled", label: "Scheduled", color: "#16a34a" },
   { key: "in_progress", label: "In progress", color: "#0d47a1" },
+  { key: "awaiting_client_approval", label: "Awaiting approval", color: "#f97316" },
   { key: "awaiting_payment", label: "Awaiting payment", color: "#7c3aed" },
   { key: "complete", label: "Complete", color: "#6b7280" },
 ];
@@ -71,7 +72,7 @@ function onDrop(e: DragEvent, target: JobStatus) {
 
 <template>
   <div class="overflow-x-auto -mx-4 px-4 pb-2">
-    <div class="grid grid-cols-[repeat(6,minmax(240px,1fr))] gap-3 min-w-[1440px]">
+    <div class="grid grid-cols-[repeat(8,minmax(240px,1fr))] gap-3 min-w-[1920px]">
       <section
         v-for="col in columns"
         :key="col.key"

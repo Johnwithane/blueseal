@@ -13,21 +13,56 @@ import {
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/firebase/config";
-import type { InvoiceDoc, LineItem, WithId } from "@/firebase/interfaces";
+import type { InvoiceDiscount, InvoiceDoc, LineItem, WithId } from "@/firebase/interfaces";
 import { typedConverter } from "@/firebase/converters";
 
 const invRef = (id: string) => doc(db, "invoices", id).withConverter(typedConverter<InvoiceDoc>());
 const invCol = () => collection(db, "invoices").withConverter(typedConverter<InvoiceDoc>());
 
-export function recomputeTotals(items: LineItem[]) {
+export interface InvoiceTotals {
+  subtotal: number; // pre-discount sum of line subs (cents)
+  discountAmount: number; // cents subtracted; 0 when discount is null
+  taxTotal: number;
+  total: number;
+}
+
+/**
+ * Compute invoice totals from line items + optional whole-invoice discount.
+ *
+ * Tax is applied to the post-discount base, proportionally per line — the
+ * Canadian retail convention ("10% off $100, then HST on $90"). Mixed tax
+ * rates across lines are preserved by scaling each line's taxable base by
+ * the same discount factor instead of merging everything into one rate.
+ *
+ * Pre-discount `subtotal` is exposed separately so the rendered invoice can
+ * show the standard four-row breakdown: subtotal · discount · tax · total.
+ */
+export function recomputeTotals(
+  items: LineItem[],
+  discount: InvoiceDiscount | null = null,
+): InvoiceTotals {
   let subtotal = 0;
+  for (const li of items) subtotal += li.quantity * li.unitPrice;
+
+  let discountAmount = 0;
+  if (discount && subtotal > 0) {
+    if (discount.type === "percent") {
+      const pct = Math.max(0, Math.min(100, discount.value));
+      discountAmount = Math.round((subtotal * pct) / 100);
+    } else {
+      discountAmount = Math.max(0, Math.min(subtotal, Math.round(discount.value)));
+    }
+  }
+
+  const factor = subtotal > 0 ? (subtotal - discountAmount) / subtotal : 1;
   let taxTotal = 0;
   for (const li of items) {
     const lineSub = li.quantity * li.unitPrice;
-    subtotal += lineSub;
-    taxTotal += Math.round(lineSub * li.taxRate);
+    taxTotal += Math.round(lineSub * factor * li.taxRate);
   }
-  return { subtotal, taxTotal, total: subtotal + taxTotal };
+
+  const total = subtotal - discountAmount + taxTotal;
+  return { subtotal, discountAmount, taxTotal, total };
 }
 
 export async function getInvoice(id: string): Promise<WithId<InvoiceDoc> | null> {
@@ -36,8 +71,24 @@ export async function getInvoice(id: string): Promise<WithId<InvoiceDoc> | null>
 }
 
 export async function updateInvoiceLineItems(id: string, items: LineItem[]): Promise<void> {
-  const totals = recomputeTotals(items);
+  // Re-read the live discount so a line-items edit doesn't accidentally
+  // wipe a previously-applied discount on the same write.
+  const snap = await getDoc(invRef(id));
+  const discount = snap.exists() ? (snap.data().discount ?? null) : null;
+  const totals = recomputeTotals(items, discount);
   await updateDoc(doc(db, "invoices", id), { lineItems: items, ...totals });
+}
+
+/** Apply or clear the whole-invoice discount and recompute totals. */
+export async function updateInvoiceDiscount(
+  id: string,
+  discount: InvoiceDiscount | null,
+): Promise<void> {
+  const snap = await getDoc(invRef(id));
+  if (!snap.exists()) return;
+  const items = snap.data().lineItems ?? [];
+  const totals = recomputeTotals(items, discount);
+  await updateDoc(doc(db, "invoices", id), { discount, ...totals });
 }
 
 export async function markInvoicePaid(id: string): Promise<void> {

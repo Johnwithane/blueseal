@@ -240,12 +240,21 @@ export interface IntakeFormSchemaDoc {
 // (acceptApplication callable). The client still owes the trade-specific intake
 // form; once submitted the job transitions to "requested" and joins the standard
 // flow. Direct /request/:uid jobs skip "accepted" and start at "requested".
+//
+// "awaiting_client_approval" sits between "in_progress" and "awaiting_payment":
+// the tradesperson has used the Finish-job flow to draft the invoice, and the
+// client is being asked to approve the work before payment is requested. From
+// here the client either approves (→ awaiting_payment) or requests changes
+// (→ in_progress + reason posted in chat). Both transitions go through
+// callables (submitJobForApproval / clientApproveJob / clientRequestChanges)
+// so the invoice doc + chat system message stay in lockstep with the status.
 export type JobStatus =
   | "accepted"
   | "requested"
   | "quoted"
   | "scheduled"
   | "in_progress"
+  | "awaiting_client_approval"
   | "awaiting_payment"
   | "complete"
   | "reviewed"
@@ -279,6 +288,13 @@ export interface JobDoc {
   scheduledEnd: Timestamp | null;
   createdAt: Timestamp;
   completedAt: Timestamp | null;
+  // Set by submitJobForApproval when the tradesperson sends the wrapped-up
+  // job to the client. Cleared back to null on clientRequestChanges so a
+  // subsequent re-submit shows a fresh timestamp.
+  clientApprovalRequestedAt: Timestamp | null;
+  // Set by clientApproveJob — locks in the moment the client signed off so
+  // any later dispute can reference the approval timeline.
+  clientApprovedAt: Timestamp | null;
   cancelledAt: Timestamp | null;
   cancelledReason: string | null;
   // uid of the party who cancelled — used by onJobCancelled trigger to pick
@@ -538,6 +554,19 @@ export interface LineItem {
   taxRate: number; // 0-1
 }
 
+// Optional whole-invoice discount applied to the subtotal before tax. Stored
+// as a structured value (not a negative line item) so PDFs + the invoice view
+// can render it on its own row and the math stays unambiguous when mixed tax
+// rates are in play. Null when no discount is applied.
+export interface InvoiceDiscount {
+  type: "percent" | "fixed";
+  // For "percent": 0-100 (UI clamps before write). For "fixed": cents.
+  value: number;
+  // Optional human label rendered next to the discount row (e.g.
+  // "Repeat customer", "Veteran"). Null/empty hides the label.
+  label: string | null;
+}
+
 export interface InvoiceDoc {
   tradespersonId: string;
   clientId: string;
@@ -545,9 +574,11 @@ export interface InvoiceDoc {
   invoiceNumber: string;
   status: InvoiceStatus;
   lineItems: LineItem[];
-  subtotal: number;
-  taxTotal: number;
-  total: number;
+  subtotal: number; // pre-discount sum of (quantity × unitPrice) across lines
+  discount: InvoiceDiscount | null;
+  discountAmount: number; // cents subtracted from subtotal; always 0 when discount is null
+  taxTotal: number; // tax computed on the post-discount base, proportionally per line
+  total: number; // subtotal − discountAmount + taxTotal
   currency: string;
   issuedAt: Timestamp | null;
   dueAt: Timestamp | null;
