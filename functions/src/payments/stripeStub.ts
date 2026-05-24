@@ -1,19 +1,16 @@
-import { onCall, HttpsError, onRequest } from "firebase-functions/v2/https";
-import { logger } from "firebase-functions/v2";
+import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { db } from "../lib/admin";
 import { requireAuth, requireAdmin } from "../lib/auth";
 import { logAdminAction } from "../lib/audit";
 
 /**
- * Stripe is stubbed for MVP per the user's choice. The wiring is in place so
- * dropping in real keys (STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET via
- * `firebase functions:secrets:set`) and switching to `defineSecret(...)` with
- * the secret listed in the function options flips it on. Using process.env
- * for now so deploy doesn't require the secrets to exist yet.
- *
- * TODO(launch): disable `adminToggleSubscription` once real Stripe webhook is
- * the source of truth, or restrict to non-production projects only.
+ * Subscription stub — kept until the subscription-removal commit lands
+ * (per `design.md` § 5.9 monetization pivot). The real Stripe Connect
+ * payment flow lives in stripeClient.ts + stripeWebhook.ts; this file
+ * only retains `createCheckoutSession` (still stubbed) and
+ * `adminToggleSubscription` (dev helper still in use). Both get deleted
+ * when the AI subscription is removed.
  */
 
 export const createCheckoutSession = onCall({ enforceAppCheck: false }, async (req) => {
@@ -25,20 +22,6 @@ export const createCheckoutSession = onCall({ enforceAppCheck: false }, async (r
     );
   }
   throw new HttpsError("unimplemented", "Stripe integration pending.");
-});
-
-export const stripeWebhook = onRequest(async (_req, res) => {
-  if (!process.env.STRIPE_WEBHOOK_SECRET) {
-    // Stripe treats 2xx as "received, don't retry". Returning a 503 keeps
-    // events queued on Stripe's side until the secret is configured.
-    logger.warn("stripeWebhook hit but no secret configured; returning 503.");
-    res.status(503).send("Webhook not configured");
-    return;
-  }
-  // When real Stripe is wired: verify the signature header BEFORE any
-  // Firestore side effects, then dispatch by event type.
-  logger.warn("stripeWebhook stub invoked; implement signature verification.");
-  res.status(200).send({ received: true });
 });
 
 const ToggleInput = z.object({

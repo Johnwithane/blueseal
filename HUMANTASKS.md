@@ -6,6 +6,52 @@ Tasks are grouped by the phase that introduced them so you can see why each one 
 
 ---
 
+## Monetization pivot — Stripe Connect Express (added 2026-05-24)
+
+Replacing the AI subscription with a 12% commission via Stripe Connect Express. Phase A wires the connection: callable to create Connect Express accounts, hosted onboarding link, login link, and an `account.updated` webhook that mirrors Stripe state onto `tradespeople/{uid}.payouts`. Payment / payout / refund / dispute webhook events land in Phase B alongside the `sendInvoice` rewrite.
+
+Until the items below are done, the Connect callables return a "Stripe is not configured" error (because the secrets aren't bound) and the webhook 400s on every event (signature verification fails without `STRIPE_WEBHOOK_SECRET`). Existing offline-payment flow continues to work.
+
+See `PROFESSIONAL_TASKS.md` for the parallel lawyer + accountant work that gates launch (FINTRAC opinion, GST/HST treatment, etc.).
+
+### [ ] Enable Stripe Connect on the platform account
+
+- **Why:** Express accounts can only be created if Connect is activated on the Blue Seal Stripe account and the platform agreement is signed.
+- **What:**
+  1. Sign in to the [Stripe dashboard](https://dashboard.stripe.com) on the production Blue Seal account.
+  2. Connect → Get started → choose **Express** as the account type. Accept Stripe's Platform & Connected Account Agreements.
+  3. Complete the platform profile: legal entity (matches what the lawyer/accountant set up), website (`https://blueseal.app`), support email, business model description ("home-services marketplace connecting verified Canadian tradespeople with clients").
+  4. Configure the **branding** (colour, logo, icon) — Express onboarding shows Blue Seal branding to the tradesperson during sign-up.
+- **Verify:** The Connect overview shows "Live: Yes" and the "Connected accounts" tab is empty (we haven't created any in prod yet).
+
+### [ ] Set Stripe secrets on Cloud Functions
+
+- **Why:** `createConnectAccount`, `createConnectOnboardingLink`, `createConnectLoginLink`, and `stripeWebhook` all declare `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` as `defineSecret(...)` params. Without them bound, the callables throw at first use and the webhook can't verify signatures.
+- **What:** From the repo root with the Firebase CLI authenticated:
+  ```
+  firebase functions:secrets:set STRIPE_SECRET_KEY
+  firebase functions:secrets:set STRIPE_WEBHOOK_SECRET
+  ```
+  Paste the live `sk_live_…` key (Dashboard → Developers → API keys) when prompted for `STRIPE_SECRET_KEY`. `STRIPE_WEBHOOK_SECRET` you'll get after the next task (it's the signing secret of the webhook endpoint you create).
+- **Verify:** `firebase functions:secrets:access STRIPE_SECRET_KEY` returns the expected key. Redeploy is required after a new secret is set so the function reads the new value: `firebase deploy --only functions:createConnectAccount,functions:createConnectOnboardingLink,functions:createConnectLoginLink,functions:stripeWebhook`.
+
+### [ ] Register the Stripe webhook endpoint
+
+- **Why:** Stripe needs to know where to POST event notifications. The endpoint URL is the Cloud Function HTTPS URL of `stripeWebhook` after deploy.
+- **What:**
+  1. Deploy Functions once so the URL exists: `firebase deploy --only functions:stripeWebhook`. Note the URL Firebase prints (looks like `https://stripewebhook-xxxxxx-uc.a.run.app`).
+  2. Stripe Dashboard → Developers → Webhooks → Add endpoint. URL = the deployed function URL. Events to listen for, for Phase A: `account.updated`. (Phase B will add `payment_intent.*`, `charge.refunded`, `charge.dispute.*`, `payout.*` — add those when Phase B ships.)
+  3. After creating the endpoint, Stripe reveals its **signing secret** (`whsec_…`). Use that as the value when running `firebase functions:secrets:set STRIPE_WEBHOOK_SECRET`. Redeploy `stripeWebhook` so it picks up the new secret.
+- **Verify:** From the dashboard's webhook detail view, click "Send test webhook" → choose `account.updated` → check that the response is 200 and that the `webhookEvents/` Firestore collection has a new doc with `status: "processed"`.
+
+### [ ] Configure `APP_BASE_URL` for the Connect onboarding redirects
+
+- **Why:** `createConnectOnboardingLink` builds `refresh_url` + `return_url` from this env var (same one notify.ts uses for deep-links). Without it set, the tradesperson is redirected to `https://blueseal.app/payouts/return` regardless of environment.
+- **What:** Already documented in the Notifications section above for the prod domain. For staging environments, set it to the staging hostname so test sign-ups don't bounce people to prod.
+- **Verify:** Call `createConnectOnboardingLink` from a logged-in tradesperson session in staging → returned URL contains `staging.blueseal.app` (or whatever staging is) in the redirect query params.
+
+---
+
 ## AI assistant chatbot (added 2026-05-22)
 
 Floating-panel assistant for tradespeople + admins. Backend lives in [functions/src/ai/chat.ts](functions/src/ai/chat.ts), conversations persist under `assistantConversations/{id}/messages/`. Runs on Vertex AI Gemini 2.5 Flash (same auth path as the existing `aiDiagnose` tools — no API keys needed once the API is enabled).

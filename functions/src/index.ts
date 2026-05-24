@@ -51,10 +51,15 @@ export { aiSuggestReplies } from "./ai/suggestReplies";
 export { aiUpdateJobLog } from "./ai/updateJobLog";
 export { parseReceipt } from "./ai/parseReceipt";
 
-// Payments (stubbed)
+// Payments — Stripe Connect Express (commission model). The subscription
+// stub still exports the dev `adminToggleSubscription` helper + the
+// no-op `createCheckoutSession` until the subscription removal commit.
+export { createConnectAccount } from "./payments/createConnectAccount";
+export { createConnectOnboardingLink } from "./payments/createConnectOnboardingLink";
+export { createConnectLoginLink } from "./payments/createConnectLoginLink";
+export { stripeWebhook } from "./payments/stripeWebhook";
 export {
   createCheckoutSession,
-  stripeWebhook,
   adminToggleSubscription,
 } from "./payments/stripeStub";
 
