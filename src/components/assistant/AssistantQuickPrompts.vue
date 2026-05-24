@@ -85,11 +85,17 @@ async function runPrompt(text: string) {
 <style scoped>
 .bs-ai-chips {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.45rem;
   padding: 0.55rem 0.85rem;
   border-top: 1px solid var(--bs-border);
   background: white;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.bs-ai-chips::-webkit-scrollbar {
+  display: none;
 }
 .bs-ai-chip {
   display: inline-flex;
@@ -103,6 +109,8 @@ async function runPrompt(text: string) {
   font-size: 0.78rem;
   font-weight: 500;
   cursor: pointer;
+  white-space: nowrap;
+  flex: 0 0 auto;
   transition: background-color 0.12s ease, border-color 0.12s ease, transform 0.12s ease;
 }
 .bs-ai-chip:hover {

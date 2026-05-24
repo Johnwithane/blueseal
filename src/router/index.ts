@@ -89,7 +89,15 @@ const routes: RouteRecordRaw[] = [
     path: "/jobs/:id",
     name: "JobDetail",
     component: () => import("@/views/JobDetailView.vue"),
-    meta: { requiresAuth: true, role: "any" as RoleGuard },
+    meta: {
+      requiresAuth: true,
+      role: "any" as RoleGuard,
+      // Hide global chrome on mobile so the tab bar can stick to the top
+      // edge and the chat composer / sticky CTA have room. The in-view
+      // "← Dashboard" link handles back nav; the notifications bell + avatar
+      // stay visible on tablet/desktop.
+      mobileCompact: true,
+    },
   },
 
   // Job-board marketplace

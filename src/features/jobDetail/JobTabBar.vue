@@ -2,6 +2,7 @@
 export interface JobTab {
   key: string;
   label: string;
+  icon: string;
   badge?: "dot" | number;
 }
 
@@ -29,13 +30,15 @@ function onClick(key: string) {
           type="button"
           role="tab"
           :aria-selected="modelValue === t.key"
+          :aria-label="t.label"
           :tabindex="modelValue === t.key ? 0 : -1"
           class="tab"
           :class="{ 'tab--active': modelValue === t.key }"
           @click="onClick(t.key)"
         >
+          <i :class="['pi', t.icon, 'icon']" aria-hidden="true"></i>
           <span class="label">{{ t.label }}</span>
-          <span v-if="t.badge === 'dot'" class="badge-dot" aria-label="action required"></span>
+          <span v-if="t.badge === 'dot'" class="badge-dot" aria-hidden="true"></span>
           <span v-else-if="typeof t.badge === 'number' && t.badge > 0" class="badge-count">
             {{ t.badge > 99 ? "99+" : t.badge }}
           </span>
@@ -48,15 +51,21 @@ function onClick(key: string) {
 <style scoped>
 .job-tab-bar {
   position: sticky;
-  /* Sits flush under AppHeader (sticky top-0). 60px matches AppHeader's
-     rendered height (py-3 + h-9 logo). If the header changes height,
-     update this value. */
-  top: 60px;
+  /* Mobile: AppHeader is hidden (route meta `mobileCompact`), so the tab
+     bar sticks to the viewport top edge.
+     Desktop: AppHeader is visible at ~60px so tabs sit just below it. */
+  top: 0;
   z-index: 20;
   background: white;
   border-bottom: 1px solid var(--bs-border);
-  margin-inline: -1rem; /* extend to viewport edges, matches bs-container padding */
+  margin-inline: -1rem;
   margin-bottom: 1rem;
+}
+
+@media (min-width: 640px) {
+  .job-tab-bar {
+    top: 60px;
+  }
 }
 
 .tab-row {
@@ -71,18 +80,19 @@ function onClick(key: string) {
 }
 
 .tab {
+  position: relative;
   flex: 1 1 0;
-  min-width: max-content;
+  min-width: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.375rem;
-  padding: 0.875rem 0.5rem;
+  gap: 0.5rem;
+  padding: 0.75rem 0.5rem;
   background: transparent;
   border: 0;
   border-bottom: 2px solid transparent;
   color: var(--bs-muted);
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
   font-weight: 500;
   letter-spacing: -0.01em;
   cursor: pointer;
@@ -106,22 +116,40 @@ function onClick(key: string) {
   outline-offset: -2px;
 }
 
+.icon {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+/* Mobile: icons only. Label hidden visually but kept in DOM via aria-label
+   for screen readers (`aria-label` on the button itself). */
 .label {
-  min-width: 0;
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .label {
+    display: inline;
+  }
+  .icon {
+    font-size: 0.95rem;
+  }
 }
 
 .badge-dot {
-  width: 0.4rem;
-  height: 0.4rem;
+  position: absolute;
+  top: 0.5rem;
+  right: calc(50% - 1rem);
+  width: 0.45rem;
+  height: 0.45rem;
   border-radius: 9999px;
   background: #ef4444;
-  display: inline-block;
 }
 
 .badge-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  position: absolute;
+  top: 0.375rem;
+  right: calc(50% - 1.25rem);
   min-width: 1.125rem;
   height: 1.125rem;
   padding: 0 0.375rem;
@@ -130,14 +158,20 @@ function onClick(key: string) {
   color: white;
   font-size: 0.6875rem;
   font-weight: 600;
-  line-height: 1;
+  line-height: 1.125rem;
+  text-align: center;
 }
 
 @media (min-width: 640px) {
-  .tab {
-    font-size: 0.875rem;
-    padding: 0.875rem 1rem;
-    gap: 0.5rem;
+  /* On desktop the label takes space, so badges sit next to the icon
+     inline instead of being absolutely positioned over a centred icon. */
+  .badge-dot,
+  .badge-count {
+    position: static;
+  }
+  .badge-dot {
+    width: 0.4rem;
+    height: 0.4rem;
   }
 }
 </style>

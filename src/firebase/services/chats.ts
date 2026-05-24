@@ -98,6 +98,17 @@ export async function sendMessage(opts: {
   });
 }
 
+export function subscribeChat(
+  chatId: string,
+  cb: (chat: WithId<ChatDoc> | null) => void,
+): () => void {
+  return onSnapshot(
+    chatRef(chatId),
+    (snap) => cb(snap.exists() ? { id: snap.id, ...snap.data() } : null),
+    (err) => console.warn(`[Firestore] chats/${chatId} listener:`, err.code, err.message),
+  );
+}
+
 export function subscribeMessages(
   chatId: string,
   cb: (messages: WithId<MessageDoc>[]) => void,

@@ -35,20 +35,19 @@ import { tradeLabel } from "@/data/trades";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 import { STATUS_LABEL, STATUS_SEVERITY } from "@/utils/jobStatus";
-import JobPhaseStrip from "@/features/jobDetail/JobPhaseStrip.vue";
 import JobTabBar, { type JobTab } from "@/features/jobDetail/JobTabBar.vue";
-import ChatTab from "@/features/jobDetail/ChatTab.vue";
 import BriefTab from "@/features/jobDetail/BriefTab.vue";
 import ScheduleTab from "@/features/jobDetail/ScheduleTab.vue";
 import InvoiceTab from "@/features/jobDetail/InvoiceTab.vue";
-import NotesTab from "@/features/jobDetail/NotesTab.vue";
+import JobChatButton from "@/features/jobDetail/JobChatButton.vue";
+import JobChatOverlay from "@/features/jobDetail/JobChatOverlay.vue";
 
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
 const toast = useToast();
 const confirmDialog = useConfirm();
-const { date, dateTime } = useFormatters();
+const { dateTime } = useFormatters();
 
 const job = ref<WithId<JobDoc> | null>(null);
 const tradieInfo = ref<WithId<TradespersonDoc> | null>(null);
@@ -82,18 +81,6 @@ const savingSchedule = ref(false);
 const showFinishSheet = ref(false);
 const markingPaid = ref(false);
 const showQuoteSheet = ref(false);
-
-// Status set that surfaces the sticky bottom CTA on mobile. Drives both
-// the bottom padding on the section (so content isn't hidden behind the
-// fixed bar) and the bar's visibility.
-const stickyCTAStatuses: ReadonlySet<JobStatus> = new Set([
-  "requested",
-  "quoted",
-  "in_progress",
-]);
-const showStickyCTA = computed(
-  () => job.value != null && isTradie.value && stickyCTAStatuses.has(job.value.status),
-);
 
 const statusOptions: { label: string; value: JobStatus }[] = [
   { label: "Accepted", value: "accepted" },
@@ -134,32 +121,33 @@ const tradieWsibLive = computed(() => {
 // signed-in user has work to do — the sticky CTA and top banners already
 // surface the primary action, so badges are a quieter "tap here, there's
 // something to settle" hint.
+// Tab list. Chat is NOT a tab — it lives in a bottom-anchored overlay
+// (JobChatButton + JobChatOverlay) so the chat composer never fights the
+// sticky CTA, and the AI assistant shares that surface as a sub-tab.
 const tabs = computed<JobTab[]>(() => {
   if (!job.value) return [];
   const s = job.value.status;
-  const list: JobTab[] = [
-    { key: "chat", label: "Chat" },
+  return [
     {
       key: "brief",
       label: "Brief",
+      icon: "pi-info-circle",
       badge: isClient.value && s === "accepted" ? "dot" : undefined,
     },
     {
       key: "schedule",
       label: "Schedule",
+      icon: "pi-calendar",
       badge: isTradie.value && s === "quote_accepted" ? "dot" : undefined,
     },
     {
       key: "invoice",
       label: "Invoice",
+      icon: "pi-receipt",
       badge:
         s === "awaiting_client_approval" || s === "awaiting_payment" ? "dot" : undefined,
     },
   ];
-  if (isTradie.value) {
-    list.push({ key: "notes", label: "Notes" });
-  }
-  return list;
 });
 
 const validTabKeys = computed(() => new Set(tabs.value.map((t) => t.key)));
@@ -167,8 +155,26 @@ const validTabKeys = computed(() => new Set(tabs.value.map((t) => t.key)));
 const activeTab = computed<string>(() => {
   const q = route.query.tab;
   const key = typeof q === "string" ? q : "";
-  return validTabKeys.value.has(key) ? key : "chat";
+  return validTabKeys.value.has(key) ? key : "brief";
 });
+
+// Chat overlay open state. Driven by the floating JobChatButton; the
+// overlay also handles its own close (backdrop tap / X button).
+const chatOverlayOpen = ref(false);
+
+// Sticky bottom CTA: tradie's primary action for the current status. Drives
+// the bottom padding on the section (so content isn't hidden behind the
+// fixed bar) and the bar's visibility. Stays visible across every tab —
+// the bar gets thinner on mobile so the chat composer can sit comfortably
+// above it.
+const stickyCTAStatuses: ReadonlySet<JobStatus> = new Set([
+  "requested",
+  "quoted",
+  "in_progress",
+]);
+const showStickyCTA = computed(
+  () => job.value != null && isTradie.value && stickyCTAStatuses.has(job.value.status),
+);
 
 function onTabChange(key: string) {
   // Use replace, not push — back button shouldn't have to walk through every
@@ -176,12 +182,12 @@ function onTabChange(key: string) {
   router.replace({ query: { ...route.query, tab: key } });
 }
 
-// If the active tab disappears (e.g. role changes and Notes is no longer
-// in the list), bounce to Chat so the URL stops pointing at nothing.
+// If the active tab disappears (e.g. role changes), bounce to Brief so the
+// URL stops pointing at nothing.
 watch(validTabKeys, (keys) => {
   const q = route.query.tab;
   if (typeof q === "string" && q && !keys.has(q)) {
-    router.replace({ query: { ...route.query, tab: "chat" } });
+    router.replace({ query: { ...route.query, tab: "brief" } });
   }
 });
 
@@ -456,8 +462,8 @@ function onReturnToApplicants() {
 
 <template>
   <section
-    class="bs-container py-6"
-    :class="{ 'pb-28': showStickyCTA }"
+    class="bs-container py-3 sm:py-6"
+    :class="{ 'job-detail--cta-on': showStickyCTA }"
   >
     <RouterLink to="/dashboard" class="text-xs text-[color:var(--bs-muted)]">← Dashboard</RouterLink>
 
@@ -480,14 +486,11 @@ function onReturnToApplicants() {
       </RouterLink>
     </div>
     <template v-else-if="job">
-      <header class="flex items-start justify-between gap-3 mt-2 mb-4">
+      <header class="flex items-start justify-between gap-2 mt-1 mb-3">
         <div class="min-w-0 flex-1">
-          <h1 class="text-xl font-bold break-words">{{ job.title }}</h1>
-          <div class="text-xs text-[color:var(--bs-muted)] mt-0.5">
-            {{ tradeLabel(job.trade) }} • Created {{ date(job.createdAt) }}
-          </div>
-          <div class="text-xs text-[color:var(--bs-muted)]">
-            {{ job.address.line1 }}, {{ job.address.city }}
+          <h1 class="text-lg font-bold break-words leading-tight">{{ job.title }}</h1>
+          <div class="text-[11px] text-[color:var(--bs-muted)] mt-0.5 truncate">
+            {{ tradeLabel(job.trade) }} · {{ job.address.line1 }}, {{ job.address.city }}
           </div>
         </div>
         <Tag
@@ -545,8 +548,6 @@ function onReturnToApplicants() {
         @decided="load"
       />
 
-      <JobPhaseStrip :status="job.status" :cancelled-reason="job.cancelledReason" />
-
       <JobTabBar
         :tabs="tabs"
         :model-value="activeTab"
@@ -554,10 +555,10 @@ function onReturnToApplicants() {
       />
 
       <div>
-        <ChatTab v-if="activeTab === 'chat'" :job="job" :is-tradie="isTradie" />
         <BriefTab
-          v-else-if="activeTab === 'brief'"
+          v-if="activeTab === 'brief'"
           v-model:intake-draft="intakeDraft"
+          v-model:private-notes="privateNotes"
           :job="job"
           :is-client="isClient"
           :is-tradie="isTradie"
@@ -568,9 +569,12 @@ function onReturnToApplicants() {
           :saving-intake="savingIntake"
           :returning-to-applicants="returningToApplicants"
           :status-options="statusOptions"
+          :updating-log="updatingLog"
           @submit-brief="submitBrief"
           @status-change="setStatus"
           @return-to-applicants="onReturnToApplicants"
+          @save-notes="saveNotes"
+          @update-log="updateLogManually"
         />
         <ScheduleTab
           v-else-if="activeTab === 'schedule'"
@@ -595,14 +599,21 @@ function onReturnToApplicants() {
           @revise-quote="showQuoteSheet = true"
           @reviewed="load"
         />
-        <NotesTab
-          v-if="activeTab === 'notes' && isTradie"
-          v-model:private-notes="privateNotes"
-          :updating-log="updatingLog"
-          @save-notes="saveNotes"
-          @update-log="updateLogManually"
-        />
       </div>
+
+      <!-- Chat + AI lives in a bottom-anchored overlay rather than as a
+           tab. The composer never has to share the bottom edge with the
+           sticky CTA, and the AI assistant rides along as a sub-tab. -->
+      <JobChatButton
+        :chat-id="job.chatId"
+        :lift-for-cta="showStickyCTA"
+        @click="chatOverlayOpen = true"
+      />
+      <JobChatOverlay
+        v-model:visible="chatOverlayOpen"
+        :job="job"
+        :is-tradie="isTradie"
+      />
     </template>
 
     <!-- Sticky bottom CTA: the tradie's primary action for this status.
