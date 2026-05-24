@@ -114,6 +114,24 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, role: "any" as RoleGuard },
   },
 
+  // Invoice payment (client) + receipt (both parties). Both gated as
+  // `any` role rather than `client` because: (a) the receipt view is
+  // useful to the tradesperson too, and (b) Stripe's `return_url`
+  // redirect can land before the auto-role-switch settles — the view's
+  // own `isParty` check is the real authorization.
+  {
+    path: "/invoices/:id/pay",
+    name: "InvoicePay",
+    component: () => import("@/views/invoices/InvoicePayView.vue"),
+    meta: { requiresAuth: true, role: "any" as RoleGuard },
+  },
+  {
+    path: "/invoices/:id/receipt",
+    name: "InvoiceReceipt",
+    component: () => import("@/views/invoices/InvoiceReceiptView.vue"),
+    meta: { requiresAuth: true, role: "any" as RoleGuard },
+  },
+
   // Job-board marketplace
   {
     path: "/jobs/post",

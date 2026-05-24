@@ -35,6 +35,18 @@ export async function getInvoice(id: string): Promise<WithId<InvoiceDoc> | null>
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
 
+// Live subscription for the payment + receipt views — they need to react
+// the moment the Stripe webhook flips status from `processing` to `paid`
+// (or the inverse for a refund) without the user reloading.
+export function subscribeInvoice(
+  id: string,
+  cb: (inv: WithId<InvoiceDoc> | null) => void,
+): () => void {
+  return onSnapshot(invRef(id), (snap) =>
+    cb(snap.exists() ? { id: snap.id, ...snap.data() } : null),
+  );
+}
+
 export async function updateInvoiceLineItems(id: string, items: LineItem[]): Promise<void> {
   const totals = recomputeTotals(items);
   await updateDoc(doc(db, "invoices", id), { lineItems: items, ...totals });

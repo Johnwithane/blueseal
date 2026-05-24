@@ -47,6 +47,16 @@ See `PROFESSIONAL_TASKS.md` for the parallel lawyer + accountant work that gates
   3. After creating the endpoint, Stripe reveals its **signing secret** (`whsec_…`). Use that as the value when running `firebase functions:secrets:set STRIPE_WEBHOOK_SECRET`. Redeploy `stripeWebhook` so it picks up the new secret.
 - **Verify:** From the dashboard's webhook detail view, click "Send test webhook" → choose `account.updated` → check that the response is 200 and that the `webhookEvents/` Firestore collection has a new doc with `status: "processed"`.
 
+### [ ] Set `VITE_STRIPE_PUBLISHABLE_KEY` in the frontend env
+
+- **Why:** The Stripe Elements payment form (`/invoices/:id/pay`) bootstraps Stripe.js with the publishable key. Without it, the view renders "Online payments aren't configured for this environment" and the Pay button is disabled.
+- **What:** In `.env.production` (and `.env.local` for local dev against real Stripe), add:
+  ```
+  VITE_STRIPE_PUBLISHABLE_KEY=pk_live_...
+  ```
+  Use the live key (Dashboard → Developers → API keys) in prod and the test key (`pk_test_…`) in staging / local. The key is safe to ship to browsers — it's the public half of the keypair whose secret is `STRIPE_SECRET_KEY`.
+- **Verify:** Build the frontend; in DevTools console, `import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY` should be the expected key. Test a payment in test mode using card `4242 4242 4242 4242` with any future expiry / any CVC / any zip.
+
 ### [ ] Configure `APP_BASE_URL` for the Connect onboarding redirects
 
 - **Why:** `createConnectOnboardingLink` builds `refresh_url` + `return_url` from this env var (same one notify.ts uses for deep-links). Without it set, the tradesperson is redirected to `https://blueseal.app/payouts/return` regardless of environment.
