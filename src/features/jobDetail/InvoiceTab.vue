@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import Button from "primevue/button";
+import { RouterLink } from "vue-router";
 import QuoteCard from "@/components/QuoteCard.vue";
 import InvoiceEditor from "@/components/InvoiceEditor.vue";
 import ExpensesCard from "@/components/ExpensesCard.vue";
@@ -11,6 +12,11 @@ defineProps<{
   isClient: boolean;
   isTradie: boolean;
   invoiceId: string | null;
+  // True only when the invoice was sent through the Stripe Connect
+  // pipeline (clientSecret available). Legacy "mark paid" / manual
+  // invoices have no in-app pay or receipt page, so the CTAs below
+  // gate on this in addition to invoiceId.
+  invoicePayable: boolean;
   markingPaid: boolean;
 }>();
 
@@ -45,6 +51,50 @@ const emit = defineEmits<{
         :loading="markingPaid"
         @click="emit('mark-paid')"
       />
+    </div>
+
+    <!-- Client: the invoice is sent, payment is due. The InvoiceEditor
+         below renders the breakdown read-only; this card surfaces the
+         primary action (pay now → Stripe checkout). Without it the
+         client has no in-app payment affordance and ends up hunting
+         for an email link. -->
+    <div
+      v-if="isClient && job.status === 'awaiting_payment' && invoiceId && invoicePayable"
+      class="bs-card p-3 border-l-4 border-l-emerald-500"
+    >
+      <h3 class="font-semibold text-sm mb-1 flex items-center gap-2">
+        <i class="pi pi-wallet text-emerald-600"></i>
+        Invoice ready to pay
+      </h3>
+      <p class="text-xs text-[color:var(--bs-muted)] mb-3">
+        Pay by card to close out the job — you'll get a receipt right after.
+      </p>
+      <RouterLink :to="`/invoices/${invoiceId}/pay`" class="block">
+        <Button
+          label="Pay invoice"
+          icon="pi pi-credit-card"
+          severity="success"
+          class="w-full"
+        />
+      </RouterLink>
+    </div>
+
+    <!-- Client: post-payment receipt link. The InvoiceEditor below
+         shows the line items, but the receipt view is the cleaner
+         shareable artifact. -->
+    <div
+      v-if="isClient && (job.status === 'complete' || job.status === 'reviewed') && invoiceId && invoicePayable"
+      class="bs-card p-3"
+    >
+      <RouterLink :to="`/invoices/${invoiceId}/receipt`" class="block">
+        <Button
+          label="View receipt"
+          icon="pi pi-file"
+          severity="secondary"
+          outlined
+          class="w-full"
+        />
+      </RouterLink>
     </div>
 
     <!-- Tradie: ball is in the client's court — read-only confirmation. -->

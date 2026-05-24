@@ -70,6 +70,15 @@ export async function getInvoice(id: string): Promise<WithId<InvoiceDoc> | null>
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
 
+export function subscribeInvoice(
+  id: string,
+  cb: (inv: WithId<InvoiceDoc> | null) => void,
+): () => void {
+  return onSnapshot(invRef(id), (snap) =>
+    cb(snap.exists() ? { id: snap.id, ...snap.data() } : null),
+  );
+}
+
 export async function updateInvoiceLineItems(id: string, items: LineItem[]): Promise<void> {
   // Re-read the live discount so a line-items edit doesn't accidentally
   // wipe a previously-applied discount on the same write.

@@ -79,8 +79,6 @@ export async function createUser(opts: {
     createdAt: serverTimestamp() as never,
     lastActiveAt: serverTimestamp() as never,
     emailVerified: false,
-    hasActiveSubscription: false,
-    stripeCustomerId: null,
     clientRatingAvg: 0,
     clientRatingCount: 0,
     termsAcceptedAt: serverTimestamp() as never,

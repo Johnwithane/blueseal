@@ -24,6 +24,14 @@ export const functions = getFunctions(app, "us-central1");
 // Analytics is browser-only; safe-guard for SSR / unsupported envs.
 export const analyticsPromise = isSupported().then((ok) => (ok ? getAnalytics(app) : null));
 
+// Stripe publishable key for client-side Stripe.js. Safe to ship to the
+// browser (it's the public counterpart to the secret key that lives on
+// Cloud Functions). Empty in environments where Stripe isn't configured
+// yet; the payment view surfaces a clear "Stripe is not configured" error
+// in that case instead of crashing.
+export const STRIPE_PUBLISHABLE_KEY: string =
+  import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? "";
+
 // Only attach to emulators when explicitly opted in.
 const useEmulators =
   import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === "true";

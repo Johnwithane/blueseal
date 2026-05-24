@@ -58,6 +58,9 @@ interface BannerContent {
 const content = computed<BannerContent | null>(() => {
   if (!auth.isAuthenticated || auth.activeRole !== "tradesperson") return null;
   if (route.path === "/onboarding") return null;
+  // The payouts view is itself the place to act on payouts state — banner
+  // would just nag the user about what they're already looking at.
+  if (route.path.startsWith("/payouts")) return null;
 
   // No doc yet (just added the role, or still loading) — show the onboarding
   // nudge. Same copy as `draft` so the user doesn't see a flicker between
@@ -101,7 +104,42 @@ const content = computed<BannerContent | null>(() => {
           tradie.value?.vettingNotes?.trim() ||
           "Your application wasn't approved. Reply to the email we sent for next steps.",
       };
-    case "approved":
+    case "approved": {
+      // Once vetting is approved, the banner moves on to nudging payouts
+      // setup. Treat missing `payouts` as `not_started` so pre-migration
+      // docs see the kickoff CTA. `enabled` = no banner.
+      const payouts = tradie.value?.payouts;
+      const onboarding = payouts?.onboardingStatus ?? "not_started";
+      if (onboarding === "enabled") return null;
+      if (onboarding === "restricted") {
+        return {
+          severity: "error",
+          icon: "pi-exclamation-triangle",
+          label: "Stripe paused your payouts",
+          message:
+            "Stripe needs more info before payouts can resume. Open Payouts to see what's needed.",
+          cta: { to: "/payouts", label: "Fix on Stripe" },
+        };
+      }
+      if (onboarding === "in_progress") {
+        return {
+          severity: "warn",
+          icon: "pi-clock",
+          label: "Finish payout setup",
+          message:
+            "You started Stripe onboarding but haven't finished. Pick up where you left off so clients can pay you through Blue Seal.",
+          cta: { to: "/payouts", label: "Continue setup" },
+        };
+      }
+      return {
+        severity: "info",
+        icon: "pi-credit-card",
+        label: "Connect your bank account",
+        message:
+          "Blue Seal pays you out through Stripe Connect. Finish a 5-minute setup so client payments can land in your account.",
+        cta: { to: "/payouts", label: "Set up payouts" },
+      };
+    }
     default:
       return null;
   }

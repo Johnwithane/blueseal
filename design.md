@@ -356,7 +356,7 @@ A persistent in-app chatbot for tradespeople and admins, surfaced as a floating 
 
 **Subsumed:** the old `aiDiagnose` / `aiQuote` / `aiSummarize` callables and the `AiToolsPanel` UI component (decision 2026-05-22 — single AI surface beats three separate buttons; results are now part of a thread the tradie can follow up in rather than a one-shot modal). The callables remain deployed during the migration window but should be removed once the chatbot has been in production for a couple of weeks with no rollback signal.
 
-**Gating:** the chatbot is intended to require `hasActiveSubscription: true` for tradespeople (admins exempt). The subscription gate ships **off** for development (`REQUIRE_SUBSCRIPTION = false` in `functions/src/ai/chat.ts`) and must be flipped on before launch — see HUMANTASKS.md.
+**Gating:** the chatbot is open to all tradespeople (and admins). Originally planned as a paid-tier feature gated on `hasActiveSubscription`; that subscription model was scrapped in the 2026-05 monetization pivot in favour of a 12% Stripe Connect commission on each completed payment, and the gate (plus the field) was removed. Role check (`tradesperson` or `admin`) still applies.
 
 **Data:** conversations live at `assistantConversations/{id}` with a `messages/` subcollection; both turns are persisted server-side by the `aiChat` callable in a single batch so partial conversations never land. `aiUsage` entries are written per turn with `tool: "chat"`.
 
@@ -381,9 +381,6 @@ users/{uid}
   displayName, email, photoURL, phone
   createdAt, lastActiveAt
   emailVerified: bool
-  // tradies only:
-  hasActiveSubscription: bool
-  stripeCustomerId: string
   // clients only:
   clientRatingAvg: number        // visible to tradies
   clientRatingCount: number
@@ -537,7 +534,8 @@ These fields are denormalized for read performance and **must** be updated by Cl
 | `tradespeople.ratingAvg`, `ratingCount`, `ratingDimensions` | `onReviewCreated` |
 | `tradespeople.verifiedTrades` | `onCertApproved` |
 | `tradespeople.idVerified`, `isVisible` | `onIdApproved` (and `onCertApproved` if all certs done) |
-| `users.hasActiveSubscription` | `stripeWebhook` |
+| `tradespeople.payouts.*` | `stripeWebhook` (`account.updated` for onboarding state; subsequent `payout.*` events write `/payouts/{po_…}` rather than the tradesperson doc) |
+| `invoices.payment.*`, `invoices.status` | `stripeWebhook` (`payment_intent.*`, `charge.refunded`, `charge.dispute.*`) |
 | `users.clientRatingAvg`, `clientRatingCount` | `onClientReviewCreated` |
 | `chats.lastMessageAt`, `lastMessagePreview` | `onMessageCreated` |
 
@@ -565,7 +563,7 @@ invoices/{invoiceId}.pdf         — generated invoice PDFs
 - Jobs/chats: read/write only by `clientId` or `tradespersonId` involved, plus admin.
 - Public reviews: client can create one per `complete` job they own; world-readable.
 - Private client reviews: tradie can create one per job they completed; readable only by users with `role: "tradesperson"` and admin.
-- AI assistant (`aiChat`): callable allowed only when `hasActiveSubscription: true` for tradespeople (admins exempt). Enforced server-side; currently off during development (see §5.9 + HUMANTASKS.md).
+- AI assistant (`aiChat`): callable open to tradespeople and admins; role check is enforced server-side. The original paid-tier gate (`hasActiveSubscription`) was removed with the 2026-05 monetization pivot — revenue comes from the per-payment Connect commission, not an AI subscription.
 - `assistantConversations/{id}` + `/messages/`: owner-only read; all writes go through the `aiChat` callable (admin SDK bypasses rules) so partial conversations never persist.
 - Audit log: write-only via Cloud Function, read by admins only.
 - Intake form schemas: world-readable, admin write only.
@@ -594,9 +592,11 @@ Live in `functions/src/`, organized by domain (`auth/`, `vetting/`, `reviews/`, 
 - `onReviewCreated` — recomputes `ratingAvg`/`ratingCount`/`ratingDimensions`
 - `onClientReviewCreated` — recomputes `clientRatingAvg`/`clientRatingCount`
 
-**Payments**
-- `stripeWebhook` — handles subscription events → updates `hasActiveSubscription`
-- `createCheckoutSession` — callable; returns Stripe Checkout URL for AI subscription
+**Payments (Stripe Connect, 12% commission per payment)**
+- `stripeWebhook` — handles Connect (`account.updated`, `payout.*`) and platform events (`payment_intent.*`, `charge.refunded`, `charge.dispute.*`); mirrors state onto `tradespeople.payouts`, `invoices.payment`, `/payouts/{po_…}`, `/disputes/{dp_…}`
+- `createConnectAccount` / `createConnectOnboardingLink` / `createConnectLoginLink` — tradesperson Connect Express onboarding + dashboard access
+- `sendInvoice` — creates the Stripe PaymentIntent (with `application_fee_amount` + `transfer_data.destination = acct_…`) so the commission split happens at capture time
+- `backfillPayoutsField` — one-shot admin callable that seeds `payouts: not_started` on existing approved tradespeople; precondition for the deferred `maybeMarkVisible` tightening
 
 **AI**
 - `aiChat` — primary callable for the persistent assistant (§5.9). Auto-resolves or creates the conversation per `(userId, scope, jobId)`, loads job context when scope is `job`, replays the prior turns, persists user + assistant turns atomically, logs to `aiUsage` with `tool: "chat"`.

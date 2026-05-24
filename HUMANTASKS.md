@@ -6,21 +6,86 @@ Tasks are grouped by the phase that introduced them so you can see why each one 
 
 ---
 
+## Monetization pivot — Stripe Connect Express (added 2026-05-24)
+
+Replacing the AI subscription with a 12% commission via Stripe Connect Express. Phase A wires the connection: callable to create Connect Express accounts, hosted onboarding link, login link, and an `account.updated` webhook that mirrors Stripe state onto `tradespeople/{uid}.payouts`. Payment / payout / refund / dispute webhook events land in Phase B alongside the `sendInvoice` rewrite.
+
+Until the items below are done, the Connect callables return a "Stripe is not configured" error (because the secrets aren't bound) and the webhook 400s on every event (signature verification fails without `STRIPE_WEBHOOK_SECRET`). Existing offline-payment flow continues to work.
+
+See `PROFESSIONAL_TASKS.md` for the parallel lawyer + accountant work that gates launch (FINTRAC opinion, GST/HST treatment, etc.).
+
+### [ ] Enable Stripe Connect on the platform account
+
+- **Why:** Express accounts can only be created if Connect is activated on the Blue Seal Stripe account and the platform agreement is signed.
+- **What:**
+  1. Sign in to the [Stripe dashboard](https://dashboard.stripe.com) on the production Blue Seal account.
+  2. Connect → Get started → choose **Express** as the account type. Accept Stripe's Platform & Connected Account Agreements.
+  3. Complete the platform profile: legal entity (matches what the lawyer/accountant set up), website (`https://blueseal.app`), support email, business model description ("home-services marketplace connecting verified Canadian tradespeople with clients").
+  4. Configure the **branding** (colour, logo, icon) — Express onboarding shows Blue Seal branding to the tradesperson during sign-up.
+- **Verify:** The Connect overview shows "Live: Yes" and the "Connected accounts" tab is empty (we haven't created any in prod yet).
+
+### [ ] Set Stripe secrets on Cloud Functions
+
+- **Why:** `createConnectAccount`, `createConnectOnboardingLink`, `createConnectLoginLink`, and `stripeWebhook` all declare `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` as `defineSecret(...)` params. Without them bound, the callables throw at first use and the webhook can't verify signatures.
+- **What:** From the repo root with the Firebase CLI authenticated:
+  ```
+  firebase functions:secrets:set STRIPE_SECRET_KEY
+  firebase functions:secrets:set STRIPE_WEBHOOK_SECRET
+  ```
+  Paste the live `sk_live_…` key (Dashboard → Developers → API keys) when prompted for `STRIPE_SECRET_KEY`. `STRIPE_WEBHOOK_SECRET` you'll get after the next task (it's the signing secret of the webhook endpoint you create).
+- **Verify:** `firebase functions:secrets:access STRIPE_SECRET_KEY` returns the expected key. Redeploy is required after a new secret is set so the function reads the new value: `firebase deploy --only functions:createConnectAccount,functions:createConnectOnboardingLink,functions:createConnectLoginLink,functions:stripeWebhook`.
+
+### [ ] Register the Stripe webhook endpoint
+
+- **Why:** Stripe needs to know where to POST event notifications. The endpoint URL is the Cloud Function HTTPS URL of `stripeWebhook` after deploy.
+- **What:**
+  1. Deploy Functions once so the URL exists: `firebase deploy --only functions:stripeWebhook`. Note the URL Firebase prints (looks like `https://stripewebhook-xxxxxx-uc.a.run.app`).
+  2. Stripe Dashboard → Developers → Webhooks → Add endpoint. URL = the deployed function URL. Events to listen for:
+     - **Phase A (Connect)**: `account.updated`
+     - **Phase B (payments) — wired**: `payment_intent.processing`, `payment_intent.succeeded`, `payment_intent.payment_failed`, `charge.refunded`
+     - **Disputes — wired**: `charge.dispute.created`, `charge.dispute.closed`
+     - **Payouts — wired**: `payout.created`, `payout.paid`, `payout.failed` (these are Connect events delivered with `event.account = acct_…`; ensure the webhook endpoint is registered to receive Connect events, not just platform events)
+  3. After creating the endpoint, Stripe reveals its **signing secret** (`whsec_…`). Use that as the value when running `firebase functions:secrets:set STRIPE_WEBHOOK_SECRET`. Redeploy `stripeWebhook` so it picks up the new secret.
+- **Verify:** From the dashboard's webhook detail view, click "Send test webhook" → choose `account.updated` → check that the response is 200 and that the `webhookEvents/` Firestore collection has a new doc with `status: "processed"`.
+
+### [ ] Set `VITE_STRIPE_PUBLISHABLE_KEY` in the frontend env
+
+- **Why:** The Stripe Elements payment form (`/invoices/:id/pay`) bootstraps Stripe.js with the publishable key. Without it, the view renders "Online payments aren't configured for this environment" and the Pay button is disabled.
+- **What:** In `.env.production` (and `.env.local` for local dev against real Stripe), add:
+  ```
+  VITE_STRIPE_PUBLISHABLE_KEY=pk_live_...
+  ```
+  Use the live key (Dashboard → Developers → API keys) in prod and the test key (`pk_test_…`) in staging / local. The key is safe to ship to browsers — it's the public half of the keypair whose secret is `STRIPE_SECRET_KEY`.
+- **Verify:** Build the frontend; in DevTools console, `import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY` should be the expected key. Test a payment in test mode using card `4242 4242 4242 4242` with any future expiry / any CVC / any zip.
+
+### [ ] Run the one-shot payouts backfill in production
+
+- **Why:** Tradesperson docs created before the Stripe Connect cutover don't carry the `payouts` field. The deferred `maybeMarkVisible()` tightening (Phase A residual) gates visibility on `payouts.payoutsEnabled === true` — without backfilling first, every existing approved tradie would drop out of search the moment the gate flips. The backfill seeds the `not_started` default so the gate-flip is a controlled rollout, not a cliff.
+- **What:** Sign in as admin → Admin console → Migration tools → "Backfill payouts field" button. Single click triggers the `backfillPayoutsField` callable; it pages through all `vettingStatus == approved` tradies in batches of 400 and merge-writes `payouts: emptyPayoutsState()` onto any without the field. Idempotent.
+- **Verify:** The toast on completion shows `scanned / updated / alreadyPresent / pages`. Re-running should report `updated: 0, alreadyPresent: <full count>`. Spot-check a few tradesperson docs in Firestore — every `vettingStatus == approved` doc should have `payouts.onboardingStatus = "not_started"` after the run.
+
+### [ ] Configure `APP_BASE_URL` for the Connect onboarding redirects
+
+- **Why:** `createConnectOnboardingLink` builds `refresh_url` + `return_url` from this env var (same one notify.ts uses for deep-links). Without it set, the tradesperson is redirected to `https://blueseal.app/payouts/return` regardless of environment.
+- **What:** Already documented in the Notifications section above for the prod domain. For staging environments, set it to the staging hostname so test sign-ups don't bounce people to prod.
+- **Verify:** Call `createConnectOnboardingLink` from a logged-in tradesperson session in staging → returned URL contains `staging.blueseal.app` (or whatever staging is) in the redirect query params.
+
+---
+
 ## AI assistant chatbot (added 2026-05-22)
 
 Floating-panel assistant for tradespeople + admins. Backend lives in [functions/src/ai/chat.ts](functions/src/ai/chat.ts), conversations persist under `assistantConversations/{id}/messages/`. Runs on Vertex AI Gemini 2.5 Flash (same auth path as the existing `aiDiagnose` tools — no API keys needed once the API is enabled).
 
-### [ ] Re-enable the subscription gate before launch
+### [x] Re-enable the subscription gate before launch (obsolete 2026-05-24)
 
-- **Why:** [functions/src/ai/chat.ts](functions/src/ai/chat.ts) has `REQUIRE_SUBSCRIPTION = false` at the top so we can dogfood the assistant during development. design.md §5.9 says AI tools require an active subscription — the chatbot is the new primary AI surface, so it should respect the same gate before paying users see it.
-- **What:** Flip `REQUIRE_SUBSCRIPTION` to `true` (or promote it to a Cloud Functions env var if you want staging vs prod control), then redeploy. The check already exists below the flag — tradespeople without `users/{uid}.hasActiveSubscription === true` will get a `permission-denied` error and the UI shows a paywall.
-- **Verify:** Sign in as a tradie with `hasActiveSubscription === false` and try to send a message — should fail with the gate message. Flip the flag on the user doc, refresh token, retry — should work.
+- **Resolution:** Cancelled by the monetization pivot. AI tools are now bundled into the platform offering — revenue comes from the 12% Stripe Connect commission per payment, not a separate AI subscription. The `REQUIRE_SUBSCRIPTION` flag + the subscription check in `chat.ts` / `tools.ts` were removed in the cutover commit. The dead `hasActiveSubscription` + `stripeCustomerId` fields on user docs were torn out in a follow-up commit (interface, signup writer, rules `hasOnly` allowlists + create/update equality locks all updated together). Existing user docs in prod still carry the fields as orphan booleans — harmless, ignored by rules and code, will fall off naturally as docs are next edited or via a one-shot cleanup script if it ever bothers anyone.
 
-### [ ] (Optional, future) Stand up Firestore rules tests
+### [x] Stand up Firestore rules tests (done 2026-05-24)
 
-- **Why:** CLAUDE.md mandates an allow + deny rules test for every collection, but the repo has no test harness yet — every new collection (this one included) ships without rules tests. Backstopping this properly means adding `@firebase/rules-unit-testing`, a `tests/rules/` folder, and CI wiring.
-- **What:** Install `@firebase/rules-unit-testing` as a devDep, scaffold `tests/rules/setup.ts` + one spec per collection (start with `chats`, `assistantConversations`, `jobs` — the ones with non-trivial rules), and add `test:rules` to package.json. The emulator hosts the rules being tested; no production project is touched.
-- **Verify:** `npm run test:rules` runs locally; CI runs it on PRs.
+- **Why:** CLAUDE.md mandates an allow + deny rules test for every collection, but the repo had no test harness — every new collection shipped without rules tests.
+- **Done:** `@firebase/rules-unit-testing@^4` + `firebase-tools@^15` installed as devDeps. Harness lives at [tests/rules/setup.ts](tests/rules/setup.ts), separate vitest config at [vitest.rules.config.ts](vitest.rules.config.ts), runner script `npm run test:rules` wraps `firebase emulators:exec --only firestore` so the emulator starts/stops around the test command. Initial specs cover the four touch-points from the monetization-pivot Phase A schema commit (`payouts/`, `webhookEvents/`, `tradespeople` server-managed field locks, `invoices.payment` field lock). Future rules changes are expected to ship with matching tests in the same folder.
+- **Outstanding:** Backfill specs for existing collections (`chats`, `jobs`, `jobPosts`, `assistantConversations`, etc.) — non-blocking. Add the script to CI as a separate job (needs Java in the runner image).
+- **Verify:** `npm run test:rules` passes locally. Needs `firebase-tools` (devDep, ✓) + Java 11+ on the runner (CI runner image needs `openjdk-jre`).
 
 ### [ ] Confirm Vertex AI API is enabled on the GCP project
 

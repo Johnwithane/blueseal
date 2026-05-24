@@ -4,6 +4,12 @@ import { RouterLink } from "vue-router";
 import Button from "primevue/button";
 import Avatar from "primevue/avatar";
 import { listPendingApplications } from "@/firebase/services/tradespeople";
+import {
+  backfillPayoutsField,
+  type BackfillPayoutsResult,
+} from "@/firebase/services/payoutsService";
+import { useToast } from "@/composables/useToast";
+import { humanizeError } from "@/utils/errors";
 import type { TradespersonDoc, WithId } from "@/firebase/interfaces";
 import { useFormatters } from "@/composables";
 import { tradeLabel } from "@/data/trades";
@@ -11,6 +17,30 @@ import { tradeLabel } from "@/data/trades";
 const pending = ref<WithId<TradespersonDoc>[]>([]);
 const loading = ref(true);
 const { relativeTime } = useFormatters();
+const toast = useToast();
+
+// Migration tools — one-shot admin ops that don't justify their own page.
+// `backfillPayoutsField` seeds the new payouts field on existing approved
+// tradies; idempotent so a re-click is harmless. Once we're confident
+// every prod tradie has the field this card can be removed.
+const backfilling = ref(false);
+const backfillResult = ref<BackfillPayoutsResult | null>(null);
+
+async function runPayoutsBackfill() {
+  backfilling.value = true;
+  try {
+    backfillResult.value = await backfillPayoutsField();
+    const r = backfillResult.value;
+    toast.success(
+      "Backfill complete",
+      `Scanned ${r.scanned}, updated ${r.updated}, already had the field ${r.alreadyPresent}.`,
+    );
+  } catch (err) {
+    toast.error("Backfill failed", humanizeError(err));
+  } finally {
+    backfilling.value = false;
+  }
+}
 
 function nameOf(t: WithId<TradespersonDoc>): string {
   return t.displayName?.trim() || tradeLabel(t.trades[0] ?? "") || "Unnamed applicant";
@@ -43,6 +73,14 @@ onMounted(async () => {
         <RouterLink to="/admin/site-content">
           <Button label="Site content" icon="pi pi-pencil" outlined />
         </RouterLink>
+        <RouterLink to="/admin/disputes">
+          <Button
+            label="Disputes"
+            icon="pi pi-exclamation-triangle"
+            outlined
+            severity="warn"
+          />
+        </RouterLink>
         <RouterLink to="/admin/vetting">
           <Button label="Open vetting queue" icon="pi pi-arrow-right" />
         </RouterLink>
@@ -63,6 +101,31 @@ onMounted(async () => {
       <div class="bs-card p-5">
         <div class="text-sm text-[color:var(--bs-muted)]">Region</div>
         <div class="text-3xl font-bold mt-1">CA</div>
+      </div>
+    </div>
+
+    <div class="bs-card mb-6 p-5">
+      <h2 class="text-base font-semibold">Migration tools</h2>
+      <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
+        One-shot ops for the Stripe Connect cutover. Idempotent — safe to
+        re-run. Remove this card once every prod tradie has been backfilled.
+      </p>
+      <div class="mt-3 flex flex-wrap items-center gap-3">
+        <Button
+          label="Backfill payouts field"
+          icon="pi pi-database"
+          :loading="backfilling"
+          @click="runPayoutsBackfill"
+        />
+        <p
+          v-if="backfillResult"
+          class="text-sm text-[color:var(--bs-muted)] flex-1 min-w-[10rem]"
+        >
+          Last run: scanned <strong>{{ backfillResult.scanned }}</strong>,
+          updated <strong>{{ backfillResult.updated }}</strong>,
+          already present <strong>{{ backfillResult.alreadyPresent }}</strong>
+          ({{ backfillResult.pages }} page{{ backfillResult.pages === 1 ? "" : "s" }}).
+        </p>
       </div>
     </div>
 

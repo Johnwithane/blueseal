@@ -1,11 +1,16 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import Button from "primevue/button";
 import Dialog from "primevue/dialog";
 import Textarea from "primevue/textarea";
-import { clientAcceptQuote, clientDeclineQuote } from "@/firebase/services/quotes";
+import {
+  clientAcceptQuote,
+  clientDeclineQuote,
+  subscribeQuote,
+} from "@/firebase/services/quotes";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
+import type { QuoteDoc, WithId } from "@/firebase/interfaces";
 
 const props = defineProps<{
   jobId: string;
@@ -21,6 +26,34 @@ const declining = ref(false);
 
 const showDeclineDialog = ref(false);
 const reason = ref("");
+
+// Live subscription to the quote doc. The parent renders this banner
+// when job.status === "quoted", but clientDeclineQuote deliberately
+// leaves job.status unchanged (so the tradie can revise without the
+// kanban moving). Without a separate gate on quote.status, declining
+// the banner just reloads the same accept/decline prompt on every
+// future visit until the tradie resubmits — visible bug. We hide the
+// action banner whenever the latest quote is "declined" / "withdrawn"
+// / "expired", and replace it with a "waiting on the tradesperson"
+// stub so the client knows the ball is in the other court.
+const quote = ref<WithId<QuoteDoc> | null>(null);
+let unsubQuote: (() => void) | null = null;
+
+onMounted(() => {
+  unsubQuote = subscribeQuote(props.jobId, (q) => {
+    quote.value = q;
+  });
+});
+onBeforeUnmount(() => unsubQuote?.());
+
+const showActions = computed(() => {
+  // Default to actionable when the quote hasn't loaded yet — the
+  // parent's `job.status === "quoted"` gate is already a precondition,
+  // and a flash of the awaiting-state would be more confusing than a
+  // flash of the action state.
+  if (!quote.value) return true;
+  return quote.value.status === "sent" || quote.value.status === "viewed";
+});
 
 async function onAccept() {
   if (accepting.value) return;
@@ -69,7 +102,10 @@ async function onSubmitDecline() {
 </script>
 
 <template>
-  <div class="bs-card p-4 border-l-4 border-l-amber-500">
+  <div
+    v-if="showActions"
+    class="bs-card p-4 border-l-4 border-l-amber-500"
+  >
     <div class="flex items-start gap-3">
       <i class="pi pi-file text-amber-600 text-xl mt-0.5"></i>
       <div class="min-w-0 flex-1">
@@ -98,6 +134,41 @@ async function onSubmitDecline() {
         :disabled="accepting || declining"
         @click="onAccept"
       />
+    </div>
+  </div>
+
+  <!-- Awaiting-tradesperson stub. Shown when the client has already
+       declined / the quote has expired or been withdrawn — keeps the
+       client from seeing the same actionable banner on every revisit
+       while the tradesperson preps a revision. -->
+  <div
+    v-else
+    class="bs-card p-4 border-l-4 border-l-slate-400"
+  >
+    <div class="flex items-start gap-3">
+      <i class="pi pi-hourglass text-slate-500 text-xl mt-0.5"></i>
+      <div class="min-w-0 flex-1">
+        <div class="font-semibold text-base">
+          {{ quote?.status === "declined" ? "Waiting on a revised quote" : "Quote pending" }}
+        </div>
+        <p class="text-sm text-[color:var(--bs-muted)] mt-1">
+          <template v-if="quote?.status === 'declined'">
+            Your feedback has been sent. The tradesperson will tweak the quote
+            and send it back — you'll see a new accept/decline prompt here when
+            it arrives.
+          </template>
+          <template v-else-if="quote?.status === 'expired'">
+            This quote's validity period passed. Ping the tradesperson in the
+            chat to ask for a fresh one.
+          </template>
+          <template v-else-if="quote?.status === 'withdrawn'">
+            The tradesperson pulled this quote back. Check the chat for context.
+          </template>
+          <template v-else>
+            Waiting for the next step from the tradesperson.
+          </template>
+        </p>
+      </div>
     </div>
 
     <Dialog

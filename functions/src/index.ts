@@ -58,12 +58,14 @@ export { aiSuggestReplies } from "./ai/suggestReplies";
 export { aiUpdateJobLog } from "./ai/updateJobLog";
 export { parseReceipt } from "./ai/parseReceipt";
 
-// Payments (stubbed)
-export {
-  createCheckoutSession,
-  stripeWebhook,
-  adminToggleSubscription,
-} from "./payments/stripeStub";
+// Payments — Stripe Connect Express (commission model). The subscription
+// stub was deleted in the Phase C cutover; the platform earns from a 12%
+// commission on each payment via Connect's application_fee_amount.
+export { createConnectAccount } from "./payments/createConnectAccount";
+export { createConnectOnboardingLink } from "./payments/createConnectOnboardingLink";
+export { createConnectLoginLink } from "./payments/createConnectLoginLink";
+export { stripeWebhook } from "./payments/stripeWebhook";
+export { backfillPayoutsField } from "./payments/backfillPayoutsField";
 
 // Seed + ops
 export { seedIntakeSchemas, ping } from "./seed/seedIntakeSchemas";

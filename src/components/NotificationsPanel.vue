@@ -35,6 +35,10 @@ const ICON: Record<NotificationType, string> = {
   insurance_approved: "pi pi-verified",
   wsib_approved: "pi pi-verified",
   invoice_sent: "pi pi-file",
+  invoice_paid: "pi pi-check-circle",
+  invoice_payment_failed: "pi pi-exclamation-triangle",
+  invoice_refunded: "pi pi-replay",
+  dispute_opened: "pi pi-exclamation-triangle",
   review_received: "pi pi-star",
 };
 

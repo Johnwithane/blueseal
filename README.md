@@ -47,14 +47,14 @@ The MVP runs end-to-end as soon as you:
 
 3. **Install the "Trigger Email" extension** in the Firebase console and point it at `mail` collection. Without it, emails accumulate in Firestore but never send.
 
-4. **(Optional) Wire Stripe.** Set secrets:
+4. **Wire Stripe Connect (commission model).** Set secrets:
 
    ```bash
    firebase functions:secrets:set STRIPE_SECRET_KEY
    firebase functions:secrets:set STRIPE_WEBHOOK_SECRET
    ```
 
-   Then implement Checkout in `functions/src/payments/stripeStub.ts` and webhook signature verification. Until then, `adminToggleSubscription` callable lets admins manually flip `users/{uid}.hasActiveSubscription` to test the AI gate.
+   Revenue comes from a 12% platform fee on each payment via Stripe Connect Express (`application_fee_amount` on the PaymentIntent, `transfer_data.destination = acct_…` on the tradesperson's connected account). Tradespeople onboard via `/payouts`. See `HUMANTASKS.md` for the Connect setup checklist (enable Connect, register the webhook for both platform + Connect events, set `APP_BASE_URL`).
 
 5. **Enable Vertex AI for the AI tools.** No API key needed — Cloud Functions authenticate via the project's service account:
 

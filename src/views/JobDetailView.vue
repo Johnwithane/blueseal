@@ -49,10 +49,41 @@ const toast = useToast();
 const confirmDialog = useConfirm();
 const { dateTime } = useFormatters();
 
+function formatScheduled(
+  start: { toDate(): Date } | null | undefined,
+  end: { toDate(): Date } | null | undefined,
+): string {
+  if (!start) return "";
+  const s = start.toDate();
+  const e = end?.toDate();
+  // Same-day bookings: show "Mon Apr 15, 9:00 AM – 11:30 AM" so the
+  // end-time isn't crowded with a redundant date. Cross-day (rare
+  // but possible for multi-visit jobs scheduled in one block) shows
+  // both ends in full.
+  if (!e) return dateTime(s);
+  const sameDay = s.toDateString() === e.toDateString();
+  if (sameDay) {
+    const endTime = new Intl.DateTimeFormat("en-CA", {
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(e);
+    return `${dateTime(s)} – ${endTime}`;
+  }
+  return `${dateTime(s)} → ${dateTime(e)}`;
+}
+
 const job = ref<WithId<JobDoc> | null>(null);
 const tradieInfo = ref<WithId<TradespersonDoc> | null>(null);
 const intakeFields = ref<IntakeField[]>([]);
 const invoiceId = ref<string | null>(null);
+// True only for invoices sent through the Stripe Connect pipeline (i.e.
+// `payment.clientSecret` is set). Legacy "mark paid" / manual-flow
+// invoices have no client-side pay path, so the InvoiceTab's pay /
+// receipt CTAs must not link to /invoices/:id/pay — those would just
+// surface a "re-send it from their dashboard" error. Pre-launch the
+// difference is moot (no legacy invoices in prod), but during the
+// rollout window stale jobs may exist and shouldn't break.
+const invoicePayable = ref(false);
 const loading = ref(true);
 // When the URL points at a job the signed-in user can't read (notification
 // pointing at a stale or wrong id, deep link from another account) the
@@ -223,6 +254,7 @@ async function load() {
     ]);
     intakeFields.value = remote?.fields ?? SEED_INTAKE_SCHEMAS[job.value.trade] ?? [];
     invoiceId.value = invoice?.id ?? null;
+    invoicePayable.value = !!invoice?.payment?.clientSecret;
 
     scheduledStart.value = job.value.scheduledStart?.toDate() ?? null;
     scheduledEnd.value = job.value.scheduledEnd?.toDate() ?? null;
@@ -548,6 +580,34 @@ function onReturnToApplicants() {
         @decided="load"
       />
 
+      <!-- Scheduled-state confirmation. Once both parties have agreed
+           a quote and the tradesperson has picked a slot, the booking
+           is the most important piece of info on the page — surface it
+           in the banners rail rather than burying it inside the
+           Schedule tab. Same banner copy for both roles since it's a
+           shared agreement. -->
+      <div
+        v-if="job.status === 'scheduled' && job.scheduledStart"
+        class="bs-card p-4 mb-4 border-l-4 border-l-blue-500"
+      >
+        <div class="flex items-start gap-3">
+          <i class="pi pi-calendar text-blue-600 text-xl mt-0.5"></i>
+          <div class="min-w-0 flex-1">
+            <div class="font-semibold text-base">
+              {{ isClient ? "You're booked in" : "Booked with the client" }}
+            </div>
+            <p class="text-sm mt-1">
+              {{ formatScheduled(job.scheduledStart, job.scheduledEnd) }}
+            </p>
+            <p class="text-xs text-[color:var(--bs-muted)] mt-1">
+              {{ isClient
+                ? "The tradesperson will arrive at the agreed time. Use the chat below for any last-minute updates."
+                : "Reminder will fire 24 h ahead. Use the chat for any last-minute coordination." }}
+            </p>
+          </div>
+        </div>
+      </div>
+
       <JobTabBar
         :tabs="tabs"
         :model-value="activeTab"
@@ -594,6 +654,7 @@ function onReturnToApplicants() {
           :is-client="isClient"
           :is-tradie="isTradie"
           :invoice-id="invoiceId"
+          :invoice-payable="invoicePayable"
           :marking-paid="markingPaid"
           @mark-paid="onMarkPaid"
           @revise-quote="showQuoteSheet = true"

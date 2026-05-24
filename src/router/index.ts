@@ -84,6 +84,28 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, role: "tradesperson" as RoleGuard },
   },
 
+  // Payouts (Stripe Connect onboarding + dashboard link). /return + /refresh
+  // mirror the redirect targets Stripe sends users to after the hosted form;
+  // all three resolve to the same view (it shows a toast + replaces the URL).
+  {
+    path: "/payouts",
+    name: "Payouts",
+    component: () => import("@/views/payouts/PayoutsOnboardingView.vue"),
+    meta: { requiresAuth: true, role: "tradesperson" as RoleGuard },
+  },
+  {
+    path: "/payouts/return",
+    name: "PayoutsReturn",
+    component: () => import("@/views/payouts/PayoutsOnboardingView.vue"),
+    meta: { requiresAuth: true, role: "tradesperson" as RoleGuard },
+  },
+  {
+    path: "/payouts/refresh",
+    name: "PayoutsRefresh",
+    component: () => import("@/views/payouts/PayoutsOnboardingView.vue"),
+    meta: { requiresAuth: true, role: "tradesperson" as RoleGuard },
+  },
+
   // Job detail (tradies + clients)
   {
     path: "/jobs/:id",
@@ -98,6 +120,24 @@ const routes: RouteRecordRaw[] = [
       // stay visible on tablet/desktop.
       mobileCompact: true,
     },
+  },
+
+  // Invoice payment (client) + receipt (both parties). Both gated as
+  // `any` role rather than `client` because: (a) the receipt view is
+  // useful to the tradesperson too, and (b) Stripe's `return_url`
+  // redirect can land before the auto-role-switch settles — the view's
+  // own `isParty` check is the real authorization.
+  {
+    path: "/invoices/:id/pay",
+    name: "InvoicePay",
+    component: () => import("@/views/invoices/InvoicePayView.vue"),
+    meta: { requiresAuth: true, role: "any" as RoleGuard },
+  },
+  {
+    path: "/invoices/:id/receipt",
+    name: "InvoiceReceipt",
+    component: () => import("@/views/invoices/InvoiceReceiptView.vue"),
+    meta: { requiresAuth: true, role: "any" as RoleGuard },
   },
 
   // Job-board marketplace
@@ -153,6 +193,18 @@ const routes: RouteRecordRaw[] = [
     path: "/admin/users",
     name: "AdminUserSearch",
     component: () => import("@/views/admin/AdminUserSearchView.vue"),
+    meta: { requiresAuth: true, role: "admin" as RoleGuard },
+  },
+  {
+    path: "/admin/disputes",
+    name: "AdminDisputes",
+    component: () => import("@/views/admin/DisputesQueueView.vue"),
+    meta: { requiresAuth: true, role: "admin" as RoleGuard },
+  },
+  {
+    path: "/admin/disputes/:id",
+    name: "AdminDisputeDetail",
+    component: () => import("@/views/admin/DisputeDetailView.vue"),
     meta: { requiresAuth: true, role: "admin" as RoleGuard },
   },
 

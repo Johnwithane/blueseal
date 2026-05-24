@@ -258,6 +258,17 @@ const awaitingVerificationMessage = computed(() => {
   if (missing.length === 0) return "";
   return `Your application is approved — our team still needs to verify your ${missing.join(" and ")} before your profile goes live. You'll get a notification when it's done; nothing more for you to do right now.`;
 });
+
+// Show the payouts setup nudge as a dashboard card once the tradie is
+// approved (banner shows it too, but the dashboard card gives the action
+// a more prominent slot and a richer description). Once payouts are
+// enabled the card disappears — the Stripe dashboard link lives at
+// /payouts from then on.
+const showPayoutsNudge = computed(
+  () =>
+    vetting.value === "approved" &&
+    (tradie.value?.payouts?.onboardingStatus ?? "not_started") !== "enabled",
+);
 </script>
 
 <template>
@@ -316,6 +327,30 @@ const awaitingVerificationMessage = computed(() => {
       :blocks="bookings"
       @remove-block="removeBlock"
     />
+
+    <div
+      v-if="showPayoutsNudge"
+      class="bs-card mt-4 p-5 flex items-start gap-3"
+    >
+      <i
+        class="pi pi-credit-card text-2xl mt-0.5 text-[color:var(--bs-blue)]"
+        aria-hidden="true"
+      ></i>
+      <div class="flex-1 min-w-0">
+        <h2 class="text-base font-semibold">Set up payouts</h2>
+        <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
+          Connect a bank account through Stripe so client payments through
+          Blue Seal land directly in your account. Takes about 5 minutes.
+        </p>
+      </div>
+      <RouterLink to="/payouts" class="shrink-0">
+        <Button
+          label="Open payouts"
+          icon="pi pi-arrow-right"
+          icon-pos="right"
+        />
+      </RouterLink>
+    </div>
 
     <div
       v-if="awaitingVerification"

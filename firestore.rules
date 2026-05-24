@@ -42,7 +42,6 @@ service cloud.firestore {
           request.resource.data.keys().hasOnly([
             'roles','activeRole','displayName','email','photoURL','phone',
             'createdAt','lastActiveAt','emailVerified',
-            'hasActiveSubscription','stripeCustomerId',
             'clientRatingAvg','clientRatingCount',
             'termsAcceptedAt','termsAcceptedVersion',
             'deletedAt','notificationPrefs'
@@ -50,7 +49,6 @@ service cloud.firestore {
           || request.resource.data.keys().hasOnly([
             'role','displayName','email','photoURL','phone',
             'createdAt','lastActiveAt','emailVerified',
-            'hasActiveSubscription','stripeCustomerId',
             'clientRatingAvg','clientRatingCount',
             'termsAcceptedAt','termsAcceptedVersion',
             'deletedAt','notificationPrefs'
@@ -67,8 +65,6 @@ service cloud.firestore {
           (!('roles' in request.resource.data)
             && request.resource.data.role in ['client', 'tradesperson'])
         )
-        && request.resource.data.hasActiveSubscription == false
-        && request.resource.data.stripeCustomerId == null
         && request.resource.data.clientRatingAvg == 0
         && request.resource.data.clientRatingCount == 0
         && request.resource.data.emailVerified == false
@@ -92,8 +88,6 @@ service cloud.firestore {
             && request.resource.data.role == resource.data.role)
         )
         && request.resource.data.email == resource.data.email
-        && request.resource.data.hasActiveSubscription == resource.data.hasActiveSubscription
-        && request.resource.data.stripeCustomerId == resource.data.stripeCustomerId
         && request.resource.data.clientRatingAvg == resource.data.clientRatingAvg
         && request.resource.data.clientRatingCount == resource.data.clientRatingCount
         && request.resource.data.emailVerified == resource.data.emailVerified
@@ -139,6 +133,20 @@ service cloud.firestore {
         && request.resource.data.ratingDimensions == resource.data.ratingDimensions
         && request.resource.data.nextInvoiceNumber == resource.data.nextInvoiceNumber
         && request.resource.data.approvedAt == resource.data.approvedAt
+        // Stripe Connect state + verified-earnings stats are server-managed
+        // (webhook dispatcher + payment_intent.succeeded handler). Use
+        // `.get(field, null)` for safe access — `resource.data.foo` throws
+        // "Property foo is undefined" on legacy docs that pre-date the
+        // monetization-pivot schema, which would otherwise lock out every
+        // existing tradesperson from editing their profile. With the
+        // default, missing-on-both-sides compares equal, owner writes that
+        // touch the field don't.
+        && request.resource.data.get('payouts', null)
+             == resource.data.get('payouts', null)
+        && request.resource.data.get('paidJobsCount', null)
+             == resource.data.get('paidJobsCount', null)
+        && request.resource.data.get('paidLifetimeCents', null)
+             == resource.data.get('paidLifetimeCents', null)
         && (resource.data.vettingStatus == 'approved'
             ? request.resource.data.vettingStatus == 'approved'
             : request.resource.data.vettingStatus in ['draft','pending','info_requested']);
@@ -597,9 +605,60 @@ service cloud.firestore {
         && request.resource.data.tradespersonId == resource.data.tradespersonId
         && request.resource.data.clientId == resource.data.clientId
         && request.resource.data.jobId == resource.data.jobId
-        && resource.data.status != 'paid';
+        // Stripe payment state is server-managed (sendInvoice callable +
+        // webhook dispatcher). Owner can't tamper with the PaymentIntent
+        // / refunds / dispute mirror. `.get(field, null)` is needed for
+        // safe access on pre-cutover invoices where `payment` is absent —
+        // without the default, `resource.data.payment` throws "Property
+        // payment is undefined" and blocks every legacy update.
+        && request.resource.data.get('payment', null)
+             == resource.data.get('payment', null)
+        // Once the invoice enters any server-managed lifecycle state —
+        // processing (PaymentIntent in flight), paid, refunded / partially
+        // refunded, disputed, or void — the owner can't mutate it. The
+        // webhook dispatcher (admin SDK, bypasses rules) is the only path
+        // that transitions through these states. Pre-cutover invoices
+        // continue to support manual "mark paid" via the legacy paid path
+        // until the cutover commit removes that.
+        && !(resource.data.status in [
+          'processing', 'paid', 'refunded', 'partially_refunded',
+          'disputed', 'void'
+        ]);
       allow update: if isAdmin();
       allow delete: if isAdmin();
+    }
+
+    // ---------- disputes (Stripe chargeback / inquiry mirror; server-only writes) ----------
+    // Doc id == Stripe `dp_…` dispute id. Written by the
+    // `charge.dispute.created|closed` handlers in the webhook dispatcher.
+    // Admin reads across all disputes (for the queue); the tradesperson +
+    // client on the underlying invoice read their own. No client writes —
+    // evidence submission happens in the Stripe Dashboard.
+    match /disputes/{disputeId} {
+      allow read: if isAdmin()
+        || (isSignedIn() && resource.data.tradespersonId == uid())
+        || (isSignedIn() && resource.data.clientId == uid());
+      allow create, update, delete: if false;
+    }
+
+    // ---------- payouts (Stripe Connect payout ledger; server-only writes) ----------
+    // Doc id == Stripe `po_…` payout id; created/updated by the webhook
+    // dispatcher in response to `payout.created|paid|failed` events. The
+    // tradesperson subscribes to their own payouts for the in-app Payouts
+    // view; admins can read across tradies. No client-side writes — the
+    // dispatcher uses the Admin SDK which bypasses rules.
+    match /payouts/{payoutId} {
+      allow read: if isAdmin()
+        || (isSignedIn() && resource.data.tradespersonId == uid());
+      allow create, update, delete: if false;
+    }
+
+    // ---------- webhookEvents (Stripe webhook idempotency sentinel; server-only) ----------
+    // Doc id == Stripe `evt_…` event id. Dispatcher creates the sentinel
+    // before doing any side-effect work, so retried deliveries become
+    // no-ops. Never readable from the client — internal infra.
+    match /webhookEvents/{eventId} {
+      allow read, write: if false;
     }
 
     // ---------- ai usage (write via Cloud Function; admin/owner read) ----------

@@ -385,6 +385,46 @@ const visibleApplications = computed(() =>
                   }}
                   ({{ applicantTradies.get(app.tradespersonId)!.ratingCount }})
                 </div>
+                <!-- Verification badges mirror the public profile so the
+                     client choosing between bidders sees the same trust
+                     signals here. Only the badges that are actually
+                     verified render; absence isn't called out (Blue Seal
+                     vets every tradie before they're visible, so the
+                     "missing" state is meaningful — they passed cert+ID
+                     but haven't uploaded insurance/WSIB). -->
+                <div
+                  v-if="applicantTradies.get(app.tradespersonId)"
+                  class="flex flex-wrap gap-1 mt-1.5"
+                >
+                  <span
+                    v-if="applicantTradies.get(app.tradespersonId)!.idVerified"
+                    class="inline-flex items-center gap-1 text-[10px] font-medium bg-emerald-100 text-emerald-800 rounded-full px-1.5 py-0.5"
+                    title="ID verified by Blue Seal"
+                  >
+                    <i class="pi pi-id-card text-[10px]" />ID
+                  </span>
+                  <span
+                    v-if="(applicantTradies.get(app.tradespersonId)!.verifiedTrades?.length ?? 0) > 0"
+                    class="inline-flex items-center gap-1 text-[10px] font-medium bg-blue-100 text-blue-800 rounded-full px-1.5 py-0.5"
+                    title="Trade certification verified"
+                  >
+                    <i class="pi pi-verified text-[10px]" />Cert
+                  </span>
+                  <span
+                    v-if="applicantTradies.get(app.tradespersonId)!.insuranceVerified"
+                    class="inline-flex items-center gap-1 text-[10px] font-medium bg-violet-100 text-violet-800 rounded-full px-1.5 py-0.5"
+                    title="Liability insurance verified"
+                  >
+                    <i class="pi pi-shield text-[10px]" />Insured
+                  </span>
+                  <span
+                    v-if="applicantTradies.get(app.tradespersonId)!.wsibVerified"
+                    class="inline-flex items-center gap-1 text-[10px] font-medium bg-amber-100 text-amber-800 rounded-full px-1.5 py-0.5"
+                    title="WSIB coverage verified"
+                  >
+                    <i class="pi pi-check-circle text-[10px]" />WSIB
+                  </span>
+                </div>
               </div>
               <div class="text-right">
                 <div class="font-semibold">{{ priceLabel(app.proposedPrice) }}</div>
