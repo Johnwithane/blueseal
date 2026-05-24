@@ -34,6 +34,7 @@ import ReviewPrompt from "@/components/ReviewPrompt.vue";
 import TimeTrackerCard from "@/components/TimeTrackerCard.vue";
 import ExpensesCard from "@/components/ExpensesCard.vue";
 import FinishJobSheet from "@/components/FinishJobSheet.vue";
+import ClientApprovalBanner from "@/components/ClientApprovalBanner.vue";
 import { SEED_INTAKE_SCHEMAS } from "@/data/intakeSchemas";
 import { getIntakeSchema } from "@/firebase/services/intakeFormSchemas";
 import type { IntakeField } from "@/firebase/interfaces";
@@ -532,6 +533,16 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
         </div>
       </div>
 
+      <!-- Client approval banner — tradesperson handed the job over for
+           sign-off. Renders above everything else so the client sees the
+           call-to-action before the chat / invoice. -->
+      <ClientApprovalBanner
+        v-if="isClient && job.status === 'awaiting_client_approval'"
+        :job-id="job.id"
+        class="mb-4"
+        @decided="load"
+      />
+
       <div class="grid lg:grid-cols-3 gap-4">
         <div class="lg:col-span-2 space-y-4">
           <ChatThread
@@ -743,24 +754,35 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
           />
 
           <div v-if="isTradie" class="bs-card p-3">
-            <div class="flex items-start justify-between gap-2 mb-2">
-              <label for="job-private-notes" class="block font-semibold text-sm">
-                Private notes
-                <span class="font-normal text-[color:var(--bs-muted)]">(tradesperson only)</span>
-              </label>
-              <!-- AI auto-log button — appends a summary of new client
-                   chat activity to the notes. Server bypasses its cooldown
-                   for this manual trigger. -->
-              <Button
-                icon="pi pi-sparkles"
-                label="Update log"
-                size="small"
-                outlined
-                :loading="updatingLog"
-                title="Have AI summarise recent client messages into a new log entry"
-                @click="updateLogManually"
-              />
-            </div>
+            <label for="job-private-notes" class="block font-semibold text-sm mb-2">
+              Private notes
+              <span class="font-normal text-[color:var(--bs-muted)]">(tradesperson only)</span>
+            </label>
+
+            <!-- AI auto-log: prominent block (large CTA + sparkles + violet
+                 accent) so the AI capability is discoverable, but using a
+                 secondary visual treatment so it doesn't compete with the
+                 primary blue/green action buttons on this page. -->
+            <button
+              type="button"
+              class="ai-update-log w-full flex items-center gap-3 rounded-lg p-3 mb-3 text-left transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              :disabled="updatingLog"
+              :title="updatingLog ? 'Summarising…' : 'Have AI summarise recent client messages into a new log entry'"
+              @click="updateLogManually"
+            >
+              <span class="ai-update-log__icon shrink-0">
+                <i :class="updatingLog ? 'pi pi-spin pi-spinner' : 'pi pi-sparkles'"></i>
+              </span>
+              <span class="min-w-0 flex-1">
+                <span class="block font-semibold text-sm">
+                  {{ updatingLog ? "Summarising…" : "Update log with AI" }}
+                </span>
+                <span class="block text-xs opacity-80 leading-snug mt-0.5">
+                  Pull a fresh summary of new client chat into your notes.
+                </span>
+              </span>
+              <i v-if="!updatingLog" class="pi pi-arrow-right text-sm opacity-60"></i>
+            </button>
             <Textarea id="job-private-notes" v-model="privateNotes" rows="6" class="w-full" />
             <Button label="Save notes" icon="pi pi-save" outlined size="small" class="mt-2" @click="saveNotes" />
           </div>
@@ -900,3 +922,30 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
     </Dialog>
   </section>
 </template>
+
+<style scoped>
+/* AI Update-log button: prominent (violet gradient + sparkles + larger
+   hit target) so the AI affordance is obvious, but visually secondary to
+   the primary blue/green flow buttons — soft tint instead of full
+   solid-fill so the eye still tracks the primary CTAs first. */
+.ai-update-log {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.08), rgba(99, 102, 241, 0.12));
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  color: #4c1d95;
+}
+.ai-update-log:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.14), rgba(99, 102, 241, 0.18));
+  border-color: rgba(139, 92, 246, 0.55);
+}
+.ai-update-log__icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+  color: white;
+  font-size: 1.1rem;
+}
+</style>

@@ -559,11 +559,27 @@ function close() {
 
 <style>
 /* Full-screen on mobile, centered modal on desktop. PrimeVue's default
-   Dialog is too narrow on phones for a multi-section form. */
+   Dialog is too narrow on phones for a multi-section form. The dialog
+   itself is a flex column so the footer pins to the bottom (sticky bottom
+   bar look) while the body scrolls. */
 .finish-sheet-dialog {
   width: 100vw;
   max-width: 640px;
   margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+.finish-sheet-dialog .p-dialog-content {
+  overflow-y: auto;
+  flex: 1 1 auto;
+}
+.finish-sheet-dialog .p-dialog-footer {
+  border-top: 1px solid var(--bs-border);
+  background: white;
+  padding: 0.75rem 1rem;
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.04);
+  flex-shrink: 0;
 }
 @media (max-width: 639px) {
   .finish-sheet-dialog {

@@ -7,16 +7,18 @@ import Tag from "primevue/tag";
 import {
   getInvoice,
   updateInvoiceLineItems,
+  updateInvoiceDiscount,
   markInvoicePaid,
   pullBillablesFromJob,
   recomputeTotals,
 } from "@/firebase/services/invoices";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/firebase/config";
-import type { InvoiceDoc, LineItem, WithId } from "@/firebase/interfaces";
+import type { InvoiceDiscount, InvoiceDoc, LineItem, WithId } from "@/firebase/interfaces";
 import { useFormatters } from "@/composables/useFormatters";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
+import SelectButton from "primevue/selectbutton";
 import { lineItemSchema } from "@/validation/schemas";
 import { z } from "zod";
 
@@ -45,6 +47,36 @@ const toast = useToast();
 
 const cents = (dollars: number) => Math.round(dollars * 100);
 
+// Discount UI state — mirrors FinishJobSheet's shape but operates against
+// an existing invoice rather than a pre-submit preview. Edits persist via
+// updateInvoiceDiscount so totals recompute server-side too.
+type DiscountMode = "off" | "percent" | "fixed";
+const discountMode = ref<DiscountMode>("off");
+const discountValueDisplay = ref<number>(0); // percent number, or dollars for fixed
+const discountLabel = ref<string>("");
+const discountModeOptions = [
+  { label: "No discount", value: "off" },
+  { label: "Percent %", value: "percent" },
+  { label: "Fixed $", value: "fixed" },
+];
+
+function discountSnapshot(): InvoiceDiscount | null {
+  if (discountMode.value === "off") return null;
+  const label = discountLabel.value.trim() || null;
+  if (discountMode.value === "percent") {
+    return {
+      type: "percent",
+      value: Math.max(0, Math.min(100, discountValueDisplay.value ?? 0)),
+      label,
+    };
+  }
+  return {
+    type: "fixed",
+    value: Math.max(0, cents(discountValueDisplay.value ?? 0)),
+    label,
+  };
+}
+
 const totals = computed(() =>
   recomputeTotals(
     items.value.map((li) => ({
@@ -53,6 +85,7 @@ const totals = computed(() =>
       unitPrice: cents(li.unitPriceDollars ?? 0),
       taxRate: li.taxRate,
     })),
+    discountSnapshot(),
   ),
 );
 
@@ -66,6 +99,16 @@ async function load() {
     unitPriceDollars: (li.unitPrice ?? 0) / 100,
     taxRate: li.taxRate,
   }));
+  const d = invoice.value?.discount ?? null;
+  if (d) {
+    discountMode.value = d.type;
+    discountValueDisplay.value = d.type === "fixed" ? (d.value ?? 0) / 100 : d.value ?? 0;
+    discountLabel.value = d.label ?? "";
+  } else {
+    discountMode.value = "off";
+    discountValueDisplay.value = 0;
+    discountLabel.value = "";
+  }
   loading.value = false;
 }
 
@@ -129,7 +172,11 @@ async function save() {
   if (!next) return;
   saving.value = true;
   try {
+    // Order matters: line items first (updateInvoiceLineItems re-reads the
+    // live discount so it doesn't accidentally clear it), then discount.
+    // Both writes recompute totals server-side.
     await updateInvoiceLineItems(props.invoiceId, next);
+    await updateInvoiceDiscount(props.invoiceId, discountSnapshot());
     toast.success("Invoice saved");
     await load();
   } catch (e) {
@@ -226,6 +273,16 @@ async function markPaid() {
             <td class="py-1 text-right">{{ money(totals.subtotal) }}</td>
             <td v-if="props.canEdit"></td>
           </tr>
+          <tr v-if="totals.discountAmount > 0" class="text-[color:var(--bs-blue)]">
+            <td colspan="4" class="py-1 text-right">
+              Discount
+              <span v-if="discountLabel.trim()" class="text-xs text-[color:var(--bs-muted)]">
+                ({{ discountLabel.trim() }})
+              </span>
+            </td>
+            <td class="py-1 text-right">−{{ money(totals.discountAmount) }}</td>
+            <td v-if="props.canEdit"></td>
+          </tr>
           <tr>
             <td colspan="4" class="py-1 text-right text-[color:var(--bs-muted)]">Tax</td>
             <td class="py-1 text-right">{{ money(totals.taxTotal) }}</td>
@@ -238,6 +295,53 @@ async function markPaid() {
           </tr>
         </tfoot>
       </table>
+
+      <div v-if="props.canEdit" class="mt-3 rounded-lg border border-[color:var(--bs-border)] p-3">
+        <div class="flex items-center gap-2 mb-2">
+          <i class="pi pi-percentage text-[color:var(--bs-blue)]"></i>
+          <h4 class="font-semibold text-sm">Discount</h4>
+        </div>
+        <SelectButton
+          v-model="discountMode"
+          :options="discountModeOptions"
+          option-label="label"
+          option-value="value"
+          :allow-empty="false"
+          class="text-xs"
+        />
+        <div v-if="discountMode !== 'off'" class="mt-3 grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">
+              {{ discountMode === "percent" ? "Percent off" : "Amount off" }}
+            </label>
+            <InputNumber
+              v-model="discountValueDisplay"
+              :min="0"
+              :max="discountMode === 'percent' ? 100 : undefined"
+              :max-fraction-digits="2"
+              :mode="discountMode === 'fixed' ? 'currency' : undefined"
+              :currency="discountMode === 'fixed' ? 'CAD' : undefined"
+              :suffix="discountMode === 'percent' ? ' %' : undefined"
+              :input-class="'text-sm w-full'"
+              fluid
+            />
+          </div>
+          <div>
+            <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">
+              Label (optional)
+            </label>
+            <InputText
+              v-model="discountLabel"
+              placeholder="e.g. Repeat customer"
+              maxlength="60"
+              class="text-sm w-full"
+            />
+          </div>
+        </div>
+        <p class="text-[11px] text-[color:var(--bs-muted)] mt-2">
+          Applied to the subtotal before tax. Save the invoice to persist the change.
+        </p>
+      </div>
 
       <div v-if="props.canEdit" class="flex flex-wrap items-center gap-2 mt-3">
         <Button label="Add line" icon="pi pi-plus" outlined size="small" @click="addItem" />
