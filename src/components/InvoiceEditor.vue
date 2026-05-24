@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { RouterLink } from "vue-router";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import InputNumber from "primevue/inputnumber";
@@ -12,9 +13,16 @@ import {
   pullBillablesFromJob,
   recomputeTotals,
 } from "@/firebase/services/invoices";
+import { subscribePayoutsState } from "@/firebase/services/payoutsService";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/firebase/config";
-import type { InvoiceDiscount, InvoiceDoc, LineItem, WithId } from "@/firebase/interfaces";
+import type {
+  InvoiceDiscount,
+  InvoiceDoc,
+  LineItem,
+  PayoutsState,
+  WithId,
+} from "@/firebase/interfaces";
 import { useFormatters } from "@/composables/useFormatters";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
@@ -114,6 +122,62 @@ async function load() {
 
 onMounted(load);
 watch(() => props.invoiceId, load);
+
+// Payouts pre-flight. sendInvoice will reject server-side if
+// payouts aren't enabled (Connect onboarding incomplete or the
+// account got restricted), so the Send button is a dead-end until
+// the tradesperson opens /payouts and finishes. Live-subscribe to
+// the tradie's payouts state so the button reflects current status
+// in real time (e.g. `account.updated` flipping enabled → restricted
+// while the editor is open). Only subscribe when the editor is in
+// edit mode (canEdit true means the viewer is the tradesperson on
+// their own invoice — the client never gets a Send button anyway).
+const payoutsState = ref<PayoutsState | null>(null);
+const payoutsLoaded = ref(false);
+let unsubPayouts: (() => void) | null = null;
+
+watch(
+  () => [props.canEdit, invoice.value?.tradespersonId] as const,
+  ([canEdit, tradieId]) => {
+    unsubPayouts?.();
+    unsubPayouts = null;
+    payoutsLoaded.value = false;
+    if (!canEdit || !tradieId) {
+      payoutsState.value = null;
+      payoutsLoaded.value = true;
+      return;
+    }
+    unsubPayouts = subscribePayoutsState(tradieId, (s) => {
+      payoutsState.value = s;
+      payoutsLoaded.value = true;
+    });
+  },
+  { immediate: true },
+);
+
+onBeforeUnmount(() => unsubPayouts?.());
+
+const payoutsReady = computed(() => {
+  if (!payoutsLoaded.value) return true; // optimistic: don't flash a warning
+  const s = payoutsState.value;
+  if (!s) return false;
+  return s.payoutsEnabled && s.onboardingStatus === "enabled";
+});
+
+const payoutsBlockerMessage = computed(() => {
+  if (payoutsReady.value) return null;
+  const s = payoutsState.value;
+  if (!s || s.onboardingStatus === "not_started") {
+    return "Set up Stripe payouts before sending invoices.";
+  }
+  if (s.onboardingStatus === "in_progress") {
+    return "Finish your Stripe onboarding to start sending invoices.";
+  }
+  if (s.onboardingStatus === "restricted") {
+    return "Stripe needs more info on your account before you can collect payments.";
+  }
+  return "Payouts aren't ready yet — open /payouts to check.";
+});
 
 function addItem() {
   items.value = [
@@ -343,6 +407,26 @@ async function markPaid() {
         </p>
       </div>
 
+      <!-- Pre-flight blocker: shown in place of a confusing post-click
+           server-side rejection. Without this the Send button errors
+           with "Finish Stripe Connect onboarding at /payouts" only
+           after the click, and the tradesperson has to navigate away
+           to fix it. -->
+      <div
+        v-if="props.canEdit && invoice.status === 'draft' && payoutsLoaded && !payoutsReady"
+        class="bs-card p-3 mt-3 border-l-4 border-l-amber-500"
+      >
+        <div class="flex items-start gap-2">
+          <i class="pi pi-exclamation-triangle text-amber-600 mt-0.5"></i>
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-medium">{{ payoutsBlockerMessage }}</p>
+            <RouterLink to="/payouts" class="text-xs text-[color:var(--bs-blue-dark)] underline">
+              Open payouts setup →
+            </RouterLink>
+          </div>
+        </div>
+      </div>
+
       <div v-if="props.canEdit" class="flex flex-wrap items-center gap-2 mt-3">
         <Button label="Add line" icon="pi pi-plus" outlined size="small" @click="addItem" />
         <Button
@@ -362,7 +446,7 @@ async function markPaid() {
           label="Send"
           icon="pi pi-send"
           :loading="saving"
-          :disabled="saving"
+          :disabled="saving || !payoutsReady"
           @click="send"
         />
         <Button

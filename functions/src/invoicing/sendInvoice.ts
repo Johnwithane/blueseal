@@ -71,6 +71,8 @@ interface TradiePayouts {
   stripeAccountId?: string | null;
   payoutsEnabled?: boolean;
   chargesEnabled?: boolean;
+  onboardingStatus?: "not_started" | "in_progress" | "restricted" | "enabled";
+  disabledReason?: string | null;
 }
 
 function fmtMoney(cents: number, currency: string): string {
@@ -182,6 +184,19 @@ export const sendInvoice = onCall(
       throw new HttpsError(
         "failed-precondition",
         "Finish Stripe Connect onboarding at /payouts before sending invoices.",
+      );
+    }
+    // Separately reject `restricted` even when payoutsEnabled briefly
+    // lingers true — Stripe can flip an account to restricted with
+    // requirements outstanding while still leaving payouts_enabled set
+    // for a short window. Sending an invoice in that window creates a
+    // PaymentIntent that fails at capture time, which is a worse UX
+    // than rejecting the send upfront. Message references /payouts
+    // where the requirements list is surfaced.
+    if (payouts.onboardingStatus === "restricted") {
+      throw new HttpsError(
+        "failed-precondition",
+        "Stripe needs more info on your account before you can collect payments. Open /payouts to see what's outstanding.",
       );
     }
 
