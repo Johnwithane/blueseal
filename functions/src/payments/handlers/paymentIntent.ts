@@ -226,6 +226,72 @@ export async function handlePaymentIntentSucceeded(
   ]);
 }
 
+// `payment_intent.canceled` — fires when an unconfirmed PaymentIntent is
+// abandoned (Stripe auto-cancels after ~24h of no confirmation, or the
+// tradie cancels via the dashboard). Without this handler the InvoicePayView
+// hangs indefinitely because the invoice stays in `processing`/`sent` with
+// a clientSecret that's no longer usable. We flip the invoice back to
+// `sent` and clear the stale paymentIntentId + clientSecret so `sendInvoice`
+// on the next attempt creates a fresh intent rather than reusing the dead
+// one. The tradie is notified so they know the client never followed
+// through; the client gets no notification (they already abandoned).
+export async function handlePaymentIntentCanceled(
+  pi: StripePaymentIntent,
+  eventId: string,
+): Promise<void> {
+  const inv = await findInvoice(pi);
+  if (!inv) return;
+
+  const ref = inv.ref;
+  const result = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) return null;
+    const data = snap.data() ?? {};
+    const payment = (data.payment ?? {}) as { lastWebhookEventId?: string | null };
+    if (payment.lastWebhookEventId === eventId) return null;
+    // Don't reverse a paid invoice — `payment_intent.canceled` shouldn't
+    // arrive after `payment_intent.succeeded`, but if Stripe replays an
+    // ancient event we don't want to undo the payment. Treat anything
+    // post-paid as a no-op.
+    const terminalStatuses = ["paid", "refunded", "partially_refunded", "disputed", "void"];
+    if (terminalStatuses.includes(data.status)) {
+      logger.info("paymentIntent canceled: ignored on terminal invoice", {
+        invoiceId: ref.id,
+        status: data.status,
+      });
+      return null;
+    }
+    tx.set(
+      ref,
+      {
+        status: "sent",
+        payment: {
+          paymentIntentId: null,
+          clientSecret: null,
+          lastWebhookEventId: eventId,
+        },
+      },
+      { merge: true },
+    );
+    return {
+      tradespersonId: data.tradespersonId as string,
+      invoiceNumber: (data.invoiceNumber as string) ?? "",
+      jobId: (data.jobId as string) ?? "",
+    };
+  });
+  if (!result) return;
+
+  await notify({
+    userId: result.tradespersonId,
+    type: "invoice_payment_failed",
+    title: `Payment expired on invoice ${result.invoiceNumber}`.trim(),
+    body: "The client didn't complete payment in time. The invoice has been reset so they can try again from the job page.",
+    link: result.jobId ? `/jobs/${result.jobId}` : null,
+    actorUid: null,
+    priority: "normal",
+  });
+}
+
 export async function handlePaymentIntentFailed(
   pi: StripePaymentIntent,
   eventId: string,

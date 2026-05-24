@@ -30,20 +30,37 @@ export async function handleChargeRefunded(
   charge: StripeCharge,
   eventId: string,
 ): Promise<void> {
-  // Locate the invoice via the chargeId we stored on `payment` at
-  // succeeded-time. PaymentIntent metadata isn't on the charge object.
-  const q = await db
-    .collection("invoices")
-    .where("payment.chargeId", "==", charge.id)
-    .limit(1)
-    .get();
-  if (q.empty) {
+  // Locate the invoice. Stripe doesn't guarantee webhook ordering, so
+  // `charge.refunded` can arrive before `payment_intent.succeeded` —
+  // which means `payment.chargeId` may not be stamped on the invoice
+  // yet. We try the paymentIntentId first (set at sendInvoice time, so
+  // always present once an invoice has any payment attempt at all),
+  // then fall back to chargeId for older invoices where the refund
+  // arrived first only on retry.
+  let ref: FirebaseFirestore.DocumentReference | null = null;
+  if (charge.payment_intent) {
+    const q = await db
+      .collection("invoices")
+      .where("payment.paymentIntentId", "==", charge.payment_intent)
+      .limit(1)
+      .get();
+    if (!q.empty) ref = q.docs[0].ref;
+  }
+  if (!ref) {
+    const q = await db
+      .collection("invoices")
+      .where("payment.chargeId", "==", charge.id)
+      .limit(1)
+      .get();
+    if (!q.empty) ref = q.docs[0].ref;
+  }
+  if (!ref) {
     logger.warn("chargeRefunded: no invoice for charge", {
       chargeId: charge.id,
+      paymentIntentId: charge.payment_intent,
     });
     return;
   }
-  const ref = q.docs[0].ref;
 
   await db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);

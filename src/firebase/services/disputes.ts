@@ -23,17 +23,29 @@ const disputeRef = (id: string) =>
 
 // Admin queue: open disputes (everything except `won` / `lost` /
 // `warning_closed`) sorted by evidence deadline ascending so the most
-// urgent surface first. The closed disputes list below the queue is a
-// separate query so it pages independently.
+// urgent surface first. Inquiry-type disputes have a null
+// `evidenceDueBy` and would be silently excluded by an `orderBy` on
+// that field — Firestore's orderBy drops docs that lack the field.
+// We orderBy `createdAt` instead and sort by deadline urgency in JS
+// so inquiries stay in the queue (sorted last, since "no deadline"
+// reads as "not urgent yet" rather than "missed deadline"). The
+// closed disputes list below the queue is a separate query so it
+// pages independently.
 export async function listOpenDisputes(): Promise<WithId<DisputeDoc>[]> {
   const q = query(
     disputesCol(),
     where("outcome", "==", null),
-    orderBy("evidenceDueBy", "asc"),
+    orderBy("createdAt", "desc"),
     limit(100),
   );
   const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const items = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  items.sort((a, b) => {
+    const am = a.evidenceDueBy?.toMillis() ?? Number.POSITIVE_INFINITY;
+    const bm = b.evidenceDueBy?.toMillis() ?? Number.POSITIVE_INFINITY;
+    return am - bm;
+  });
+  return items;
 }
 
 export async function listClosedDisputes(): Promise<WithId<DisputeDoc>[]> {

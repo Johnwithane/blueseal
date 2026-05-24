@@ -26,6 +26,7 @@ import {
 } from "./stripeClient";
 import { handleAccountUpdated } from "./handlers/accountUpdated";
 import {
+  handlePaymentIntentCanceled,
   handlePaymentIntentFailed,
   handlePaymentIntentProcessing,
   handlePaymentIntentSucceeded,
@@ -124,6 +125,12 @@ export const stripeWebhook = onRequest(
             event.id,
           );
           break;
+        case "payment_intent.canceled":
+          await handlePaymentIntentCanceled(
+            event.data.object as StripePaymentIntent,
+            event.id,
+          );
+          break;
         case "charge.refunded":
           await handleChargeRefunded(
             event.data.object as StripeCharge,
@@ -188,9 +195,20 @@ export const stripeWebhook = onRequest(
           errorMessage: message,
         })
         .catch(() => undefined);
-      // Convert HttpsError-style errors into the right HTTP code so
-      // Stripe's retry decision is sensible. Anything else → 500.
-      const status = err instanceof HttpsError ? 500 : 500;
+      // Map permanent (caller-side) errors to 4xx so Stripe stops
+      // retrying them — anything else returns 500 and Stripe retries
+      // with exponential backoff. Without this branch every malformed
+      // payload would loop forever in Stripe's retry queue.
+      const permanentCodes = new Set([
+        "invalid-argument",
+        "permission-denied",
+        "not-found",
+        "failed-precondition",
+        "unauthenticated",
+      ]);
+      const isPermanent =
+        err instanceof HttpsError && permanentCodes.has(err.code);
+      const status = isPermanent ? 400 : 500;
       res.status(status).send({ received: false, error: message });
     }
   },
