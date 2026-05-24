@@ -116,6 +116,20 @@ const showStickyCTA = computed(
   () => job.value != null && isTradie.value && stickyCTAStatuses.has(job.value.status),
 );
 
+// AI log button: floats over the page for the tradesperson on any
+// still-active job (i.e. not done or cancelled). When the sticky CTA is
+// also showing, the FAB sits above it; otherwise it pins to the page
+// bottom. Inactive statuses skip it — once the work is closed out there
+// is no new client activity worth summarising.
+const AI_FAB_INACTIVE: ReadonlySet<JobStatus> = new Set([
+  "complete",
+  "reviewed",
+  "cancelled",
+]);
+const showAiFab = computed(
+  () => job.value != null && isTradie.value && !AI_FAB_INACTIVE.has(job.value.status),
+);
+
 const statusOptions: { label: string; value: JobStatus }[] = [
   { label: "Accepted", value: "accepted" },
   { label: "Requested", value: "requested" },
@@ -831,33 +845,12 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
               Private notes
               <span class="font-normal text-[color:var(--bs-muted)]">(tradesperson only)</span>
             </label>
-
-            <!-- AI auto-log: prominent block (large CTA + sparkles + violet
-                 accent) so the AI capability is discoverable, but using a
-                 secondary visual treatment so it doesn't compete with the
-                 primary blue/green action buttons on this page. -->
-            <button
-              type="button"
-              class="ai-update-log w-full flex items-center gap-3 rounded-lg p-3 mb-3 text-left transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-              :disabled="updatingLog"
-              :title="updatingLog ? 'Summarising…' : 'Have AI summarise recent client messages into a new log entry'"
-              @click="updateLogManually"
-            >
-              <span class="ai-update-log__icon shrink-0">
-                <i :class="updatingLog ? 'pi pi-spin pi-spinner' : 'pi pi-sparkles'"></i>
-              </span>
-              <span class="min-w-0 flex-1">
-                <span class="block font-semibold text-sm">
-                  {{ updatingLog ? "Summarising…" : "Update log with AI" }}
-                </span>
-                <span class="block text-xs opacity-80 leading-snug mt-0.5">
-                  Pull a fresh summary of new client chat into your notes.
-                </span>
-              </span>
-              <i v-if="!updatingLog" class="pi pi-arrow-right text-sm opacity-60"></i>
-            </button>
             <Textarea id="job-private-notes" v-model="privateNotes" rows="6" class="w-full" />
             <Button label="Save notes" icon="pi pi-save" outlined size="small" class="mt-2" @click="saveNotes" />
+            <p class="text-[11px] text-[color:var(--bs-muted)] mt-2">
+              Use the AI button at the bottom-right to summarise recent client
+              messages into a new log entry.
+            </p>
           </div>
 
           <div v-if="canClientCancel" class="bs-card p-3">
@@ -923,6 +916,29 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
         />
       </div>
     </div>
+
+    <!-- AI log update FAB — floats over the page so the tradesperson can
+         pull a chat summary into Private notes from anywhere on the job.
+         Sits above the sticky CTA when one's showing, otherwise pins to
+         the bottom-right of the viewport. Violet AI gradient so it reads
+         as a distinct (secondary) capability vs. the primary status CTAs. -->
+    <button
+      v-if="showAiFab"
+      type="button"
+      class="ai-log-fab"
+      :class="{ 'ai-log-fab--above-cta': showStickyCTA }"
+      :disabled="updatingLog"
+      :title="updatingLog ? 'Summarising recent chat…' : 'Summarise recent client chat into your notes'"
+      @click="updateLogManually"
+    >
+      <i
+        :class="updatingLog ? 'pi pi-spin pi-spinner' : 'pi pi-sparkles'"
+        class="ai-log-fab__icon"
+      ></i>
+      <span class="ai-log-fab__label">
+        {{ updatingLog ? "Summarising…" : "AI log update" }}
+      </span>
+    </button>
 
     <FinishJobSheet
       v-if="job && isTradie"
@@ -1022,28 +1038,87 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
 </template>
 
 <style scoped>
-/* AI Update-log button: prominent (violet gradient + sparkles + larger
-   hit target) so the AI affordance is obvious, but visually secondary to
-   the primary blue/green flow buttons — soft tint instead of full
-   solid-fill so the eye still tracks the primary CTAs first. */
-.ai-update-log {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.08), rgba(99, 102, 241, 0.12));
-  border: 1px solid rgba(139, 92, 246, 0.35);
-  color: #4c1d95;
-}
-.ai-update-log:hover:not(:disabled) {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.14), rgba(99, 102, 241, 0.18));
-  border-color: rgba(139, 92, 246, 0.55);
-}
-.ai-update-log__icon {
-  width: 2.25rem;
-  height: 2.25rem;
-  border-radius: 0.5rem;
+/* Floating AI log button. Larger and bolder than a typical FAB because
+   it carries a label — but kept a tier below the primary status CTAs
+   (lower shadow weight, secondary-violet rather than primary-blue) so
+   the eye still goes to the sticky bottom bar first. */
+.ai-log-fab {
+  position: fixed;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  z-index: 35; /* above the sticky CTA (z-30) so it floats over */
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: 0.6rem;
+  padding: 0.85rem 1.25rem;
+  border: none;
+  border-radius: 999px;
   background: linear-gradient(135deg, #8b5cf6, #6366f1);
   color: white;
-  font-size: 1.1rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  box-shadow:
+    0 10px 24px -8px rgba(99, 102, 241, 0.55),
+    0 4px 10px -2px rgba(0, 0, 0, 0.15);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease,
+    bottom 0.2s ease;
+}
+.ai-log-fab:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: linear-gradient(135deg, #7c3aed, #4f46e5);
+  box-shadow:
+    0 14px 28px -8px rgba(99, 102, 241, 0.65),
+    0 6px 12px -2px rgba(0, 0, 0, 0.18);
+}
+.ai-log-fab:active:not(:disabled) {
+  transform: translateY(0);
+}
+.ai-log-fab:disabled {
+  cursor: default;
+  opacity: 0.7;
+  transform: none;
+}
+.ai-log-fab__icon {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+.ai-log-fab__label {
+  white-space: nowrap;
+}
+
+/* When the page is showing the sticky CTA bar, lift the FAB above it so
+   neither covers the other. ~4.75rem clears the CTA bar (~3.5rem of
+   button + padding + border) without touching the safe-area accommodations
+   that the sticky bar already applies. */
+.ai-log-fab--above-cta {
+  bottom: calc(max(1rem, env(safe-area-inset-bottom)) + 4.75rem);
+}
+
+/* On narrow phones drop the label to an icon-only FAB so it doesn't
+   crowd the screen edge or overlap the sticky CTA's full-width button. */
+@media (max-width: 420px) {
+  .ai-log-fab {
+    padding: 0.95rem;
+    border-radius: 50%;
+  }
+  .ai-log-fab__label {
+    /* Visually hidden but still announced by screen readers. */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+  }
+  .ai-log-fab__icon {
+    font-size: 1.35rem;
+  }
 }
 </style>
