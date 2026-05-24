@@ -42,6 +42,25 @@ export async function createConnectLoginLink(): Promise<{ url: string }> {
   return data;
 }
 
+export interface BackfillPayoutsResult {
+  scanned: number;
+  updated: number;
+  alreadyPresent: number;
+  pages: number;
+}
+
+// Admin-only: seeds `payouts: not_started` onto every approved
+// tradesperson doc that doesn't have the field. One-shot migration for
+// the Stripe Connect cutover. Idempotent — safe to re-run.
+export async function backfillPayoutsField(): Promise<BackfillPayoutsResult> {
+  const callable = httpsCallable<undefined, BackfillPayoutsResult>(
+    functions,
+    "backfillPayoutsField",
+  );
+  const { data } = await callable();
+  return data;
+}
+
 // Subscribe to the payouts slice of the tradesperson doc. Wraps the full-doc
 // subscription so callers that only care about payouts don't re-render on
 // unrelated field changes — `onSnapshot` still fires, but the callback

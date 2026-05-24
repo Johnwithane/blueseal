@@ -58,6 +58,12 @@ See `PROFESSIONAL_TASKS.md` for the parallel lawyer + accountant work that gates
   Use the live key (Dashboard → Developers → API keys) in prod and the test key (`pk_test_…`) in staging / local. The key is safe to ship to browsers — it's the public half of the keypair whose secret is `STRIPE_SECRET_KEY`.
 - **Verify:** Build the frontend; in DevTools console, `import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY` should be the expected key. Test a payment in test mode using card `4242 4242 4242 4242` with any future expiry / any CVC / any zip.
 
+### [ ] Run the one-shot payouts backfill in production
+
+- **Why:** Tradesperson docs created before the Stripe Connect cutover don't carry the `payouts` field. The deferred `maybeMarkVisible()` tightening (Phase A residual) gates visibility on `payouts.payoutsEnabled === true` — without backfilling first, every existing approved tradie would drop out of search the moment the gate flips. The backfill seeds the `not_started` default so the gate-flip is a controlled rollout, not a cliff.
+- **What:** Sign in as admin → Admin console → Migration tools → "Backfill payouts field" button. Single click triggers the `backfillPayoutsField` callable; it pages through all `vettingStatus == approved` tradies in batches of 400 and merge-writes `payouts: emptyPayoutsState()` onto any without the field. Idempotent.
+- **Verify:** The toast on completion shows `scanned / updated / alreadyPresent / pages`. Re-running should report `updated: 0, alreadyPresent: <full count>`. Spot-check a few tradesperson docs in Firestore — every `vettingStatus == approved` doc should have `payouts.onboardingStatus = "not_started"` after the run.
+
 ### [ ] Configure `APP_BASE_URL` for the Connect onboarding redirects
 
 - **Why:** `createConnectOnboardingLink` builds `refresh_url` + `return_url` from this env var (same one notify.ts uses for deep-links). Without it set, the tradesperson is redirected to `https://blueseal.app/payouts/return` regardless of environment.
@@ -70,11 +76,9 @@ See `PROFESSIONAL_TASKS.md` for the parallel lawyer + accountant work that gates
 
 Floating-panel assistant for tradespeople + admins. Backend lives in [functions/src/ai/chat.ts](functions/src/ai/chat.ts), conversations persist under `assistantConversations/{id}/messages/`. Runs on Vertex AI Gemini 2.5 Flash (same auth path as the existing `aiDiagnose` tools — no API keys needed once the API is enabled).
 
-### [ ] Re-enable the subscription gate before launch
+### [x] Re-enable the subscription gate before launch (obsolete 2026-05-24)
 
-- **Why:** [functions/src/ai/chat.ts](functions/src/ai/chat.ts) has `REQUIRE_SUBSCRIPTION = false` at the top so we can dogfood the assistant during development. design.md §5.9 says AI tools require an active subscription — the chatbot is the new primary AI surface, so it should respect the same gate before paying users see it.
-- **What:** Flip `REQUIRE_SUBSCRIPTION` to `true` (or promote it to a Cloud Functions env var if you want staging vs prod control), then redeploy. The check already exists below the flag — tradespeople without `users/{uid}.hasActiveSubscription === true` will get a `permission-denied` error and the UI shows a paywall.
-- **Verify:** Sign in as a tradie with `hasActiveSubscription === false` and try to send a message — should fail with the gate message. Flip the flag on the user doc, refresh token, retry — should work.
+- **Resolution:** Cancelled by the monetization pivot. AI tools are now bundled into the platform offering — revenue comes from the 12% Stripe Connect commission per payment, not a separate AI subscription. The `REQUIRE_SUBSCRIPTION` flag + the subscription check in `chat.ts` / `tools.ts` were removed in the cutover commit; the `hasActiveSubscription` field on user docs lingers as a dead boolean and will be torn out in a follow-up after rules + clients ratchet together.
 
 ### [x] Stand up Firestore rules tests (done 2026-05-24)
 

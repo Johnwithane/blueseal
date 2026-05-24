@@ -58,11 +58,6 @@ async function loadContext(jobId: string, callerUid: string) {
   if (job.tradespersonId !== callerUid) {
     throw new HttpsError("permission-denied", "Only the assigned tradesperson can use AI tools.");
   }
-  const tradieUser = await db.doc(`users/${callerUid}`).get();
-  const userData = tradieUser.data() as { hasActiveSubscription?: boolean } | undefined;
-  if (!userData?.hasActiveSubscription) {
-    throw new HttpsError("permission-denied", "AI tools require an active subscription.");
-  }
 
   const msgsSnap = await db
     .collection(`chats/${job.chatId}/messages`)

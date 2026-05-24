@@ -28,15 +28,15 @@ import { JOB_TOOLS, executeTool, type ToolContext } from "./chatTools";
  *     to the messages collection sees them appear together — no
  *     "in-flight" partial state.
  *
- *   - Subscription gate: OFF during development. Flip REQUIRE_SUBSCRIPTION
- *     to true before launch (HUMANTASKS has the reminder).
+ *   - Subscription gate removed with the Stripe Connect monetization
+ *     pivot — AI tools are now bundled into the platform offering
+ *     (revenue comes from the per-payment commission). See design.md
+ *     §5.9.
  */
 
 const PROJECT_ID = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || "blueseal-762af";
 const LOCATION = process.env.VERTEX_LOCATION || "us-central1";
 const MODEL = process.env.VERTEX_MODEL || "gemini-2.5-flash";
-
-const REQUIRE_SUBSCRIPTION = false;
 
 // Rolling history window — Gemini Flash handles long context but each turn
 // re-bills the prior history. 16 turns keeps a usable working memory without
@@ -219,15 +219,6 @@ export const aiChat = onCall({ enforceAppCheck: false }, async (req) => {
   }
   if (input.scope === "admin" && !isAdmin) {
     throw new HttpsError("permission-denied", "Admin scope requires the admin role.");
-  }
-
-  // Subscription gate (currently off during dev — see HUMANTASKS).
-  if (REQUIRE_SUBSCRIPTION && isTradesperson && !isAdmin) {
-    const userSnap = await db.doc(`users/${uid}`).get();
-    const userData = userSnap.data() as { hasActiveSubscription?: boolean } | undefined;
-    if (!userData?.hasActiveSubscription) {
-      throw new HttpsError("permission-denied", "The assistant requires an active subscription.");
-    }
   }
 
   const logCtx = { fn: "aiChat", uid, scope: input.scope, jobId: input.jobId ?? null };
