@@ -78,7 +78,7 @@ Floating-panel assistant for tradespeople + admins. Backend lives in [functions/
 
 ### [x] Re-enable the subscription gate before launch (obsolete 2026-05-24)
 
-- **Resolution:** Cancelled by the monetization pivot. AI tools are now bundled into the platform offering — revenue comes from the 12% Stripe Connect commission per payment, not a separate AI subscription. The `REQUIRE_SUBSCRIPTION` flag + the subscription check in `chat.ts` / `tools.ts` were removed in the cutover commit; the `hasActiveSubscription` field on user docs lingers as a dead boolean and will be torn out in a follow-up after rules + clients ratchet together.
+- **Resolution:** Cancelled by the monetization pivot. AI tools are now bundled into the platform offering — revenue comes from the 12% Stripe Connect commission per payment, not a separate AI subscription. The `REQUIRE_SUBSCRIPTION` flag + the subscription check in `chat.ts` / `tools.ts` were removed in the cutover commit. The dead `hasActiveSubscription` + `stripeCustomerId` fields on user docs were torn out in a follow-up commit (interface, signup writer, rules `hasOnly` allowlists + create/update equality locks all updated together). Existing user docs in prod still carry the fields as orphan booleans — harmless, ignored by rules and code, will fall off naturally as docs are next edited or via a one-shot cleanup script if it ever bothers anyone.
 
 ### [x] Stand up Firestore rules tests (done 2026-05-24)
 

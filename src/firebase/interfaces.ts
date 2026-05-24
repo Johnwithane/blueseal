@@ -22,8 +22,6 @@ export interface UserDoc {
   createdAt: Timestamp;
   lastActiveAt: Timestamp;
   emailVerified: boolean;
-  hasActiveSubscription: boolean;
-  stripeCustomerId: string | null;
   // clients only:
   clientRatingAvg: number;
   clientRatingCount: number;
