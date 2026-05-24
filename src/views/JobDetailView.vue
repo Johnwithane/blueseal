@@ -35,6 +35,9 @@ import TimeTrackerCard from "@/components/TimeTrackerCard.vue";
 import ExpensesCard from "@/components/ExpensesCard.vue";
 import FinishJobSheet from "@/components/FinishJobSheet.vue";
 import ClientApprovalBanner from "@/components/ClientApprovalBanner.vue";
+import QuoteSheet from "@/components/QuoteSheet.vue";
+import QuoteCard from "@/components/QuoteCard.vue";
+import ClientQuoteApprovalBanner from "@/components/ClientQuoteApprovalBanner.vue";
 import { SEED_INTAKE_SCHEMAS } from "@/data/intakeSchemas";
 import { getIntakeSchema } from "@/firebase/services/intakeFormSchemas";
 import type { IntakeField } from "@/firebase/interfaces";
@@ -97,6 +100,21 @@ const showFinishSheet = ref(false);
 // the markJobPaid callable which atomically flips invoice → paid AND job
 // → complete so the two never drift.
 const markingPaid = ref(false);
+// Quote-prep sheet (tradie only, requested/quoted). Same sticky-CTA slot
+// as Finish-job — they're mutually exclusive by status.
+const showQuoteSheet = ref(false);
+
+// Status set that surfaces the sticky bottom CTA on mobile. Drives both
+// the bottom padding on the section (so content isn't hidden behind the
+// fixed bar) and the bar's visibility.
+const stickyCTAStatuses: ReadonlySet<JobStatus> = new Set([
+  "requested",
+  "quoted",
+  "in_progress",
+]);
+const showStickyCTA = computed(
+  () => job.value != null && isTradie.value && stickyCTAStatuses.has(job.value.status),
+);
 
 const statusOptions: { label: string; value: JobStatus }[] = [
   { label: "Accepted", value: "accepted" },
@@ -454,7 +472,7 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
 <template>
   <section
     class="bs-container py-6"
-    :class="{ 'pb-28': job && isTradie && job.status === 'in_progress' }"
+    :class="{ 'pb-28': showStickyCTA }"
   >
     <RouterLink to="/dashboard" class="text-xs text-[color:var(--bs-muted)]">← Dashboard</RouterLink>
 
@@ -535,6 +553,15 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
         </div>
       </div>
 
+      <!-- Client quote-approval banner — tradesperson sent a quote and is
+           waiting on the client to accept or discuss. -->
+      <ClientQuoteApprovalBanner
+        v-if="isClient && job.status === 'quoted'"
+        :job-id="job.id"
+        class="mb-4"
+        @decided="load"
+      />
+
       <!-- Client approval banner — tradesperson handed the job over for
            sign-off. Renders above everything else so the client sees the
            call-to-action before the chat / invoice. -->
@@ -588,6 +615,16 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
             </div>
           </div>
 
+          <!-- Quote (if one's been drafted/sent). Shown to both parties;
+               tradesperson can "Revise & re-send" via the QuoteSheet. The
+               read-receipt stamp only fires for the client viewer. -->
+          <QuoteCard
+            :job-id="job.id"
+            :can-edit="isTradie"
+            :stamp-viewed-on-load="isClient"
+            @revise="showQuoteSheet = true"
+          />
+
           <InvoiceEditor v-if="invoiceId" :invoice-id="invoiceId" :can-edit="isTradie" />
         </div>
 
@@ -635,6 +672,40 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
               :to="{ name: 'TradieProfile', params: { uid: tradieInfo.id } }"
               class="mt-3 text-xs text-[color:var(--bs-blue)] inline-block"
             >View full profile →</RouterLink>
+          </div>
+
+          <!-- Quote-accepted prompt — client said yes, tradie now needs
+               to pick a date. The Schedule card below does the actual
+               picking; this just elevates the next action so it's not
+               buried below the chat. -->
+          <div
+            v-if="isTradie && job.status === 'quote_accepted'"
+            class="bs-card p-3 border-l-4 border-l-emerald-500"
+          >
+            <h3 class="font-semibold text-sm mb-1 flex items-center gap-2">
+              <i class="pi pi-calendar-plus text-emerald-600"></i>
+              Client accepted — pick a date
+            </h3>
+            <p class="text-xs text-[color:var(--bs-muted)]">
+              Use the Schedule section below to set start + end. Saving the
+              schedule moves the job to Scheduled and the client gets notified.
+            </p>
+          </div>
+
+          <!-- Mirror banner for the client side so they're not left guessing
+               after they accept. -->
+          <div
+            v-if="isClient && job.status === 'quote_accepted'"
+            class="bs-card p-3 border-l-4 border-l-emerald-500"
+          >
+            <h3 class="font-semibold text-sm mb-1 flex items-center gap-2">
+              <i class="pi pi-check text-emerald-600"></i>
+              Quote accepted
+            </h3>
+            <p class="text-xs text-[color:var(--bs-muted)]">
+              The tradesperson is picking a date — you'll get a notification when
+              it's scheduled.
+            </p>
           </div>
 
           <!-- Awaiting-payment CTA — promoted to top of sidebar so the
@@ -817,15 +888,33 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
       </div>
     </template>
 
-    <!-- Sticky bottom CTA: tradie's primary action while in_progress.
-         Replaces the buried status-dropdown "complete" route — clear,
-         unmissable, and routed through the proper approval-flow callable. -->
+    <!-- Sticky bottom CTA: the tradie's primary action for this status.
+         One slot, status-driven label so the page never offers more than
+         one "next step" at a time. -->
     <div
-      v-if="job && isTradie && job.status === 'in_progress'"
+      v-if="showStickyCTA && job"
       class="fixed inset-x-0 bottom-0 z-30 border-t border-[color:var(--bs-border)] bg-white/95 backdrop-blur p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-2px_8px_rgba(0,0,0,0.04)]"
     >
       <div class="bs-container">
         <Button
+          v-if="job.status === 'requested'"
+          label="Prepare quote"
+          icon="pi pi-file"
+          class="w-full"
+          size="large"
+          @click="showQuoteSheet = true"
+        />
+        <Button
+          v-else-if="job.status === 'quoted'"
+          label="Edit & re-send quote"
+          icon="pi pi-pencil"
+          class="w-full"
+          size="large"
+          outlined
+          @click="showQuoteSheet = true"
+        />
+        <Button
+          v-else-if="job.status === 'in_progress'"
           label="Finish job & prepare invoice"
           icon="pi pi-check-circle"
           class="w-full"
@@ -841,6 +930,13 @@ const statusColor: Record<JobStatus, "info" | "warn" | "success" | "danger" | "s
       :job-id="job.id"
       :tradesperson-id="job.tradespersonId"
       :client-id="job.clientId"
+      @submitted="load"
+    />
+
+    <QuoteSheet
+      v-if="job && isTradie"
+      v-model:visible="showQuoteSheet"
+      :job-id="job.id"
       @submitted="load"
     />
 
