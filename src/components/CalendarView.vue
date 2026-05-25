@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import Button from "primevue/button";
 import SelectButton from "primevue/selectbutton";
+import Dialog from "primevue/dialog";
 import JobCounterparty from "@/components/JobCounterparty.vue";
 import type {
   BookingDoc,
@@ -18,6 +19,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{
   "remove-block": [bookingId: string];
+  "block-day": [day: Date];
 }>();
 const router = useRouter();
 
@@ -154,6 +156,36 @@ function goToday() {
 function dayOfWeekKey(d: Date): (typeof days)[number] {
   return days[(d.getDay() + 6) % 7];
 }
+
+// A day is "blockable" if it's today or later AND not already blocked.
+// We also skip days outside the visible month in month view — blocking a
+// Feb day from a March view would be confusing.
+function isPast(d: Date): boolean {
+  return startOfDay(d).getTime() < today.value.getTime();
+}
+function canBlock(d: Date, inCurrentMonth = true): boolean {
+  if (!inCurrentMonth) return false;
+  if (isPast(d)) return false;
+  if (blocksForDay(d).length > 0) return false;
+  return true;
+}
+
+const pendingBlockDate = ref<Date | null>(null);
+const dayFmt = new Intl.DateTimeFormat(undefined, {
+  weekday: "long",
+  month: "long",
+  day: "numeric",
+});
+const pendingBlockLabel = computed(() =>
+  pendingBlockDate.value ? dayFmt.format(pendingBlockDate.value) : "",
+);
+function askBlock(d: Date) {
+  pendingBlockDate.value = startOfDay(d);
+}
+function confirmBlock() {
+  if (pendingBlockDate.value) emit("block-day", pendingBlockDate.value);
+  pendingBlockDate.value = null;
+}
 </script>
 
 <template>
@@ -257,6 +289,15 @@ function dayOfWeekKey(d: Date): (typeof days)[number] {
             />
           </div>
         </article>
+        <button
+          v-if="canBlock(d)"
+          type="button"
+          class="mt-2 flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-[color:var(--bs-border)] py-1 text-xs text-[color:var(--bs-muted)] hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+          @click="askBlock(d)"
+        >
+          <i class="pi pi-ban text-[10px]"></i>
+          Block day
+        </button>
       </div>
     </div>
 
@@ -280,7 +321,17 @@ function dayOfWeekKey(d: Date): (typeof days)[number] {
             'opacity-50': d.getMonth() !== anchor.getMonth(),
             'ring-2 ring-[color:var(--bs-blue)]': isSameDay(d, today),
             'bg-red-50/50': blocksForDay(d).length > 0,
+            'cursor-pointer hover:bg-red-50/30': canBlock(d, d.getMonth() === anchor.getMonth()),
           }"
+          :role="canBlock(d, d.getMonth() === anchor.getMonth()) ? 'button' : undefined"
+          :aria-label="
+            canBlock(d, d.getMonth() === anchor.getMonth())
+              ? `Block ${d.toDateString()}`
+              : undefined
+          "
+          @click="
+            canBlock(d, d.getMonth() === anchor.getMonth()) && askBlock(d)
+          "
         >
           <div class="mb-1 flex items-center justify-between">
             <div class="text-xs font-semibold sm:text-sm">{{ d.getDate() }}</div>
@@ -301,7 +352,7 @@ function dayOfWeekKey(d: Date): (typeof days)[number] {
             v-for="job in jobsForDay(d).slice(0, 2)"
             :key="job.id"
             class="mb-0.5 cursor-pointer truncate rounded bg-[color:var(--bs-blue)] px-1.5 py-0.5 text-[10px] text-white sm:text-xs"
-            @click="router.push({ name: 'JobDetail', params: { id: job.id } })"
+            @click.stop="router.push({ name: 'JobDetail', params: { id: job.id } })"
           >
             {{ job.title }}
           </article>
@@ -314,5 +365,36 @@ function dayOfWeekKey(d: Date): (typeof days)[number] {
         </div>
       </div>
     </div>
+
+    <Dialog
+      :visible="pendingBlockDate !== null"
+      modal
+      header="Block this day?"
+      :style="{ width: '90vw', maxWidth: '22rem' }"
+      :draggable="false"
+      @update:visible="(v) => { if (!v) pendingBlockDate = null }"
+    >
+      <p class="text-sm">
+        Mark <span class="font-semibold">{{ pendingBlockLabel }}</span> as
+        unavailable? New bookings won't land on this day.
+      </p>
+      <p class="mt-2 text-xs text-[color:var(--bs-muted)]">
+        You can remove the block from the week view.
+      </p>
+      <template #footer>
+        <Button
+          label="Cancel"
+          severity="secondary"
+          text
+          @click="pendingBlockDate = null"
+        />
+        <Button
+          label="Block day"
+          icon="pi pi-ban"
+          severity="danger"
+          @click="confirmBlock"
+        />
+      </template>
+    </Dialog>
   </div>
 </template>

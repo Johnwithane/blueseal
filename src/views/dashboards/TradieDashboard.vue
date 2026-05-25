@@ -34,6 +34,7 @@ import type {
 } from "@/firebase/interfaces";
 import KanbanBoard from "@/components/KanbanBoard.vue";
 import CalendarView from "@/components/CalendarView.vue";
+import JobList from "@/components/JobList.vue";
 import AvailabilityEditor from "@/components/AvailabilityEditor.vue";
 
 const auth = useAuthStore();
@@ -41,11 +42,21 @@ const router = useRouter();
 const toast = useToast();
 const tradie = ref<WithId<TradespersonDoc> | null>(null);
 const jobs = ref<WithId<JobDoc>[]>([]);
-const view = ref<"kanban" | "calendar">("kanban");
+// List is the default — jobs-first triage. Board is the renamed kanban
+// (clients of the dashboard don't know the term "kanban"). Calendar is
+// the scheduling/blocking surface.
+const view = ref<"list" | "board" | "calendar">("list");
 const viewOptions = [
-  { label: "Kanban", value: "kanban" },
+  { label: "List", value: "list" },
+  { label: "Board", value: "board" },
   { label: "Calendar", value: "calendar" },
 ];
+
+const viewHint = computed(() => {
+  if (view.value === "board") return "Drag cards between columns to update status.";
+  if (view.value === "calendar") return "Tap a free day to block it off.";
+  return "Tap a job to open it.";
+});
 
 const moreMenu = ref<InstanceType<typeof Menu> | null>(null);
 const moreMenuItems = computed(() => [
@@ -199,6 +210,18 @@ async function removeBlock(bookingId: string) {
   }
 }
 
+// Tap-to-block from the calendar view. The CalendarView component handles
+// its own confirm dialog, so we just persist on emit.
+async function blockDay(day: Date) {
+  if (!auth.fbUser) return;
+  try {
+    await createBlock(auth.fbUser.uid, day, day);
+    toast.success("Block-off saved");
+  } catch (e) {
+    toast.error(humanizeError(e));
+  }
+}
+
 async function saveAvailability() {
   if (!auth.fbUser || !draftAvailability.value || !tradie.value) return;
   const parsed = weeklyAvailabilitySchema.safeParse(draftAvailability.value);
@@ -277,7 +300,7 @@ const showPayoutsNudge = computed(
       <div class="min-w-0">
         <h1 class="text-xl sm:text-2xl font-bold">Your jobs</h1>
         <p class="hidden sm:block text-[color:var(--bs-muted)] text-sm">
-          Drag cards between columns to update status.
+          {{ viewHint }}
         </p>
       </div>
       <div class="flex items-center gap-2 flex-wrap">
@@ -319,13 +342,15 @@ const showPayoutsNudge = computed(
       </div>
     </div>
 
-    <KanbanBoard v-if="view === 'kanban' && tradie?.isVisible" :jobs="jobs" />
+    <JobList v-if="view === 'list' && tradie?.isVisible" :jobs="jobs" />
+    <KanbanBoard v-else-if="view === 'board' && tradie?.isVisible" :jobs="jobs" />
     <CalendarView
       v-else-if="view === 'calendar' && tradie?.isVisible"
       :jobs="jobs"
       :availability="tradie.weeklyAvailability"
       :blocks="bookings"
       @remove-block="removeBlock"
+      @block-day="blockDay"
     />
 
     <div
