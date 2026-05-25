@@ -22,8 +22,6 @@ const sections: Section[] = [
   { key: "accepted", label: "Accepted (awaiting brief)", color: "#a0d6f1" },
   { key: "requested", label: "Inbox", color: "#0ea5e9" },
   { key: "quoted", label: "Quoted", color: "#f59e0b" },
-  { key: "quote_accepted", label: "Quote accepted", color: "#10b981" },
-  { key: "scheduled", label: "Scheduled", color: "#16a34a" },
   { key: "in_progress", label: "In progress", color: "#0d47a1" },
   { key: "awaiting_client_approval", label: "Awaiting approval", color: "#f97316" },
   { key: "awaiting_payment", label: "Awaiting payment", color: "#7c3aed" },

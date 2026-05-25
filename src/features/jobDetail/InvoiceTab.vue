@@ -125,14 +125,14 @@ const emit = defineEmits<{
 
     <!-- No-invoice empty state, only when there's also no quote drafted. -->
     <div
-      v-if="!invoiceId && (job.status === 'requested' || job.status === 'scheduled' || job.status === 'in_progress')"
+      v-if="!invoiceId && (job.status === 'requested' || job.status === 'in_progress')"
       class="bs-empty"
     >
       <i class="pi pi-receipt text-2xl mb-2 block text-[color:var(--bs-muted)]"></i>
       <p class="text-sm font-medium">No invoice yet</p>
       <p class="text-xs text-[color:var(--bs-muted)] mt-1">
         The invoice draft is generated when the tradesperson uses
-        <span class="font-medium">Finish job</span>.
+        <span class="font-medium">Create and send invoice</span>.
       </p>
     </div>
 

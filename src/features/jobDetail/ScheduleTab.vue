@@ -26,33 +26,35 @@ const { dateTime } = useFormatters();
 
 <template>
   <div class="space-y-4">
-    <!-- Quote-accepted prompts — surface the "next action" right next to
-         the scheduling controls (tradie side) or as confirmation (client). -->
+    <!-- Optional date-picking nudge while the job is active but no date
+         is set yet. Scheduling no longer gates status — it's metadata
+         the tradesperson can fill in (or not) to drive their calendar
+         and the on-the-day time tracker. -->
     <div
-      v-if="isTradie && job.status === 'quote_accepted'"
+      v-if="isTradie && job.status === 'in_progress' && !job.scheduledStart"
       class="bs-card p-3 border-l-4 border-l-emerald-500"
     >
       <h3 class="font-semibold text-sm mb-1 flex items-center gap-2">
         <i class="pi pi-calendar-plus text-emerald-600"></i>
-        Client accepted — pick a date
+        Set a visit date (optional)
       </h3>
       <p class="text-xs text-[color:var(--bs-muted)]">
-        Set start + end below. Saving the schedule moves the job to Scheduled
-        and the client gets notified.
+        Pick start + end below to put this job on your calendar. Time
+        tracking still works without a date — invoice when you're done.
       </p>
     </div>
 
     <div
-      v-if="isClient && job.status === 'quote_accepted'"
+      v-if="isClient && job.status === 'in_progress' && !job.scheduledStart"
       class="bs-card p-3 border-l-4 border-l-emerald-500"
     >
       <h3 class="font-semibold text-sm mb-1 flex items-center gap-2">
         <i class="pi pi-check text-emerald-600"></i>
-        Quote accepted
+        Quote accepted — job is active
       </h3>
       <p class="text-xs text-[color:var(--bs-muted)]">
-        The tradesperson is picking a date — you'll get a notification when
-        it's scheduled.
+        The tradesperson will reach out to confirm a visit date. You'll see
+        it here once it's set.
       </p>
     </div>
 

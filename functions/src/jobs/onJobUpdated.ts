@@ -18,8 +18,6 @@ const STATUS_LABEL: Record<string, string> = {
   accepted: "Accepted",
   requested: "Requested",
   quoted: "Quoted",
-  quote_accepted: "Quote accepted — pick a date",
-  scheduled: "Scheduled",
   in_progress: "In progress",
   awaiting_client_approval: "Awaiting your approval",
   awaiting_payment: "Awaiting payment",
@@ -42,9 +40,10 @@ function isApprovalFlowTransition(before: string | undefined, after: string | un
     pair === "awaiting_payment->complete" ||
     // Quote-flow transitions covered by submitQuote / clientAcceptQuote.
     // Any source → quoted is the submit/resubmit path. quoted →
-    // quote_accepted is the client-accept path.
+    // in_progress is the client-accept path (we skip the old
+    // quote_accepted/scheduled gates and jump straight to active).
     after === "quoted" ||
-    pair === "quoted->quote_accepted"
+    pair === "quoted->in_progress"
   );
 }
 
@@ -103,8 +102,8 @@ export const onJobUpdated = onDocumentUpdated("jobs/{jobId}", async (event) => {
     return;
   }
 
-  // Schedule writes set status=scheduled in the same update — fold the two
-  // into one line so the chat doesn't repeat itself.
+  // Schedule writes update scheduledStart/End on an already-active job;
+  // post a single line so the chat reflects the new booking time.
   if (scheduleChanged && after.scheduledStart && after.scheduledEnd) {
     const range = fmtScheduleRange(after.scheduledStart, after.scheduledEnd);
     await postSystemMessage(chatId, `Scheduled for ${range}`);

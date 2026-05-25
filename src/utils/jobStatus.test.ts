@@ -6,8 +6,6 @@ const ALL_STATUSES: JobStatus[] = [
   "accepted",
   "requested",
   "quoted",
-  "quote_accepted",
-  "scheduled",
   "in_progress",
   "awaiting_client_approval",
   "awaiting_payment",

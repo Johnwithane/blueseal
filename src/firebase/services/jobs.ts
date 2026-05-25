@@ -109,17 +109,17 @@ export async function updateJobStatus(id: string, status: JobStatus): Promise<vo
   }
 }
 
-// Statuses where either party can still cancel. Once work has started
-// ("in_progress") or money is owed ("awaiting_payment"/"complete"/
-// "reviewed"), cancellation has to go through a dispute or admin instead.
-// quote_accepted is still safe to cancel — nothing's been done yet, the
-// tradesperson just hasn't picked a date.
+// Statuses where either party can still cancel. Once money is owed
+// ("awaiting_client_approval"/"awaiting_payment"/"complete"/"reviewed"),
+// cancellation has to go through a dispute or admin instead. in_progress
+// stays cancellable because that now covers the window between client
+// quote-accept and the tradesperson actually doing the work — clients
+// need a way out if plans change before the visit.
 export const CANCELLABLE_STATUSES: readonly JobStatus[] = [
   "accepted",
   "requested",
   "quoted",
-  "quote_accepted",
-  "scheduled",
+  "in_progress",
 ] as const;
 
 /**
@@ -140,10 +140,11 @@ export async function cancelJob(id: string, reason: string): Promise<void> {
 }
 
 export async function scheduleJob(id: string, start: Date, end: Date): Promise<void> {
+  // Scheduling is metadata on an active job, not a status transition.
+  // The job is already in_progress by the time this is called.
   await updateDoc(doc(db, "jobs", id), {
     scheduledStart: start,
     scheduledEnd: end,
-    status: "scheduled",
   });
 }
 

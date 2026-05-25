@@ -162,13 +162,14 @@ export async function findCollisions(
     });
   }
 
-  // Jobs already scheduled or in progress. Excludes terminal states
-  // (complete, reviewed, cancelled) — those don't conflict.
+  // Jobs in progress with a scheduled window. Excludes terminal states
+  // (complete, reviewed, cancelled) and the pre-active states (no
+  // scheduledStart yet) — those don't conflict.
   const jobsCol = collection(db, "jobs").withConverter(typedConverter<JobDoc>());
   const jobsSnap = await getDocs(
     query(jobsCol, where("tradespersonId", "==", tradespersonId)),
   );
-  const ACTIVE: ReadonlySet<string> = new Set(["scheduled", "in_progress"]);
+  const ACTIVE: ReadonlySet<string> = new Set(["in_progress"]);
   for (const d of jobsSnap.docs) {
     if (d.id === options?.excludeJobId) continue;
     const data = d.data();

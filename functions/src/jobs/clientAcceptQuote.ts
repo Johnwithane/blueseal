@@ -25,13 +25,13 @@ interface QuoteData {
 }
 
 /**
- * Client accepts the quote. Atomically transitions the job to
- * "quote_accepted" and the quote doc to "accepted"; the tradesperson is
- * notified to pick a schedule (the existing schedule card on the job page
- * handles the date pick and flips the job to "scheduled").
+ * Client accepts the quote. Atomically transitions the job straight to
+ * "in_progress" (the scheduling step is no longer a status gate — date
+ * pick is metadata the tradesperson can fill in from the Schedule tab)
+ * and the quote doc to "accepted".
  *
- * onJobUpdated suppresses its generic line for the quoted →
- * quote_accepted transition (richer message posted here).
+ * onJobUpdated suppresses its generic line for the quoted → in_progress
+ * transition (richer message posted here).
  */
 export const clientAcceptQuote = onCall({ enforceAppCheck: false }, async (req) => {
   const uid = requireRole(req, "client");
@@ -72,7 +72,7 @@ export const clientAcceptQuote = onCall({ enforceAppCheck: false }, async (req) 
       throw new HttpsError("failed-precondition", "Quote has zero total.");
     }
 
-    tx.update(jobRef, { status: "quote_accepted" });
+    tx.update(jobRef, { status: "in_progress" });
     tx.update(quoteRef, {
       status: "accepted",
       acceptedAt: FieldValue.serverTimestamp(),
@@ -89,7 +89,7 @@ export const clientAcceptQuote = onCall({ enforceAppCheck: false }, async (req) 
   if (result.chatId) {
     await postSystemMessage(
       result.chatId,
-      `Client accepted quote ${result.quoteNumber} ($${(result.total / 100).toFixed(2)}). Pick a date to schedule.`,
+      `Client accepted quote ${result.quoteNumber} ($${(result.total / 100).toFixed(2)}). Job is now active — invoice when the work is done.`,
     );
   }
 
@@ -97,7 +97,7 @@ export const clientAcceptQuote = onCall({ enforceAppCheck: false }, async (req) 
     userId: result.tradespersonId,
     type: "invoice_sent",
     title: "Client accepted your quote",
-    body: `${result.quoteNumber} ($${(result.total / 100).toFixed(2)}). Open the job to schedule.`,
+    body: `${result.quoteNumber} ($${(result.total / 100).toFixed(2)}). Job is now active — invoice when finished.`,
     link: `/jobs/${jobId}`,
     actorUid: uid,
     jobId,

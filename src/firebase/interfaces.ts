@@ -305,16 +305,13 @@ export interface IntakeFormSchemaDoc {
 // callables (submitJobForApproval / clientApproveJob / clientRequestChanges)
 // so the invoice doc + chat system message stay in lockstep with the status.
 //
-// "quote_accepted" sits between "quoted" and "scheduled": the client has
-// accepted the quote (via clientAcceptQuote) and the tradesperson now needs
-// to pick a date. Schedule write transitions the job into "scheduled" via
-// the existing scheduleJob flow.
+// Client-quote-accept jumps the job straight from "quoted" to "in_progress" —
+// scheduling is metadata (scheduledStart/End) on an active job, not a
+// status gate of its own.
 export type JobStatus =
   | "accepted"
   | "requested"
   | "quoted"
-  | "quote_accepted"
-  | "scheduled"
   | "in_progress"
   | "awaiting_client_approval"
   | "awaiting_payment"
@@ -772,7 +769,7 @@ export interface DisputeDoc {
 //   draft   — tradesperson is building, never shown to client
 //   sent    — client now sees it; awaiting their decision
 //   viewed  — client opened the job page after sent (soft signal)
-//   accepted — client clicked Accept; job flips to "quote_accepted"
+//   accepted — client clicked Accept; job flips straight to "in_progress"
 //   declined — client clicked Discuss/Decline; job stays "quoted" so the
 //              tradesperson can revise and re-send (status flips back to
 //              "sent" on next submitQuote call)

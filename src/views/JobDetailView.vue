@@ -11,7 +11,6 @@ import {
   getJob,
   markJobPaid,
   scheduleJob,
-  updateJobStatus,
   updatePrivateNotes,
   saveJobIntakeAndAdvance,
 } from "@/firebase/services/jobs";
@@ -156,7 +155,12 @@ const tabs = computed<JobTab[]>(() => {
       key: "schedule",
       label: "Schedule",
       icon: "pi-calendar",
-      badge: isTradie.value && s === "quote_accepted" ? "dot" : undefined,
+      // Nudge the tradie to set a date once the job is active and there
+      // isn't one yet.
+      badge:
+        isTradie.value && s === "in_progress" && !job.value.scheduledStart
+          ? "dot"
+          : undefined,
     },
     {
       key: "invoice",
@@ -209,8 +213,6 @@ watch(
 const stickyCTAStatuses: ReadonlySet<JobStatus> = new Set([
   "requested",
   "quoted",
-  "quote_accepted",
-  "scheduled",
   "in_progress",
   "awaiting_payment",
 ]);
@@ -338,20 +340,6 @@ async function commitSchedule() {
     await load();
   } catch (e) {
     toast.error("Couldn't save schedule", humanizeError(e));
-  }
-}
-
-// The only manual transition still wired into the UI: tradesperson taps
-// the "Mark started" sticky CTA after a scheduled visit begins. Every
-// other status move is driven by a domain action (send-quote, accept,
-// schedule, finish-job, approve, pay) or the cancel-job dialog.
-async function markStarted() {
-  if (!job.value) return;
-  try {
-    await updateJobStatus(job.value.id, "in_progress");
-    await load();
-  } catch (e) {
-    toast.error("Couldn't update status", humanizeError(e));
   }
 }
 
@@ -591,14 +579,13 @@ function onReturnToApplicants() {
         @decided="load"
       />
 
-      <!-- Scheduled-state confirmation. Once both parties have agreed
-           a quote and the tradesperson has picked a slot, the booking
-           is the most important piece of info on the page — surface it
-           in the banners rail rather than burying it inside the
-           Schedule tab. Same banner copy for both roles since it's a
-           shared agreement. -->
+      <!-- Active-job booking confirmation. Once a date is set on an
+           active job, the booking is the most important piece of info
+           on the page — surface it in the banners rail rather than
+           burying it inside the Schedule tab. Same banner copy for
+           both roles since it's a shared agreement. -->
       <div
-        v-if="job.status === 'scheduled' && job.scheduledStart"
+        v-if="job.status === 'in_progress' && job.scheduledStart"
         class="bs-card p-4 mb-4 border-l-4 border-l-blue-500"
       >
         <div class="flex items-start gap-3">
@@ -718,25 +705,9 @@ function onReturnToApplicants() {
           @click="showQuoteSheet = true"
         />
         <Button
-          v-else-if="job.status === 'quote_accepted'"
-          label="Pick a date"
-          icon="pi pi-calendar-plus"
-          class="w-full"
-          size="large"
-          @click="onTabChange('schedule')"
-        />
-        <Button
-          v-else-if="job.status === 'scheduled'"
-          label="Mark started"
-          icon="pi pi-play"
-          class="w-full"
-          size="large"
-          @click="markStarted"
-        />
-        <Button
           v-else-if="job.status === 'in_progress'"
-          label="Finish job & prepare invoice"
-          icon="pi pi-check-circle"
+          label="Create and send invoice"
+          icon="pi pi-receipt"
           class="w-full"
           size="large"
           @click="showFinishSheet = true"

@@ -60,7 +60,7 @@ export const JOB_TOOLS: Tool = {
     {
       name: "setSchedule",
       description:
-        "Set or update the scheduled start and end times for this job. Times must be ISO 8601 strings with timezone (e.g. '2026-05-25T09:00:00-07:00' for 9am Pacific). If endISO is omitted the existing end time is kept. If the job's current status is 'requested' or 'quoted', it's auto-advanced to 'scheduled'.",
+        "Set or update the scheduled start and end times for this job. Times must be ISO 8601 strings with timezone (e.g. '2026-05-25T09:00:00-07:00' for 9am Pacific). If endISO is omitted the existing end time is kept. Status is never changed by this tool — scheduling is metadata, not a status gate.",
       parameters: {
         type: FunctionDeclarationSchemaType.OBJECT,
         properties: {
@@ -203,7 +203,7 @@ async function toolAppendPrivateNote(
   return { ok: true, privateNotes: updated };
 }
 
-/** Write — tradesperson only. Auto-advances status if it's still requested/quoted. */
+/** Write — tradesperson only. Updates scheduled times only; status is not touched here. */
 async function toolSetSchedule(
   ctx: ToolContext,
   args: { startISO?: unknown; endISO?: unknown },
@@ -228,18 +228,15 @@ async function toolSetSchedule(
     if (job.tradespersonId !== ctx.uid) {
       throw new Error("Only the assigned tradesperson can change the schedule.");
     }
-    const updates: { [key: string]: Timestamp | string } = {
+    const updates: { [key: string]: Timestamp } = {
       scheduledStart: Timestamp.fromDate(start),
     };
     if (end) updates.scheduledEnd = Timestamp.fromDate(end);
-    if (job.status === "requested" || job.status === "quoted") {
-      updates.status = "scheduled";
-    }
     tx.update(jobRef, updates);
     return {
       scheduledStart: start.toISOString(),
       scheduledEnd: end?.toISOString() ?? null,
-      status: (updates.status as string) ?? job.status,
+      status: job.status,
     };
   });
   return { ok: true, ...result };
