@@ -21,7 +21,7 @@ import { logger } from "firebase-functions/v2";
 import { db } from "../lib/admin";
 import { requireAdmin } from "../lib/auth";
 import { logAdminAction } from "../lib/audit";
-import { emptyPayoutsState } from "./stripeClient";
+import { emptyPayoutsState } from "./payoutsState";
 
 const PAGE_SIZE = 400;
 

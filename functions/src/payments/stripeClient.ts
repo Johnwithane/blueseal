@@ -50,27 +50,7 @@ export function getStripe(): StripeClient {
   return _stripe;
 }
 
-// Default empty PayoutsState seeded onto a tradesperson doc the first time
-// they kick off Stripe Connect onboarding. Mirrored by the
-// `account.updated` webhook from that point forward.
-export function emptyPayoutsState(): {
-  stripeAccountId: null;
-  onboardingStatus: "not_started";
-  chargesEnabled: false;
-  payoutsEnabled: false;
-  detailsSubmitted: false;
-  disabledReason: null;
-  pendingRequirements: string[];
-  lastSyncedAt: null;
-} {
-  return {
-    stripeAccountId: null,
-    onboardingStatus: "not_started",
-    chargesEnabled: false,
-    payoutsEnabled: false,
-    detailsSubmitted: false,
-    disabledReason: null,
-    pendingRequirements: [],
-    lastSyncedAt: null,
-  };
-}
+// emptyPayoutsState lives in ./payoutsState so callers that only need the
+// default shape don't transitively trigger `defineSecret()` here. Re-export
+// for back-compat with existing Stripe callers (webhook, callables).
+export { emptyPayoutsState } from "./payoutsState";
