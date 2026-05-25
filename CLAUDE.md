@@ -39,6 +39,39 @@ These override everything else when in conflict:
 5. **Mobile first.** 375px width is the design target. Everything must work there before it's "done."
 6. **No `any`.** Use `unknown` and narrow. Strict TS throughout.
 7. **Push back when needed.** If the user asks for something that contradicts these docs or introduces real risk, say so — don't silently accept.
+8. **Firebase changes deploy before commit.** Any change that touches `firestore.rules`, `storage.rules`, `firestore.indexes.json`, or `functions/` source must be deployed to Firebase *before* the commit that ships the dependent code. Never commit code that calls a function or relies on a rule that isn't live yet — that's the #1 way prod silently breaks. See [Firebase deployment discipline](#firebase-deployment-discipline) below.
+
+---
+
+## Workflow principles
+
+These shape *how* code gets written inside the per-feature loop below.
+
+1. **Plan before coding.** For any non-trivial task, write a short plan first — files you'll touch, approach, success criteria. Reduce ambiguity before writing code, not after. For small edits, a one-line inline plan is enough.
+2. **Surgical edits only.** Change only what the task requires. Don't reformat, rename, or "improve" unrelated code or comments while you're in there. Every extra line is review burden and regression risk — minimize churn.
+3. **Keep it simple.** Prefer 100 lines over 1000. Avoid speculative abstractions and premature generalization. If you can solve it without a new helper, do. Clean up dead code and cruft as you encounter it (within the task's scope).
+4. **Verify relentlessly.** Before declaring something done: check assumptions, edge cases, and tradeoffs; run the quality gates; read your own diff. Don't blindly trust that it worked because there was no error — stay in the loop.
+5. **Goal-driven execution.** State success criteria up front. Where it fits the feature, write the test first and then make it pass. Iterate against the criteria, not against vibes.
+6. **Parallelize with subagents.** Offload research, exploration, and broad codebase searches to subagents so the main context stays clean. One focused task per subagent. Merge results with judgment — don't just relay them.
+
+Three meta-principles that override the above when in tension:
+
+- **Simplicity first.** Minimal code that solves the problem. Nothing speculative, nothing "in case we need it later."
+- **No laziness.** Find root causes. No temporary fixes that paper over the real issue. Senior-developer standards.
+- **Minimal impact.** Only touch what's necessary. No side effects beyond the task. No new bugs.
+
+---
+
+## Engineer mindset
+
+How to *carry* the work, not just produce it.
+
+- **Tenacity.** When the test fails or the build breaks, iterate. Read the error, form a hypothesis, try again. Don't bail out to "let me know how you'd like to proceed" on the first red — that's giving up disguised as deference. Bail out when you're genuinely stuck or about to do something risky, not when you're frustrated.
+- **Leverage.** Translate vague asks into declarative success criteria, then drive to them. "Make the signup work" → "intake form validates with Zod, writes to `users/{uid}` with role claim set, redirects to dashboard, tested at 375px." Specs multiply leverage; vibes don't.
+- **Fun.** Bias toward courage on the creative parts — try the cleaner refactor, the better-named component, the nicer empty state. Automate the drudgery (boilerplate, scaffolding, repetitive test setup). Don't be timid where boldness is cheap.
+- **Atrophy.** Johnny is reading the diff, not writing it. When a change is non-obvious — a tricky rule, an unusual pattern, a tradeoff taken — explain *why* in the commit body or a code comment, so he stays sharp on the codebase he owns. Don't over-narrate the obvious.
+- **Speedups ≠ just faster.** Use the speed to do *more*, not to rush. More tests, more edge cases handled, more mobile checks, a real verify step. If a task finishes "fast," that's the budget for thoroughness — not a license to ship thinner work.
+- **Slopacolypse.** Be allergic to confident-sounding output that isn't actually grounded. Don't invent APIs, file paths, library functions, or Firestore field names — check them. If a fix "looks right" but you didn't verify the failure mode, say so. Signal beats hype.
 
 ---
 
@@ -61,6 +94,10 @@ Build:
   - Write tests (unit + rules)
   ↓
 Verify: npm run lint && npm run build && npm run test:run
+  ↓
+Deploy Firebase changes (IF rules / indexes / storage / functions touched):
+  firebase deploy --only firestore:rules,storage,firestore:indexes,functions
+  → confirm success in CLI output before continuing
   ↓
 Commit: "Phase N: short feature description"
   ↓
@@ -263,7 +300,36 @@ npm run deploy:prod      # Build + deploy hosting
 npm run deploy           # Build + deploy everything
 ```
 
-**Before any commit:** `npm run lint && npm run build && npm run test:run` must pass.
+**Before any commit:** `npm run lint && npm run build && npm run test:run` must pass *and* any Firebase-side changes must be deployed (see below).
+
+---
+
+## Firebase deployment discipline
+
+If a change touches any of the following, it must be deployed to Firebase **before** the commit lands:
+
+| Change | Deploy command |
+| --- | --- |
+| `firestore.rules` | `firebase deploy --only firestore:rules` |
+| `storage.rules` | `firebase deploy --only storage` |
+| `firestore.indexes.json` | `firebase deploy --only firestore:indexes` |
+| `functions/` (any callable, trigger, scheduled job) | `firebase deploy --only functions` |
+| Multiple of the above in one feature | `firebase deploy --only firestore:rules,storage,firestore:indexes,functions` |
+
+**Why deploy-before-commit:**
+- Committing a client that calls a non-deployed Cloud Function = the moment Johnny pulls/CI deploys hosting, prod is broken.
+- Committing rules that lag behind the data shape = silent permission-denied errors users can't recover from.
+- The deployed Firebase state IS the contract the client codes against. The commit should never reference a contract that isn't live.
+
+**Process:**
+1. Run the verify gates (`lint && build && test:run`) — including `tests/rules/` so rules changes don't break existing collections.
+2. Run the targeted `firebase deploy --only ...` command. Confirm the CLI prints `✔ Deploy complete!` (or per-target ✔ lines). If any target fails, **stop** — do not commit. Fix the failure, redeploy, then commit.
+3. After deploy succeeds, commit the code change. Reference the deploy in the commit body when it's non-trivial (e.g. `Deployed: firestore:rules + functions (acceptVouch callable)`).
+4. Hosting (`firebase deploy --only hosting` or `npm run deploy:prod`) is separate and happens *after* commit + push — that's the normal release flow and stays unchanged.
+
+**One exception:** while iterating locally against emulators (`npm run dev:full`), you don't deploy on every WIP save — only when you're about to commit the change. The rule is about commit boundaries, not edit boundaries.
+
+**Failure modes and rollback:** see [skills/firebase-deploy.md](skills/firebase-deploy.md) for the full reference — what each `✔` line means, the common failure modes (TS errors in predeploy, index-build delays, missing-function deletion prompts), and how to roll back rules / functions / indexes when a deploy goes bad.
 
 ---
 
@@ -329,8 +395,9 @@ If you find yourself building any of the above, stop and ask.
 
 - [ ] `npm run lint` passes
 - [ ] `npm run build` passes (includes type-check)
-- [ ] `npm run test:run` passes
+- [ ] `npm run test:run` passes (including `tests/rules/` if rules changed)
 - [ ] If schema changed, `interfaces.ts` + `firestore.rules` + service functions all consistent
+- [ ] **If `firestore.rules` / `storage.rules` / `firestore.indexes.json` / `functions/` changed → `firebase deploy --only ...` ran successfully BEFORE this commit** (see [Firebase deployment discipline](#firebase-deployment-discipline))
 - [ ] If a new pattern emerged 3+ times, it's been promoted (skill or note here)
 - [ ] If an open question got answered, `design.md` § 14 reflects it
 - [ ] Mobile (375px) tested
