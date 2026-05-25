@@ -83,6 +83,13 @@ export { seedIntakeSchemas, ping } from "./seed/seedIntakeSchemas";
 // Messaging (WhatsApp Cloud API queue processor)
 export { processWhatsAppMessage } from "./messaging/processWhatsAppMessage";
 
+// Vouches — peer endorsements between tradespeople
+export { sendVouchRequest } from "./vouches/sendVouchRequest";
+export { acceptVouchRequest } from "./vouches/acceptVouchRequest";
+export { declineVouchRequest } from "./vouches/declineVouchRequest";
+export { revokeVouch } from "./vouches/revokeVouch";
+export { linkPendingVouchesOnSignup } from "./vouches/linkPendingVouchesOnSignup";
+
 // Job-board marketplace
 export { createJobPost } from "./jobPosts/createJobPost";
 export { submitApplication } from "./jobPosts/submitApplication";
@@ -90,6 +97,7 @@ export { withdrawApplication } from "./jobPosts/withdrawApplication";
 export { acceptApplication } from "./jobPosts/acceptApplication";
 export { returnToApplicants } from "./jobPosts/returnToApplicants";
 export { cancelJobPost } from "./jobPosts/cancelJobPost";
+export { onJobPostCreated } from "./jobPosts/onJobPostCreated";
 export { onJobPostClosed } from "./jobPosts/onJobPostClosed";
 export { onApplicationCreated } from "./jobPosts/onApplicationCreated";
 export { scheduledJobPostExpiry } from "./jobPosts/scheduledJobPostExpiry";

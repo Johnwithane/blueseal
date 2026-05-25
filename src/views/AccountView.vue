@@ -75,6 +75,7 @@ const exportUrl = ref<string | null>(null);
 // missing-field behavior so legacy users aren't silently opted out.
 const emailEnabled = ref(true);
 const whatsappEnabled = ref(true);
+const newJobPostingEnabled = ref(true);
 const savingPrefs = ref(false);
 
 onMounted(async () => {
@@ -90,6 +91,7 @@ onMounted(async () => {
   // we don't silently change their notification behavior.
   emailEnabled.value = u.notificationPrefs?.emailEnabled ?? true;
   whatsappEnabled.value = u.notificationPrefs?.whatsappEnabled ?? true;
+  newJobPostingEnabled.value = u.notificationPrefs?.newJobPostingEnabled ?? true;
   // Pull the tradesperson doc to seed the tradie-only profile fields below
   // (companyName / bio / languages). The vetting-status banner is rendered
   // globally by TradieStatusBanner.vue so we don't recompute it here.
@@ -257,15 +259,18 @@ async function savePrefs() {
   savingPrefs.value = true;
   error.value = null;
   try {
-    await updateNotificationPrefs(auth.fbUser.uid, {
+    const prefs = {
       emailEnabled: emailEnabled.value,
       whatsappEnabled: whatsappEnabled.value,
-    });
+      // Only persisted on tradesperson accounts — clients never receive
+      // this type, so the field is omitted from their doc.
+      ...(auth.hasTradieRole
+        ? { newJobPostingEnabled: newJobPostingEnabled.value }
+        : {}),
+    };
+    await updateNotificationPrefs(auth.fbUser.uid, prefs);
     if (auth.user) {
-      auth.user.notificationPrefs = {
-        emailEnabled: emailEnabled.value,
-        whatsappEnabled: whatsappEnabled.value,
-      };
+      auth.user.notificationPrefs = prefs;
     }
     toast.success("Notification preferences saved");
   } catch (e) {
@@ -491,6 +496,30 @@ async function grantAdminAllRoles() {
       class="mt-4"
     />
 
+    <!-- Tradesperson-only vouches shortcut. Manage outgoing + incoming peer
+         endorsements; the public profile renders the accepted ones. -->
+    <div v-if="auth.hasTradieRole" class="bs-card mt-4 p-5 flex items-start gap-3">
+      <i
+        class="pi pi-users text-2xl mt-0.5 text-[color:var(--bs-blue)]"
+        aria-hidden="true"
+      ></i>
+      <div class="flex-1 min-w-0">
+        <h2 class="text-lg font-semibold">Vouches</h2>
+        <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
+          Endorse other tradespeople you've worked with, and manage the
+          ones who've vouched for you.
+        </p>
+      </div>
+      <RouterLink to="/account/vouches" class="shrink-0">
+        <Button
+          label="Manage vouches"
+          icon="pi pi-arrow-right"
+          icon-pos="right"
+          outlined
+        />
+      </RouterLink>
+    </div>
+
     <!-- Tradesperson-only payouts shortcut. State + actions live on /payouts;
          this card is just a stable, discoverable entry point from Account. -->
     <div v-if="auth.hasTradieRole" class="bs-card mt-4 p-5 flex items-start gap-3">
@@ -676,6 +705,20 @@ async function grantAdminAllRoles() {
             </p>
           </div>
           <ToggleSwitch v-model="whatsappEnabled" />
+        </div>
+
+        <div
+          v-if="auth.hasTradieRole"
+          class="flex items-start justify-between gap-3 rounded-lg border border-[color:var(--bs-border)] p-3"
+        >
+          <div>
+            <div class="font-medium">New job postings</div>
+            <p class="text-xs text-[color:var(--bs-muted)] mt-0.5">
+              Get an in-app notification when a client posts a new job that
+              matches your trade and falls within your service area.
+            </p>
+          </div>
+          <ToggleSwitch v-model="newJobPostingEnabled" />
         </div>
       </div>
 

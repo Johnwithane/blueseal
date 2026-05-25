@@ -34,7 +34,10 @@ export type NotificationType =
   | "invoice_payment_failed"
   | "invoice_refunded"
   | "dispute_opened"
-  | "review_received";
+  | "review_received"
+  | "vouch_requested"
+  | "vouch_accepted"
+  | "new_job_posting";
 
 /**
  * Channel routing per notification.
@@ -75,6 +78,7 @@ interface UserContact {
   phone: string | null;
   emailEnabled: boolean;
   whatsappEnabled: boolean;
+  newJobPostingEnabled: boolean;
 }
 
 async function getUserContact(uid: string): Promise<UserContact> {
@@ -84,7 +88,11 @@ async function getUserContact(uid: string): Promise<UserContact> {
       | {
           email?: string;
           phone?: string;
-          notificationPrefs?: { emailEnabled?: boolean; whatsappEnabled?: boolean };
+          notificationPrefs?: {
+            emailEnabled?: boolean;
+            whatsappEnabled?: boolean;
+            newJobPostingEnabled?: boolean;
+          };
         }
       | undefined;
     // Missing-pref = enabled. Legacy users (created before this field
@@ -96,10 +104,17 @@ async function getUserContact(uid: string): Promise<UserContact> {
       phone: data?.phone ?? null,
       emailEnabled: prefs.emailEnabled !== false,
       whatsappEnabled: prefs.whatsappEnabled !== false,
+      newJobPostingEnabled: prefs.newJobPostingEnabled !== false,
     };
   } catch (err) {
     logger.warn("notify: failed to load user contact", { uid, err });
-    return { email: null, phone: null, emailEnabled: true, whatsappEnabled: true };
+    return {
+      email: null,
+      phone: null,
+      emailEnabled: true,
+      whatsappEnabled: true,
+      newJobPostingEnabled: true,
+    };
   }
 }
 
@@ -124,6 +139,15 @@ export async function notify(input: NotifyInput): Promise<void> {
   const title = input.title.slice(0, 120);
   const body = input.body.slice(0, 500);
   const link = input.link ?? null;
+
+  // Per-type opt-out. new_job_posting is a high-volume broadcast (every
+  // matching tradesperson gets one per new marketplace post in their area)
+  // so the toggle gates the whole notification, not just channels — there
+  // is no "in-app only" silent fallback the way emailEnabled has.
+  if (input.type === "new_job_posting") {
+    const contact = await getUserContact(input.userId);
+    if (!contact.newJobPostingEnabled) return;
+  }
 
   // In-app inbox always.
   try {

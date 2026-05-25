@@ -20,7 +20,11 @@ const route = useRoute();
 const isTradie = ref(route.query.as === "tradesperson");
 
 const displayName = ref("");
-const email = ref("");
+// Prefill the email field when arriving via a vouch invite link
+// (/sign-up?invite=email@example.com). The signup linker trigger keys on
+// the email match to claim any pending_signup vouches sent to this
+// address, so we want the signup to actually go through with that email.
+const email = ref(typeof route.query.invite === "string" ? route.query.invite : "");
 const password = ref("");
 const termsAccepted = ref(false);
 const fieldErrors = ref<Record<string, string>>({});

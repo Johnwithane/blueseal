@@ -43,6 +43,10 @@ export interface UserDoc {
 export interface NotificationPrefs {
   emailEnabled: boolean;
   whatsappEnabled: boolean;
+  // Tradesperson-only: opt out of "new job in your area" broadcasts.
+  // Missing = enabled (matches the legacy-friendly default of the other
+  // prefs above).
+  newJobPostingEnabled?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -993,7 +997,10 @@ export type NotificationType =
   | "invoice_payment_failed"
   | "invoice_refunded"
   | "dispute_opened"
-  | "review_received";
+  | "review_received"
+  | "vouch_requested"
+  | "vouch_accepted"
+  | "new_job_posting";
 
 export interface NotificationDoc {
   userId: string;
@@ -1016,4 +1023,67 @@ export interface NotificationDoc {
   // through the wrong lens. Null on legacy docs created before the field
   // existed; the click handler treats null as "don't switch."
   recipientRole: Role | null;
+}
+
+// ---------------------------------------------------------------------------
+// vouches/{vouchId}
+// Peer endorsement: a tradesperson (fromUserId) vouches for another person
+// they've worked with. Two flows feed the same collection:
+//
+//   pending_acceptance — vouchee already has a Blue Seal account; they get a
+//     notification and must accept before the vouch becomes public.
+//   pending_signup     — vouchee was invited by email; an invite email is
+//     sent. When they sign up with that email, the linkPendingVouchesOnSignup
+//     trigger flips the doc to accepted and stamps toUserId. Auto-acceptance:
+//     the act of completing signup via the invited email counts as consent.
+//
+//   accepted — mutually visible on both profiles. Public-readable.
+//   declined — vouchee said no. Read-only to parties + admin (not public).
+//
+// Display fields (fromDisplayName/fromPhotoURL/fromPrimaryTrade and the
+// matching to* trio) are denormalised so the public profile can render the
+// chip row without cross-account user-doc reads. They're snapshotted at
+// acceptance/link time and not kept live in sync (small acceptable staleness
+// vs the cost of a fanout trigger on every profile edit).
+//
+// Doc id is auto-generated. Uniqueness of (fromUserId, toUserId) and
+// (fromUserId, toEmail) is enforced in the sendVouchRequest callable via a
+// query, not by id — keeps the pending_signup → accepted path immutable-id
+// safe.
+// ---------------------------------------------------------------------------
+export type VouchStatus =
+  | "pending_acceptance"
+  | "pending_signup"
+  | "accepted"
+  | "declined";
+
+export interface VouchDoc {
+  fromUserId: string;
+  fromDisplayName: string;
+  fromPhotoURL: string | null;
+  fromPrimaryTrade: string | null;
+
+  // Null while status === "pending_signup" — populated by the signup linker
+  // trigger when the invited email completes signup.
+  toUserId: string | null;
+  // Captured at create time (voucher types the person's name). Overwritten
+  // with the live displayName from the user doc on accept/link so the
+  // profile chip matches the actual account name.
+  toDisplayName: string;
+  toPhotoURL: string | null;
+  toPrimaryTrade: string | null;
+  // Only set when the voucher invited by email (status pending_signup).
+  // Cleared to null on link so we don't keep the email around once the
+  // account exists.
+  toEmail: string | null;
+
+  status: VouchStatus;
+  // Optional short note from the voucher ("worked together on the Riverside
+  // project"). Rendered on the chip's tooltip on the profile.
+  message: string;
+
+  createdAt: Timestamp;
+  // Stamped when status flips to accepted/declined OR when the signup
+  // linker converts pending_signup → accepted.
+  respondedAt: Timestamp | null;
 }

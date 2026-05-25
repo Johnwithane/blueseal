@@ -275,6 +275,42 @@ export const withdrawApplicationSchema = z.object({
 // its own copy of this schema to keep callable inputs locked in even if a
 // future refactor diverges the client-side schema.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Vouches — peer endorsements between tradespeople. sendVouchRequest accepts
+// EITHER an existing user by uid OR a new invitee by email — exactly one,
+// not both. The refine() at the bottom enforces that XOR.
+// ---------------------------------------------------------------------------
+export const sendVouchRequestSchema = z
+  .object({
+    toUserId: z.string().min(1).max(128).optional(),
+    toEmail: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .email("Enter a valid email")
+      .max(200)
+      .optional(),
+    // Display name the voucher types in. For existing-user requests this is
+    // a hint only — the server overwrites with the live displayName on
+    // accept. For email invites it's what appears in the invite email and
+    // as a placeholder until the invitee signs up.
+    toDisplayName: z.string().trim().min(1).max(80),
+    message: z.string().trim().max(500).optional(),
+  })
+  .refine(
+    (v) => (v.toUserId == null) !== (v.toEmail == null),
+    {
+      message: "Provide either toUserId or toEmail, not both",
+      path: ["toUserId"],
+    },
+  );
+export type SendVouchRequestInput = z.infer<typeof sendVouchRequestSchema>;
+
+export const vouchIdSchema = z.object({
+  vouchId: z.string().min(1).max(128),
+});
+export type VouchIdInput = z.infer<typeof vouchIdSchema>;
+
 export const aiChatInputSchema = z
   .object({
     // Omit to auto-resolve by (userId, scope, jobId) — backend creates one

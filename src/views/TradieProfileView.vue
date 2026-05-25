@@ -7,7 +7,16 @@ import Rating from "primevue/rating";
 import Avatar from "primevue/avatar";
 import { getTradesperson } from "@/firebase/services/tradespeople";
 import { listReviewsFor } from "@/firebase/services/reviews";
-import type { ReviewDoc, TradespersonDoc, WithId } from "@/firebase/interfaces";
+import {
+  listAcceptedVouchesFor,
+  listAcceptedVouchesFrom,
+} from "@/firebase/services/vouches";
+import type {
+  ReviewDoc,
+  TradespersonDoc,
+  VouchDoc,
+  WithId,
+} from "@/firebase/interfaces";
 import { tradeLabel } from "@/data/trades";
 import { useFormatters } from "@/composables/useFormatters";
 import { useAuthStore } from "@/stores/auth";
@@ -17,6 +26,12 @@ import CalendarView from "@/components/CalendarView.vue";
 const route = useRoute();
 const tradie = ref<WithId<TradespersonDoc> | null>(null);
 const reviews = ref<WithId<ReviewDoc>[]>([]);
+// Two-direction peer-endorsement chips. vouchesFrom = people this tradie
+// vouches for; vouchesFor = people who've vouched for this tradie. Both
+// queries hit accepted-only docs (rules permit world-read of accepted
+// vouches; pending/declined are party-only).
+const vouchesFrom = ref<WithId<VouchDoc>[]>([]);
+const vouchesFor = ref<WithId<VouchDoc>[]>([]);
 const loading = ref(true);
 const { money, relativeTime } = useFormatters();
 const auth = useAuthStore();
@@ -85,10 +100,28 @@ async function share() {
   }
 }
 
+const isOwnProfile = computed(
+  () => !!auth.fbUser && auth.fbUser.uid === (route.params.uid as string),
+);
+
+function vouchInitial(name: string): string {
+  return (name || "?").trim().slice(0, 1).toUpperCase();
+}
+
 onMounted(async () => {
   const uid = route.params.uid as string;
-  tradie.value = await getTradesperson(uid);
-  reviews.value = await listReviewsFor(uid);
+  // Parallel — vouches reads are independent of the tradesperson + reviews
+  // fetches and we want the chips visible without waiting.
+  const [t, r, vFrom, vFor] = await Promise.all([
+    getTradesperson(uid),
+    listReviewsFor(uid),
+    listAcceptedVouchesFrom(uid),
+    listAcceptedVouchesFor(uid),
+  ]);
+  tradie.value = t;
+  reviews.value = r;
+  vouchesFrom.value = vFrom;
+  vouchesFor.value = vFor;
   loading.value = false;
 });
 </script>
@@ -226,6 +259,104 @@ onMounted(async () => {
           Weekly availability pattern — toggle to month view to plan ahead.
         </p>
         <CalendarView :jobs="[]" :availability="tradie.weeklyAvailability" />
+      </section>
+
+      <section
+        v-if="vouchesFrom.length || vouchesFor.length || isOwnProfile"
+        class="bs-card p-5 mt-4"
+      >
+        <div class="mb-2 flex items-center justify-between gap-2">
+          <h2 class="font-semibold">Peer endorsements</h2>
+          <RouterLink v-if="isOwnProfile" :to="{ name: 'AccountVouches' }">
+            <Button
+              label="Manage"
+              icon="pi pi-pencil"
+              size="small"
+              text
+            />
+          </RouterLink>
+        </div>
+
+        <div v-if="vouchesFor.length" class="mb-3">
+          <div class="mb-1 text-xs font-semibold uppercase text-[color:var(--bs-muted)]">
+            Vouched for by
+          </div>
+          <ul class="flex flex-wrap gap-2">
+            <li v-for="v in vouchesFor" :key="v.id">
+              <RouterLink
+                :to="{ name: 'TradieProfile', params: { uid: v.fromUserId } }"
+                :title="v.message || ''"
+                class="bs-pill verified inline-flex items-center gap-1 hover:underline"
+              >
+                <Avatar
+                  v-if="v.fromPhotoURL"
+                  :image="v.fromPhotoURL"
+                  shape="circle"
+                  size="small"
+                />
+                <Avatar
+                  v-else
+                  :label="vouchInitial(v.fromDisplayName)"
+                  shape="circle"
+                  size="small"
+                  style="background-color: var(--bs-blue); color: white;"
+                />
+                <span>{{ v.fromDisplayName }}</span>
+                <span
+                  v-if="v.fromPrimaryTrade"
+                  class="text-xs opacity-75"
+                >· {{ tradeLabel(v.fromPrimaryTrade) }}</span>
+              </RouterLink>
+            </li>
+          </ul>
+        </div>
+
+        <div v-if="vouchesFrom.length">
+          <div class="mb-1 text-xs font-semibold uppercase text-[color:var(--bs-muted)]">
+            Works with
+          </div>
+          <ul class="flex flex-wrap gap-2">
+            <li v-for="v in vouchesFrom" :key="v.id">
+              <RouterLink
+                v-if="v.toUserId"
+                :to="{ name: 'TradieProfile', params: { uid: v.toUserId } }"
+                :title="v.message || ''"
+                class="bs-pill inline-flex items-center gap-1 hover:underline"
+              >
+                <Avatar
+                  v-if="v.toPhotoURL"
+                  :image="v.toPhotoURL"
+                  shape="circle"
+                  size="small"
+                />
+                <Avatar
+                  v-else
+                  :label="vouchInitial(v.toDisplayName)"
+                  shape="circle"
+                  size="small"
+                  style="background-color: var(--bs-blue); color: white;"
+                />
+                <span>{{ v.toDisplayName }}</span>
+                <span
+                  v-if="v.toPrimaryTrade"
+                  class="text-xs opacity-75"
+                >· {{ tradeLabel(v.toPrimaryTrade) }}</span>
+              </RouterLink>
+            </li>
+          </ul>
+        </div>
+
+        <div
+          v-if="isOwnProfile && !vouchesFrom.length && !vouchesFor.length"
+          class="text-sm text-[color:var(--bs-muted)]"
+        >
+          No endorsements yet —
+          <RouterLink
+            :to="{ name: 'AccountVouches' }"
+            class="text-[color:var(--bs-blue)] hover:underline"
+          >vouch for tradespeople you've worked with</RouterLink>
+          to build out your network.
+        </div>
       </section>
 
       <section class="bs-card p-5 mt-4">

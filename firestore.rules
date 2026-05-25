@@ -726,6 +726,30 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    // ---------- vouches (peer endorsements between tradespeople) ----------
+    // All writes flow through the vouch callables (sendVouchRequest /
+    // acceptVouch / declineVouch / revokeVouch + the signup linker
+    // trigger) so denormalised display fields stay consistent and dupe
+    // checks (one vouch per from→to pair) happen transactionally.
+    //
+    // Reads:
+    //   accepted    → world-readable so any profile viewer can render the
+    //                 "Vouched for by" / "Tradespeople I work with" chips.
+    //   declined    → parties + admin only (no public proof of a refusal).
+    //   pending_*   → parties + admin only.
+    // toEmail is only present while status == pending_signup and is gated
+    // behind party-only read by the rule above, so the invited email never
+    // leaks publicly.
+    match /vouches/{vouchId} {
+      allow read: if resource.data.status == 'accepted'
+                  || isAdmin()
+                  || (isSignedIn() && (
+                       resource.data.fromUserId == uid()
+                       || resource.data.toUserId == uid()
+                     ));
+      allow create, update, delete: if false;
+    }
+
     // ---------- siteContent (admin-editable public site copy) ----------
     // World-readable so the home page can render testimonials etc. without
     // requiring auth. Admin-only write — adding new editable content blocks

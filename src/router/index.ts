@@ -49,6 +49,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import("@/views/AccountView.vue"),
     meta: { requiresAuth: true, role: "any" as RoleGuard },
   },
+  {
+    path: "/account/vouches",
+    name: "AccountVouches",
+    component: () => import("@/views/AccountVouchesView.vue"),
+    meta: { requiresAuth: true, role: "tradesperson" as RoleGuard },
+  },
 
   // Dashboards (role-gated)
   {

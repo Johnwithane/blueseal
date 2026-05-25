@@ -40,6 +40,8 @@ const ICON: Record<NotificationType, string> = {
   invoice_refunded: "pi pi-replay",
   dispute_opened: "pi pi-exclamation-triangle",
   review_received: "pi pi-star",
+  vouch_requested: "pi pi-user-plus",
+  vouch_accepted: "pi pi-thumbs-up",
 };
 
 function iconFor(type: NotificationType): string {
