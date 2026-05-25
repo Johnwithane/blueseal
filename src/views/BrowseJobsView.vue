@@ -42,7 +42,7 @@ onMounted(async () => {
   tradie.value = await getTradesperson(auth.fbUser.uid);
   loadingTradie.value = false;
 
-  if (!tradie.value || !tradie.value.isVisible) return;
+  if (!tradie.value || !tradie.value.isVisible || !tradie.value.location) return;
 
   // Default trade filter to primary trade.
   tradeFilter.value = tradie.value.trades[0] ?? "any";
@@ -56,12 +56,12 @@ onMounted(async () => {
 });
 
 watch([tradeFilter, radiusKm], () => {
-  if (tradie.value?.isVisible) startFeed();
+  if (tradie.value?.isVisible && tradie.value.location) startFeed();
 });
 
 function startFeed() {
   unsubFeed?.();
-  if (!tradie.value) return;
+  if (!tradie.value || !tradie.value.location) return;
   const center = {
     lat: tradie.value.location.latitude,
     lng: tradie.value.location.longitude,
@@ -133,6 +133,13 @@ function urgencyLabel(u: string): string {
     <Message v-else-if="!tradie?.isVisible" severity="info" :closable="false" class="mt-6">
       <strong>Vetting in progress.</strong>
       You'll be able to browse and apply to open jobs once your application is approved (typically 1–2 business days).
+    </Message>
+
+    <Message v-else-if="!tradie?.location" severity="warn" :closable="false" class="mt-6">
+      <strong>Service area not set.</strong>
+      We need your address and service radius to show jobs near you.
+      <RouterLink :to="{ name: 'Account' }" class="underline ml-1">Update your profile</RouterLink>
+      to start browsing.
     </Message>
 
     <template v-else>
