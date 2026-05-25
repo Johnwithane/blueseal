@@ -15,6 +15,7 @@ import {
   markNotificationRead,
   subscribeMyNotifications,
 } from "@/firebase/services/notifications";
+import { findJobIdByChatId } from "@/firebase/services/jobs";
 import {
   resolveNotificationLink,
   shouldSwitchRoleForNotification,
@@ -70,8 +71,21 @@ async function onOpenNotification(item: WithId<NotificationDoc>) {
       /* surfaced via UI eventually if write fails persistently */
     });
   }
-  const link = resolveNotificationLink(item);
+  let link = resolveNotificationLink(item);
   if (!link) return;
+
+  // Repair legacy `/jobs/pending` deep-links: an old bug created chats
+  // with `jobId: "pending"` and rules now prevent patching the chat.
+  // Recover the real jobId from the job doc (it stores chatId) so the
+  // user lands on the correct job instead of the 404-ish JobDetailView.
+  if (link.startsWith("/jobs/pending") && item.chatId && auth.fbUser) {
+    try {
+      const realJobId = await findJobIdByChatId(item.chatId, auth.fbUser.uid);
+      if (realJobId) link = link.replace("/jobs/pending", `/jobs/${realJobId}`);
+    } catch {
+      /* fall through with the original link; user lands on a not-found state */
+    }
+  }
 
   // Multi-role accounts: if the notification was raised for the user
   // wearing a different hat than they're currently wearing, flip the

@@ -247,6 +247,36 @@ export async function markJobPaid(jobId: string): Promise<{ ok: true }> {
   return res.data;
 }
 
+/**
+ * Resolve the real jobId for a chat. Used to repair legacy notification
+ * deep-links that point at `/jobs/pending` — those came from a fixed bug
+ * where the chat was created with `jobId: "pending"` and rules now
+ * prevent patching it. The job itself stores the real chatId at create
+ * time, so we can recover the jobId from there.
+ *
+ * Rules require the query to be constrained by the caller's own party
+ * id, so we probe both seats (client first, then tradesperson) and
+ * return whichever matches.
+ */
+export async function findJobIdByChatId(
+  chatId: string,
+  uid: string,
+): Promise<string | null> {
+  const asClient = await getDocs(
+    query(jobsCol(), where("clientId", "==", uid), where("chatId", "==", chatId), limit(1)),
+  );
+  if (!asClient.empty) return asClient.docs[0].id;
+  const asTradie = await getDocs(
+    query(
+      jobsCol(),
+      where("tradespersonId", "==", uid),
+      where("chatId", "==", chatId),
+      limit(1),
+    ),
+  );
+  return asTradie.empty ? null : asTradie.docs[0].id;
+}
+
 export async function listJobsForTradie(tradieUid: string): Promise<WithId<JobDoc>[]> {
   const q = query(
     jobsCol(),
