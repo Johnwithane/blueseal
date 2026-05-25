@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
-import { RouterLink, useRouter } from "vue-router";
+import { computed, onMounted, ref, watch } from "vue";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 import { updateProfile } from "firebase/auth";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
@@ -33,8 +33,10 @@ import { humanizeError } from "@/utils/errors";
 import { COMMON_LANGUAGES } from "@/data/languages";
 import PortfolioEditor from "@/components/PortfolioEditor.vue";
 import TradieDocsManager from "@/components/TradieDocsManager.vue";
+import VouchesPanel from "@/components/VouchesPanel.vue";
 
 const auth = useAuthStore();
+const route = useRoute();
 const router = useRouter();
 const toast = useToast();
 const { date } = useFormatters();
@@ -75,8 +77,62 @@ const exportUrl = ref<string | null>(null);
 // missing-field behavior so legacy users aren't silently opted out.
 const emailEnabled = ref(true);
 const whatsappEnabled = ref(true);
-const newJobPostingEnabled = ref(true);
 const savingPrefs = ref(false);
+
+// Tab navigation. The active tab is persisted in the URL (?tab=) so reloads
+// and shared links return to the same place. The Tradesperson tab is only
+// shown to users with the tradesperson role; if a non-tradie lands on it via
+// a URL, we fall back to Profile.
+type TabKey = "profile" | "tradesperson" | "notifications" | "account";
+
+interface TabDef {
+  key: TabKey;
+  label: string;
+  icon: string;
+  visible: boolean;
+}
+
+const tabs = computed<TabDef[]>(() => [
+  { key: "profile", label: "Profile", icon: "pi-user", visible: true },
+  {
+    key: "tradesperson",
+    label: "Tradesperson",
+    icon: "pi-wrench",
+    visible: auth.hasTradieRole,
+  },
+  { key: "notifications", label: "Notifications", icon: "pi-bell", visible: true },
+  { key: "account", label: "Privacy & account", icon: "pi-cog", visible: true },
+]);
+
+const visibleTabs = computed(() => tabs.value.filter((t) => t.visible));
+
+const activeTab = computed<TabKey>(() => {
+  const raw = route.query.tab;
+  const candidate = Array.isArray(raw) ? raw[0] : raw;
+  const found = visibleTabs.value.find((t) => t.key === candidate);
+  return found ? found.key : "profile";
+});
+
+function setTab(key: TabKey) {
+  if (key === activeTab.value) return;
+  router.replace({ query: { ...route.query, tab: key } });
+}
+
+// If the URL points at a tab that's not visible (e.g. ?tab=tradesperson for
+// a non-tradie), strip the bad value so the URL matches what's rendered.
+watch(
+  visibleTabs,
+  (list) => {
+    const raw = route.query.tab;
+    const candidate = Array.isArray(raw) ? raw[0] : raw;
+    if (candidate && !list.find((t) => t.key === candidate)) {
+      const { tab: _omit, ...rest } = route.query;
+      void _omit;
+      router.replace({ query: rest });
+    }
+  },
+  { immediate: true },
+);
 
 onMounted(async () => {
   if (!auth.fbUser) return;
@@ -91,7 +147,6 @@ onMounted(async () => {
   // we don't silently change their notification behavior.
   emailEnabled.value = u.notificationPrefs?.emailEnabled ?? true;
   whatsappEnabled.value = u.notificationPrefs?.whatsappEnabled ?? true;
-  newJobPostingEnabled.value = u.notificationPrefs?.newJobPostingEnabled ?? true;
   // Pull the tradesperson doc to seed the tradie-only profile fields below
   // (companyName / bio / languages). The vetting-status banner is rendered
   // globally by TradieStatusBanner.vue so we don't recompute it here.
@@ -259,18 +314,15 @@ async function savePrefs() {
   savingPrefs.value = true;
   error.value = null;
   try {
-    const prefs = {
+    await updateNotificationPrefs(auth.fbUser.uid, {
       emailEnabled: emailEnabled.value,
       whatsappEnabled: whatsappEnabled.value,
-      // Only persisted on tradesperson accounts — clients never receive
-      // this type, so the field is omitted from their doc.
-      ...(auth.hasTradieRole
-        ? { newJobPostingEnabled: newJobPostingEnabled.value }
-        : {}),
-    };
-    await updateNotificationPrefs(auth.fbUser.uid, prefs);
+    });
     if (auth.user) {
-      auth.user.notificationPrefs = prefs;
+      auth.user.notificationPrefs = {
+        emailEnabled: emailEnabled.value,
+        whatsappEnabled: whatsappEnabled.value,
+      };
     }
     toast.success("Notification preferences saved");
   } catch (e) {
@@ -355,445 +407,452 @@ async function grantAdminAllRoles() {
 <template>
   <section class="bs-container max-w-2xl py-6">
     <h1 class="text-2xl font-bold">Your account</h1>
-    <p class="mb-6 text-[color:var(--bs-muted)]">
-      Update your display name, contact info, and photo.
+    <p class="mb-4 text-[color:var(--bs-muted)]">
+      Update your profile, notifications, and account settings.
     </p>
+
+    <!-- Sticky tab bar. Mirrors JobTabBar's pattern: icons-only on mobile,
+         icon+label on desktop, blue underline for the active tab. Tab state
+         is reflected in ?tab= so reloads and deep links stay put. -->
+    <div role="tablist" aria-label="Account sections" class="account-tab-row">
+      <button
+        v-for="t in visibleTabs"
+        :key="t.key"
+        type="button"
+        role="tab"
+        :aria-selected="activeTab === t.key"
+        :aria-label="t.label"
+        :tabindex="activeTab === t.key ? 0 : -1"
+        class="account-tab"
+        :class="{ 'account-tab--active': activeTab === t.key }"
+        @click="setTab(t.key)"
+      >
+        <i :class="['pi', t.icon, 'account-tab-icon']" aria-hidden="true"></i>
+        <span class="account-tab-label">{{ t.label }}</span>
+      </button>
+    </div>
 
     <Message v-if="error" severity="error" :closable="false" class="mb-4">{{ error }}</Message>
 
-    <div class="bs-card p-5">
-      <div class="flex items-center gap-4">
-        <div class="relative">
-          <Avatar
-            v-if="photoURL"
-            :image="photoURL"
-            size="xlarge"
-            shape="circle"
-          />
-          <Avatar
-            v-else
-            :label="initial()"
-            size="xlarge"
-            shape="circle"
-            style="background-color: var(--bs-blue); color: white;"
-          />
+    <!-- PROFILE TAB ----------------------------------------------------- -->
+    <div v-show="activeTab === 'profile'">
+      <div class="bs-card p-5">
+        <div class="flex items-center gap-4">
+          <div class="relative">
+            <Avatar
+              v-if="photoURL"
+              :image="photoURL"
+              size="xlarge"
+              shape="circle"
+            />
+            <Avatar
+              v-else
+              :label="initial()"
+              size="xlarge"
+              shape="circle"
+              style="background-color: var(--bs-blue); color: white;"
+            />
+          </div>
+          <div>
+            <Button
+              :label="uploading ? 'Uploading…' : 'Change photo'"
+              icon="pi pi-camera"
+              outlined
+              :loading="uploading"
+              @click="fileInput?.click()"
+            />
+            <p class="mt-1 text-xs text-[color:var(--bs-muted)]">
+              JPG/PNG/HEIC — we'll compress to WebP under 512px.
+            </p>
+            <input
+              ref="fileInput"
+              type="file"
+              accept="image/*"
+              class="hidden"
+              @change="onPhotoChange"
+            />
+          </div>
+        </div>
+      </div>
+
+      <form class="bs-card bs-form mt-4 space-y-4 p-5" @submit.prevent="saveProfile">
+        <div>
+          <label class="text-sm font-medium">Display name</label>
+          <InputText v-model="displayName" class="mt-1 w-full" autocomplete="name" />
         </div>
         <div>
-          <Button
-            :label="uploading ? 'Uploading…' : 'Change photo'"
-            icon="pi pi-camera"
-            outlined
-            :loading="uploading"
-            @click="fileInput?.click()"
+          <label class="text-sm font-medium">Phone (optional)</label>
+          <InputText v-model="phone" class="mt-1 w-full" autocomplete="tel" type="tel" />
+        </div>
+        <div>
+          <label class="text-sm font-medium">Email</label>
+          <InputText :model-value="email" disabled class="mt-1 w-full" />
+          <small class="text-[color:var(--bs-muted)]">
+            Email changes aren't supported in MVP. Contact support.
+          </small>
+        </div>
+        <div class="flex justify-end">
+          <Button type="submit" label="Save changes" icon="pi pi-save" :loading="saving" />
+        </div>
+      </form>
+
+      <!-- Tradesperson profile: company name, bio, languages — mirrors the
+           wizard's Basics step so the tradie can edit these from one place
+           instead of jumping back to the wizard. -->
+      <form
+        v-if="auth.hasTradieRole"
+        class="bs-card bs-form mt-4 space-y-4 p-5"
+        @submit.prevent="saveTradieProfile"
+      >
+        <div>
+          <h2 class="text-lg font-semibold">Tradesperson profile</h2>
+          <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
+            What clients see on your public profile. You can also edit these
+            during onboarding.
+          </p>
+        </div>
+        <div>
+          <label class="text-sm font-medium">
+            Company / business name
+            <span class="text-xs text-[color:var(--bs-muted)] font-normal">Optional</span>
+          </label>
+          <InputText
+            v-model="companyName"
+            class="mt-1 w-full"
+            placeholder="e.g. ABC Mechanical Ltd."
           />
           <p class="mt-1 text-xs text-[color:var(--bs-muted)]">
-            JPG/PNG/HEIC — we'll compress to WebP under 512px.
+            Leave blank if you operate as a sole proprietor.
           </p>
-          <input
-            ref="fileInput"
-            type="file"
-            accept="image/*"
-            class="hidden"
-            @change="onPhotoChange"
+        </div>
+        <div>
+          <label class="text-sm font-medium">Short bio</label>
+          <Textarea
+            v-model="bio"
+            rows="5"
+            class="mt-1 w-full"
+            placeholder="What kind of work do you do? How long? What sets you apart?"
+          />
+          <p class="mt-1 text-xs text-[color:var(--bs-muted)]">
+            At least 20 characters — this is what clients read first.
+          </p>
+        </div>
+        <div>
+          <label class="text-sm font-medium">
+            Languages you work in
+            <span class="text-xs text-[color:var(--bs-muted)] font-normal">Optional</span>
+          </label>
+          <MultiSelect
+            v-model="languages"
+            :options="COMMON_LANGUAGES"
+            placeholder="Select all that apply"
+            class="mt-1 w-full"
+            filter
+            :max-selected-labels="6"
+          />
+          <p class="mt-1 text-xs text-[color:var(--bs-muted)]">
+            Helps clients who'd prefer to be served in a specific language.
+          </p>
+        </div>
+        <div class="flex justify-end">
+          <Button
+            type="submit"
+            label="Save tradesperson profile"
+            icon="pi pi-save"
+            :loading="savingTradieProfile"
           />
         </div>
-      </div>
+      </form>
+
+      <PortfolioEditor
+        v-if="auth.hasTradieRole && auth.fbUser"
+        :tradie-uid="auth.fbUser.uid"
+        class="mt-4"
+      />
     </div>
 
-    <form class="bs-card bs-form mt-4 space-y-4 p-5" @submit.prevent="saveProfile">
-      <div>
-        <label class="text-sm font-medium">Display name</label>
-        <InputText v-model="displayName" class="mt-1 w-full" autocomplete="name" />
-      </div>
-      <div>
-        <label class="text-sm font-medium">Phone (optional)</label>
-        <InputText v-model="phone" class="mt-1 w-full" autocomplete="tel" type="tel" />
-      </div>
-      <div>
-        <label class="text-sm font-medium">Email</label>
-        <InputText :model-value="email" disabled class="mt-1 w-full" />
-        <small class="text-[color:var(--bs-muted)]">
-          Email changes aren't supported in MVP. Contact support.
-        </small>
-      </div>
-      <div class="flex justify-end">
-        <Button type="submit" label="Save changes" icon="pi pi-save" :loading="saving" />
-      </div>
-    </form>
+    <!-- TRADESPERSON TAB ------------------------------------------------ -->
+    <div v-if="auth.hasTradieRole" v-show="activeTab === 'tradesperson'">
+      <!-- Documents: trade certification + government ID for vetting. -->
+      <TradieDocsManager
+        v-if="auth.fbUser"
+        :tradie-uid="auth.fbUser.uid"
+      />
 
-    <!-- Tradesperson profile: company name, bio, languages — mirrors the
-         wizard's Basics step so the tradie can edit these from one place
-         instead of jumping back to the wizard. Portfolio editor lives just
-         below since it's also part of the public profile. -->
-    <form
-      v-if="auth.hasTradieRole"
-      class="bs-card bs-form mt-4 space-y-4 p-5"
-      @submit.prevent="saveTradieProfile"
-    >
-      <div>
-        <h2 class="text-lg font-semibold">Tradesperson profile</h2>
-        <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
-          What clients see on your public profile. You can also edit these
-          during onboarding.
-        </p>
+      <!-- Payouts shortcut. State + actions live on /payouts; this card is
+           a stable, discoverable entry point from Account. -->
+      <div class="bs-card mt-4 p-5 flex items-start gap-3">
+        <i
+          class="pi pi-credit-card text-2xl mt-0.5 text-[color:var(--bs-blue)]"
+          aria-hidden="true"
+        ></i>
+        <div class="flex-1 min-w-0">
+          <h2 class="text-lg font-semibold">Payouts</h2>
+          <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
+            Connect or manage the bank account where Blue Seal pays out your
+            invoices through Stripe.
+          </p>
+        </div>
+        <RouterLink to="/payouts" class="shrink-0">
+          <Button
+            label="Manage payouts"
+            icon="pi pi-arrow-right"
+            icon-pos="right"
+            outlined
+          />
+        </RouterLink>
       </div>
-      <div>
-        <label class="text-sm font-medium">
-          Company / business name
-          <span class="text-xs text-[color:var(--bs-muted)] font-normal">Optional</span>
-        </label>
-        <InputText
-          v-model="companyName"
-          class="mt-1 w-full"
-          placeholder="e.g. ABC Mechanical Ltd."
-        />
-        <p class="mt-1 text-xs text-[color:var(--bs-muted)]">
-          Leave blank if you operate as a sole proprietor.
-        </p>
-      </div>
-      <div>
-        <label class="text-sm font-medium">Short bio</label>
-        <Textarea
-          v-model="bio"
-          rows="5"
-          class="mt-1 w-full"
-          placeholder="What kind of work do you do? How long? What sets you apart?"
-        />
-        <p class="mt-1 text-xs text-[color:var(--bs-muted)]">
-          At least 20 characters — this is what clients read first.
-        </p>
-      </div>
-      <div>
-        <label class="text-sm font-medium">
-          Languages you work in
-          <span class="text-xs text-[color:var(--bs-muted)] font-normal">Optional</span>
-        </label>
-        <MultiSelect
-          v-model="languages"
-          :options="COMMON_LANGUAGES"
-          placeholder="Select all that apply"
-          class="mt-1 w-full"
-          filter
-          :max-selected-labels="6"
-        />
-        <p class="mt-1 text-xs text-[color:var(--bs-muted)]">
-          Helps clients who'd prefer to be served in a specific language.
-        </p>
-      </div>
-      <div class="flex justify-end">
-        <Button
-          type="submit"
-          label="Save tradesperson profile"
-          icon="pi pi-save"
-          :loading="savingTradieProfile"
-        />
-      </div>
-    </form>
 
-    <PortfolioEditor
-      v-if="auth.hasTradieRole && auth.fbUser"
-      :tradie-uid="auth.fbUser.uid"
-      class="mt-4"
-    />
-
-    <!-- Tradesperson-only vouches shortcut. Manage outgoing + incoming peer
-         endorsements; the public profile renders the accepted ones. -->
-    <div v-if="auth.hasTradieRole" class="bs-card mt-4 p-5 flex items-start gap-3">
-      <i
-        class="pi pi-users text-2xl mt-0.5 text-[color:var(--bs-blue)]"
-        aria-hidden="true"
-      ></i>
-      <div class="flex-1 min-w-0">
+      <!-- Vouches: embedded directly. The standalone /account/vouches route
+           still works for email links and external entry points. -->
+      <div class="mt-6">
         <h2 class="text-lg font-semibold">Vouches</h2>
-        <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
-          Endorse other tradespeople you've worked with, and manage the
-          ones who've vouched for you.
+        <p class="mt-1 mb-3 text-sm text-[color:var(--bs-muted)]">
+          Endorse tradespeople you've worked with. Once accepted, the vouch
+          appears on both your profile and theirs.
         </p>
+        <VouchesPanel />
       </div>
-      <RouterLink to="/account/vouches" class="shrink-0">
-        <Button
-          label="Manage vouches"
-          icon="pi pi-arrow-right"
-          icon-pos="right"
-          outlined
-        />
-      </RouterLink>
     </div>
 
-    <!-- Tradesperson-only payouts shortcut. State + actions live on /payouts;
-         this card is just a stable, discoverable entry point from Account. -->
-    <div v-if="auth.hasTradieRole" class="bs-card mt-4 p-5 flex items-start gap-3">
-      <i
-        class="pi pi-credit-card text-2xl mt-0.5 text-[color:var(--bs-blue)]"
-        aria-hidden="true"
-      ></i>
-      <div class="flex-1 min-w-0">
-        <h2 class="text-lg font-semibold">Payouts</h2>
+    <!-- NOTIFICATIONS TAB ---------------------------------------------- -->
+    <div v-show="activeTab === 'notifications'">
+      <div class="bs-card p-5">
+        <h2 class="text-lg font-semibold">Notifications</h2>
         <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
-          Connect or manage the bank account where Blue Seal pays out your
-          invoices through Stripe.
+          The in-app inbox always shows new activity. Choose how you'd like
+          to be reached for important events outside the app.
         </p>
+
+        <div class="mt-4 space-y-3">
+          <div
+            class="flex items-start justify-between gap-3 rounded-lg border border-[color:var(--bs-border)] p-3"
+          >
+            <div>
+              <div class="font-medium">Email</div>
+              <p class="text-xs text-[color:var(--bs-muted)] mt-0.5">
+                For most events. Time-critical ones also send WhatsApp if enabled.
+              </p>
+            </div>
+            <ToggleSwitch v-model="emailEnabled" />
+          </div>
+
+          <div
+            class="flex items-start justify-between gap-3 rounded-lg border border-[color:var(--bs-border)] p-3"
+          >
+            <div>
+              <div class="font-medium">WhatsApp</div>
+              <p class="text-xs text-[color:var(--bs-muted)] mt-0.5">
+                For time-critical events (new job request, vetting decision,
+                accepted application). Uses the phone number on your profile.
+              </p>
+            </div>
+            <ToggleSwitch v-model="whatsappEnabled" />
+          </div>
+        </div>
+
+        <div class="mt-4 flex justify-end">
+          <Button
+            label="Save preferences"
+            icon="pi pi-save"
+            :loading="savingPrefs"
+            @click="savePrefs"
+          />
+        </div>
       </div>
-      <RouterLink to="/payouts" class="shrink-0">
-        <Button
-          label="Manage payouts"
-          icon="pi pi-arrow-right"
-          icon-pos="right"
-          outlined
-        />
-      </RouterLink>
     </div>
 
-    <div class="bs-card mt-4 p-5">
-      <h2 class="text-lg font-semibold">Password</h2>
-      <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
-        We'll email you a secure link to change your password.
-      </p>
-      <div class="mt-3 flex justify-end">
-        <Button
-          label="Send password reset email"
-          icon="pi pi-envelope"
-          outlined
-          :loading="sendingReset"
-          :disabled="!email"
-          @click="sendPasswordReset"
-        />
-      </div>
-    </div>
+    <!-- PRIVACY & ACCOUNT TAB ------------------------------------------ -->
+    <div v-show="activeTab === 'account'">
+      <!-- Roles / view-switching -->
+      <div class="bs-card p-5">
+        <h2 class="text-lg font-semibold">Your roles</h2>
+        <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
+          You can hold both views on one account. Switch between them anytime.
+        </p>
 
-    <div class="bs-card mt-4 p-5">
-      <h2 class="text-lg font-semibold">Your roles</h2>
-      <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
-        You can hold both views on one account. Switch between them anytime.
-      </p>
-
-      <ul class="mt-3 space-y-2">
-        <li
-          v-for="r in auth.roles"
-          :key="r"
-          class="flex items-center justify-between rounded-lg border border-[color:var(--bs-border)] px-3 py-2"
-        >
-          <span class="flex items-center gap-2 text-sm font-medium">
-            <i
-              :class="r === 'tradesperson' ? 'pi pi-wrench' : r === 'admin' ? 'pi pi-shield' : 'pi pi-user'"
-            ></i>
-            {{ ROLE_LABEL[r] }}
-            <span
-              v-if="auth.activeRole === r"
-              class="ml-1 rounded-full bg-[color:var(--bs-blue-light)] px-2 py-0.5 text-xs text-[color:var(--bs-blue-dark)]"
-            >
-              Active
+        <ul class="mt-3 space-y-2">
+          <li
+            v-for="r in auth.roles"
+            :key="r"
+            class="flex items-center justify-between rounded-lg border border-[color:var(--bs-border)] px-3 py-2"
+          >
+            <span class="flex items-center gap-2 text-sm font-medium">
+              <i
+                :class="r === 'tradesperson' ? 'pi pi-wrench' : r === 'admin' ? 'pi pi-shield' : 'pi pi-user'"
+              ></i>
+              {{ ROLE_LABEL[r] }}
+              <span
+                v-if="auth.activeRole === r"
+                class="ml-1 rounded-full bg-[color:var(--bs-blue-light)] px-2 py-0.5 text-xs text-[color:var(--bs-blue-dark)]"
+              >
+                Active
+              </span>
             </span>
-          </span>
+            <Button
+              v-if="auth.activeRole !== r"
+              label="Switch to this view"
+              size="small"
+              text
+              @click="switchView(r as 'client' | 'tradesperson' | 'admin')"
+            />
+          </li>
+        </ul>
+
+        <div v-if="!auth.hasTradieRole" class="mt-4 rounded-lg bg-[color:var(--bs-surface-alt)] p-4">
+          <div class="flex items-start gap-3">
+            <i class="pi pi-verified text-2xl text-[color:var(--bs-blue)]"></i>
+            <div class="flex-1">
+              <h3 class="font-semibold">Become a tradesperson</h3>
+              <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
+                Add a verified tradesperson profile to your account. You'll need
+                to upload a trade certification and government-issued ID for our
+                vetting team to review.
+              </p>
+              <div class="mt-3">
+                <Button
+                  label="Get started"
+                  icon="pi pi-arrow-right"
+                  icon-pos="right"
+                  :loading="addingTradie"
+                  @click="becomeTradesperson"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="!auth.hasClientRole" class="mt-4 rounded-lg bg-[color:var(--bs-surface-alt)] p-4">
+          <div class="flex items-start gap-3">
+            <i class="pi pi-user-plus text-2xl text-[color:var(--bs-blue)]"></i>
+            <div class="flex-1">
+              <h3 class="font-semibold">Hire a tradesperson too</h3>
+              <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
+                Need work done at your own place? Add a client view to request
+                quotes and chat with verified tradespeople.
+              </p>
+              <div class="mt-3">
+                <Button
+                  label="Add client view"
+                  icon="pi pi-plus"
+                  outlined
+                  :loading="addingClient"
+                  @click="addClientView"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div
+          v-if="auth.hasAdminRole && !(auth.hasClientRole && auth.hasTradieRole)"
+          class="mt-4 rounded-lg border border-dashed border-[color:var(--bs-border)] p-4"
+        >
+          <div class="flex items-start gap-3">
+            <i class="pi pi-shield text-2xl text-[color:var(--bs-blue)]"></i>
+            <div class="flex-1">
+              <h3 class="font-semibold">Admin testing</h3>
+              <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
+                Grant yourself all three roles and a visible tradesperson profile
+                so you can dogfood the full client + tradesperson surface
+                (post jobs, browse the marketplace, submit applications).
+              </p>
+              <div class="mt-3">
+                <Button
+                  label="Enable all roles for testing"
+                  icon="pi pi-bolt"
+                  :loading="grantingAdminAllRoles"
+                  @click="grantAdminAllRoles"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Password -->
+      <div class="bs-card mt-4 p-5">
+        <h2 class="text-lg font-semibold">Password</h2>
+        <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
+          We'll email you a secure link to change your password.
+        </p>
+        <div class="mt-3 flex justify-end">
           <Button
-            v-if="auth.activeRole !== r"
-            label="Switch to this view"
-            size="small"
-            text
-            @click="switchView(r as 'client' | 'tradesperson' | 'admin')"
-          />
-        </li>
-      </ul>
-
-      <div v-if="!auth.hasTradieRole" class="mt-4 rounded-lg bg-[color:var(--bs-surface-alt)] p-4">
-        <div class="flex items-start gap-3">
-          <i class="pi pi-verified text-2xl text-[color:var(--bs-blue)]"></i>
-          <div class="flex-1">
-            <h3 class="font-semibold">Become a tradesperson</h3>
-            <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
-              Add a verified tradesperson profile to your account. You'll need
-              to upload a trade certification and government-issued ID for our
-              vetting team to review.
-            </p>
-            <div class="mt-3">
-              <Button
-                label="Get started"
-                icon="pi pi-arrow-right"
-                icon-pos="right"
-                :loading="addingTradie"
-                @click="becomeTradesperson"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div v-if="!auth.hasClientRole" class="mt-4 rounded-lg bg-[color:var(--bs-surface-alt)] p-4">
-        <div class="flex items-start gap-3">
-          <i class="pi pi-user-plus text-2xl text-[color:var(--bs-blue)]"></i>
-          <div class="flex-1">
-            <h3 class="font-semibold">Hire a tradesperson too</h3>
-            <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
-              Need work done at your own place? Add a client view to request
-              quotes and chat with verified tradespeople.
-            </p>
-            <div class="mt-3">
-              <Button
-                label="Add client view"
-                icon="pi pi-plus"
-                outlined
-                :loading="addingClient"
-                @click="addClientView"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div
-        v-if="auth.hasAdminRole && !(auth.hasClientRole && auth.hasTradieRole)"
-        class="mt-4 rounded-lg border border-dashed border-[color:var(--bs-border)] p-4"
-      >
-        <div class="flex items-start gap-3">
-          <i class="pi pi-shield text-2xl text-[color:var(--bs-blue)]"></i>
-          <div class="flex-1">
-            <h3 class="font-semibold">Admin testing</h3>
-            <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
-              Grant yourself all three roles and a visible tradesperson profile
-              so you can dogfood the full client + tradesperson surface
-              (post jobs, browse the marketplace, submit applications).
-            </p>
-            <div class="mt-3">
-              <Button
-                label="Enable all roles for testing"
-                icon="pi pi-bolt"
-                :loading="grantingAdminAllRoles"
-                @click="grantAdminAllRoles"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Vetting-status banner is rendered globally by TradieStatusBanner.vue
-         (mounted in App.vue), so we don't duplicate it here. -->
-
-    <TradieDocsManager
-      v-if="auth.hasTradieRole && auth.fbUser"
-      :tradie-uid="auth.fbUser.uid"
-    />
-
-    <div class="bs-card mt-4 p-5">
-      <h2 class="text-lg font-semibold">Notifications</h2>
-      <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
-        The in-app inbox always shows new activity. Choose how you'd like
-        to be reached for important events outside the app.
-      </p>
-
-      <div class="mt-4 space-y-3">
-        <div
-          class="flex items-start justify-between gap-3 rounded-lg border border-[color:var(--bs-border)] p-3"
-        >
-          <div>
-            <div class="font-medium">Email</div>
-            <p class="text-xs text-[color:var(--bs-muted)] mt-0.5">
-              For most events. Time-critical ones also send WhatsApp if enabled.
-            </p>
-          </div>
-          <ToggleSwitch v-model="emailEnabled" />
-        </div>
-
-        <div
-          class="flex items-start justify-between gap-3 rounded-lg border border-[color:var(--bs-border)] p-3"
-        >
-          <div>
-            <div class="font-medium">WhatsApp</div>
-            <p class="text-xs text-[color:var(--bs-muted)] mt-0.5">
-              For time-critical events (new job request, vetting decision,
-              accepted application). Uses the phone number on your profile.
-            </p>
-          </div>
-          <ToggleSwitch v-model="whatsappEnabled" />
-        </div>
-
-        <div
-          v-if="auth.hasTradieRole"
-          class="flex items-start justify-between gap-3 rounded-lg border border-[color:var(--bs-border)] p-3"
-        >
-          <div>
-            <div class="font-medium">New job postings</div>
-            <p class="text-xs text-[color:var(--bs-muted)] mt-0.5">
-              Get an in-app notification when a client posts a new job that
-              matches your trade and falls within your service area.
-            </p>
-          </div>
-          <ToggleSwitch v-model="newJobPostingEnabled" />
-        </div>
-      </div>
-
-      <div class="mt-4 flex justify-end">
-        <Button
-          label="Save preferences"
-          icon="pi pi-save"
-          :loading="savingPrefs"
-          @click="savePrefs"
-        />
-      </div>
-    </div>
-
-    <div class="bs-card mt-4 p-5">
-      <h2 class="text-lg font-semibold">Privacy &amp; your data</h2>
-      <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
-        Under Canada's PIPEDA you can download your personal data or delete
-        your account at any time.
-      </p>
-
-      <div class="mt-4 rounded-lg border border-[color:var(--bs-border)] p-4">
-        <div class="flex items-start justify-between gap-3">
-          <div>
-            <h3 class="font-semibold">Download your data</h3>
-            <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
-              We'll bundle every Firestore record you're a party to into a
-              single JSON file and email you a private 30-day download link.
-              Chat messages are excluded for size; you can still read them
-              while signed in.
-            </p>
-          </div>
-          <Button
-            label="Export my data"
-            icon="pi pi-download"
+            label="Send password reset email"
+            icon="pi pi-envelope"
             outlined
-            :loading="exporting"
-            @click="exportData"
+            :loading="sendingReset"
+            :disabled="!email"
+            @click="sendPasswordReset"
           />
         </div>
-        <a
-          v-if="exportUrl"
-          :href="exportUrl"
-          target="_blank"
-          rel="noopener"
-          class="mt-3 inline-block text-sm text-[color:var(--bs-blue)]"
-        >
-          Download now →
-        </a>
       </div>
 
-      <div class="mt-4 rounded-lg border border-red-200 bg-red-50/30 p-4">
-        <div class="flex items-start justify-between gap-3">
-          <div>
-            <h3 class="font-semibold text-red-700">Delete my account</h3>
-            <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
-              Marks your account for deletion. You'll be signed out, your
-              profile will be hidden from search immediately, and we'll wipe
-              your data permanently after 30 days. Reply to the confirmation
-              email within that window to recover.
-            </p>
+      <!-- Privacy / data -->
+      <div class="bs-card mt-4 p-5">
+        <h2 class="text-lg font-semibold">Privacy &amp; your data</h2>
+        <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
+          Under Canada's PIPEDA you can download your personal data or delete
+          your account at any time.
+        </p>
+
+        <div class="mt-4 rounded-lg border border-[color:var(--bs-border)] p-4">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <h3 class="font-semibold">Download your data</h3>
+              <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
+                We'll bundle every Firestore record you're a party to into a
+                single JSON file and email you a private 30-day download link.
+                Chat messages are excluded for size; you can still read them
+                while signed in.
+              </p>
+            </div>
+            <Button
+              label="Export my data"
+              icon="pi pi-download"
+              outlined
+              :loading="exporting"
+              @click="exportData"
+            />
           </div>
-          <Button
-            label="Delete account"
-            icon="pi pi-trash"
-            severity="danger"
-            outlined
-            @click="openDeleteDialog"
-          />
+          <a
+            v-if="exportUrl"
+            :href="exportUrl"
+            target="_blank"
+            rel="noopener"
+            class="mt-3 inline-block text-sm text-[color:var(--bs-blue)]"
+          >
+            Download now →
+          </a>
+        </div>
+
+        <div class="mt-4 rounded-lg border border-red-200 bg-red-50/30 p-4">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <h3 class="font-semibold text-red-700">Delete my account</h3>
+              <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
+                Marks your account for deletion. You'll be signed out, your
+                profile will be hidden from search immediately, and we'll wipe
+                your data permanently after 30 days. Reply to the confirmation
+                email within that window to recover.
+              </p>
+            </div>
+            <Button
+              label="Delete account"
+              icon="pi pi-trash"
+              severity="danger"
+              outlined
+              @click="openDeleteDialog"
+            />
+          </div>
         </div>
       </div>
-    </div>
 
-    <div class="bs-card mt-4 p-5 text-sm text-[color:var(--bs-muted)]">
-      <div><strong>Member since:</strong> {{ date(createdAt) }}</div>
-      <div class="mt-2 break-all"><strong>UID:</strong> <code>{{ auth.fbUser?.uid }}</code></div>
+      <!-- Member meta -->
+      <div class="bs-card mt-4 p-5 text-sm text-[color:var(--bs-muted)]">
+        <div><strong>Member since:</strong> {{ date(createdAt) }}</div>
+        <div class="mt-2 break-all"><strong>UID:</strong> <code>{{ auth.fbUser?.uid }}</code></div>
+      </div>
     </div>
 
     <Dialog
@@ -839,3 +898,83 @@ async function grantAdminAllRoles() {
   </section>
 </template>
 
+<style scoped>
+/* Tab bar — mirrors src/features/jobDetail/JobTabBar.vue but tailored for
+   the Account view (which keeps AppHeader visible on all viewports, so the
+   sticky offset is constant). Icons-only on mobile, icon+label on desktop. */
+.account-tab-row {
+  position: sticky;
+  top: 60px;
+  z-index: 10;
+  display: flex;
+  gap: 0;
+  margin-inline: -1rem;
+  margin-bottom: 1.5rem;
+  padding-inline: 1rem;
+  background: white;
+  border-bottom: 1px solid var(--bs-border);
+  overflow-x: auto;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.account-tab-row::-webkit-scrollbar {
+  display: none;
+}
+
+.account-tab {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 0.5rem;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--bs-muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 120ms ease, border-color 120ms ease;
+  min-height: 44px;
+}
+
+.account-tab:hover {
+  color: var(--bs-text);
+}
+
+.account-tab--active {
+  color: var(--bs-blue);
+  border-bottom-color: var(--bs-blue);
+  font-weight: 600;
+}
+
+.account-tab:focus-visible {
+  outline: 2px solid var(--bs-blue);
+  outline-offset: -2px;
+}
+
+.account-tab-icon {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+/* Mobile: icons only (label still in DOM for screen readers via aria-label
+   on the button itself). */
+.account-tab-label {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .account-tab-label {
+    display: inline;
+  }
+  .account-tab-icon {
+    font-size: 0.95rem;
+  }
+}
+</style>

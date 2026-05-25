@@ -42,6 +42,7 @@ const ICON: Record<NotificationType, string> = {
   review_received: "pi pi-star",
   vouch_requested: "pi pi-user-plus",
   vouch_accepted: "pi pi-thumbs-up",
+  new_job_posting: "pi pi-briefcase",
 };
 
 function iconFor(type: NotificationType): string {
