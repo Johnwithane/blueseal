@@ -135,9 +135,8 @@ const content = computed<BannerContent | null>(() => {
         severity: "info",
         icon: "pi-credit-card",
         label: "Connect your bank account",
-        message:
-          "Blue Seal pays you out through Stripe Connect. Finish a 5-minute setup so client payments can land in your account.",
-        cta: { to: "/payouts", label: "Set up payouts" },
+        message: "Add your details so clients can pay you — about 5 minutes.",
+        cta: { to: "/payouts", label: "Set up" },
       };
     }
     default:

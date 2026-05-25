@@ -57,7 +57,7 @@ const viewOptions: { label: string; value: DashboardView; icon: string }[] = [
 ];
 
 const viewHint = computed(() => {
-  if (view.value === "board") return "Drag cards between columns to update status.";
+  if (view.value === "board") return "Pipeline overview. Tap a card to open the job.";
   if (view.value === "calendar") return "Tap a free day to block it off.";
   if (view.value === "applied") return "Jobs you've applied to, grouped by status.";
   return "Tap a job to open it.";

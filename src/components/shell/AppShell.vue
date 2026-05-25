@@ -13,6 +13,12 @@ import TradieStatusBanner from "@/components/TradieStatusBanner.vue";
 // On `meta.mobileCompact` routes (currently /jobs/:id) we hide the bottom
 // nav and the title so the underlying view can claim the full viewport on
 // phones — the chat composer + sticky CTA need that space.
+//
+// The shell also exposes a `--bs-content-left-offset` CSS var on its root
+// element (0 on mobile, 260px on desktop where the side panel is shown).
+// Any `position: fixed` sticky bar inside the shell (e.g. JobDetailView's
+// "Prepare quote" CTA) can read this var to leave room for the side panel
+// instead of running underneath it.
 const route = useRoute();
 const title = computed(() => (route.meta.title as string | undefined) ?? "");
 const mobileCompact = computed(() => route.meta.mobileCompact === true);
@@ -34,7 +40,11 @@ const mobileCompact = computed(() => route.meta.mobileCompact === true);
         <slot />
       </main>
     </div>
-    <BottomNav class="app-shell__bottom" :class="{ 'hidden sm:hidden': mobileCompact }" />
+    <!-- v-if (not class) because Vue's scoped CSS specificity beats
+         Tailwind's `.hidden` utility, so a class toggle would not actually
+         hide the nav on mobileCompact routes. Removing it from the DOM
+         altogether also drops the BottomNav subscription work. -->
+    <BottomNav v-if="!mobileCompact" class="app-shell__bottom" />
   </div>
 </template>
 
@@ -42,6 +52,17 @@ const mobileCompact = computed(() => route.meta.mobileCompact === true);
 .app-shell {
   display: flex;
   min-height: 100dvh;
+  /* Default: no side-panel offset for mobile (panel is hidden, content is
+     full-width). Inherited by any `position: fixed` descendant that wants
+     to leave room for the side panel via `left: var(...)`. */
+  --bs-content-left-offset: 0px;
+}
+@media (min-width: 768px) {
+  .app-shell {
+    /* Matches the 260px width set in SidePanel.vue. If that changes,
+       update both in lock-step. */
+    --bs-content-left-offset: 260px;
+  }
 }
 
 .app-shell__side {

@@ -113,19 +113,6 @@ const showFinishSheet = ref(false);
 const markingPaid = ref(false);
 const showQuoteSheet = ref(false);
 
-const statusOptions: { label: string; value: JobStatus }[] = [
-  { label: "Accepted", value: "accepted" },
-  { label: "Requested", value: "requested" },
-  { label: "Quoted", value: "quoted" },
-  { label: "Quote accepted", value: "quote_accepted" },
-  { label: "Scheduled", value: "scheduled" },
-  { label: "In progress", value: "in_progress" },
-  { label: "Awaiting approval", value: "awaiting_client_approval" },
-  { label: "Awaiting payment", value: "awaiting_payment" },
-  { label: "Complete", value: "complete" },
-  { label: "Cancelled", value: "cancelled" },
-];
-
 const isTradie = computed(() => auth.fbUser?.uid === job.value?.tradespersonId);
 const isClient = computed(() => auth.fbUser?.uid === job.value?.clientId);
 
@@ -215,10 +202,17 @@ watch(
 // fixed bar) and the bar's visibility. Stays visible across every tab —
 // the bar gets thinner on mobile so the chat composer can sit comfortably
 // above it.
+// Every tradesperson-actionable step in the loop gets a sticky CTA so
+// "what's next" is never buried in a tab. `awaiting_client_approval` is
+// the one wait-state we intentionally skip — the InvoiceTab already
+// renders the explainer card, and there's no tradie action to take.
 const stickyCTAStatuses: ReadonlySet<JobStatus> = new Set([
   "requested",
   "quoted",
+  "quote_accepted",
+  "scheduled",
   "in_progress",
+  "awaiting_payment",
 ]);
 const showStickyCTA = computed(
   () => job.value != null && isTradie.value && stickyCTAStatuses.has(job.value.status),
@@ -347,14 +341,14 @@ async function commitSchedule() {
   }
 }
 
-async function setStatus(s: JobStatus) {
+// The only manual transition still wired into the UI: tradesperson taps
+// the "Mark started" sticky CTA after a scheduled visit begins. Every
+// other status move is driven by a domain action (send-quote, accept,
+// schedule, finish-job, approve, pay) or the cancel-job dialog.
+async function markStarted() {
   if (!job.value) return;
-  if (s === "complete" && !confirm("Mark this job complete? A draft invoice will be created.")) {
-    return;
-  }
-  if (s === "cancelled" && !confirm("Cancel this job?")) return;
   try {
-    await updateJobStatus(job.value.id, s);
+    await updateJobStatus(job.value.id, "in_progress");
     await load();
   } catch (e) {
     toast.error("Couldn't update status", humanizeError(e));
@@ -645,10 +639,8 @@ function onReturnToApplicants() {
           :tradie-wsib-live="tradieWsibLive"
           :saving-intake="savingIntake"
           :returning-to-applicants="returningToApplicants"
-          :status-options="statusOptions"
           :updating-log="updatingLog"
           @submit-brief="submitBrief"
-          @status-change="setStatus"
           @return-to-applicants="onReturnToApplicants"
           @save-notes="saveNotes"
           @update-log="updateLogManually"
@@ -697,10 +689,15 @@ function onReturnToApplicants() {
     <!-- Sticky bottom CTA: the tradie's primary action for this status.
          One slot, status-driven label so the page never offers more than
          one "next step" at a time. Lives outside the tabs so it persists
-         while the user browses other surfaces. -->
+         while the user browses other surfaces.
+         `left:` reads `--bs-content-left-offset` from AppShell so the bar
+         starts after the side panel on desktop (260px) instead of running
+         underneath it. On mobile the var is 0 and `mobileCompact` hides
+         the bottom nav, so the bar can sit flush at the viewport edge. -->
     <div
       v-if="showStickyCTA && job"
-      class="fixed inset-x-0 bottom-0 z-30 border-t border-[color:var(--bs-border)] bg-white/95 backdrop-blur p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-2px_8px_rgba(0,0,0,0.04)]"
+      class="fixed right-0 bottom-0 z-30 border-t border-[color:var(--bs-border)] bg-white/95 backdrop-blur p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-2px_8px_rgba(0,0,0,0.04)]"
+      style="left: var(--bs-content-left-offset, 0px);"
     >
       <div class="bs-container">
         <Button
@@ -721,12 +718,38 @@ function onReturnToApplicants() {
           @click="showQuoteSheet = true"
         />
         <Button
+          v-else-if="job.status === 'quote_accepted'"
+          label="Pick a date"
+          icon="pi pi-calendar-plus"
+          class="w-full"
+          size="large"
+          @click="onTabChange('schedule')"
+        />
+        <Button
+          v-else-if="job.status === 'scheduled'"
+          label="Mark started"
+          icon="pi pi-play"
+          class="w-full"
+          size="large"
+          @click="markStarted"
+        />
+        <Button
           v-else-if="job.status === 'in_progress'"
           label="Finish job & prepare invoice"
           icon="pi pi-check-circle"
           class="w-full"
           size="large"
           @click="showFinishSheet = true"
+        />
+        <Button
+          v-else-if="job.status === 'awaiting_payment'"
+          label="Mark as paid"
+          icon="pi pi-wallet"
+          severity="success"
+          class="w-full"
+          size="large"
+          :loading="markingPaid"
+          @click="onMarkPaid"
         />
       </div>
     </div>

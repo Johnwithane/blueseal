@@ -2,14 +2,12 @@
 import { RouterLink } from "vue-router";
 import Avatar from "primevue/avatar";
 import Button from "primevue/button";
-import Select from "primevue/select";
 import Tag from "primevue/tag";
 import Textarea from "primevue/textarea";
 import IntakeFormRenderer from "@/components/IntakeFormRenderer.vue";
 import type {
   IntakeField,
   JobDoc,
-  JobStatus,
   TradespersonDoc,
   WithId,
 } from "@/firebase/interfaces";
@@ -24,7 +22,6 @@ const props = defineProps<{
   tradieWsibLive: boolean;
   savingIntake: boolean;
   returningToApplicants: boolean;
-  statusOptions: { label: string; value: JobStatus }[];
   updatingLog: boolean;
 }>();
 
@@ -33,7 +30,6 @@ const privateNotes = defineModel<string>("privateNotes", { required: true });
 
 const emit = defineEmits<{
   "submit-brief": [];
-  "status-change": [s: JobStatus];
   "return-to-applicants": [];
   "save-notes": [];
   "update-log": [];
@@ -49,24 +45,6 @@ function tradieAvatarInitial() {
 
 <template>
   <div class="space-y-4">
-    <!-- Status select (tradie only) — escape hatch for one-off corrections. -->
-    <div v-if="isTradie" class="bs-card p-3">
-      <label for="job-status-select" class="block font-semibold text-sm mb-2">Status</label>
-      <Select
-        input-id="job-status-select"
-        :model-value="job.status"
-        :options="statusOptions"
-        option-label="label"
-        option-value="value"
-        class="w-full"
-        @update:model-value="(v) => emit('status-change', v as JobStatus)"
-      />
-      <p class="text-[11px] text-[color:var(--bs-muted)] mt-2 leading-snug">
-        One-off corrections only. The normal flow is the "Finish job" button
-        and the client's approve/pay actions.
-      </p>
-    </div>
-
     <!-- Client-only: trust signal with face + verified badges. -->
     <div v-if="isClient" class="bs-card p-3">
       <h3 class="font-semibold text-sm mb-2">Your tradesperson</h3>

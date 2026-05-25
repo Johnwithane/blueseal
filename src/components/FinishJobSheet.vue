@@ -10,6 +10,7 @@ import Message from "primevue/message";
 import Tag from "primevue/tag";
 import { submitJobForApproval } from "@/firebase/services/jobs";
 import { recomputeTotals } from "@/firebase/services/invoices";
+import { getQuoteByJobId } from "@/firebase/services/quotes";
 import { subscribeJobTimeEntries, entryBillable } from "@/firebase/services/timeEntries";
 import { subscribeJobExpenses } from "@/firebase/services/expenses";
 import type {
@@ -55,6 +56,17 @@ interface ExtraRow {
   taxRate: number;
 }
 const extraRows = ref<ExtraRow[]>([]);
+
+// Quote line items, hydrated once when the sheet opens. Pre-filled so the
+// invoice picks up where the quote left off — the tradesperson can edit
+// descriptions / amounts / taxes per row, or remove what no longer applies
+// (e.g. a quoted line that didn't end up being needed). Hourly quote rows
+// are flattened into a single line total here because expanded hours/rate
+// already came in via the time tracker — the description preserves the
+// original "Xh × $Y/hr" framing so the client can match it back.
+const quoteRows = ref<ExtraRow[]>([]);
+const loadingQuote = ref(false);
+const quoteLoaded = ref(false);
 
 type DiscountMode = "off" | "percent" | "fixed";
 const discountMode = ref<DiscountMode>("off");
@@ -109,17 +121,54 @@ function detach() {
   expensesUnsub = null;
   ticker = null;
 }
+async function hydrateFromQuote() {
+  loadingQuote.value = true;
+  quoteLoaded.value = false;
+  try {
+    const q = await getQuoteByJobId(props.jobId);
+    if (!q?.lineItems?.length) {
+      quoteRows.value = [];
+      return;
+    }
+    quoteRows.value = q.lineItems.map((li) => {
+      const qty = li.quantity ?? 1;
+      const unit = li.unitPrice ?? 0;
+      const total = qty * unit;
+      let desc = li.description ?? "";
+      if (li.kind === "hourly" && qty > 0 && unit > 0) {
+        const rate = (unit / 100).toFixed(2);
+        desc = `${desc} — ${qty}h × $${rate}/hr`;
+      }
+      return {
+        description: desc,
+        unitPriceDollars: total / 100,
+        taxRate: li.taxRate ?? 0,
+      };
+    });
+  } catch {
+    // Quote read can fail (legacy job without a quote, permission edge).
+    // Leave quoteRows empty — sheet still works from time + expenses + extras.
+    quoteRows.value = [];
+  } finally {
+    loadingQuote.value = false;
+    quoteLoaded.value = true;
+  }
+}
+
 watch(
   () => props.visible,
   (v) => {
     if (v) {
       // Reset form each open so closing + re-opening starts clean.
       extraRows.value = [];
+      quoteRows.value = [];
+      quoteLoaded.value = false;
       discountMode.value = "off";
       discountValue.value = 0;
       discountLabel.value = "";
       noteToClient.value = "";
       attach();
+      void hydrateFromQuote();
     } else {
       detach();
     }
@@ -192,6 +241,19 @@ const previewLines = computed<LineItem[]>(() => {
       taxRate: 0,
     });
   }
+  // Quote rows render first so the invoice line ordering matches what the
+  // client originally saw on the quote — easier to reconcile at payment time.
+  for (const r of quoteRows.value) {
+    if (!r.description.trim()) continue;
+    const unitPrice = centsFromDollars(r.unitPriceDollars);
+    if (unitPrice <= 0) continue;
+    lines.push({
+      description: r.description.trim(),
+      quantity: 1,
+      unitPrice,
+      taxRate: r.taxRate ?? 0,
+    });
+  }
   for (const r of extraRows.value) {
     if (!r.description.trim()) continue;
     const unitPrice = centsFromDollars(r.unitPriceDollars);
@@ -261,11 +323,18 @@ function removeExtraRow(i: number) {
   extraRows.value = extraRows.value.filter((_, idx) => idx !== i);
 }
 
+function removeQuoteRow(i: number) {
+  quoteRows.value = quoteRows.value.filter((_, idx) => idx !== i);
+}
+
 async function onSubmit() {
   if (!canSubmit.value) return;
   submitting.value = true;
   try {
-    const extraLineItems: LineItem[] = extraRows.value
+    // Quote rows + freeform extras both submit as extraLineItems — the
+    // server doesn't distinguish their origin. Quote first to preserve the
+    // ordering the client saw originally.
+    const extraLineItems: LineItem[] = [...quoteRows.value, ...extraRows.value]
       .filter((r) => r.description.trim() && centsFromDollars(r.unitPriceDollars) > 0)
       .map((r) => ({
         description: r.description.trim(),
@@ -376,6 +445,61 @@ function close() {
           Markups + categories live in the Expenses card on the job page — edit there
           before finishing if anything's off.
         </p>
+      </section>
+
+      <!-- From the original quote. Pre-filled when the sheet opens so the
+           invoice starts from "what the client agreed to", with time +
+           expenses + extras layered on top. Each row is editable and
+           removable so the tradesperson can adjust for what actually
+           happened on-site without re-typing the whole quote. -->
+      <section
+        v-if="loadingQuote || quoteRows.length > 0"
+        class="rounded-lg border border-[color:var(--bs-border)] p-3"
+      >
+        <header class="flex items-center gap-2 mb-2">
+          <i class="pi pi-file text-[color:var(--bs-blue)]"></i>
+          <h4 class="font-semibold text-sm">From your quote</h4>
+        </header>
+        <div v-if="loadingQuote" class="text-xs text-[color:var(--bs-muted)]">
+          Loading quote…
+        </div>
+        <template v-else>
+          <p class="text-[11px] text-[color:var(--bs-muted)] mb-2 leading-snug">
+            Pre-filled from the quote the client accepted. Edit amounts or
+            remove rows if the actual work differed.
+          </p>
+          <ul class="space-y-2">
+            <li
+              v-for="(r, i) in quoteRows"
+              :key="`q-${i}`"
+              class="grid grid-cols-[1fr_8rem_auto] gap-2 items-start"
+            >
+              <InputText
+                v-model="r.description"
+                placeholder="Description"
+                maxlength="200"
+                class="w-full text-sm"
+              />
+              <InputNumber
+                v-model="r.unitPriceDollars"
+                mode="currency"
+                currency="CAD"
+                :min="0"
+                :max-fraction-digits="2"
+                :input-class="'text-sm w-full text-right'"
+                fluid
+              />
+              <Button
+                text
+                icon="pi pi-times"
+                size="small"
+                severity="danger"
+                aria-label="Remove line"
+                @click="removeQuoteRow(i)"
+              />
+            </li>
+          </ul>
+        </template>
       </section>
 
       <!-- Extra line items -->
