@@ -35,8 +35,12 @@ export type NotificationType =
   | "invoice_refunded"
   | "dispute_opened"
   | "review_received"
+  // "vouch_*" stay for back-compat with notifications written before the
+  // Recommendations rename; new writes use the "recommendation_*" variants.
   | "vouch_requested"
   | "vouch_accepted"
+  | "recommendation_received"
+  | "recommendation_accepted"
   | "new_job_posting";
 
 /**

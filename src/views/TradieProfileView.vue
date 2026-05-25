@@ -284,8 +284,8 @@ onMounted(async () => {
         class="bs-card p-5 mt-4"
       >
         <div class="mb-2 flex items-center justify-between gap-2">
-          <h2 class="font-semibold">Peer endorsements</h2>
-          <RouterLink v-if="isOwnProfile" :to="{ name: 'AccountVouches' }">
+          <h2 class="font-semibold">Recommendations</h2>
+          <RouterLink v-if="isOwnProfile" :to="{ name: 'AccountRecommendations' }">
             <Button
               label="Manage"
               icon="pi pi-pencil"
@@ -297,7 +297,7 @@ onMounted(async () => {
 
         <div v-if="vouchesFor.length" class="mb-3">
           <div class="mb-1 text-xs font-semibold uppercase text-[color:var(--bs-muted)]">
-            Vouched for by
+            Recommended by
           </div>
           <ul class="flex flex-wrap gap-2">
             <li v-for="v in vouchesFor" :key="v.id">
@@ -331,7 +331,7 @@ onMounted(async () => {
 
         <div v-if="vouchesFrom.length">
           <div class="mb-1 text-xs font-semibold uppercase text-[color:var(--bs-muted)]">
-            Works with
+            Recommends
           </div>
           <ul class="flex flex-wrap gap-2">
             <li v-for="v in vouchesFrom" :key="v.id">
@@ -368,11 +368,11 @@ onMounted(async () => {
           v-if="isOwnProfile && !vouchesFrom.length && !vouchesFor.length"
           class="text-sm text-[color:var(--bs-muted)]"
         >
-          No endorsements yet —
+          No recommendations yet —
           <RouterLink
-            :to="{ name: 'AccountVouches' }"
+            :to="{ name: 'AccountRecommendations' }"
             class="text-[color:var(--bs-blue)] hover:underline"
-          >vouch for tradespeople you've worked with</RouterLink>
+          >recommend tradespeople you've worked with</RouterLink>
           to build out your network.
         </div>
       </section>

@@ -24,11 +24,11 @@ export const revokeVouch = onCall({ enforceAppCheck: false }, async (req) => {
 
   const ref = db.doc(`vouches/${vouchId}`);
   const snap = await ref.get();
-  if (!snap.exists) throw new HttpsError("not-found", "Vouch not found.");
+  if (!snap.exists) throw new HttpsError("not-found", "Recommendation not found.");
   const data = snap.data() as { fromUserId: string; toUserId: string | null };
 
   if (data.fromUserId !== uid && data.toUserId !== uid) {
-    throw new HttpsError("permission-denied", "Not your vouch.");
+    throw new HttpsError("permission-denied", "Not your recommendation.");
   }
 
   await ref.delete();

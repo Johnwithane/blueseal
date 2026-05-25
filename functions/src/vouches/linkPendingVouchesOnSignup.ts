@@ -64,9 +64,9 @@ export const linkPendingVouchesOnSignup = onDocumentCreated(
       try {
         await notify({
           userId: vouch.fromUserId,
-          type: "vouch_accepted",
+          type: "recommendation_accepted",
           title: `${display.displayName} just signed up`,
-          body: "Your vouch is now live on both profiles.",
+          body: "Your recommendation is now live on both profiles.",
           link: `/tradies/${vouch.fromUserId}`,
           actorUid: uid,
           recipientRole: "tradesperson",

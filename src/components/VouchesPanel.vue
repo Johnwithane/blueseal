@@ -224,7 +224,7 @@ async function submitCompose() {
       );
     } else {
       toast.success(
-        "Vouch sent",
+        "Recommendation sent",
         `${name} will see it in their inbox — they need to accept first.`,
       );
     }
@@ -239,7 +239,7 @@ async function submitCompose() {
 async function accept(v: WithId<VouchDoc>) {
   try {
     await acceptVouchRequest(v.id);
-    toast.success("Vouch accepted");
+    toast.success("Recommendation accepted");
   } catch (e) {
     toast.error(humanizeError(e));
   }
@@ -248,17 +248,17 @@ async function accept(v: WithId<VouchDoc>) {
 async function decline(v: WithId<VouchDoc>) {
   try {
     await declineVouchRequest(v.id);
-    toast.success("Vouch declined");
+    toast.success("Recommendation declined");
   } catch (e) {
     toast.error(humanizeError(e));
   }
 }
 
 async function revoke(v: WithId<VouchDoc>) {
-  if (!confirm("Remove this vouch?")) return;
+  if (!confirm("Remove this recommendation?")) return;
   try {
     await revokeVouch(v.id);
-    toast.success("Vouch removed");
+    toast.success("Recommendation removed");
   } catch (e) {
     toast.error(humanizeError(e));
   }
@@ -281,7 +281,7 @@ function avatarInitial(name: string): string {
         </div>
       </div>
       <Button
-        label="Add vouch"
+        label="Recommend a tradesperson"
         icon="pi pi-plus"
         @click="openDialog"
       />
@@ -289,9 +289,9 @@ function avatarInitial(name: string): string {
 
     <!-- Incoming: pending requests addressed to me -->
     <div v-if="pendingIncoming.length" class="bs-card mt-4 p-5">
-      <h2 class="text-lg font-semibold">Vouches waiting for you</h2>
+      <h2 class="text-lg font-semibold">Recommendations waiting for you</h2>
       <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
-        Other tradespeople have vouched for you. Accept to show it on both
+        Other tradespeople have recommended you. Accept to show it on both
         profiles.
       </p>
       <ul class="mt-3 space-y-2">
@@ -353,7 +353,7 @@ function avatarInitial(name: string): string {
 
       <div v-if="acceptedOutgoing.length" class="mt-3">
         <div class="mb-1 text-xs font-semibold uppercase text-[color:var(--bs-muted)]">
-          You vouch for ({{ acceptedOutgoing.length }})
+          You recommend ({{ acceptedOutgoing.length }})
         </div>
         <ul class="space-y-2">
           <li
@@ -400,7 +400,7 @@ function avatarInitial(name: string): string {
 
       <div v-if="acceptedIncoming.length" class="mt-4">
         <div class="mb-1 text-xs font-semibold uppercase text-[color:var(--bs-muted)]">
-          Vouched for you ({{ acceptedIncoming.length }})
+          Recommended you ({{ acceptedIncoming.length }})
         </div>
         <ul class="space-y-2">
           <li
@@ -491,15 +491,15 @@ function avatarInitial(name: string): string {
       class="bs-card mt-4 p-5 text-center text-sm text-[color:var(--bs-muted)]"
     >
       <i class="pi pi-users mb-2 block text-2xl"></i>
-      No vouches yet. Tap <strong>Add vouch</strong> above to endorse someone
-      you've worked with.
+      No recommendations yet. Tap <strong>Recommend a tradesperson</strong>
+      above to endorse someone you've worked with.
     </div>
 
-    <!-- Add-vouch dialog -->
+    <!-- Add-recommendation dialog -->
     <Dialog
       v-model:visible="dialogOpen"
       modal
-      :header="step === 'compose' ? 'Send vouch' : 'Vouch for a tradesperson'"
+      :header="step === 'compose' ? 'Send recommendation' : 'Recommend a tradesperson'"
       :style="{ width: '32rem', maxWidth: '92vw' }"
     >
       <Message v-if="error" severity="error" :closable="false" class="mb-3">{{ error }}</Message>
@@ -653,8 +653,8 @@ function avatarInitial(name: string): string {
               autocomplete="email"
             />
             <p class="mt-1 text-xs text-[color:var(--bs-muted)]">
-              We'll email them an invite. The vouch auto-accepts when they
-              sign up.
+              We'll email them an invite. The recommendation auto-accepts
+              when they sign up.
             </p>
           </div>
         </div>
@@ -683,7 +683,7 @@ function avatarInitial(name: string): string {
         />
         <Button
           v-if="step === 'compose'"
-          :label="inviteMode ? 'Send invite' : 'Send vouch'"
+          :label="inviteMode ? 'Send invite' : 'Send recommendation'"
           :icon="inviteMode ? 'pi pi-envelope' : 'pi pi-send'"
           :loading="sending"
           @click="submitCompose"

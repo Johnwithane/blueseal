@@ -25,19 +25,19 @@ export const declineVouchRequest = onCall(
 
     const ref = db.doc(`vouches/${vouchId}`);
     const snap = await ref.get();
-    if (!snap.exists) throw new HttpsError("not-found", "Vouch not found.");
+    if (!snap.exists) throw new HttpsError("not-found", "Recommendation not found.");
     const data = snap.data() as { toUserId: string | null; status: string };
 
     if (data.toUserId !== uid) {
       throw new HttpsError(
         "permission-denied",
-        "This vouch isn't addressed to you.",
+        "This recommendation isn't addressed to you.",
       );
     }
     if (data.status !== "pending_acceptance") {
       throw new HttpsError(
         "failed-precondition",
-        `Vouch is ${data.status}, not pending.`,
+        `Recommendation is ${data.status}, not pending.`,
       );
     }
 

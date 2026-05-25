@@ -630,13 +630,14 @@ async function grantAdminAllRoles() {
         </RouterLink>
       </div>
 
-      <!-- Vouches: embedded directly. The standalone /account/vouches route
-           still works for email links and external entry points. -->
+      <!-- Recommendations: embedded directly. The standalone
+           /account/recommendations route still works for email links and
+           external entry points. -->
       <div class="mt-6">
-        <h2 class="text-lg font-semibold">Vouches</h2>
+        <h2 class="text-lg font-semibold">Recommendations</h2>
         <p class="mt-1 mb-3 text-sm text-[color:var(--bs-muted)]">
-          Endorse tradespeople you've worked with. Once accepted, the vouch
-          appears on both your profile and theirs.
+          Endorse tradespeople you've worked with. Once accepted, the
+          recommendation appears on both your profile and theirs.
         </p>
         <VouchesPanel />
       </div>

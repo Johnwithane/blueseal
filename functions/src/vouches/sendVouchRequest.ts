@@ -58,7 +58,7 @@ export const sendVouchRequest = onCall({ enforceAppCheck: false }, async (req) =
   // Self-vouch is meaningless and would create a confusing chip on your own
   // profile — block it explicitly.
   if (rawToUserId === uid) {
-    throw new HttpsError("invalid-argument", "You can't vouch for yourself.");
+    throw new HttpsError("invalid-argument", "You can't recommend yourself.");
   }
 
   // Cheap outgoing-volume guard: limit how many pending vouches a single
@@ -73,7 +73,7 @@ export const sendVouchRequest = onCall({ enforceAppCheck: false }, async (req) =
   if (pendingSnap.data().count >= MAX_OUTGOING_PENDING) {
     throw new HttpsError(
       "resource-exhausted",
-      `You already have ${MAX_OUTGOING_PENDING} pending vouches. Wait for some to be accepted first.`,
+      `You already have ${MAX_OUTGOING_PENDING} pending recommendations. Wait for some to be accepted first.`,
     );
   }
 
@@ -91,7 +91,7 @@ export const sendVouchRequest = onCall({ enforceAppCheck: false }, async (req) =
   }
 
   if (toUserId === uid) {
-    throw new HttpsError("invalid-argument", "You can't vouch for yourself.");
+    throw new HttpsError("invalid-argument", "You can't recommend yourself.");
   }
 
   if (toUserId) {
@@ -117,7 +117,7 @@ export const sendVouchRequest = onCall({ enforceAppCheck: false }, async (req) =
     if (!dupeSnap.empty) {
       throw new HttpsError(
         "already-exists",
-        "You've already vouched for this person.",
+        "You've already recommended this person.",
       );
     }
 
@@ -145,12 +145,12 @@ export const sendVouchRequest = onCall({ enforceAppCheck: false }, async (req) =
 
     await notify({
       userId: toUserId,
-      type: "vouch_requested",
-      title: `${voucherDisplay.fromDisplayName} vouched for you`,
+      type: "recommendation_received",
+      title: `${voucherDisplay.fromDisplayName} recommended you`,
       body: message
-        ? `"${message}" — accept to show this on your profile.`
-        : "Accept to show this endorsement on your profile.",
-      link: "/account/vouches",
+        ? `"${message}" — accept to show this recommendation on your profile.`
+        : "Accept to show this recommendation on your profile.",
+      link: "/account/recommendations",
       actorUid: uid,
       recipientRole: "tradesperson",
       priority: "normal",

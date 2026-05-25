@@ -83,7 +83,7 @@ export async function sendInviteEmail(args: {
   const base = appBaseUrl();
   const signupUrl = `${base}/sign-up?invite=${encodeURIComponent(args.toEmail)}&as=tradesperson`;
   const tradeLabel = args.voucherTrade ? ` (${args.voucherTrade})` : "";
-  const subject = `${args.voucherName} vouched for you on Blue Seal`;
+  const subject = `${args.voucherName} recommended you on Blue Seal`;
   const noteHtml = args.message
     ? `<blockquote style="margin:16px 0;padding:8px 12px;border-left:3px solid #1d4ed8;color:#374151;">${escapeHtml(args.message)}</blockquote>`
     : "";
@@ -94,14 +94,14 @@ export async function sendInviteEmail(args: {
     subject,
     text:
       `Hi ${args.inviteeName},\n\n` +
-      `${args.voucherName}${tradeLabel} vouched for you on Blue Seal — a verified-trades platform in Canada.${noteText}\n` +
-      `Sign up to claim your profile and the vouch appears on both your profile and theirs:\n${signupUrl}\n\n` +
+      `${args.voucherName}${tradeLabel} recommended you on Blue Seal — a verified-trades platform in Canada.${noteText}\n` +
+      `Sign up to claim your profile and the recommendation appears on both your profile and theirs:\n${signupUrl}\n\n` +
       `If you weren't expecting this, you can ignore the email.\n`,
     html:
       `<p>Hi ${escapeHtml(args.inviteeName)},</p>` +
-      `<p><strong>${escapeHtml(args.voucherName)}</strong>${escapeHtml(tradeLabel)} vouched for you on Blue Seal — a verified-trades platform in Canada.</p>` +
+      `<p><strong>${escapeHtml(args.voucherName)}</strong>${escapeHtml(tradeLabel)} recommended you on Blue Seal — a verified-trades platform in Canada.</p>` +
       noteHtml +
-      `<p>Sign up to claim your profile and the vouch appears on both your profile and theirs:</p>` +
+      `<p>Sign up to claim your profile and the recommendation appears on both your profile and theirs:</p>` +
       `<p><a href="${signupUrl}" style="display:inline-block;background:#1d4ed8;color:white;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">Sign up on Blue Seal</a></p>` +
       `<p style="color:#6b7280;font-size:12px;">If you weren't expecting this, you can ignore the email.</p>`,
   });

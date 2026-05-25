@@ -50,10 +50,17 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, role: "any" as RoleGuard },
   },
   {
-    path: "/account/vouches",
-    name: "AccountVouches",
+    path: "/account/recommendations",
+    name: "AccountRecommendations",
     component: () => import("@/views/AccountVouchesView.vue"),
     meta: { requiresAuth: true, role: "tradesperson" as RoleGuard },
+  },
+  // Legacy path — old invite emails + pre-rename notifications still link
+  // here. Redirect to the new canonical route so external links keep
+  // working.
+  {
+    path: "/account/vouches",
+    redirect: { name: "AccountRecommendations" },
   },
 
   // Dashboards (role-gated)
