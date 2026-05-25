@@ -134,6 +134,24 @@ onMounted(async () => {
       <p>Profile not found.</p>
     </div>
     <template v-else>
+      <!-- Preview banner — only the owner sees this, and only while the
+           profile isn't publicly visible (pre-vetting or admin-suspended).
+           Rules let the owner read their own doc regardless of isVisible,
+           so the page renders fine but clients can't reach it yet. -->
+      <div
+        v-if="isOwnProfile && !tradie.isVisible"
+        class="mb-4 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50/60 p-3"
+      >
+        <i class="pi pi-eye text-lg mt-0.5 text-amber-700" aria-hidden="true"></i>
+        <div class="text-sm">
+          <div class="font-semibold text-amber-900">Preview mode</div>
+          <p class="text-amber-900/80">
+            This is how your profile will look — it isn't visible to clients
+            until your trade certification + ID are approved.
+          </p>
+        </div>
+      </div>
+
       <header class="bs-card p-5">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start">
           <Avatar

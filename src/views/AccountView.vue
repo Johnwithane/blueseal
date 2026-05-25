@@ -573,6 +573,33 @@ async function grantAdminAllRoles() {
 
     <!-- TRADESPERSON TAB ------------------------------------------------ -->
     <div v-if="auth.hasTradieRole" v-show="activeTab === 'tradesperson'">
+      <!-- View-my-profile shortcut. Owner read always passes regardless of
+           isVisible, so the tradesperson can preview their page even
+           pre-vetting; TradieProfileView shows a banner in that state. -->
+      <div v-if="auth.fbUser" class="bs-card p-5 flex items-start gap-3">
+        <i
+          class="pi pi-user text-2xl mt-0.5 text-[color:var(--bs-blue)]"
+          aria-hidden="true"
+        ></i>
+        <div class="flex-1 min-w-0">
+          <h2 class="text-lg font-semibold">Your public profile</h2>
+          <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
+            Preview the page clients see when they land on your profile.
+          </p>
+        </div>
+        <RouterLink
+          :to="{ name: 'TradieProfile', params: { uid: auth.fbUser.uid } }"
+          class="shrink-0"
+        >
+          <Button
+            label="View my profile"
+            icon="pi pi-arrow-right"
+            icon-pos="right"
+            outlined
+          />
+        </RouterLink>
+      </div>
+
       <!-- Documents: trade certification + government ID for vetting. -->
       <TradieDocsManager
         v-if="auth.fbUser"

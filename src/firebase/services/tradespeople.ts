@@ -39,6 +39,40 @@ export async function getTradesperson(uid: string): Promise<WithId<TradespersonD
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
 
+/**
+ * Prefix-search visible tradespeople by `displayName`. Used by the vouch
+ * dialog so users find people already on Blue Seal before falling back to
+ * an email invite. Firestore's range query is prefix-only and
+ * case-sensitive — "Sam" matches "Sam Patel" but not "sam patel" or
+ * "Patel". Good enough for the typical "I know their name" flow; full
+ * fuzzy search would need an external index (Algolia/Typesense).
+ *
+ * The `isVisible == true` filter is mandatory: /tradespeople rules deny
+ * read on hidden docs, and Firestore aborts the whole query if any row
+ * is rule-blocked.
+ */
+export async function searchVisibleTradiesByName(
+  prefix: string,
+  max = 8,
+): Promise<WithId<TradespersonDoc>[]> {
+  const p = prefix.trim();
+  if (!p) return [];
+  //  is a very high unicode code point — Firestore's idiomatic
+  // upper-bound for a startsWith range query.
+  const upper = p + "";
+  const snap = await getDocs(
+    query(
+      tradiesCol(),
+      where("isVisible", "==", true),
+      where("displayName", ">=", p),
+      where("displayName", "<", upper),
+      orderBy("displayName"),
+      fbLimit(max),
+    ),
+  );
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
 // Live subscription to a tradesperson doc. Used by the global status banner
 // so the banner clears (or changes) the instant an admin updates vetting.
 // Emits `null` if the doc doesn't exist (e.g. user just added the role).
