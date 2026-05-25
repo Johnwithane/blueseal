@@ -34,6 +34,14 @@ See `PROFESSIONAL_TASKS.md` for the parallel lawyer + accountant work that gates
   ```
   Paste the live `sk_live_…` key (Dashboard → Developers → API keys) when prompted for `STRIPE_SECRET_KEY`. `STRIPE_WEBHOOK_SECRET` you'll get after the next task (it's the signing secret of the webhook endpoint you create).
 - **Verify:** `firebase functions:secrets:access STRIPE_SECRET_KEY` returns the expected key. Redeploy is required after a new secret is set so the function reads the new value: `firebase deploy --only functions:createConnectAccount,functions:createConnectOnboardingLink,functions:createConnectLoginLink,functions:stripeWebhook`.
+- **Also do at the same time:**
+  1. Re-enable the 5 Stripe-binding exports in [functions/src/index.ts](functions/src/index.ts) — `sendInvoice`, `createConnectAccount`, `createConnectOnboardingLink`, `createConnectLoginLink`, `stripeWebhook`. They were commented out so deploys could go through before the secrets existed (search for `TODO(stripe-setup)`).
+  2. Grant the CI service account Secret Manager permissions so future deploys can bind the secrets to function runtime SAs:
+     ```
+     gcloud projects add-iam-policy-binding blueseal-762af \
+       --member="serviceAccount:blueseal-ci@blueseal-762af.iam.gserviceaccount.com" \
+       --role="roles/secretmanager.admin"
+     ```
 
 ### [ ] Register the Stripe webhook endpoint
 

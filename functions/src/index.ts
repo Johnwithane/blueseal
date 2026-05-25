@@ -47,7 +47,11 @@ export { clientDeclineQuote } from "./jobs/clientDeclineQuote";
 
 // Invoicing
 export { onJobCompleted } from "./invoicing/onJobCompleted";
-export { sendInvoice } from "./invoicing/sendInvoice";
+// TODO(stripe-setup): re-enable once STRIPE_SECRET_KEY is set via
+// `firebase functions:secrets:set` (HUMANTASKS.md → "Set Stripe secrets
+// on Cloud Functions"). sendInvoice binds STRIPE_SECRET_KEY and blocks
+// the whole deploy when the secret doesn't exist yet.
+// export { sendInvoice } from "./invoicing/sendInvoice";
 export { markInvoiceOverdue } from "./invoicing/scheduledOverdue";
 export { pullBillablesFromJob } from "./invoicing/pullBillablesFromJob";
 
@@ -61,10 +65,16 @@ export { parseReceipt } from "./ai/parseReceipt";
 // Payments — Stripe Connect Express (commission model). The subscription
 // stub was deleted in the Phase C cutover; the platform earns from a 12%
 // commission on each payment via Connect's application_fee_amount.
-export { createConnectAccount } from "./payments/createConnectAccount";
-export { createConnectOnboardingLink } from "./payments/createConnectOnboardingLink";
-export { createConnectLoginLink } from "./payments/createConnectLoginLink";
-export { stripeWebhook } from "./payments/stripeWebhook";
+// TODO(stripe-setup): re-enable the 4 Stripe-binding exports below once
+// STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET are set via
+// `firebase functions:secrets:set` (HUMANTASKS.md → "Set Stripe secrets
+// on Cloud Functions"). They block the deploy when the secrets don't
+// exist. backfillPayoutsField stays — it only imports a helper, no
+// secret binding.
+// export { createConnectAccount } from "./payments/createConnectAccount";
+// export { createConnectOnboardingLink } from "./payments/createConnectOnboardingLink";
+// export { createConnectLoginLink } from "./payments/createConnectLoginLink";
+// export { stripeWebhook } from "./payments/stripeWebhook";
 export { backfillPayoutsField } from "./payments/backfillPayoutsField";
 
 // Seed + ops
