@@ -149,7 +149,11 @@ export async function searchUsers(input: string): Promise<WithId<UserDoc>[]> {
 /** Save per-channel notification opt-outs. Owner-writable per Firestore rules. */
 export async function updateNotificationPrefs(
   uid: string,
-  prefs: { emailEnabled: boolean; whatsappEnabled: boolean },
+  prefs: {
+    emailEnabled: boolean;
+    whatsappEnabled: boolean;
+    newJobPostingEnabled?: boolean;
+  },
 ): Promise<void> {
   await updateDoc(doc(db, "users", uid), { notificationPrefs: prefs });
 }
