@@ -40,14 +40,14 @@ service cloud.firestore {
       allow create: if isOwner(userId)
         && (
           request.resource.data.keys().hasOnly([
-            'roles','activeRole','displayName','email','photoURL','phone',
+            'roles','activeRole','displayName','email','photoURL','phone','bio',
             'createdAt','lastActiveAt','emailVerified',
             'clientRatingAvg','clientRatingCount',
             'termsAcceptedAt','termsAcceptedVersion',
             'deletedAt','notificationPrefs'
           ])
           || request.resource.data.keys().hasOnly([
-            'role','displayName','email','photoURL','phone',
+            'role','displayName','email','photoURL','phone','bio',
             'createdAt','lastActiveAt','emailVerified',
             'clientRatingAvg','clientRatingCount',
             'termsAcceptedAt','termsAcceptedVersion',

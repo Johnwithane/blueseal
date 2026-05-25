@@ -22,13 +22,20 @@ import { typedConverter } from "@/firebase/converters";
  */
 async function mirrorProfileToTradieIfExists(
   uid: string,
-  patch: { displayName?: string; photoURL?: string | null },
+  patch: { displayName?: string; photoURL?: string | null; bio?: string | null },
 ): Promise<void> {
   try {
     const tradieRef = doc(db, "tradespeople", uid);
     const snap = await getDoc(tradieRef);
     if (!snap.exists()) return;
-    await updateDoc(tradieRef, patch);
+    // tradesperson.bio is a non-nullable string; coerce a null bio (user
+    // cleared their About me) into an empty string so the field stays
+    // type-clean for the public profile read.
+    const out: { displayName?: string; photoURL?: string | null; bio?: string } = {};
+    if (patch.displayName !== undefined) out.displayName = patch.displayName;
+    if (patch.photoURL !== undefined) out.photoURL = patch.photoURL;
+    if (patch.bio !== undefined) out.bio = patch.bio ?? "";
+    await updateDoc(tradieRef, out);
   } catch {
     /* swallow — denormalization is best-effort */
   }
@@ -187,13 +194,17 @@ export async function exportMyData(): Promise<{ url: string }> {
 
 export async function updateUserProfile(
   uid: string,
-  patch: Partial<Pick<UserDoc, "displayName" | "photoURL" | "phone">>,
+  patch: Partial<Pick<UserDoc, "displayName" | "photoURL" | "phone" | "bio">>,
 ): Promise<void> {
   await updateDoc(doc(db, "users", uid), { ...patch, lastActiveAt: serverTimestamp() });
-  // Mirror name/photo into the tradesperson doc for the public profile page.
-  const mirror: { displayName?: string; photoURL?: string | null } = {};
+  // Mirror name/photo/bio into the tradesperson doc so the public profile
+  // page (which only reads from tradespeople/{uid}) reflects them. Bio is
+  // canonically on the user doc; this mirror keeps the public view fresh
+  // without forcing TradieProfileView to do an extra user-doc read.
+  const mirror: { displayName?: string; photoURL?: string | null; bio?: string | null } = {};
   if (patch.displayName !== undefined) mirror.displayName = patch.displayName;
   if (patch.photoURL !== undefined) mirror.photoURL = patch.photoURL;
+  if (patch.bio !== undefined) mirror.bio = patch.bio;
   if (Object.keys(mirror).length > 0) await mirrorProfileToTradieIfExists(uid, mirror);
 }
 

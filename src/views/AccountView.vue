@@ -543,9 +543,11 @@ async function grantAdminAllRoles() {
 
     <!-- TRADESPERSON TAB ------------------------------------------------ -->
     <div v-if="auth.hasTradieRole" v-show="activeTab === 'tradesperson'">
-      <!-- View-my-profile shortcut. Owner read always passes regardless of
-           isVisible, so the tradesperson can preview their page even
-           pre-vetting; TradieProfileView shows a banner in that state. -->
+      <!-- View-my-profile shortcut stays as a non-collapsible card at the
+           top — it's a quick link, not a section. Owner read always passes
+           regardless of isVisible, so the tradesperson can preview their
+           page even pre-vetting; TradieProfileView shows a banner in that
+           state. -->
       <div v-if="auth.fbUser" class="bs-card p-5 flex items-start gap-3">
         <i
           class="pi pi-user text-2xl mt-0.5 text-[color:var(--bs-blue)]"
@@ -570,25 +572,113 @@ async function grantAdminAllRoles() {
         </RouterLink>
       </div>
 
-      <!-- Documents: trade certification + government ID for vetting. -->
-      <TradieDocsManager
-        v-if="auth.fbUser"
-        :tradie-uid="auth.fbUser.uid"
-      />
+      <!-- Accordion of trade-specific sections. All closed by default
+           (no `value` set) and `:multiple="false"` (default) so only one
+           panel opens at a time — reduces visual noise for tradies who
+           rarely touch most of these. -->
+      <Accordion class="mt-4">
+        <AccordionPanel value="trade-profile">
+          <AccordionHeader>
+            <span class="flex items-center gap-2">
+              <i class="pi pi-wrench"></i>
+              Trade profile
+            </span>
+          </AccordionHeader>
+          <AccordionContent>
+            <form class="bs-form space-y-4 pt-3" @submit.prevent="saveTradieProfile">
+              <p class="text-sm text-[color:var(--bs-muted)]">
+                What clients see on your public profile. You can also edit
+                these during onboarding.
+              </p>
+              <div>
+                <label class="text-sm font-medium">
+                  Company / business name
+                  <span class="text-xs text-[color:var(--bs-muted)] font-normal">Optional</span>
+                </label>
+                <InputText
+                  v-model="companyName"
+                  class="mt-1 w-full"
+                  placeholder="e.g. ABC Mechanical Ltd."
+                />
+                <p class="mt-1 text-xs text-[color:var(--bs-muted)]">
+                  Leave blank if you operate as a sole proprietor.
+                </p>
+              </div>
+              <div>
+                <label class="text-sm font-medium">
+                  Languages you work in
+                  <span class="text-xs text-[color:var(--bs-muted)] font-normal">Optional</span>
+                </label>
+                <MultiSelect
+                  v-model="languages"
+                  :options="COMMON_LANGUAGES"
+                  placeholder="Select all that apply"
+                  class="mt-1 w-full"
+                  filter
+                  :max-selected-labels="6"
+                />
+                <p class="mt-1 text-xs text-[color:var(--bs-muted)]">
+                  Helps clients who'd prefer to be served in a specific language.
+                </p>
+              </div>
+              <div class="flex justify-end">
+                <Button
+                  type="submit"
+                  label="Save trade profile"
+                  icon="pi pi-save"
+                  :loading="savingTradieProfile"
+                />
+              </div>
+            </form>
+          </AccordionContent>
+        </AccordionPanel>
 
-      <!-- Recommendations: embedded directly. The standalone
-           /account/vouches route still works for email links and
-           external entry points (URL kept for back-compat). Payouts used
-           to live here as a shortcut card; it's now its own tab so the
-           tradesperson-specific surface stays focused on profile + docs. -->
-      <div class="mt-6">
-        <h2 class="text-lg font-semibold">Recommendations</h2>
-        <p class="mt-1 mb-3 text-sm text-[color:var(--bs-muted)]">
-          Endorse tradespeople you've worked with. Once accepted, the
-          recommendation appears on both your profile and theirs.
-        </p>
-        <VouchesPanel />
-      </div>
+        <AccordionPanel value="portfolio">
+          <AccordionHeader>
+            <span class="flex items-center gap-2">
+              <i class="pi pi-images"></i>
+              Portfolio
+            </span>
+          </AccordionHeader>
+          <AccordionContent>
+            <PortfolioEditor
+              v-if="auth.fbUser"
+              :tradie-uid="auth.fbUser.uid"
+            />
+          </AccordionContent>
+        </AccordionPanel>
+
+        <AccordionPanel value="documents">
+          <AccordionHeader>
+            <span class="flex items-center gap-2">
+              <i class="pi pi-id-card"></i>
+              Documents
+            </span>
+          </AccordionHeader>
+          <AccordionContent>
+            <TradieDocsManager
+              v-if="auth.fbUser"
+              :tradie-uid="auth.fbUser.uid"
+            />
+          </AccordionContent>
+        </AccordionPanel>
+
+        <AccordionPanel value="recommendations">
+          <AccordionHeader>
+            <span class="flex items-center gap-2">
+              <i class="pi pi-thumbs-up"></i>
+              Recommendations
+            </span>
+          </AccordionHeader>
+          <AccordionContent>
+            <p class="mb-3 text-sm text-[color:var(--bs-muted)]">
+              Endorse tradespeople you've worked with. Once accepted, the
+              recommendation appears on both your profile and theirs.
+            </p>
+            <VouchesPanel />
+          </AccordionContent>
+        </AccordionPanel>
+      </Accordion>
     </div>
 
     <!-- PAYOUTS TAB ----------------------------------------------------- -->
@@ -596,54 +686,10 @@ async function grantAdminAllRoles() {
       <PayoutsPanel />
     </div>
 
-    <!-- NOTIFICATIONS TAB ---------------------------------------------- -->
-    <div v-show="activeTab === 'notifications'">
-      <div class="bs-card p-5">
-        <h2 class="text-lg font-semibold">Notifications</h2>
-        <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
-          The in-app inbox always shows new activity. Choose how you'd like
-          to be reached for important events outside the app.
-        </p>
-
-        <div class="mt-4 space-y-3">
-          <div
-            class="flex items-start justify-between gap-3 rounded-lg border border-[color:var(--bs-border)] p-3"
-          >
-            <div>
-              <div class="font-medium">Email</div>
-              <p class="text-xs text-[color:var(--bs-muted)] mt-0.5">
-                For most events. Time-critical ones also send WhatsApp if enabled.
-              </p>
-            </div>
-            <ToggleSwitch v-model="emailEnabled" />
-          </div>
-
-          <div
-            class="flex items-start justify-between gap-3 rounded-lg border border-[color:var(--bs-border)] p-3"
-          >
-            <div>
-              <div class="font-medium">WhatsApp</div>
-              <p class="text-xs text-[color:var(--bs-muted)] mt-0.5">
-                For time-critical events (new job request, vetting decision,
-                accepted application). Uses the phone number on your profile.
-              </p>
-            </div>
-            <ToggleSwitch v-model="whatsappEnabled" />
-          </div>
-        </div>
-
-        <div class="mt-4 flex justify-end">
-          <Button
-            label="Save preferences"
-            icon="pi pi-save"
-            :loading="savingPrefs"
-            @click="savePrefs"
-          />
-        </div>
-      </div>
-    </div>
-
     <!-- PRIVACY & ACCOUNT TAB ------------------------------------------ -->
+    <!-- Holds: roles, password, notifications, privacy/PIPEDA, account
+         meta, sign out. Notifications used to be its own tab — it's
+         settings-shaped so it lives alongside the other account settings. -->
     <div v-show="activeTab === 'account'">
       <!-- Roles / view-switching -->
       <div class="bs-card p-5">
@@ -765,6 +811,51 @@ async function grantAdminAllRoles() {
             :loading="sendingReset"
             :disabled="!email"
             @click="sendPasswordReset"
+          />
+        </div>
+      </div>
+
+      <!-- Notifications (folded in from its old standalone tab) -->
+      <div class="bs-card mt-4 p-5">
+        <h2 class="text-lg font-semibold">Notifications</h2>
+        <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
+          The in-app inbox always shows new activity. Choose how you'd like
+          to be reached for important events outside the app.
+        </p>
+
+        <div class="mt-4 space-y-3">
+          <div
+            class="flex items-start justify-between gap-3 rounded-lg border border-[color:var(--bs-border)] p-3"
+          >
+            <div>
+              <div class="font-medium">Email</div>
+              <p class="text-xs text-[color:var(--bs-muted)] mt-0.5">
+                For most events. Time-critical ones also send WhatsApp if enabled.
+              </p>
+            </div>
+            <ToggleSwitch v-model="emailEnabled" />
+          </div>
+
+          <div
+            class="flex items-start justify-between gap-3 rounded-lg border border-[color:var(--bs-border)] p-3"
+          >
+            <div>
+              <div class="font-medium">WhatsApp</div>
+              <p class="text-xs text-[color:var(--bs-muted)] mt-0.5">
+                For time-critical events (new job request, vetting decision,
+                accepted application). Uses the phone number on your profile.
+              </p>
+            </div>
+            <ToggleSwitch v-model="whatsappEnabled" />
+          </div>
+        </div>
+
+        <div class="mt-4 flex justify-end">
+          <Button
+            label="Save preferences"
+            icon="pi pi-save"
+            :loading="savingPrefs"
+            @click="savePrefs"
           />
         </div>
       </div>

@@ -19,6 +19,12 @@ export interface UserDoc {
   email: string;
   photoURL: string | null;
   phone: string | null;
+  // "About me" — free-form short blurb visible on the user's profile tab
+  // (everyone) and on the public tradesperson profile (tradies). Optional;
+  // legacy users (and clients who haven't filled it in) will have it absent.
+  // The tradesperson public profile reads this first and falls back to
+  // tradesperson.bio for accounts created before this field existed.
+  bio?: string | null;
   createdAt: Timestamp;
   lastActiveAt: Timestamp;
   emailVerified: boolean;
