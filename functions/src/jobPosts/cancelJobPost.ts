@@ -3,7 +3,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { z } from "zod";
 import { db } from "../lib/admin";
-import { requireRole } from "../lib/auth";
+import { requireRoleOrAdmin } from "../lib/auth";
 import { logAdminAction } from "../lib/audit";
 
 const Input = z.object({
@@ -12,7 +12,7 @@ const Input = z.object({
 });
 
 export const cancelJobPost = onCall({ enforceAppCheck: false }, async (req) => {
-  const uid = requireRole(req, "client");
+  const uid = requireRoleOrAdmin(req, "client");
   const parsed = Input.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);
   const { postId, reason } = parsed.data;

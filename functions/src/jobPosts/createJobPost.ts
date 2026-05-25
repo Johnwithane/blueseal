@@ -3,7 +3,7 @@ import { FieldValue, GeoPoint, Timestamp } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { z } from "zod";
 import { db } from "../lib/admin";
-import { requireRole } from "../lib/auth";
+import { requireRoleOrAdmin } from "../lib/auth";
 import { logAdminAction } from "../lib/audit";
 import { deriveGeohashes } from "./helpers";
 
@@ -56,7 +56,7 @@ function toTimestamp(dateStr: string | null): Timestamp | null {
 }
 
 export const createJobPost = onCall({ enforceAppCheck: false }, async (req) => {
-  const uid = requireRole(req, "client");
+  const uid = requireRoleOrAdmin(req, "client");
   const parsed = Input.safeParse(req.data);
   if (!parsed.success) {
     throw new HttpsError("invalid-argument", parsed.error.issues[0]?.message ?? "Invalid input");

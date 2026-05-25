@@ -3,12 +3,12 @@ import { FieldValue } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { z } from "zod";
 import { db } from "../lib/admin";
-import { requireRole } from "../lib/auth";
+import { requireRoleOrAdmin } from "../lib/auth";
 
 const Input = z.object({ postId: z.string().min(1).max(128) });
 
 export const withdrawApplication = onCall({ enforceAppCheck: false }, async (req) => {
-  const uid = requireRole(req, "tradesperson");
+  const uid = requireRoleOrAdmin(req, "tradesperson");
   const parsed = Input.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);
   const { postId } = parsed.data;

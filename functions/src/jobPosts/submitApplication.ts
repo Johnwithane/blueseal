@@ -3,7 +3,7 @@ import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { z } from "zod";
 import { db } from "../lib/admin";
-import { requireRole } from "../lib/auth";
+import { requireRoleOrAdmin } from "../lib/auth";
 import { requireVisibleTradie, rateLimitKey } from "./helpers";
 import { notify } from "../lib/notify";
 
@@ -25,7 +25,9 @@ const Input = z.object({
 const DAILY_APPLICATION_CAP = 10;
 
 export const submitApplication = onCall({ enforceAppCheck: false }, async (req) => {
-  const uid = requireRole(req, "tradesperson");
+  const uid = requireRoleOrAdmin(req, "tradesperson");
+  // Admins still need a tradesperson doc with isVisible:true to apply —
+  // they don't get a free pass on the verified-tradie contract.
   await requireVisibleTradie(uid);
 
   const parsed = Input.safeParse(req.data);
