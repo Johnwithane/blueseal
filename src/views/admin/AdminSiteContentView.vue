@@ -80,8 +80,7 @@ async function save() {
     </RouterLink>
 
     <header class="mt-2 mb-6">
-      <h1 class="text-2xl font-bold">Site content</h1>
-      <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
+      <p class="text-sm text-[color:var(--bs-muted)]">
         Edit the testimonials shown on the home page. The section auto-hides
         when this list is empty, so we never ship fake quotes.
       </p>

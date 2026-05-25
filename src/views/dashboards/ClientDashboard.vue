@@ -70,8 +70,9 @@ function formatBudget(min: number, max: number): string {
   <section class="bs-container py-8">
     <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
       <div>
-        <h1 class="text-2xl font-bold">Welcome, {{ auth.user?.displayName }}</h1>
-        <p class="text-[color:var(--bs-muted)]">Your jobs and posted requests.</p>
+        <p class="text-[color:var(--bs-muted)]">
+          Welcome{{ auth.user?.displayName ? `, ${auth.user.displayName}` : "" }} — your jobs and posted requests.
+        </p>
       </div>
       <div class="flex gap-2">
         <RouterLink to="/jobs/post">

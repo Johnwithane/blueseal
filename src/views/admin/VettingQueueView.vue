@@ -36,8 +36,7 @@ onMounted(refresh);
     <div class="flex items-center justify-between mb-4">
       <div>
         <RouterLink to="/dashboard" class="text-xs text-[color:var(--bs-muted)]">← Back</RouterLink>
-        <h1 class="text-2xl font-bold mt-1">Vetting queue</h1>
-        <p class="text-[color:var(--bs-muted)] text-sm">Sorted by oldest pending first.</p>
+        <p class="text-[color:var(--bs-muted)] text-sm mt-1">Sorted by oldest pending first.</p>
       </div>
       <Button label="Refresh" icon="pi pi-refresh" outlined :loading="loading" @click="refresh" />
     </div>

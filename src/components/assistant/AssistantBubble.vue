@@ -10,15 +10,25 @@ const auth = useAuthStore();
 const route = useRoute();
 const store = useAssistantStore();
 
-// Tradesperson + admin only. Clients use the per-job human chat instead.
-const visible = computed(() => auth.isAuthenticated && (auth.isTradie || auth.isAdmin));
+// AI is a jobs-helper for tradespeople: it should only surface on the
+// TradieDashboard (their Jobs page). Anywhere else — Account, Browse jobs,
+// Recommendations, Payouts — it's noise. JobDetail has its own combined
+// Chat + AI overlay (JobChatOverlay) which handles per-job AI, so the
+// global bubble doesn't appear there either. Admins still see the bubble
+// across the admin surface since their assistant has a different scope.
+const visible = computed(() => {
+  if (!auth.isAuthenticated) return false;
+  if (auth.isTradie) return route.name === "TradieDashboard";
+  if (auth.isAdmin) return true;
+  return false;
+});
 
 // Routes that should hide the bubble even for an eligible role — wizards,
 // auth screens, and anything where a floating overlay would fight the page.
 const HIDDEN_ROUTE_PREFIXES = ["/sign-in", "/sign-up", "/forgot-password", "/onboarding"];
 // JobDetail has its own combined Chat + AI overlay (JobChatOverlay), so the
-// global bubble would double up. Hide by route name to avoid matching the
-// `/jobs/post` route as well.
+// global bubble would double up. Kept here so it also covers admins viewing
+// a job detail page.
 const HIDDEN_ROUTE_NAMES = new Set(["JobDetail"]);
 const hiddenOnThisRoute = computed(() => {
   if (HIDDEN_ROUTE_PREFIXES.some((p) => route.path.startsWith(p))) return true;
@@ -82,7 +92,14 @@ onBeforeUnmount(() => store.reset());
 <style scoped>
 .bs-ai-fab {
   position: fixed;
-  bottom: 1rem;
+  /* Clear the mobile bottom nav. Bar height = ~60px (4px padding-top +
+     48px min-height + 8px padding-bottom) plus iOS safe-area inset. We
+     anchor 6rem (96px) above the viewport bottom on phones — that puts
+     the FAB visibly above the bar on a no-safe-area browser (96 - 60 =
+     36px clearance) and even further above on an iPhone (96 + 34 - 86 =
+     44px). AppShell hides the bottom nav above `md`, so the desktop
+     rule below resets to the original placement. */
+  bottom: calc(6rem + env(safe-area-inset-bottom));
   right: 1rem;
   z-index: 40;
   height: 3.25rem;
@@ -135,7 +152,8 @@ onBeforeUnmount(() => store.reset());
 .bs-ai-fab__label {
   padding-right: 0.25rem;
 }
-@media (min-width: 640px) {
+@media (min-width: 768px) {
+  /* No bottom nav above `md` — restore the original FAB placement. */
   .bs-ai-fab {
     bottom: 1.5rem;
     right: 1.5rem;

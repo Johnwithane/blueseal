@@ -3,7 +3,6 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import Button from "primevue/button";
 import SelectButton from "primevue/selectbutton";
-import Menu from "primevue/menu";
 import Message from "primevue/message";
 import Dialog from "primevue/dialog";
 import DatePicker from "primevue/datepicker";
@@ -36,6 +35,7 @@ import KanbanBoard from "@/components/KanbanBoard.vue";
 import CalendarView from "@/components/CalendarView.vue";
 import JobList from "@/components/JobList.vue";
 import AvailabilityEditor from "@/components/AvailabilityEditor.vue";
+import MyApplicationsList from "@/components/MyApplicationsList.vue";
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -44,46 +44,24 @@ const tradie = ref<WithId<TradespersonDoc> | null>(null);
 const jobs = ref<WithId<JobDoc>[]>([]);
 // List is the default — jobs-first triage. Board is the renamed kanban
 // (clients of the dashboard don't know the term "kanban"). Calendar is
-// the scheduling/blocking surface.
-const view = ref<"list" | "board" | "calendar">("list");
-const viewOptions = [
-  { label: "List", value: "list" },
-  { label: "Board", value: "board" },
-  { label: "Calendar", value: "calendar" },
+// the scheduling/blocking surface. Applied surfaces the job-board
+// applications the tradie has sent — same data as /my-applications but
+// co-located with the rest of their job pipeline.
+type DashboardView = "list" | "board" | "calendar" | "applied";
+const view = ref<DashboardView>("list");
+const viewOptions: { label: string; value: DashboardView; icon: string }[] = [
+  { label: "List", value: "list", icon: "pi-list" },
+  { label: "Board", value: "board", icon: "pi-th-large" },
+  { label: "Calendar", value: "calendar", icon: "pi-calendar" },
+  { label: "Applied", value: "applied", icon: "pi-send" },
 ];
 
 const viewHint = computed(() => {
   if (view.value === "board") return "Drag cards between columns to update status.";
   if (view.value === "calendar") return "Tap a free day to block it off.";
+  if (view.value === "applied") return "Jobs you've applied to, grouped by status.";
   return "Tap a job to open it.";
 });
-
-const moreMenu = ref<InstanceType<typeof Menu> | null>(null);
-const moreMenuItems = computed(() => [
-  {
-    label: "Manage availability",
-    icon: "pi pi-clock",
-    command: openAvailabilityEditor,
-  },
-  {
-    label: "Block off time",
-    icon: "pi pi-ban",
-    command: openBlockEditor,
-  },
-  {
-    label: "Browse open jobs",
-    icon: "pi pi-megaphone",
-    command: () => router.push("/jobs/browse"),
-  },
-  {
-    label: "My applications",
-    icon: "pi pi-send",
-    command: () => router.push("/my-applications"),
-  },
-]);
-function toggleMoreMenu(e: Event) {
-  moreMenu.value?.toggle(e);
-}
 
 const availabilityOpen = ref(false);
 const draftAvailability = ref<WeeklyAvailability | null>(null);
@@ -295,51 +273,59 @@ const showPayoutsNudge = computed(
 </script>
 
 <template>
-  <section class="bs-container py-6">
-    <div class="flex items-start justify-between gap-3 mb-4 flex-wrap">
-      <div class="min-w-0">
-        <h1 class="text-xl sm:text-2xl font-bold">Your jobs</h1>
-        <p class="hidden sm:block text-[color:var(--bs-muted)] text-sm">
-          {{ viewHint }}
-        </p>
+  <section class="pb-6">
+    <!-- Sticky underline-tab bar — same visual pattern as the job-detail
+         JobTabBar (icon + label, active border-bottom). AppShell has no
+         sticky chrome above the route slot, so top:0 is correct on both
+         viewports. Inlined rather than reusing JobTabBar because that
+         component is named/aria-labelled for job sections. -->
+    <div class="bs-tradie-tab-bar">
+      <div class="bs-container">
+        <div role="tablist" class="tab-row" aria-label="Dashboard views">
+          <button
+            v-for="opt in viewOptions"
+            :key="opt.value"
+            type="button"
+            role="tab"
+            :aria-selected="view === opt.value"
+            :aria-label="opt.label"
+            :tabindex="view === opt.value ? 0 : -1"
+            class="tab"
+            :class="{ 'tab--active': view === opt.value }"
+            @click="view = opt.value"
+          >
+            <i :class="['pi', opt.icon, 'icon']" aria-hidden="true"></i>
+            <span class="label">{{ opt.label }}</span>
+          </button>
+        </div>
       </div>
-      <div class="flex items-center gap-2 flex-wrap">
-        <SelectButton v-model="view" :options="viewOptions" option-label="label" option-value="value" />
-        <template v-if="tradie?.isVisible">
-          <!-- Desktop: actions inline -->
-          <div class="hidden sm:flex items-center gap-2 flex-wrap">
-            <Button
-              label="Manage availability"
-              icon="pi pi-clock"
-              outlined
-              @click="openAvailabilityEditor"
-            />
-            <Button
-              label="Block off time"
-              icon="pi pi-ban"
-              outlined
-              severity="danger"
-              @click="openBlockEditor"
-            />
-            <RouterLink to="/jobs/browse">
-              <Button label="Browse open jobs" icon="pi pi-megaphone" outlined />
-            </RouterLink>
-            <RouterLink to="/my-applications">
-              <Button label="My applications" icon="pi pi-send" text />
-            </RouterLink>
-          </div>
-          <!-- Mobile: overflow menu -->
-          <Button
-            icon="pi pi-ellipsis-v"
-            outlined
-            aria-label="More actions"
-            aria-haspopup="true"
-            class="sm:hidden"
-            @click="toggleMoreMenu"
-          />
-          <Menu ref="moreMenu" :model="moreMenuItems" popup />
-        </template>
-      </div>
+    </div>
+
+    <div class="bs-container pt-4">
+    <p class="hidden sm:block text-[color:var(--bs-muted)] text-sm mb-4">
+      {{ viewHint }}
+    </p>
+
+    <!-- Availability + block-off live with the Calendar view since that's
+         where scheduling lives. Kept on their own row so the tabs above
+         stay fixed in place across view switches. -->
+    <div
+      v-if="tradie?.isVisible && view === 'calendar'"
+      class="flex flex-wrap items-center gap-2 mb-4"
+    >
+      <Button
+        label="Manage availability"
+        icon="pi pi-clock"
+        outlined
+        @click="openAvailabilityEditor"
+      />
+      <Button
+        label="Block off time"
+        icon="pi pi-ban"
+        outlined
+        severity="danger"
+        @click="openBlockEditor"
+      />
     </div>
 
     <JobList v-if="view === 'list' && tradie?.isVisible" :jobs="jobs" />
@@ -352,6 +338,10 @@ const showPayoutsNudge = computed(
       @remove-block="removeBlock"
       @block-day="blockDay"
     />
+    <!-- Applied: job-board applications. Independent of `tradie.isVisible`
+         (an unverified tradie can't actually submit applications anyway, but
+         we render the list either way and let the empty state speak). -->
+    <MyApplicationsList v-else-if="view === 'applied'" />
 
     <div
       v-if="showPayoutsNudge"
@@ -493,5 +483,76 @@ const showPayoutsNudge = computed(
         />
       </template>
     </Dialog>
+    </div>
   </section>
 </template>
+
+<style scoped>
+.bs-tradie-tab-bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: white;
+  border-bottom: 1px solid var(--bs-border);
+}
+
+.tab-row {
+  display: flex;
+  gap: 0;
+}
+
+.tab {
+  flex: 1 1 0;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 0.5rem;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--bs-muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 120ms ease, border-color 120ms ease;
+  min-height: 44px;
+}
+
+.tab:hover {
+  color: var(--bs-text);
+}
+
+.tab--active {
+  color: var(--bs-blue);
+  border-bottom-color: var(--bs-blue);
+  font-weight: 600;
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--bs-blue);
+  outline-offset: -2px;
+}
+
+.icon {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+/* Mobile: icons only — four tabs are too tight at 375px with labels. The
+   label stays in the DOM via aria-label on the button for screen readers. */
+.label {
+  display: none;
+}
+@media (min-width: 640px) {
+  .label {
+    display: inline;
+  }
+  .icon {
+    font-size: 0.95rem;
+  }
+}
+</style>

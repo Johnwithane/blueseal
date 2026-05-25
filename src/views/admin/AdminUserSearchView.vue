@@ -47,8 +47,7 @@ function roleSeverity(role: string): "info" | "success" | "warn" {
     </RouterLink>
 
     <header class="mt-2 mb-6">
-      <h1 class="text-2xl font-bold">User search</h1>
-      <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
+      <p class="text-sm text-[color:var(--bs-muted)]">
         Paste a UID, email, or phone number to look up an account. Used by support
         when a customer writes in.
       </p>

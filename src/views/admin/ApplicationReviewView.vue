@@ -260,7 +260,6 @@ const approveBlockerHint = computed(() => {
     <div v-if="loading" class="bs-empty mt-4">Loading…</div>
     <template v-else-if="tradie">
       <header class="mt-2 mb-4">
-        <h1 class="text-2xl font-bold">Application review</h1>
         <div class="text-sm text-[color:var(--bs-muted)]">
           <code>{{ uid }}</code>
         </div>

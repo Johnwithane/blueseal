@@ -51,21 +51,16 @@ function onClick(key: string) {
 <style scoped>
 .job-tab-bar {
   position: sticky;
-  /* Mobile: AppHeader is hidden (route meta `mobileCompact`), so the tab
-     bar sticks to the viewport top edge.
-     Desktop: AppHeader is visible at ~60px so tabs sit just below it. */
+  /* AppShell renders this route inside its content column with no top
+     chrome above it on either viewport — the side panel sits to the left
+     on desktop, and mobileCompact hides the bottom nav on mobile. So the
+     tab bar can always stick to the top edge of the content column. */
   top: 0;
   z-index: 20;
   background: white;
   border-bottom: 1px solid var(--bs-border);
   margin-inline: -1rem;
   margin-bottom: 1rem;
-}
-
-@media (min-width: 640px) {
-  .job-tab-bar {
-    top: 60px;
-  }
 }
 
 .tab-row {

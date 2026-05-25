@@ -105,7 +105,6 @@ function urgencyLabel(u: string): string {
 
 <template>
   <section class="bs-container py-6">
-    <h1 class="text-2xl font-bold">Browse open jobs</h1>
     <p class="text-[color:var(--bs-muted)]">
       Jobs posted by clients in your area. Apply with a message and your proposed price.
     </p>

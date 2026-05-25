@@ -71,8 +71,7 @@ const openCount = computed(() => open.value.length);
         <RouterLink to="/dashboard" class="text-xs text-[color:var(--bs-muted)]"
           >← Back</RouterLink
         >
-        <h1 class="text-2xl font-bold mt-1">Disputes</h1>
-        <p class="text-[color:var(--bs-muted)] text-sm">
+        <p class="text-[color:var(--bs-muted)] text-sm mt-1">
           {{ openCount }} open dispute{{ openCount === 1 ? "" : "s" }}. Evidence
           is submitted via the Stripe Dashboard — this queue is for awareness +
           coordination.

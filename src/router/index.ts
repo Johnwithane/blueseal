@@ -4,42 +4,83 @@ import type { Role } from "@/firebase/interfaces";
 
 type RoleGuard = Role | "any";
 
+// `meta.layout` selects which shell wraps the route:
+//   - "public" (default if unset) → AppHeader/Footer marketing chrome
+//   - "app"                       → AppShell (side panel + bottom nav)
+//   - "chromeless"                → no chrome (onboarding wizard)
+// `meta.title` is rendered as the page h1 by AppShell when layout is "app".
+type LayoutKind = "public" | "app" | "chromeless";
+
+declare module "vue-router" {
+  interface RouteMeta {
+    requiresAuth?: boolean;
+    role?: RoleGuard;
+    mobileCompact?: boolean;
+    layout?: LayoutKind;
+    title?: string;
+  }
+}
+
 const routes: RouteRecordRaw[] = [
   {
     path: "/",
     name: "Home",
     component: () => import("@/views/HomeView.vue"),
+    meta: { layout: "public" },
   },
   {
     path: "/search",
     name: "Search",
     component: () => import("@/views/SearchView.vue"),
+    meta: { layout: "public" },
   },
   {
     path: "/tradies/:uid",
     name: "TradieProfile",
     component: () => import("@/views/TradieProfileView.vue"),
+    meta: { layout: "public" },
   },
   {
     path: "/request/:uid",
     name: "RequestQuote",
     component: () => import("@/views/RequestQuoteView.vue"),
-    meta: { requiresAuth: true, role: "client" as RoleGuard },
+    meta: { requiresAuth: true, role: "client", layout: "app", title: "Request quote" },
   },
 
   // Legal
-  { path: "/privacy", name: "Privacy", component: () => import("@/views/PrivacyView.vue") },
-  { path: "/terms", name: "Terms", component: () => import("@/views/TermsView.vue") },
+  {
+    path: "/privacy",
+    name: "Privacy",
+    component: () => import("@/views/PrivacyView.vue"),
+    meta: { layout: "public" },
+  },
+  {
+    path: "/terms",
+    name: "Terms",
+    component: () => import("@/views/TermsView.vue"),
+    meta: { layout: "public" },
+  },
 
   // Auth
-  { path: "/sign-in", name: "SignIn", component: () => import("@/views/auth/SignInView.vue") },
-  { path: "/sign-up", name: "SignUp", component: () => import("@/views/auth/SignUpView.vue") },
+  {
+    path: "/sign-in",
+    name: "SignIn",
+    component: () => import("@/views/auth/SignInView.vue"),
+    meta: { layout: "public" },
+  },
+  {
+    path: "/sign-up",
+    name: "SignUp",
+    component: () => import("@/views/auth/SignUpView.vue"),
+    meta: { layout: "public" },
+  },
   // Legacy path — tradie signup is now a toggle inside /sign-up.
   { path: "/sign-up/tradie", redirect: { name: "SignUp", query: { as: "tradesperson" } } },
   {
     path: "/forgot-password",
     name: "ForgotPassword",
     component: () => import("@/views/auth/ForgotPasswordView.vue"),
+    meta: { layout: "public" },
   },
 
   // Account
@@ -47,20 +88,21 @@ const routes: RouteRecordRaw[] = [
     path: "/account",
     name: "Account",
     component: () => import("@/views/AccountView.vue"),
-    meta: { requiresAuth: true, role: "any" as RoleGuard },
+    meta: { requiresAuth: true, role: "any", layout: "app", title: "Account" },
   },
   {
-    path: "/account/recommendations",
+    // URL stays /account/vouches (vouch invite emails, shared links rely on
+    // the old path). Route NAME is renamed to match the user-facing label
+    // — TradieProfileView already references `AccountRecommendations`.
+    path: "/account/vouches",
     name: "AccountRecommendations",
     component: () => import("@/views/AccountVouchesView.vue"),
-    meta: { requiresAuth: true, role: "tradesperson" as RoleGuard },
-  },
-  // Legacy path — old invite emails + pre-rename notifications still link
-  // here. Redirect to the new canonical route so external links keep
-  // working.
-  {
-    path: "/account/vouches",
-    redirect: { name: "AccountRecommendations" },
+    meta: {
+      requiresAuth: true,
+      role: "tradesperson",
+      layout: "app",
+      title: "Recommendations",
+    },
   },
 
   // Dashboards (role-gated)
@@ -68,25 +110,25 @@ const routes: RouteRecordRaw[] = [
     path: "/dashboard",
     name: "Dashboard",
     component: () => import("@/views/DashboardEntry.vue"),
-    meta: { requiresAuth: true, role: "any" as RoleGuard },
+    meta: { requiresAuth: true, role: "any", layout: "app", title: "Jobs" },
   },
   {
     path: "/dashboard/client",
     name: "ClientDashboard",
     component: () => import("@/views/dashboards/ClientDashboard.vue"),
-    meta: { requiresAuth: true, role: "client" as RoleGuard },
+    meta: { requiresAuth: true, role: "client", layout: "app", title: "Jobs" },
   },
   {
     path: "/dashboard/tradie",
     name: "TradieDashboard",
     component: () => import("@/views/dashboards/TradieDashboard.vue"),
-    meta: { requiresAuth: true, role: "tradesperson" as RoleGuard },
+    meta: { requiresAuth: true, role: "tradesperson", layout: "app", title: "Jobs" },
   },
   {
     path: "/dashboard/admin",
     name: "AdminDashboard",
     component: () => import("@/views/dashboards/AdminDashboard.vue"),
-    meta: { requiresAuth: true, role: "admin" as RoleGuard },
+    meta: { requiresAuth: true, role: "admin", layout: "app", title: "Admin dashboard" },
   },
 
   // Tradesperson onboarding wizard
@@ -94,7 +136,7 @@ const routes: RouteRecordRaw[] = [
     path: "/onboarding",
     name: "TradieOnboarding",
     component: () => import("@/views/tradie/OnboardingWizard.vue"),
-    meta: { requiresAuth: true, role: "tradesperson" as RoleGuard },
+    meta: { requiresAuth: true, role: "tradesperson", layout: "chromeless" },
   },
 
   // Payouts (Stripe Connect onboarding + dashboard link). /return + /refresh
@@ -104,19 +146,19 @@ const routes: RouteRecordRaw[] = [
     path: "/payouts",
     name: "Payouts",
     component: () => import("@/views/payouts/PayoutsOnboardingView.vue"),
-    meta: { requiresAuth: true, role: "tradesperson" as RoleGuard },
+    meta: { requiresAuth: true, role: "tradesperson", layout: "app", title: "Payouts" },
   },
   {
     path: "/payouts/return",
     name: "PayoutsReturn",
     component: () => import("@/views/payouts/PayoutsOnboardingView.vue"),
-    meta: { requiresAuth: true, role: "tradesperson" as RoleGuard },
+    meta: { requiresAuth: true, role: "tradesperson", layout: "app", title: "Payouts" },
   },
   {
     path: "/payouts/refresh",
     name: "PayoutsRefresh",
     component: () => import("@/views/payouts/PayoutsOnboardingView.vue"),
-    meta: { requiresAuth: true, role: "tradesperson" as RoleGuard },
+    meta: { requiresAuth: true, role: "tradesperson", layout: "app", title: "Payouts" },
   },
 
   // Job detail (tradies + clients)
@@ -126,10 +168,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import("@/views/JobDetailView.vue"),
     meta: {
       requiresAuth: true,
-      role: "any" as RoleGuard,
+      role: "any",
+      layout: "app",
+      title: "Job",
       // Hide global chrome on mobile so the tab bar can stick to the top
       // edge and the chat composer / sticky CTA have room. The in-view
-      // "← Dashboard" link handles back nav; the notifications bell + avatar
+      // "← Dashboard" link handles back nav; the side panel + bottom nav
       // stay visible on tablet/desktop.
       mobileCompact: true,
     },
@@ -144,13 +188,13 @@ const routes: RouteRecordRaw[] = [
     path: "/invoices/:id/pay",
     name: "InvoicePay",
     component: () => import("@/views/invoices/InvoicePayView.vue"),
-    meta: { requiresAuth: true, role: "any" as RoleGuard },
+    meta: { requiresAuth: true, role: "any", layout: "app", title: "Pay invoice" },
   },
   {
     path: "/invoices/:id/receipt",
     name: "InvoiceReceipt",
     component: () => import("@/views/invoices/InvoiceReceiptView.vue"),
-    meta: { requiresAuth: true, role: "any" as RoleGuard },
+    meta: { requiresAuth: true, role: "any", layout: "app", title: "Receipt" },
   },
 
   // Job-board marketplace
@@ -160,7 +204,8 @@ const routes: RouteRecordRaw[] = [
     component: () => import("@/views/PostJobView.vue"),
     // Auth-at-submit: the form persists draft to localStorage and bounces to
     // sign-in only when the user hits "Post". Letting unauthed users into the
-    // route is intentional.
+    // route is intentional — keep public chrome so the sign-in CTA stays.
+    meta: { layout: "public" },
   },
   {
     path: "/jobs/browse",
@@ -168,19 +213,29 @@ const routes: RouteRecordRaw[] = [
     component: () => import("@/views/BrowseJobsView.vue"),
     // isVisible:true gate handled inside the view so the unverified tradie
     // gets a "vetting in progress" message instead of a silent bounce.
-    meta: { requiresAuth: true, role: "tradesperson" as RoleGuard },
+    meta: {
+      requiresAuth: true,
+      role: "tradesperson",
+      layout: "app",
+      title: "Browse jobs",
+    },
   },
   {
     path: "/jobs/posted/:postId",
     name: "JobPostDetail",
     component: () => import("@/views/JobPostDetailView.vue"),
-    meta: { requiresAuth: true, role: "any" as RoleGuard },
+    meta: { requiresAuth: true, role: "any", layout: "app", title: "Job post" },
   },
   {
     path: "/my-applications",
     name: "MyApplications",
     component: () => import("@/views/MyApplicationsView.vue"),
-    meta: { requiresAuth: true, role: "tradesperson" as RoleGuard },
+    meta: {
+      requiresAuth: true,
+      role: "tradesperson",
+      layout: "app",
+      title: "My applications",
+    },
   },
 
   // Admin sub-routes
@@ -188,37 +243,42 @@ const routes: RouteRecordRaw[] = [
     path: "/admin/vetting",
     name: "AdminVetting",
     component: () => import("@/views/admin/VettingQueueView.vue"),
-    meta: { requiresAuth: true, role: "admin" as RoleGuard },
+    meta: { requiresAuth: true, role: "admin", layout: "app", title: "Vetting queue" },
   },
   {
     path: "/admin/applications/:uid",
     name: "AdminApplication",
     component: () => import("@/views/admin/ApplicationReviewView.vue"),
-    meta: { requiresAuth: true, role: "admin" as RoleGuard },
+    meta: {
+      requiresAuth: true,
+      role: "admin",
+      layout: "app",
+      title: "Application review",
+    },
   },
   {
     path: "/admin/site-content",
     name: "AdminSiteContent",
     component: () => import("@/views/admin/AdminSiteContentView.vue"),
-    meta: { requiresAuth: true, role: "admin" as RoleGuard },
+    meta: { requiresAuth: true, role: "admin", layout: "app", title: "Site content" },
   },
   {
     path: "/admin/users",
     name: "AdminUserSearch",
     component: () => import("@/views/admin/AdminUserSearchView.vue"),
-    meta: { requiresAuth: true, role: "admin" as RoleGuard },
+    meta: { requiresAuth: true, role: "admin", layout: "app", title: "Users" },
   },
   {
     path: "/admin/disputes",
     name: "AdminDisputes",
     component: () => import("@/views/admin/DisputesQueueView.vue"),
-    meta: { requiresAuth: true, role: "admin" as RoleGuard },
+    meta: { requiresAuth: true, role: "admin", layout: "app", title: "Disputes" },
   },
   {
     path: "/admin/disputes/:id",
     name: "AdminDisputeDetail",
     component: () => import("@/views/admin/DisputeDetailView.vue"),
-    meta: { requiresAuth: true, role: "admin" as RoleGuard },
+    meta: { requiresAuth: true, role: "admin", layout: "app", title: "Dispute" },
   },
 
   // 404
@@ -226,6 +286,7 @@ const routes: RouteRecordRaw[] = [
     path: "/:pathMatch(.*)*",
     name: "NotFound",
     component: () => import("@/views/NotFoundView.vue"),
+    meta: { layout: "public" },
   },
 ];
 

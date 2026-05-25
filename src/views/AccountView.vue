@@ -10,6 +10,10 @@ import Dialog from "primevue/dialog";
 import Textarea from "primevue/textarea";
 import ToggleSwitch from "primevue/toggleswitch";
 import MultiSelect from "primevue/multiselect";
+import Accordion from "primevue/accordion";
+import AccordionPanel from "primevue/accordionpanel";
+import AccordionHeader from "primevue/accordionheader";
+import AccordionContent from "primevue/accordioncontent";
 import { useAuthStore } from "@/stores/auth";
 import {
   exportMyData,
@@ -34,6 +38,7 @@ import { COMMON_LANGUAGES } from "@/data/languages";
 import PortfolioEditor from "@/components/PortfolioEditor.vue";
 import TradieDocsManager from "@/components/TradieDocsManager.vue";
 import VouchesPanel from "@/components/VouchesPanel.vue";
+import PayoutsPanel from "@/components/PayoutsPanel.vue";
 
 const auth = useAuthStore();
 const route = useRoute();
@@ -43,6 +48,11 @@ const { date } = useFormatters();
 
 const displayName = ref("");
 const phone = ref("");
+// "About me" — lives on /users/{uid}.bio. For pre-existing tradies who set
+// a bio during onboarding (which historically wrote to /tradespeople/{uid}),
+// we seed from the tradesperson doc on first load so they don't see an
+// empty field. The first save here writes it to users.bio canonically.
+const bio = ref("");
 const photoURL = ref<string | null>(null);
 const email = ref("");
 const createdAt = ref<{ toDate(): Date } | null>(null);
@@ -56,12 +66,11 @@ const grantingAdminAllRoles = ref(false);
 const error = ref<string | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
 
-// Tradesperson-only profile fields. Pulled from /tradespeople/{uid}; written
+// Tradesperson-only trade fields. Pulled from /tradespeople/{uid}; written
 // back via createOrUpdateDraft alongside the same denormalized fields the
-// onboarding wizard manages. Only mounted/saved when the user holds the
-// tradesperson role.
+// onboarding wizard manages. Bio used to live here too — it's now on the
+// user doc (see `bio` above) so it shows on the Profile tab for everyone.
 const companyName = ref("");
-const bio = ref("");
 const languages = ref<string[]>([]);
 const savingTradieProfile = ref(false);
 
@@ -82,8 +91,10 @@ const savingPrefs = ref(false);
 // Tab navigation. The active tab is persisted in the URL (?tab=) so reloads
 // and shared links return to the same place. The Tradesperson tab is only
 // shown to users with the tradesperson role; if a non-tradie lands on it via
-// a URL, we fall back to Profile.
-type TabKey = "profile" | "tradesperson" | "notifications" | "account";
+// a URL, we fall back to Profile. Notifications used to be its own tab —
+// it's now a section inside Privacy & account since the two are conceptually
+// "settings" rather than profile-editing.
+type TabKey = "profile" | "tradesperson" | "payouts" | "account";
 
 interface TabDef {
   key: TabKey;
@@ -100,7 +111,12 @@ const tabs = computed<TabDef[]>(() => [
     icon: "pi-wrench",
     visible: auth.hasTradieRole,
   },
-  { key: "notifications", label: "Notifications", icon: "pi-bell", visible: true },
+  {
+    key: "payouts",
+    label: "Payouts",
+    icon: "pi-credit-card",
+    visible: auth.hasTradieRole,
+  },
   { key: "account", label: "Privacy & account", icon: "pi-cog", visible: true },
 ]);
 
@@ -147,18 +163,21 @@ onMounted(async () => {
   // we don't silently change their notification behavior.
   emailEnabled.value = u.notificationPrefs?.emailEnabled ?? true;
   whatsappEnabled.value = u.notificationPrefs?.whatsappEnabled ?? true;
-  // Pull the tradesperson doc to seed the tradie-only profile fields below
-  // (companyName / bio / languages). The vetting-status banner is rendered
+  // Pull the tradesperson doc to seed the tradie-only trade fields
+  // (companyName / languages). The vetting-status banner is rendered
   // globally by TradieStatusBanner.vue so we don't recompute it here.
   if (auth.hasTradieRole) {
     const t = await getTradesperson(auth.fbUser.uid);
     tradie.value = t;
     if (t) {
       companyName.value = t.companyName ?? "";
-      bio.value = t.bio ?? "";
       languages.value = Array.isArray(t.languages) ? [...t.languages] : [];
     }
   }
+  // About me: canonical home is users.bio. Pre-existing tradies have their
+  // bio on /tradespeople/{uid} from onboarding — seed from there so the
+  // field isn't empty for them. First save here writes to users.bio.
+  bio.value = u.bio ?? tradie.value?.bio ?? "";
 });
 
 async function saveProfile() {
@@ -167,18 +186,27 @@ async function saveProfile() {
     error.value = "Display name must be at least 2 characters.";
     return;
   }
+  // Match the previous tradesperson-bio minimum so the public profile
+  // doesn't end up with a one-word "about me". Empty is fine (optional).
+  const trimmedBio = bio.value.trim();
+  if (trimmedBio.length > 0 && trimmedBio.length < 20) {
+    error.value = "About me should be at least 20 characters, or leave it blank.";
+    return;
+  }
   error.value = null;
   saving.value = true;
   try {
     await updateUserProfile(auth.fbUser.uid, {
       displayName: displayName.value.trim(),
       phone: phone.value.trim() || null,
+      bio: trimmedBio || null,
     });
     // Keep Firebase Auth's display name in sync so the header label stays current.
     await updateProfile(auth.fbUser, { displayName: displayName.value.trim() });
     if (auth.user) {
       auth.user.displayName = displayName.value.trim();
       auth.user.phone = phone.value.trim() || null;
+      auth.user.bio = trimmedBio || null;
     }
     toast.success("Profile saved");
   } catch (e) {
@@ -188,28 +216,23 @@ async function saveProfile() {
   }
 }
 
-// Tradesperson-only profile fields: companyName / bio / languages live on
+// Tradesperson trade fields: companyName / languages live on
 // /tradespeople/{uid} (the public profile reads them there). Mirrors the
-// wizard's Basics step but skipped here for non-tradies. We don't touch
-// vettingStatus — pending applications stay pending; createOrUpdateDraft
-// only patches what's in the object.
+// wizard's Basics step but skipped here for non-tradies. Bio moved to the
+// user doc — saved via saveProfile above. We don't touch vettingStatus —
+// pending applications stay pending; createOrUpdateDraft only patches
+// what's in the object.
 async function saveTradieProfile() {
   if (!auth.fbUser || !auth.hasTradieRole) return;
-  if (bio.value.length > 0 && bio.value.length < 20) {
-    error.value = "Bio should be at least 20 characters — it's what clients read first.";
-    return;
-  }
   error.value = null;
   savingTradieProfile.value = true;
   try {
     await createOrUpdateDraft(auth.fbUser.uid, {
       companyName: companyName.value.trim() || null,
-      bio: bio.value,
       languages: languages.value,
     });
     if (tradie.value) {
       tradie.value.companyName = companyName.value.trim() || null;
-      tradie.value.bio = bio.value;
       tradie.value.languages = [...languages.value];
     }
     toast.success("Tradesperson profile saved");
@@ -383,6 +406,15 @@ async function confirmDelete() {
   }
 }
 
+async function signOut() {
+  try {
+    await auth.signOut();
+    router.push({ name: "Home" });
+  } catch (e) {
+    error.value = humanizeError(e);
+  }
+}
+
 async function grantAdminAllRoles() {
   grantingAdminAllRoles.value = true;
   error.value = null;
@@ -406,14 +438,11 @@ async function grantAdminAllRoles() {
 
 <template>
   <section class="bs-container max-w-2xl py-6">
-    <h1 class="text-2xl font-bold">Your account</h1>
-    <p class="mb-4 text-[color:var(--bs-muted)]">
-      Update your profile, notifications, and account settings.
-    </p>
-
     <!-- Sticky tab bar. Mirrors JobTabBar's pattern: icons-only on mobile,
          icon+label on desktop, blue underline for the active tab. Tab state
-         is reflected in ?tab= so reloads and deep links stay put. -->
+         is reflected in ?tab= so reloads and deep links stay put. The tab
+         row sticks to the top of the AppShell content column (no AppHeader
+         above it anymore), so the offset is 0. -->
     <div role="tablist" aria-label="Account sections" class="account-tab-row">
       <button
         v-for="t in visibleTabs"
@@ -491,84 +520,25 @@ async function grantAdminAllRoles() {
             Email changes aren't supported in MVP. Contact support.
           </small>
         </div>
-        <div class="flex justify-end">
-          <Button type="submit" label="Save changes" icon="pi pi-save" :loading="saving" />
-        </div>
-      </form>
-
-      <!-- Tradesperson profile: company name, bio, languages — mirrors the
-           wizard's Basics step so the tradie can edit these from one place
-           instead of jumping back to the wizard. -->
-      <form
-        v-if="auth.hasTradieRole"
-        class="bs-card bs-form mt-4 space-y-4 p-5"
-        @submit.prevent="saveTradieProfile"
-      >
-        <div>
-          <h2 class="text-lg font-semibold">Tradesperson profile</h2>
-          <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
-            What clients see on your public profile. You can also edit these
-            during onboarding.
-          </p>
-        </div>
         <div>
           <label class="text-sm font-medium">
-            Company / business name
+            About me
             <span class="text-xs text-[color:var(--bs-muted)] font-normal">Optional</span>
           </label>
-          <InputText
-            v-model="companyName"
-            class="mt-1 w-full"
-            placeholder="e.g. ABC Mechanical Ltd."
-          />
-          <p class="mt-1 text-xs text-[color:var(--bs-muted)]">
-            Leave blank if you operate as a sole proprietor.
-          </p>
-        </div>
-        <div>
-          <label class="text-sm font-medium">Short bio</label>
           <Textarea
             v-model="bio"
             rows="5"
             class="mt-1 w-full"
-            placeholder="What kind of work do you do? How long? What sets you apart?"
+            placeholder="A few sentences about you. Tradespeople: this is what clients read first on your public profile."
           />
           <p class="mt-1 text-xs text-[color:var(--bs-muted)]">
-            At least 20 characters — this is what clients read first.
-          </p>
-        </div>
-        <div>
-          <label class="text-sm font-medium">
-            Languages you work in
-            <span class="text-xs text-[color:var(--bs-muted)] font-normal">Optional</span>
-          </label>
-          <MultiSelect
-            v-model="languages"
-            :options="COMMON_LANGUAGES"
-            placeholder="Select all that apply"
-            class="mt-1 w-full"
-            filter
-            :max-selected-labels="6"
-          />
-          <p class="mt-1 text-xs text-[color:var(--bs-muted)]">
-            Helps clients who'd prefer to be served in a specific language.
+            Leave blank, or write at least 20 characters.
           </p>
         </div>
         <div class="flex justify-end">
-          <Button
-            type="submit"
-            label="Save tradesperson profile"
-            icon="pi pi-save"
-            :loading="savingTradieProfile"
-          />
+          <Button type="submit" label="Save changes" icon="pi pi-save" :loading="saving" />
         </div>
       </form>
-
-      <PortfolioEditor
-        v-if="auth.hasTradieRole && auth.fbUser"
-        :tradie-uid="auth.fbUser.uid"
-        class="mt-4"
-      />
     </div>
 
     <!-- TRADESPERSON TAB ------------------------------------------------ -->
@@ -606,33 +576,11 @@ async function grantAdminAllRoles() {
         :tradie-uid="auth.fbUser.uid"
       />
 
-      <!-- Payouts shortcut. State + actions live on /payouts; this card is
-           a stable, discoverable entry point from Account. -->
-      <div class="bs-card mt-4 p-5 flex items-start gap-3">
-        <i
-          class="pi pi-credit-card text-2xl mt-0.5 text-[color:var(--bs-blue)]"
-          aria-hidden="true"
-        ></i>
-        <div class="flex-1 min-w-0">
-          <h2 class="text-lg font-semibold">Payouts</h2>
-          <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
-            Connect or manage the bank account where Blue Seal pays out your
-            invoices through Stripe.
-          </p>
-        </div>
-        <RouterLink to="/payouts" class="shrink-0">
-          <Button
-            label="Manage payouts"
-            icon="pi pi-arrow-right"
-            icon-pos="right"
-            outlined
-          />
-        </RouterLink>
-      </div>
-
       <!-- Recommendations: embedded directly. The standalone
-           /account/recommendations route still works for email links and
-           external entry points. -->
+           /account/vouches route still works for email links and
+           external entry points (URL kept for back-compat). Payouts used
+           to live here as a shortcut card; it's now its own tab so the
+           tradesperson-specific surface stays focused on profile + docs. -->
       <div class="mt-6">
         <h2 class="text-lg font-semibold">Recommendations</h2>
         <p class="mt-1 mb-3 text-sm text-[color:var(--bs-muted)]">
@@ -641,6 +589,11 @@ async function grantAdminAllRoles() {
         </p>
         <VouchesPanel />
       </div>
+    </div>
+
+    <!-- PAYOUTS TAB ----------------------------------------------------- -->
+    <div v-if="auth.hasTradieRole" v-show="activeTab === 'payouts'">
+      <PayoutsPanel />
     </div>
 
     <!-- NOTIFICATIONS TAB ---------------------------------------------- -->
@@ -881,6 +834,20 @@ async function grantAdminAllRoles() {
         <div><strong>Member since:</strong> {{ date(createdAt) }}</div>
         <div class="mt-2 break-all"><strong>UID:</strong> <code>{{ auth.fbUser?.uid }}</code></div>
       </div>
+
+      <!-- Sign out lives at the very bottom of the tab so it's a deliberate
+           action — you scroll past your roles, password, data, and meta to
+           get to it. Avoids accidental taps that used to be a risk with the
+           one-click avatar dropdown. -->
+      <div class="mt-6 flex justify-center">
+        <Button
+          label="Sign out"
+          icon="pi pi-sign-out"
+          severity="secondary"
+          outlined
+          @click="signOut"
+        />
+      </div>
     </div>
 
     <Dialog
@@ -927,12 +894,12 @@ async function grantAdminAllRoles() {
 </template>
 
 <style scoped>
-/* Tab bar — mirrors src/features/jobDetail/JobTabBar.vue but tailored for
-   the Account view (which keeps AppHeader visible on all viewports, so the
-   sticky offset is constant). Icons-only on mobile, icon+label on desktop. */
+/* Tab bar — mirrors src/features/jobDetail/JobTabBar.vue. AppShell renders
+   the page title above this view but doesn't sit between us and the
+   viewport edge on scroll, so the sticky offset is 0. */
 .account-tab-row {
   position: sticky;
-  top: 60px;
+  top: 0;
   z-index: 10;
   display: flex;
   gap: 0;

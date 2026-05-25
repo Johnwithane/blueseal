@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { computed, ref } from "vue";
 import { useRouter, RouterLink } from "vue-router";
 import Button from "primevue/button";
 import Menu from "primevue/menu";
@@ -10,53 +10,16 @@ import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 import NotificationsPanel from "@/components/NotificationsPanel.vue";
 import type { NotificationDoc, WithId } from "@/firebase/interfaces";
-import {
-  markAllRead,
-  markNotificationRead,
-  subscribeMyNotifications,
-} from "@/firebase/services/notifications";
-import { findJobIdByChatId } from "@/firebase/services/jobs";
-import {
-  resolveNotificationLink,
-  shouldSwitchRoleForNotification,
-} from "@/utils/notifications";
+import { useNotificationsStore } from "@/stores/notifications";
 
 const auth = useAuthStore();
 const router = useRouter();
 const toast = useToast();
+const notifs = useNotificationsStore();
 const menu = ref<InstanceType<typeof Menu> | null>(null);
 const notifPopover = ref<InstanceType<typeof Popover> | null>(null);
 
-const notifications = ref<WithId<NotificationDoc>[]>([]);
-const notifLoading = ref(false);
-const unreadCount = computed(() => notifications.value.filter((n) => !n.read).length);
-
-let unsubNotifs: (() => void) | null = null;
-
-function startNotifSubscription() {
-  // Cancel any prior subscription before starting a fresh one — `watch` may
-  // fire on sign-out followed by sign-in and we don't want stale listeners.
-  if (unsubNotifs) {
-    unsubNotifs();
-    unsubNotifs = null;
-  }
-  if (!auth.isAuthenticated) {
-    notifications.value = [];
-    return;
-  }
-  notifLoading.value = true;
-  unsubNotifs = subscribeMyNotifications((items) => {
-    notifications.value = items;
-    notifLoading.value = false;
-  });
-}
-
-// Re-subscribe whenever the signed-in user identity changes.
-watch(() => auth.fbUser?.uid ?? null, startNotifSubscription, { immediate: true });
-
-onBeforeUnmount(() => {
-  if (unsubNotifs) unsubNotifs();
-});
+const unreadCount = computed(() => notifs.unreadCount);
 
 function toggleNotifs(e: Event) {
   notifPopover.value?.toggle(e);
@@ -64,48 +27,12 @@ function toggleNotifs(e: Event) {
 
 async function onOpenNotification(item: WithId<NotificationDoc>) {
   notifPopover.value?.hide();
-  // Fire-and-forget the mark-read — the snapshot listener will reconcile.
-  // Don't await; a slow Firestore round-trip shouldn't delay navigation.
-  if (!item.read) {
-    markNotificationRead(item.id).catch(() => {
-      /* surfaced via UI eventually if write fails persistently */
-    });
-  }
-  let link = resolveNotificationLink(item);
-  if (!link) return;
-
-  // Repair legacy `/jobs/pending` deep-links: an old bug created chats
-  // with `jobId: "pending"` and rules now prevent patching the chat.
-  // Recover the real jobId from the job doc (it stores chatId) so the
-  // user lands on the correct job instead of the 404-ish JobDetailView.
-  if (link.startsWith("/jobs/pending") && item.chatId && auth.fbUser) {
-    try {
-      const realJobId = await findJobIdByChatId(item.chatId, auth.fbUser.uid);
-      if (realJobId) link = link.replace("/jobs/pending", `/jobs/${realJobId}`);
-    } catch {
-      /* fall through with the original link; user lands on a not-found state */
-    }
-  }
-
-  // Multi-role accounts: if the notification was raised for the user
-  // wearing a different hat than they're currently wearing, flip the
-  // active role BEFORE navigating so the page renders in the right
-  // context (header chrome, role-gated tabs in JobPostDetailView, etc).
-  if (shouldSwitchRoleForNotification(item, auth.activeRole, auth.roles)) {
-    try {
-      await auth.switchActiveRole(item.recipientRole);
-    } catch {
-      /* persistence failed — push anyway so the user isn't stranded */
-    }
-  }
-  router.push(link);
+  await notifs.onOpen(item, router);
 }
 
 async function onMarkAllRead() {
-  const unreadIds = notifications.value.filter((n) => !n.read).map((n) => n.id);
-  if (unreadIds.length === 0) return;
   try {
-    await markAllRead(unreadIds);
+    await notifs.markAllRead();
   } catch (e) {
     toast.error(humanizeError(e));
   }
@@ -291,8 +218,8 @@ function openMenu(e: Event) {
           </button>
           <Popover ref="notifPopover">
             <NotificationsPanel
-              :items="notifications"
-              :loading="notifLoading"
+              :items="notifs.items"
+              :loading="notifs.loading"
               @open="onOpenNotification"
               @mark-all-read="onMarkAllRead"
             />

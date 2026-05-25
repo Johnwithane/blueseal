@@ -84,7 +84,6 @@ function reasonExplanation(reason: string): string {
         class="text-xs text-[color:var(--bs-muted)]"
         >← Back to disputes</RouterLink
       >
-      <h1 class="text-2xl font-bold mt-1">Dispute</h1>
     </div>
 
     <div v-if="loading" class="bs-card p-6">
