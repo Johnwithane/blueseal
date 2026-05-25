@@ -42,8 +42,13 @@ export async function createChat(opts: {
   jobId: string;
   clientId: string;
   tradespersonId: string;
+  // Caller can pre-allocate an id so the chat's jobId can carry the real
+  // value at create time (the rules lock jobId post-create — there is no
+  // "patch it later" path). The request-quote flow needs this so the
+  // job/chat pair is consistent before any messages get notified on.
+  chatId?: string;
 }): Promise<string> {
-  const chatId = doc(collection(db, "chats")).id;
+  const chatId = opts.chatId ?? doc(collection(db, "chats")).id;
   await setDoc(chatRef(chatId), {
     jobId: opts.jobId,
     clientId: opts.clientId,
@@ -53,6 +58,11 @@ export async function createChat(opts: {
     unreadCounts: { [opts.clientId]: 0, [opts.tradespersonId]: 0 },
   });
   return chatId;
+}
+
+/** Stable id for an unsaved chat — see `createChat({ chatId })`. */
+export function newChatId(): string {
+  return doc(collection(db, "chats")).id;
 }
 
 export async function getChat(id: string): Promise<WithId<ChatDoc> | null> {

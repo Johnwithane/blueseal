@@ -7,6 +7,7 @@ import AppHeader from "@/components/AppHeader.vue";
 import AppFooter from "@/components/AppFooter.vue";
 import TradieStatusBanner from "@/components/TradieStatusBanner.vue";
 import AssistantBubble from "@/components/assistant/AssistantBubble.vue";
+import RoleSwitchOverlay from "@/components/RoleSwitchOverlay.vue";
 
 const route = useRoute();
 const chromeless = computed(() => route.path === "/onboarding" || route.path.startsWith("/admin"));
@@ -36,5 +37,9 @@ const mobileCompact = computed(() => route.meta.mobileCompact === true);
          it on their respective pages. The bubble has its own route + role
          visibility rules. -->
     <AssistantBubble />
+    <!-- Global overlay for Airbnb-style role switches. Stays mounted; the
+         component shows/hides itself based on the role-switch animation
+         store, which `auth.switchActiveRole` drives. -->
+    <RoleSwitchOverlay />
   </div>
 </template>

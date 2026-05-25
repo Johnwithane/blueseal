@@ -10,7 +10,7 @@ import { useAuthStore } from "@/stores/auth";
 import { getTradesperson } from "@/firebase/services/tradespeople";
 import { getIntakeSchema } from "@/firebase/services/intakeFormSchemas";
 import { createJob } from "@/firebase/services/jobs";
-import { createChat, sendMessage } from "@/firebase/services/chats";
+import { createChat, newChatId, sendMessage } from "@/firebase/services/chats";
 import { uploadFile, makeStoragePath } from "@/firebase/services/storage";
 import { SEED_INTAKE_SCHEMAS } from "@/data/intakeSchemas";
 import type { IntakeField, TradespersonDoc, WithId, Urgency } from "@/firebase/interfaces";
@@ -169,12 +169,13 @@ async function submit() {
 
   submitting.value = true;
   try {
-    // Chat then job — uploads happen against the real job's intake path.
-    const chatId = await createChat({
-      jobId: "pending",
-      clientId: auth.fbUser.uid,
-      tradespersonId: tradieUid,
-    });
+    // Pre-allocate the chatId so the job can be created first (with the
+    // chatId on it) and the chat doc can be written with the real jobId.
+    // Rules lock chat.jobId post-create — there is no patch-later path —
+    // so any "create chat with jobId='pending' then update later" approach
+    // leaves the link `/jobs/pending` baked in forever, which breaks the
+    // notification deep-link for message_received.
+    const chatId = newChatId();
 
     const jobId = await createJob(
       {
@@ -204,6 +205,16 @@ async function submit() {
       },
       chatId,
     );
+
+    // Now that the real jobId exists, persist the chat with it. Done after
+    // the job so a transient failure here doesn't strand a job-less chat;
+    // a failure in createJob aborts before any chat write happens at all.
+    await createChat({
+      chatId,
+      jobId,
+      clientId: auth.fbUser.uid,
+      tradespersonId: tradieUid,
+    });
 
     // Upload photos in parallel under the real job path.
     const photoUrls = await Promise.all(

@@ -20,6 +20,7 @@ import {
 } from "@/firebase/services/users";
 import type { Role, UserDoc, WithId } from "@/firebase/interfaces";
 import { LEGAL_VERSION } from "@/legal/version";
+import { useRoleSwitchAnimationStore } from "@/stores/roleSwitchAnimation";
 
 interface State {
   fbUser: User | null;
@@ -287,6 +288,11 @@ export const useAuthStore = defineStore("auth", {
         throw new Error(`Cannot switch to ${role}: role not held.`);
       }
       if (this.activeRole === role) return;
+      // Kick the animation BEFORE the persisted write + state flip so the
+      // overlay covers any role-driven re-render underneath. All three
+      // switch paths (manual menu, notification deep-link, router
+      // auto-switch on a role-gated route) flow through here.
+      useRoleSwitchAnimationStore().play(role);
       await writeActiveRole(this.fbUser.uid, role);
       this.activeRole = role;
       if (this.user) this.user.activeRole = role;
