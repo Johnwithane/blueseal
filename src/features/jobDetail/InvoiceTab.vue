@@ -20,6 +20,13 @@ const props = defineProps<{
   // the offline-pay dialog instead so the loop still closes.
   invoicePayable: boolean;
   markingPaid: boolean;
+  // Resolved party names. The job doc carries denormalized
+  // tradespersonName/clientName from create time but older test jobs
+  // have them blank — JobDetailView resolves the best available
+  // source (auth.displayName for the current user side, tradieInfo
+  // for the other side when available) and passes the strings here.
+  resolvedTradespersonName: string;
+  resolvedClientName: string;
 }>();
 
 const emit = defineEmits<{
@@ -148,23 +155,27 @@ function openPayDialog() {
       </p>
     </div>
 
-    <!-- Quote (renders nothing when no quote yet — safe to always mount). -->
-    <QuoteCard
-      :job-id="job.id"
-      :can-edit="isTradie"
-      :stamp-viewed-on-load="isClient"
-      :tradesperson-name="job.tradespersonName ?? null"
-      :client-name="job.clientName ?? null"
-      @revise="emit('revise-quote')"
-    />
-
-    <!-- Invoice (renders only when one exists). -->
+    <!-- Invoice first — once it exists it's the artifact the conversation
+         is really about. Renders only when one exists. -->
     <InvoiceEditor
       v-if="invoiceId"
       :invoice-id="invoiceId"
       :can-edit="isTradie"
-      :tradesperson-name="job.tradespersonName ?? null"
-      :client-name="job.clientName ?? null"
+      :tradesperson-name="resolvedTradespersonName"
+      :client-name="resolvedClientName"
+    />
+
+    <!-- Quote second — it's the historical agreement. Defaults to
+         collapsed once an invoice exists (the invoice is the live
+         document). Renders nothing until a quote is drafted. -->
+    <QuoteCard
+      :job-id="job.id"
+      :can-edit="isTradie"
+      :stamp-viewed-on-load="isClient"
+      :tradesperson-name="resolvedTradespersonName"
+      :client-name="resolvedClientName"
+      :default-collapsed="!!invoiceId"
+      @revise="emit('revise-quote')"
     />
 
     <!-- No-invoice empty state, only when there's also no quote drafted. -->

@@ -13,7 +13,9 @@ import {
   pullBillablesFromJob,
   recomputeTotals,
 } from "@/firebase/services/invoices";
+import { getInvoicePartyInfo } from "@/firebase/services/jobs";
 import { subscribePayoutsState } from "@/firebase/services/payoutsService";
+import PdfPreviewDialog from "@/components/PdfPreviewDialog.vue";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/firebase/config";
 import type {
@@ -36,24 +38,41 @@ const props = defineProps<{
   /** Names denormalized on the job — used for the PDF "From"/"To" header. */
   tradespersonName?: string | null;
   clientName?: string | null;
+  /** When true, start collapsed (header-only). User can toggle open. */
+  defaultCollapsed?: boolean;
 }>();
 
-const downloadingPdf = ref(false);
+const renderingPdf = ref(false);
+const pdfBlob = ref<Blob | null>(null);
+const pdfFilename = ref("");
+const showPdfPreview = ref(false);
 
-async function downloadPdf() {
-  if (!invoice.value || downloadingPdf.value) return;
-  downloadingPdf.value = true;
+// Collapsible state. Initialised from defaultCollapsed; user can toggle.
+const collapsed = ref(false);
+watch(
+  () => props.defaultCollapsed,
+  (v) => {
+    collapsed.value = !!v;
+  },
+  { immediate: true },
+);
+
+async function openPdfPreview() {
+  if (!invoice.value || renderingPdf.value) return;
+  renderingPdf.value = true;
   try {
-    const { downloadInvoicePdf } = await import("@/utils/pdfRender");
-    await downloadInvoicePdf(
-      invoice.value,
-      { name: props.tradespersonName?.trim() || "Tradesperson" },
-      { name: props.clientName?.trim() || "Client" },
-    );
+    const [{ renderInvoicePdfBlob }, party] = await Promise.all([
+      import("@/utils/pdfRender"),
+      getInvoicePartyInfo(invoice.value.jobId),
+    ]);
+    const { blob, filename } = await renderInvoicePdfBlob(invoice.value, party);
+    pdfBlob.value = blob;
+    pdfFilename.value = filename;
+    showPdfPreview.value = true;
   } catch (e) {
     toast.error("Couldn't render PDF", humanizeError(e));
   } finally {
-    downloadingPdf.value = false;
+    renderingPdf.value = false;
   }
 }
 
@@ -306,16 +325,33 @@ async function markPaid() {
 
 <template>
   <div class="bs-card p-4">
-    <header class="flex items-center justify-between mb-2">
-      <div>
-        <h3 class="font-semibold">Invoice</h3>
-        <div v-if="invoice" class="text-xs text-[color:var(--bs-muted)]">
-          {{ invoice.invoiceNumber }} • Issued {{ date(invoice.issuedAt) }}
+    <!-- Header doubles as the collapse toggle so a tap anywhere on it
+         opens/closes the invoice body. Tag stays visible while
+         collapsed so the user sees status at a glance. -->
+    <button
+      type="button"
+      class="flex items-center justify-between w-full text-left"
+      :class="{ 'mb-2': !collapsed }"
+      :aria-expanded="!collapsed"
+      @click="collapsed = !collapsed"
+    >
+      <div class="flex items-center gap-2 min-w-0">
+        <i
+          class="pi text-xs text-[color:var(--bs-muted)] shrink-0"
+          :class="collapsed ? 'pi-chevron-right' : 'pi-chevron-down'"
+          aria-hidden="true"
+        ></i>
+        <div class="min-w-0">
+          <h3 class="font-semibold">Invoice</h3>
+          <div v-if="invoice" class="text-xs text-[color:var(--bs-muted)] truncate">
+            {{ invoice.invoiceNumber }} • Issued {{ date(invoice.issuedAt) }}
+          </div>
         </div>
       </div>
       <Tag v-if="invoice" :value="invoice.status" />
-    </header>
+    </button>
 
+    <template v-if="!collapsed">
     <div v-if="loading" class="bs-empty">Loading…</div>
     <template v-else-if="invoice">
       <table class="w-full text-sm border-t">
@@ -482,24 +518,28 @@ async function markPaid() {
         />
       </div>
 
-      <!-- Download row: visible to both tradesperson and client. Prefers the
-           server-rendered pdfUrl (written by sendInvoice when Stripe Connect
-           is live) and falls back to the lazy-loaded client-side renderer. -->
+      <!-- View / download row: visible to both tradesperson and client.
+           Opens the PDF in an in-app preview modal with download +
+           open-in-new-tab from the modal footer. -->
       <div class="flex items-center mt-3">
-        <a v-if="invoice.pdfUrl" :href="invoice.pdfUrl" target="_blank" rel="noopener noreferrer">
-          <Button label="Download PDF" icon="pi pi-download" outlined size="small" />
-        </a>
         <Button
-          v-else
-          label="Download PDF"
-          icon="pi pi-download"
+          label="View PDF"
+          icon="pi pi-file-pdf"
           outlined
           size="small"
-          :loading="downloadingPdf"
-          :disabled="downloadingPdf"
-          @click="downloadPdf"
+          :loading="renderingPdf"
+          :disabled="renderingPdf"
+          @click="openPdfPreview"
         />
       </div>
     </template>
+    </template>
+
+    <PdfPreviewDialog
+      v-model:visible="showPdfPreview"
+      :blob="pdfBlob"
+      :filename="pdfFilename"
+      :title="invoice ? `Invoice ${invoice.invoiceNumber}` : ''"
+    />
   </div>
 </template>

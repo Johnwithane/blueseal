@@ -3,10 +3,12 @@ import { onBeforeUnmount, ref, watch } from "vue";
 import Button from "primevue/button";
 import Tag from "primevue/tag";
 import { subscribeQuote, getQuoteByJobId, markQuoteViewed } from "@/firebase/services/quotes";
+import { getInvoicePartyInfo } from "@/firebase/services/jobs";
 import type { LineItemKind, QuoteDoc, QuoteStatus, WithId } from "@/firebase/interfaces";
 import { useFormatters } from "@/composables/useFormatters";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
+import PdfPreviewDialog from "@/components/PdfPreviewDialog.vue";
 
 const props = defineProps<{
   jobId: string;
@@ -16,25 +18,43 @@ const props = defineProps<{
   /** Names denormalized on the job — used for the PDF "From"/"To" header. */
   tradespersonName?: string | null;
   clientName?: string | null;
+  /** When true, start collapsed (header-only). User can toggle open. */
+  defaultCollapsed?: boolean;
 }>();
 
-const toast = useToast();
-const downloadingPdf = ref(false);
+// Local open/close state — initialised from defaultCollapsed but the user
+// toggles it freely after that.
+const collapsed = ref(false);
+watch(
+  () => props.defaultCollapsed,
+  (v) => {
+    collapsed.value = !!v;
+  },
+  { immediate: true },
+);
 
-async function downloadPdf() {
-  if (!quote.value || downloadingPdf.value) return;
-  downloadingPdf.value = true;
+const toast = useToast();
+const renderingPdf = ref(false);
+const pdfBlob = ref<Blob | null>(null);
+const pdfFilename = ref("");
+const showPdfPreview = ref(false);
+
+async function openPdfPreview() {
+  if (!quote.value || renderingPdf.value) return;
+  renderingPdf.value = true;
   try {
-    const { downloadQuotePdf } = await import("@/utils/pdfRender");
-    await downloadQuotePdf(
-      quote.value,
-      { name: props.tradespersonName?.trim() || "Tradesperson" },
-      { name: props.clientName?.trim() || "Client" },
-    );
+    const [{ renderQuotePdfBlob }, party] = await Promise.all([
+      import("@/utils/pdfRender"),
+      getInvoicePartyInfo(props.jobId),
+    ]);
+    const { blob, filename } = await renderQuotePdfBlob(quote.value, party);
+    pdfBlob.value = blob;
+    pdfFilename.value = filename;
+    showPdfPreview.value = true;
   } catch (e) {
     toast.error("Couldn't render PDF", humanizeError(e));
   } finally {
-    downloadingPdf.value = false;
+    renderingPdf.value = false;
   }
 }
 
@@ -126,17 +146,34 @@ const KIND_ICON: Record<LineItemKind, string> = {
   </div>
 
   <div v-else-if="quote" class="bs-card p-4">
-    <header class="flex items-center justify-between mb-3">
-      <div>
-        <h3 class="font-semibold">Quote</h3>
-        <div class="text-xs text-[color:var(--bs-muted)]">
-          {{ quote.quoteNumber }}
-          <template v-if="quote.sentAt"> • Sent {{ date(quote.sentAt) }}</template>
+    <!-- Header doubles as the collapse toggle so a tap anywhere on it
+         opens/closes the quote body. The status tag stays visible
+         while collapsed so the user knows the state without expanding. -->
+    <button
+      type="button"
+      class="flex items-center justify-between w-full text-left"
+      :class="{ 'mb-3': !collapsed }"
+      :aria-expanded="!collapsed"
+      @click="collapsed = !collapsed"
+    >
+      <div class="flex items-center gap-2 min-w-0">
+        <i
+          class="pi text-xs text-[color:var(--bs-muted)] shrink-0"
+          :class="collapsed ? 'pi-chevron-right' : 'pi-chevron-down'"
+          aria-hidden="true"
+        ></i>
+        <div class="min-w-0">
+          <h3 class="font-semibold">Quote</h3>
+          <div class="text-xs text-[color:var(--bs-muted)] truncate">
+            {{ quote.quoteNumber }}
+            <template v-if="quote.sentAt"> • Sent {{ date(quote.sentAt) }}</template>
+          </div>
         </div>
       </div>
       <Tag :value="STATUS_LABEL[quote.status]" :severity="STATUS_SEVERITY[quote.status]" />
-    </header>
+    </button>
 
+    <template v-if="!collapsed">
     <div v-if="quote.noteToClient" class="text-sm whitespace-pre-wrap mb-3 italic">
       "{{ quote.noteToClient }}"
     </div>
@@ -248,24 +285,23 @@ const KIND_ICON: Record<LineItemKind, string> = {
         size="small"
         @click="emit('revise')"
       />
-      <a
-        v-if="quote.pdfUrl"
-        :href="quote.pdfUrl"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        <Button label="Download PDF" icon="pi pi-download" outlined size="small" />
-      </a>
       <Button
-        v-else
-        label="Download PDF"
-        icon="pi pi-download"
+        label="View PDF"
+        icon="pi pi-file-pdf"
         outlined
         size="small"
-        :loading="downloadingPdf"
-        :disabled="downloadingPdf"
-        @click="downloadPdf"
+        :loading="renderingPdf"
+        :disabled="renderingPdf"
+        @click="openPdfPreview"
       />
     </div>
+    </template>
+
+    <PdfPreviewDialog
+      v-model:visible="showPdfPreview"
+      :blob="pdfBlob"
+      :filename="pdfFilename"
+      :title="`Quote ${quote.quoteNumber}`"
+    />
   </div>
 </template>

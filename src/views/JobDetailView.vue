@@ -116,6 +116,34 @@ const showQuoteSheet = ref(false);
 const isTradie = computed(() => auth.fbUser?.uid === job.value?.tradespersonId);
 const isClient = computed(() => auth.fbUser?.uid === job.value?.clientId);
 
+// Best-effort name resolution for PDFs + downstream UI. Falls back through
+// the data we have available locally so the PDF "From" / "To" header
+// never reads "Tradesperson" / "Client" when a real name exists somewhere:
+// 1. The denormalized field on the job (set at create time, blank on old
+//    test jobs).
+// 2. The auth store's display name for the current user's own side.
+// 3. The tradesperson public doc (loaded for client viewers).
+// 4. A generic placeholder so something always renders.
+const resolvedTradespersonName = computed(() => {
+  const denorm = job.value?.tradespersonName?.trim();
+  if (denorm) return denorm;
+  if (isTradie.value && auth.fbUser?.displayName?.trim()) {
+    return auth.fbUser.displayName.trim();
+  }
+  const fromTradieDoc = tradieInfo.value?.displayName?.trim();
+  if (fromTradieDoc) return fromTradieDoc;
+  return "Tradesperson";
+});
+
+const resolvedClientName = computed(() => {
+  const denorm = job.value?.clientName?.trim();
+  if (denorm) return denorm;
+  if (isClient.value && auth.fbUser?.displayName?.trim()) {
+    return auth.fbUser.displayName.trim();
+  }
+  return "Client";
+});
+
 const canClientCancel = computed(
   () =>
     isClient.value &&
@@ -667,6 +695,8 @@ function onReturnToApplicants() {
           :invoice-id="invoiceId"
           :invoice-payable="invoicePayable"
           :marking-paid="markingPaid"
+          :resolved-tradesperson-name="resolvedTradespersonName"
+          :resolved-client-name="resolvedClientName"
           @mark-paid="onMarkPaid"
           @revise-quote="showQuoteSheet = true"
           @reviewed="load"
@@ -680,6 +710,7 @@ function onReturnToApplicants() {
       <JobChatButton
         :chat-id="job.chatId"
         :lift-for-cta="showStickyCTA"
+        :is-tradie="isTradie"
         @click="chatOverlayOpen = true"
       />
       <JobChatOverlay

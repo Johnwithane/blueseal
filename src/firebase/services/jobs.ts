@@ -255,6 +255,36 @@ export async function clientMarkPaid(jobId: string): Promise<{ ok: true }> {
   return res.data;
 }
 
+export interface InvoicePartyInfo {
+  tradesperson: {
+    name: string;
+    companyName: string | null;
+    address: string | null;
+    phone: string | null;
+    email: string | null;
+  };
+  client: {
+    name: string;
+    email: string | null;
+    phone: string | null;
+    address: string | null;
+  };
+}
+
+/**
+ * Server-side admin reads for both parties' contact info — used to populate
+ * quote/invoice PDFs without needing each party to read the other's private
+ * user doc. Auth: either party of the job, or an admin.
+ */
+export async function getInvoicePartyInfo(jobId: string): Promise<InvoicePartyInfo> {
+  const fn = httpsCallable<{ jobId: string }, InvoicePartyInfo>(
+    functions,
+    "getInvoicePartyInfo",
+  );
+  const res = await fn({ jobId });
+  return res.data;
+}
+
 /**
  * Resolve the real jobId for a chat. Used to repair legacy notification
  * deep-links that point at `/jobs/pending` — those came from a fixed bug

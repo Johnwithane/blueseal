@@ -9,6 +9,9 @@ const props = defineProps<{
   // When true, lift the button above the sticky bottom CTA so they don't
   // stack on top of each other.
   liftForCta: boolean;
+  // The AI sub-tab inside the overlay is tradesperson-only — so the client
+  // pill should just say "Chat". Defaults to false (client view) when omitted.
+  isTradie?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -52,12 +55,12 @@ const unreadCount = computed(() => {
     class="job-chat-button"
     :class="{ 'job-chat-button--lifted': liftForCta }"
     :aria-label="unreadCount > 0
-      ? `Open chat and AI (${unreadCount} unread)`
-      : 'Open chat and AI'"
+      ? `Open ${props.isTradie ? 'chat and AI' : 'chat'} (${unreadCount} unread)`
+      : `Open ${props.isTradie ? 'chat and AI' : 'chat'}`"
     @click="emit('click')"
   >
     <i class="pi pi-comments icon" aria-hidden="true"></i>
-    <span class="label">Chat &amp; AI</span>
+    <span class="label">{{ props.isTradie ? "Chat &amp; AI" : "Chat" }}</span>
     <span
       v-if="unreadCount > 0"
       class="badge"

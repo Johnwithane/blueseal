@@ -140,6 +140,16 @@ export interface TradespersonDoc {
   geohash: string;
   serviceRadiusKm: number;
   primaryAddressText: string;
+  // Billing-side contact info shown on quotes + invoices the tradesperson
+  // issues. businessAddress optionally overrides primaryAddressText for
+  // sole proprietors who'd rather not show their home address on
+  // paperwork; falls back to primaryAddressText when blank. businessPhone
+  // is a separate line so the client can reach the trade's billing
+  // contact directly. Both optional only because pre-existing tradesperson
+  // docs predate the fields; new docs default to null + the UI nudges the
+  // owner to fill them.
+  businessAddress?: string | null;
+  businessPhone?: string | null;
   portfolioPhotos: string[];
   ratingAvg: number;
   ratingCount: number;

@@ -72,6 +72,10 @@ const fileInput = ref<HTMLInputElement | null>(null);
 // user doc (see `bio` above) so it shows on the Profile tab for everyone.
 const companyName = ref("");
 const languages = ref<string[]>([]);
+// Billing-side contact info shown on quotes + invoices. businessAddress
+// optionally overrides the primary address; blank falls back to it.
+const businessAddress = ref("");
+const businessPhone = ref("");
 const savingTradieProfile = ref(false);
 
 // Privacy section state (PIPEDA — export + delete)
@@ -172,6 +176,8 @@ onMounted(async () => {
     if (t) {
       companyName.value = t.companyName ?? "";
       languages.value = Array.isArray(t.languages) ? [...t.languages] : [];
+      businessAddress.value = t.businessAddress ?? "";
+      businessPhone.value = t.businessPhone ?? "";
     }
   }
   // About me: canonical home is users.bio. Pre-existing tradies have their
@@ -230,10 +236,14 @@ async function saveTradieProfile() {
     await createOrUpdateDraft(auth.fbUser.uid, {
       companyName: companyName.value.trim() || null,
       languages: languages.value,
+      businessAddress: businessAddress.value.trim() || null,
+      businessPhone: businessPhone.value.trim() || null,
     });
     if (tradie.value) {
       tradie.value.companyName = companyName.value.trim() || null;
       tradie.value.languages = [...languages.value];
+      tradie.value.businessAddress = businessAddress.value.trim() || null;
+      tradie.value.businessPhone = businessPhone.value.trim() || null;
     }
     toast.success("Tradesperson profile saved");
   } catch (e) {
@@ -621,6 +631,51 @@ async function grantAdminAllRoles() {
                   Helps clients who'd prefer to be served in a specific language.
                 </p>
               </div>
+
+              <!-- Billing info block. The text on quotes and invoices uses
+                   these fields so clients see a real business address +
+                   phone number on the paperwork. -->
+              <div class="rounded-lg border border-[color:var(--bs-border)] bg-[color:var(--bs-surface-alt,#f9fafb)] p-3 space-y-3">
+                <div class="flex items-center gap-2">
+                  <i class="pi pi-receipt text-[color:var(--bs-blue)]"></i>
+                  <h4 class="text-sm font-semibold m-0">Billing info on invoices</h4>
+                </div>
+                <p class="text-xs text-[color:var(--bs-muted)] -mt-2">
+                  Shown on every quote and invoice you send. Clients use this
+                  to mail payment or reach you with billing questions.
+                </p>
+                <div>
+                  <label class="text-sm font-medium">
+                    Business address
+                    <span class="text-xs text-red-600 font-normal ml-1">Required for invoices</span>
+                  </label>
+                  <InputText
+                    v-model="businessAddress"
+                    class="mt-1 w-full"
+                    placeholder="123 Main St, Suite 4, Toronto ON M5V 2T6"
+                  />
+                  <p class="mt-1 text-xs text-[color:var(--bs-muted)]">
+                    Where you're registered for business. Leave blank to fall
+                    back to your primary service address from onboarding.
+                  </p>
+                </div>
+                <div>
+                  <label class="text-sm font-medium">
+                    Business phone
+                    <span class="text-xs text-[color:var(--bs-muted)] font-normal">Optional</span>
+                  </label>
+                  <InputText
+                    v-model="businessPhone"
+                    class="mt-1 w-full"
+                    placeholder="(416) 555-0199"
+                  />
+                  <p class="mt-1 text-xs text-[color:var(--bs-muted)]">
+                    A direct billing number. Different from your personal
+                    profile phone — leave blank to skip.
+                  </p>
+                </div>
+              </div>
+
               <div class="flex justify-end">
                 <Button
                   type="submit"
