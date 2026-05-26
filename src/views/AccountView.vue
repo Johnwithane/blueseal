@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import { updateProfile } from "firebase/auth";
+import { GeoPoint } from "firebase/firestore";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import InputNumber from "primevue/inputnumber";
@@ -28,6 +29,7 @@ import {
 import {
   createOrUpdateDraft,
   getTradesperson,
+  setLocation,
 } from "@/firebase/services/tradespeople";
 import { setInvoiceNumbering } from "@/firebase/services/billing";
 import type { TradespersonDoc, WithId } from "@/firebase/interfaces";
@@ -35,12 +37,14 @@ import { uploadFile, makeStoragePath } from "@/firebase/services/storage";
 import { compressToWebp } from "@/utils/image";
 import { useToast } from "@/composables/useToast";
 import { useFormatters } from "@/composables/useFormatters";
+import { useGoogleMaps } from "@/composables/useGoogleMaps";
 import { humanizeError } from "@/utils/errors";
 import { COMMON_LANGUAGES } from "@/data/languages";
 import PortfolioEditor from "@/components/PortfolioEditor.vue";
 import TradieDocsManager from "@/components/TradieDocsManager.vue";
 import VouchesPanel from "@/components/VouchesPanel.vue";
 import PayoutsPanel from "@/components/PayoutsPanel.vue";
+import LocationPicker, { type LocationValue } from "@/components/LocationPicker.vue";
 
 const auth = useAuthStore();
 const route = useRoute();
@@ -80,6 +84,24 @@ const businessAddress = ref("");
 const businessPhone = ref("");
 const gstNumber = ref("");
 const savingTradieProfile = ref(false);
+// Element ref for the businessAddress input — wired to Google Places
+// Autocomplete on mount so picking a suggestion fills the formatted address
+// in one go. Raw typing still saves (v-model'd), mirroring RequestQuoteView.
+const businessAddressEl = ref<HTMLInputElement | null>(null);
+
+// Service area lives on /tradespeople/{uid} (location GeoPoint + geohash +
+// serviceRadiusKm + primaryAddressText). Onboarding step 4 sets it; this
+// section lets the tradesperson revisit it without re-entering the wizard.
+// Hydrated from the tradie doc on mount, saved via createOrUpdateDraft +
+// setLocation (the latter recomputes the geohash so BrowseJobs queries
+// pick up the move).
+const serviceLocation = ref<LocationValue>({
+  lat: null,
+  lng: null,
+  radiusKm: 25,
+  label: "",
+});
+const savingServiceArea = ref(false);
 
 // Company logo — shown at the top of generated invoice + quote PDFs in
 // place of the Blue Seal wordmark. Writes the public download URL to
@@ -238,7 +260,38 @@ onMounted(async () => {
       nextQuoteNumber.value = t.nextQuoteNumber ?? 1;
       initialNextInvoiceNumber.value = t.nextInvoiceNumber ?? 1;
       initialNextQuoteNumber.value = t.nextQuoteNumber ?? 1;
+      // Onboarding writes (0,0) into `location` for new drafts; treat
+      // that the same as "unset" so the picker opens on the country
+      // centroid instead of dropping a pin in the Gulf of Guinea.
+      const hasGeo = !!t.location && t.location.latitude !== 0;
+      serviceLocation.value = {
+        lat: hasGeo ? t.location.latitude : null,
+        lng: hasGeo ? t.location.longitude : null,
+        radiusKm: t.serviceRadiusKm || 25,
+        label: t.primaryAddressText ?? "",
+      };
     }
+  }
+  // Wire Google Places autocomplete onto the business-address input the
+  // same way RequestQuoteView does. Stores the formatted address straight
+  // into businessAddress — we don't keep the lat/lng (it's billing copy,
+  // not a service-area centre).
+  try {
+    await useGoogleMaps().load();
+    if (businessAddressEl.value) {
+      const ac = new google.maps.places.Autocomplete(businessAddressEl.value, {
+        fields: ["formatted_address", "name"],
+        types: ["geocode"],
+        componentRestrictions: { country: "ca" },
+      });
+      ac.addListener("place_changed", () => {
+        const place = ac.getPlace();
+        businessAddress.value =
+          place?.formatted_address || place?.name || businessAddress.value;
+      });
+    }
+  } catch {
+    /* maps failed to load — input still works as a plain text field */
   }
   // About me: canonical home is users.bio. Pre-existing tradies have their
   // bio on /tradespeople/{uid} from onboarding — seed from there so the
@@ -312,6 +365,41 @@ async function saveTradieProfile() {
     error.value = humanizeError(e);
   } finally {
     savingTradieProfile.value = false;
+  }
+}
+
+// Service area save. Mirrors the wizard's location-save path:
+// `createOrUpdateDraft` patches primaryAddressText/serviceRadiusKm/location,
+// then `setLocation` rewrites geohash so the BrowseJobs geo query picks up
+// the move. Requires lat+lng — without them we tell the tradesperson to
+// pick a point on the map (the LocationPicker emits null lat/lng if they
+// only adjusted the radius).
+async function saveServiceArea() {
+  if (!auth.fbUser || !auth.hasTradieRole) return;
+  const { lat, lng, radiusKm, label } = serviceLocation.value;
+  if (lat == null || lng == null) {
+    toast.warn("Pick a point on the map (or use 'My location') before saving.");
+    return;
+  }
+  error.value = null;
+  savingServiceArea.value = true;
+  try {
+    await createOrUpdateDraft(auth.fbUser.uid, {
+      primaryAddressText: label ?? "",
+      serviceRadiusKm: radiusKm,
+      location: new GeoPoint(lat, lng),
+    });
+    await setLocation(auth.fbUser.uid, lat, lng);
+    if (tradie.value) {
+      tradie.value.primaryAddressText = label ?? "";
+      tradie.value.serviceRadiusKm = radiusKm;
+      tradie.value.location = new GeoPoint(lat, lng);
+    }
+    toast.success("Service area saved");
+  } catch (e) {
+    error.value = humanizeError(e);
+  } finally {
+    savingServiceArea.value = false;
   }
 }
 
@@ -861,10 +949,18 @@ async function grantAdminAllRoles() {
                     Business address
                     <span class="text-xs text-red-600 font-normal ml-1">Required for invoices</span>
                   </label>
-                  <InputText
+                  <!-- Raw <input> (not InputText) so we can attach Google
+                       Places Autocomplete to the DOM node — same pattern as
+                       RequestQuoteView. Picking a suggestion fills the
+                       formatted address; typing freely still saves. -->
+                  <input
+                    ref="businessAddressEl"
                     v-model="businessAddress"
-                    class="mt-1 w-full"
+                    type="text"
+                    class="p-inputtext p-component mt-1 w-full"
                     placeholder="123 Main St, Suite 4, Toronto ON M5V 2T6"
+                    autocomplete="off"
+                    maxlength="200"
                   />
                   <p class="mt-1 text-xs text-[color:var(--bs-muted)]">
                     Where you're registered for business. Leave blank to fall
@@ -1084,6 +1180,33 @@ async function grantAdminAllRoles() {
                   :loading="savingNumbering"
                   :disabled="!!invoicePrefixError || !!quotePrefixError"
                   @click="saveNumbering"
+                />
+              </div>
+            </div>
+          </AccordionContent>
+        </AccordionPanel>
+
+        <AccordionPanel value="service-area">
+          <AccordionHeader>
+            <span class="flex items-center gap-2">
+              <i class="pi pi-map-marker"></i>
+              Service area
+            </span>
+          </AccordionHeader>
+          <AccordionContent>
+            <div class="space-y-3 pt-3">
+              <p class="text-sm text-[color:var(--bs-muted)]">
+                Set the centre and radius of the area you'll travel to for
+                jobs. Clients see your area on your public profile and the
+                Browse jobs feed uses it to surface nearby leads.
+              </p>
+              <LocationPicker v-model="serviceLocation" />
+              <div class="flex justify-end">
+                <Button
+                  label="Save service area"
+                  icon="pi pi-save"
+                  :loading="savingServiceArea"
+                  @click="saveServiceArea"
                 />
               </div>
             </div>
