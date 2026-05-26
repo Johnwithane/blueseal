@@ -8,6 +8,7 @@ import Textarea from "primevue/textarea";
 import SelectButton from "primevue/selectbutton";
 import Message from "primevue/message";
 import { submitQuote, getQuoteByJobId } from "@/firebase/services/quotes";
+import type { SubmitQuoteUpfrontFee } from "@/firebase/services/quotes";
 import { recomputeTotals } from "@/firebase/services/invoices";
 import { getTradesperson } from "@/firebase/services/tradespeople";
 import { useAuthStore } from "@/stores/auth";
@@ -36,19 +37,25 @@ const auth = useAuthStore();
 // `rateOverrideDollars` only applies to hourly rows: null means "use the
 // rate from my profile", a number is a per-line override (e.g. a discount
 // for this client, or a specialty rate for this task).
+// `taxRatePercent` is the percent the user actually sees/types (e.g. 13
+// for 13% HST). Converted to/from the stored decimal at the buildLineItems
+// + hydrate boundaries so the persisted shape stays unchanged.
 interface UiLine {
   kind: LineItemKind;
   description: string;
   hoursInput: number;          // only used when kind === "hourly"
   rateOverrideDollars: number | null;  // only used when kind === "hourly"
   amountDollars: number;       // only used when kind === "labour" | "materials"
-  taxRate: number;
+  taxRatePercent: number;      // 0–50 (percent)
 }
 const lines = ref<UiLine[]>([]);
 
+// "labour" stays as the underlying kind so all the data model / cloud
+// functions / pulled time-entries keep working unchanged. The label in
+// the UI just reads as "Flat rate" since that's what it actually is.
 const kindOptions: { label: string; value: LineItemKind; icon: string }[] = [
   { label: "Hourly", value: "hourly", icon: "pi pi-clock" },
-  { label: "Labour", value: "labour", icon: "pi pi-wrench" },
+  { label: "Flat rate", value: "labour", icon: "pi pi-wrench" },
   { label: "Materials", value: "materials", icon: "pi pi-box" },
 ];
 
@@ -65,6 +72,23 @@ const discountModeOptions = [
 const validUntilDays = ref<number>(14);
 const terms = ref<string>("");
 const noteToClient = ref<string>("");
+
+// Upfront-fee composer state. Optional — when `upfrontMode === "off"` the
+// quote ships with no fee and the client lands straight in `in_progress`
+// on accept. `percent` carries a 0–50% value; `fixed` carries a dollar
+// amount. Both shapes resolve to a server-snapshotted cents amount at
+// submitQuote time so the client can't accept a different fee than what
+// the tradesperson typed here.
+type UpfrontMode = "off" | "percent" | "fixed";
+const upfrontMode = ref<UpfrontMode>("off");
+const upfrontPercent = ref<number>(20);   // % of pre-tax subtotal
+const upfrontDollars = ref<number>(0);    // dollars when mode === "fixed"
+const upfrontModeOptions = [
+  { label: "No upfront fee", value: "off" },
+  { label: "Percent %", value: "percent" },
+  { label: "Fixed $", value: "fixed" },
+];
+const UPFRONT_PERCENT_CAP = 50;
 
 const submitting = ref(false);
 const priorDeclinedReason = ref<string | null>(null);
@@ -96,6 +120,22 @@ const hasHourlyLineWithoutRate = computed(() =>
   lines.value.some((l) => l.kind === "hourly" && effectiveRateCents(l) == null),
 );
 
+// True for any row where the tradesperson has typed a billable amount
+// (hours OR a flat-rate / materials dollar value) but hasn't given the
+// line a description yet. We deliberately surface this loudly instead of
+// silently dropping the row from the totals — that's how a tradesperson
+// ends up staring at a "$0 — add a line" submit button while their
+// numbers are already on screen.
+function isLineIncomplete(l: UiLine): boolean {
+  const hasDesc = l.description.trim().length > 0;
+  if (hasDesc) return false;
+  if (l.kind === "hourly") {
+    return (l.hoursInput ?? 0) > 0 || (l.rateOverrideDollars ?? 0) > 0;
+  }
+  return (l.amountDollars ?? 0) > 0;
+}
+const hasIncompleteLine = computed(() => lines.value.some(isLineIncomplete));
+
 // Turn the UI rows into LineItem[] for the totals preview AND the submit
 // payload. Hourly rows expand to quantity = hours, unitPrice = rate;
 // labour / materials rows expand to quantity = 1, unitPrice = amount.
@@ -106,6 +146,7 @@ function buildLineItems(): LineItem[] {
   for (const l of lines.value) {
     const desc = l.description.trim();
     if (!desc) continue;
+    const taxRate = Math.max(0, Math.min(0.5, (l.taxRatePercent ?? 0) / 100));
     if (l.kind === "hourly") {
       const rate = effectiveRateCents(l);
       if (rate == null || rate <= 0) continue;
@@ -115,7 +156,7 @@ function buildLineItems(): LineItem[] {
         description: desc,
         quantity: l.hoursInput,
         unitPrice: rate,
-        taxRate: l.taxRate ?? 0,
+        taxRate,
       });
     } else {
       const amount = centsFromDollars(l.amountDollars);
@@ -125,7 +166,7 @@ function buildLineItems(): LineItem[] {
         description: desc,
         quantity: 1,
         unitPrice: amount,
-        taxRate: l.taxRate ?? 0,
+        taxRate,
       });
     }
   }
@@ -154,6 +195,33 @@ const discountForCallable = computed<InvoiceDiscount | null>(() => {
 const totals = computed(() => recomputeTotals(previewLines.value, discountForCallable.value));
 const canSubmit = computed(() => !submitting.value && totals.value.total > 0);
 
+// Live preview of the upfront fee in cents — matches the server-side
+// snapshot logic in submitQuote (percent applied to pre-tax subtotal post-
+// discount). Returns 0 when mode is "off" or when the math is invalid.
+const upfrontPreviewCents = computed<number>(() => {
+  if (upfrontMode.value === "off") return 0;
+  const preTaxBase = Math.max(0, totals.value.subtotal - totals.value.discountAmount);
+  if (preTaxBase <= 0) return 0;
+  if (upfrontMode.value === "percent") {
+    const pct = Math.max(0, Math.min(UPFRONT_PERCENT_CAP, upfrontPercent.value ?? 0));
+    return Math.round((preTaxBase * pct) / 100);
+  }
+  const dollars = Math.max(0, upfrontDollars.value ?? 0);
+  const cents = Math.round(dollars * 100);
+  return Math.min(cents, preTaxBase);
+});
+
+const upfrontFeeForCallable = computed<SubmitQuoteUpfrontFee | null>(() => {
+  if (upfrontMode.value === "off") return null;
+  if (upfrontPreviewCents.value <= 0) return null;
+  if (upfrontMode.value === "percent") {
+    const pct = Math.max(0, Math.min(UPFRONT_PERCENT_CAP, upfrontPercent.value ?? 0));
+    if (pct <= 0) return null;
+    return { type: "percent", bps: Math.round(pct * 100) };
+  }
+  return { type: "fixed", amountCents: upfrontPreviewCents.value };
+});
+
 const validUntilPreview = computed(() => {
   const d = new Date();
   d.setDate(d.getDate() + validUntilDays.value);
@@ -167,7 +235,7 @@ function emptyLine(kind: LineItemKind): UiLine {
     hoursInput: 0,
     rateOverrideDollars: null,
     amountDollars: 0,
-    taxRate: 0.13,
+    taxRatePercent: 13,
   };
 }
 
@@ -202,6 +270,9 @@ function resetForm() {
   noteToClient.value = "";
   priorDeclinedReason.value = null;
   isResend.value = false;
+  upfrontMode.value = "off";
+  upfrontPercent.value = 20;
+  upfrontDollars.value = 0;
 }
 
 // Best-effort rate fetch on open. Failure leaves the rate null and the
@@ -246,7 +317,7 @@ async function hydrateFromExisting() {
         hoursInput: li.quantity,
         rateOverrideDollars: isOverride ? storedRate / 100 : null,
         amountDollars: 0,
-        taxRate: li.taxRate ?? 0,
+        taxRatePercent: Math.round((li.taxRate ?? 0) * 10000) / 100,
       };
     }
     return {
@@ -255,7 +326,7 @@ async function hydrateFromExisting() {
       hoursInput: 0,
       rateOverrideDollars: null,
       amountDollars: (li.unitPrice ?? 0) / 100,
-      taxRate: li.taxRate ?? 0,
+      taxRatePercent: Math.round((li.taxRate ?? 0) * 10000) / 100,
     };
   });
   if (lines.value.length === 0) lines.value = [emptyLine(defaultKind())];
@@ -267,6 +338,16 @@ async function hydrateFromExisting() {
   }
   terms.value = existing.terms ?? "";
   noteToClient.value = existing.noteToClient ?? "";
+  const fee = existing.upfrontFee ?? null;
+  if (fee) {
+    if (fee.type === "percent") {
+      upfrontMode.value = "percent";
+      upfrontPercent.value = Math.round(fee.bps / 100);
+    } else {
+      upfrontMode.value = "fixed";
+      upfrontDollars.value = (fee.amountCents ?? 0) / 100;
+    }
+  }
 }
 
 watch(
@@ -280,8 +361,8 @@ watch(
   },
 );
 
-function addLine() {
-  lines.value = [...lines.value, emptyLine(defaultKind())];
+function addLine(kind?: LineItemKind) {
+  lines.value = [...lines.value, emptyLine(kind ?? defaultKind())];
   void nextTick(() => {
     const inputs = document.querySelectorAll<HTMLInputElement>(
       ".quote-sheet-line-description input",
@@ -319,7 +400,7 @@ async function onSubmit() {
   if (hasHourlyLineWithoutRate.value) {
     toast.error(
       "Hourly line is missing a rate",
-      "Set a profile rate, override the rate on that line, or switch it to Labour.",
+      "Set a profile rate, override the rate on that line, or switch it to Flat rate.",
     );
     return;
   }
@@ -338,6 +419,7 @@ async function onSubmit() {
       validUntilDays: validUntilDays.value,
       terms: terms.value.trim(),
       noteToClient: noteToClient.value.trim(),
+      upfrontFee: upfrontFeeForCallable.value,
     });
     toast.success(
       isResend.value ? "Quote re-sent" : "Quote sent",
@@ -388,21 +470,12 @@ function close() {
 
       <!-- Line items -->
       <section class="rounded-lg border border-[color:var(--bs-border)] p-3">
-        <header class="flex items-center justify-between gap-2 mb-2">
-          <div class="flex items-center gap-2">
-            <i class="pi pi-list text-[color:var(--bs-blue)]"></i>
-            <h4 class="font-semibold text-sm">Scope of work</h4>
-          </div>
-          <Button
-            label="Add line"
-            icon="pi pi-plus"
-            size="small"
-            outlined
-            @click="addLine"
-          />
+        <header class="flex items-center gap-2 mb-2">
+          <i class="pi pi-list text-[color:var(--bs-blue)]"></i>
+          <h4 class="font-semibold text-sm">Scope of work</h4>
         </header>
         <p class="text-xs text-[color:var(--bs-muted)] mb-2">
-          Mix hourly time, flat-rate labour, and parts/materials. Hourly uses your
+          Mix hourly time, flat-rate fees, and parts/materials. Hourly uses your
           profile rate ({{ hourlyRateCents ? money(hourlyRateCents) + "/hr" : "not set" }}).
         </p>
 
@@ -413,7 +486,7 @@ function close() {
           class="mb-3 text-xs"
         >
           One or more Hourly lines have no rate. Set a profile rate, use
-          "Override rate for this line", or switch the row to Labour.
+          "Override rate for this line", or switch the row to Flat rate.
         </Message>
 
         <ul class="space-y-3">
@@ -463,8 +536,18 @@ function close() {
                   : 'e.g. Install new shower mixer'
               "
               maxlength="200"
+              :invalid="isLineIncomplete(l)"
               class="quote-sheet-line-description w-full text-sm"
             />
+            <!-- Surfaces the silent-drop case from buildLineItems: an
+                 amount/hours value with no description means this row
+                 won't reach the totals until a description is typed. -->
+            <p
+              v-if="isLineIncomplete(l)"
+              class="text-[11px] text-red-600 mt-1"
+            >
+              Add a description so this line counts toward the total.
+            </p>
 
             <!-- Hourly: hours + rate (profile by default, per-line override
                  on opt-in). The "X hrs × $Y/hr = $Z" preview below uses
@@ -535,8 +618,8 @@ function close() {
               </div>
             </div>
 
-            <!-- Labour / Materials: single amount input. quantity stays 1
-                 server-side; the tradesperson types the full line total. -->
+            <!-- Flat rate / Materials: single amount input. quantity stays
+                 1 server-side; the tradesperson types the full line total. -->
             <div v-else class="mt-2">
               <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">
                 {{ l.kind === "materials" ? "Cost to client" : "Amount" }}
@@ -552,19 +635,21 @@ function close() {
               />
             </div>
 
-            <!-- Tax per line. Defaults HST 13% so the user rarely has to
-                 think about it. -->
+            <!-- Tax per line. Entered as a percent (e.g. 13 for HST) so the
+                 number on screen matches what a tradesperson would say out
+                 loud. Stored as a 0–1 decimal on the line item. -->
             <div class="grid grid-cols-2 gap-2 mt-2">
               <div>
                 <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">
                   Tax rate
                 </label>
                 <InputNumber
-                  v-model="l.taxRate"
+                  v-model="l.taxRatePercent"
                   :min="0"
-                  :max="0.5"
-                  :max-fraction-digits="3"
-                  :step="0.01"
+                  :max="50"
+                  :max-fraction-digits="2"
+                  :step="1"
+                  suffix=" %"
                   :input-class="'text-sm w-full'"
                   fluid
                 />
@@ -572,6 +657,34 @@ function close() {
             </div>
           </li>
         </ul>
+
+        <!-- Add-line controls live UNDER the items so it's visually obvious
+             that tapping one stacks a new row at the bottom. Each button
+             pre-picks the kind so the tradesperson doesn't have to flip
+             chips after adding. -->
+        <div class="mt-3 grid grid-cols-3 gap-2">
+          <Button
+            label="Hourly"
+            icon="pi pi-plus"
+            size="small"
+            outlined
+            @click="addLine('hourly')"
+          />
+          <Button
+            label="Flat rate"
+            icon="pi pi-plus"
+            size="small"
+            outlined
+            @click="addLine('labour')"
+          />
+          <Button
+            label="Materials"
+            icon="pi pi-plus"
+            size="small"
+            outlined
+            @click="addLine('materials')"
+          />
+        </div>
       </section>
 
       <!-- Discount -->
@@ -615,6 +728,61 @@ function close() {
               maxlength="60"
               class="text-sm w-full"
             />
+          </div>
+        </div>
+      </section>
+
+      <!-- Upfront fee -->
+      <section class="rounded-lg border border-[color:var(--bs-border)] p-3">
+        <header class="flex items-center gap-2 mb-2">
+          <i class="pi pi-wallet text-[color:var(--bs-blue)]"></i>
+          <h4 class="font-semibold text-sm">Upfront fee</h4>
+        </header>
+        <p class="text-xs text-[color:var(--bs-muted)] mb-2">
+          Require part of the quote before you start. Job moves to
+          <span class="font-semibold">Awaiting upfront payment</span>
+          on acceptance; work begins once you mark it received. The amount
+          is credited against the final invoice.
+        </p>
+        <SelectButton
+          v-model="upfrontMode"
+          :options="upfrontModeOptions"
+          option-label="label"
+          option-value="value"
+          :allow-empty="false"
+          class="text-xs"
+        />
+        <div v-if="upfrontMode !== 'off'" class="mt-3 grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">
+              {{ upfrontMode === "percent" ? `Percent (max ${UPFRONT_PERCENT_CAP}%)` : "Amount" }}
+            </label>
+            <InputNumber
+              v-if="upfrontMode === 'percent'"
+              v-model="upfrontPercent"
+              :min="1"
+              :max="UPFRONT_PERCENT_CAP"
+              :max-fraction-digits="0"
+              suffix=" %"
+              :input-class="'text-sm w-full'"
+              fluid
+            />
+            <InputNumber
+              v-else
+              v-model="upfrontDollars"
+              :min="0"
+              :max-fraction-digits="2"
+              mode="currency"
+              currency="CAD"
+              :input-class="'text-sm w-full'"
+              fluid
+            />
+          </div>
+          <div class="flex flex-col justify-end">
+            <span class="text-[11px] text-[color:var(--bs-muted)]">Client pays upfront</span>
+            <span class="font-semibold text-sm text-[color:var(--bs-blue-dark)]">
+              {{ money(upfrontPreviewCents) }}
+            </span>
           </div>
         </div>
       </section>
@@ -705,6 +873,16 @@ function close() {
             <dt>Total</dt>
             <dd>{{ money(totals.total) }}</dd>
           </div>
+          <div
+            v-if="upfrontPreviewCents > 0"
+            class="flex items-center justify-between text-xs text-[color:var(--bs-blue-dark)] pt-1"
+          >
+            <dt class="flex items-center gap-1">
+              <i class="pi pi-wallet text-[10px]"></i>
+              Upfront before work starts
+            </dt>
+            <dd class="font-semibold">{{ money(upfrontPreviewCents) }}</dd>
+          </div>
         </dl>
       </section>
     </div>
@@ -719,6 +897,8 @@ function close() {
               ? isResend
                 ? `Re-send quote — ${money(totals.total)}`
                 : `Send quote — ${money(totals.total)}`
+              : hasIncompleteLine
+              ? 'Add a description to each line'
               : 'Add a line to bill first'
           "
           icon="pi pi-send"

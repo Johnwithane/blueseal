@@ -51,6 +51,8 @@ export { getInvoicePartyInfo } from "./jobs/getInvoicePartyInfo";
 export { submitQuote } from "./jobs/submitQuote";
 export { clientAcceptQuote } from "./jobs/clientAcceptQuote";
 export { clientDeclineQuote } from "./jobs/clientDeclineQuote";
+export { markUpfrontFeePaid } from "./jobs/markUpfrontFeePaid";
+export { clientMarkUpfrontFeePaid } from "./jobs/clientMarkUpfrontFeePaid";
 
 // Invoicing
 export { onJobCompleted } from "./invoicing/onJobCompleted";

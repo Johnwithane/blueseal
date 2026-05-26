@@ -18,6 +18,7 @@ const STATUS_LABEL: Record<string, string> = {
   accepted: "Accepted",
   requested: "Requested",
   quoted: "Quoted",
+  awaiting_upfront_payment: "Awaiting upfront payment",
   in_progress: "In progress",
   awaiting_client_approval: "Awaiting your approval",
   awaiting_payment: "Awaiting payment",
@@ -43,7 +44,13 @@ function isApprovalFlowTransition(before: string | undefined, after: string | un
     // in_progress is the client-accept path (we skip the old
     // quote_accepted/scheduled gates and jump straight to active).
     after === "quoted" ||
-    pair === "quoted->in_progress"
+    pair === "quoted->in_progress" ||
+    // Upfront fee flow — both transitions carry richer messages from the
+    // respective callables (clientAcceptQuote / markUpfrontFeePaid /
+    // clientMarkUpfrontFeePaid). Generic line would just double up.
+    pair === "quoted->awaiting_upfront_payment" ||
+    pair === "awaiting_upfront_payment->in_progress" ||
+    pair === "awaiting_upfront_payment->cancelled"
   );
 }
 

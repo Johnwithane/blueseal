@@ -115,10 +115,14 @@ export async function updateJobStatus(id: string, status: JobStatus): Promise<vo
 // stays cancellable because that now covers the window between client
 // quote-accept and the tradesperson actually doing the work — clients
 // need a way out if plans change before the visit.
+// `awaiting_upfront_payment` is cancellable while unpaid; once the fee
+// has been paid the job moves to `in_progress` (still cancellable, with
+// a UI warning that any refund is handled out-of-band).
 export const CANCELLABLE_STATUSES: readonly JobStatus[] = [
   "accepted",
   "requested",
   "quoted",
+  "awaiting_upfront_payment",
   "in_progress",
 ] as const;
 
@@ -273,6 +277,23 @@ export async function markJobPaid(jobId: string): Promise<{ ok: true }> {
 /** Client-initiated mark-as-paid (manual/offline payment path, no Stripe). */
 export async function clientMarkPaid(jobId: string): Promise<{ ok: true }> {
   const fn = httpsCallable<{ jobId: string }, { ok: true }>(functions, "clientMarkPaid");
+  const res = await fn({ jobId });
+  return res.data;
+}
+
+/** Tradesperson confirms they received the upfront fee — advances job to in_progress. */
+export async function markUpfrontFeePaid(jobId: string): Promise<{ ok: true }> {
+  const fn = httpsCallable<{ jobId: string }, { ok: true }>(functions, "markUpfrontFeePaid");
+  const res = await fn({ jobId });
+  return res.data;
+}
+
+/** Client-side "I've paid the upfront fee" signal — same effect as the tradesperson path. */
+export async function clientMarkUpfrontFeePaid(jobId: string): Promise<{ ok: true }> {
+  const fn = httpsCallable<{ jobId: string }, { ok: true }>(
+    functions,
+    "clientMarkUpfrontFeePaid",
+  );
   const res = await fn({ jobId });
   return res.data;
 }

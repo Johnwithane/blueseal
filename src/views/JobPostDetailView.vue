@@ -55,6 +55,10 @@ const myApplication = ref<WithId<ApplicationDoc> | null>(null);
 const photoUrls = ref<Map<string, string>>(new Map());
 
 const loading = ref(true);
+// Page-load error only — anything that switches the page to the error view.
+// Per-action failures must NOT write here, or they'll replace the whole
+// post + form with a bare message (the "white screen with just the error"
+// bug). Use applyError for the apply form, toast.error for other actions.
 const error = ref<string | null>(null);
 
 // Apply form (tradesperson view)
@@ -64,6 +68,7 @@ const applyAmount = ref<number | null>(null);
 const applyNotes = ref("");
 const applyStartDate = ref<string>("");
 const submittingApply = ref(false);
+const applyError = ref<string | null>(null);
 const submittingAccept = ref(false);
 const submittingCancel = ref(false);
 const submittingWithdraw = ref(false);
@@ -149,7 +154,7 @@ function priceLabel(p: ApplicationDoc["proposedPrice"]): string {
 
 async function submitApply() {
   if (!post.value || submittingApply.value) return;
-  error.value = null;
+  applyError.value = null;
 
   const payload = {
     postId: postId.value,
@@ -163,7 +168,7 @@ async function submitApply() {
   };
   const parsed = submitApplicationSchema.safeParse(payload);
   if (!parsed.success) {
-    error.value = parsed.error.issues[0]?.message ?? "Check the form.";
+    applyError.value = parsed.error.issues[0]?.message ?? "Check the form.";
     return;
   }
 
@@ -176,7 +181,7 @@ async function submitApply() {
     applyNotes.value = "";
     applyStartDate.value = "";
   } catch (e) {
-    error.value = humanizeError(e);
+    applyError.value = humanizeError(e);
   } finally {
     submittingApply.value = false;
   }
@@ -199,7 +204,7 @@ async function onAccept(app: WithId<ApplicationDoc>) {
         const { jobId } = await acceptApplication(postId.value, app.id);
         router.push({ name: "JobDetail", params: { id: jobId } });
       } catch (e) {
-        error.value = humanizeError(e);
+        toast.error("Couldn't pick this tradesperson", humanizeError(e));
       } finally {
         submittingAccept.value = false;
       }
@@ -221,7 +226,7 @@ async function onCancelPost() {
         toast.success("Post cancelled");
         post.value = await getJobPost(postId.value);
       } catch (e) {
-        error.value = humanizeError(e);
+        toast.error("Couldn't cancel post", humanizeError(e));
       } finally {
         submittingCancel.value = false;
       }
@@ -235,7 +240,7 @@ async function onWithdraw() {
     await withdrawApplication(postId.value);
     toast.success("Application withdrawn");
   } catch (e) {
-    error.value = humanizeError(e);
+    toast.error("Couldn't withdraw application", humanizeError(e));
   } finally {
     submittingWithdraw.value = false;
   }
@@ -502,6 +507,9 @@ const visibleApplications = computed(() =>
           <p class="text-xs text-[color:var(--bs-muted)]">
             Anticipate what the client might ask — your approach, availability, what's included.
           </p>
+          <Message v-if="applyError" severity="error" :closable="false">
+            {{ applyError }}
+          </Message>
           <div>
             <label class="text-sm font-medium">Cover message</label>
             <Textarea

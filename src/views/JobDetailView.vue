@@ -11,6 +11,7 @@ import {
   cancelJob,
   getJob,
   markJobPaid,
+  markUpfrontFeePaid,
   scheduleJob,
   updatePrivateNotes,
   saveJobIntakeAndAdvance,
@@ -35,6 +36,7 @@ import FinishJobSheet from "@/components/FinishJobSheet.vue";
 import ClientApprovalBanner from "@/components/ClientApprovalBanner.vue";
 import QuoteSheet from "@/components/QuoteSheet.vue";
 import ClientQuoteApprovalBanner from "@/components/ClientQuoteApprovalBanner.vue";
+import UpfrontFeePaymentBanner from "@/components/UpfrontFeePaymentBanner.vue";
 import TradieChangesRequestedBanner from "@/components/TradieChangesRequestedBanner.vue";
 import MutualReviewCard from "@/components/MutualReviewCard.vue";
 import { SEED_INTAKE_SCHEMAS } from "@/data/intakeSchemas";
@@ -56,7 +58,7 @@ const router = useRouter();
 const auth = useAuthStore();
 const toast = useToast();
 const confirmDialog = useConfirm();
-const { dateTime } = useFormatters();
+const { dateTime, money } = useFormatters();
 
 function formatScheduled(
   start: { toDate(): Date } | null | undefined,
@@ -127,6 +129,7 @@ const savingSchedule = ref(false);
 
 const showFinishSheet = ref(false);
 const markingPaid = ref(false);
+const markingUpfront = ref(false);
 const showQuoteSheet = ref(false);
 
 const isTradie = computed(() => auth.fbUser?.uid === job.value?.tradespersonId);
@@ -316,6 +319,7 @@ watch(
 const stickyCTAStatuses: ReadonlySet<JobStatus> = new Set([
   "requested",
   "quoted",
+  "awaiting_upfront_payment",
   "in_progress",
   "awaiting_payment",
 ]);
@@ -634,6 +638,20 @@ async function onMarkPaid() {
   });
 }
 
+async function onMarkUpfrontPaid() {
+  if (!job.value || markingUpfront.value) return;
+  markingUpfront.value = true;
+  try {
+    await markUpfrontFeePaid(job.value.id);
+    toast.success("Upfront fee confirmed", "Job is now active — you're clear to start.");
+    await load();
+  } catch (e) {
+    toast.error("Couldn't mark paid", humanizeError(e));
+  } finally {
+    markingUpfront.value = false;
+  }
+}
+
 function openCancelDialog() {
   cancelReason.value = "";
   showCancelDialog.value = true;
@@ -856,6 +874,16 @@ function onReturnToApplicants() {
         @decided="load"
       />
 
+      <UpfrontFeePaymentBanner
+        v-if="job.status === 'awaiting_upfront_payment' && job.upfrontFee"
+        :job="job"
+        :is-client="isClient"
+        :is-tradie="isTradie"
+        :payment-instructions="tradieInfo?.paymentInstructions ?? null"
+        class="mb-4"
+        @marked="load"
+      />
+
       <ClientApprovalBanner
         v-if="isClient && job.status === 'awaiting_client_approval'"
         :job-id="job.id"
@@ -1006,6 +1034,16 @@ function onReturnToApplicants() {
           @click="showQuoteSheet = true"
         />
         <Button
+          v-else-if="job.status === 'awaiting_upfront_payment'"
+          :label="job.upfrontFee ? `Mark upfront received — ${money(job.upfrontFee.amountCents)}` : 'Mark upfront received'"
+          icon="pi pi-check"
+          severity="success"
+          class="w-full"
+          size="large"
+          :loading="markingUpfront"
+          @click="onMarkUpfrontPaid"
+        />
+        <Button
           v-else-if="job.status === 'in_progress'"
           :label="job.clientChangesRequestedAt ? 'Update invoice' : 'Create invoice'"
           :icon="job.clientChangesRequestedAt ? 'pi pi-pencil' : 'pi pi-receipt'"
@@ -1098,6 +1136,20 @@ function onReturnToApplicants() {
       header="Cancel this job?"
       :style="{ width: '28rem', maxWidth: '92vw' }"
     >
+      <!-- Upfront fee warning. Refunds aren't tracked in the data model
+           (deferred to v1.1, per design.md), so flag the manual settlement
+           obligation before the user commits — they'd otherwise cancel
+           thinking platform owes them the refund. -->
+      <div
+        v-if="job?.upfrontFee?.paidAt"
+        class="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 mb-3"
+      >
+        <i class="pi pi-exclamation-triangle text-amber-700 mr-1"></i>
+        This job already has a
+        <span class="font-semibold">{{ money(job.upfrontFee.amountCents) }}</span>
+        upfront fee paid. Refunds are handled outside Blue Seal —
+        coordinate that with the {{ isClient ? "tradesperson" : "client" }} before cancelling.
+      </div>
       <p class="text-sm text-[color:var(--bs-text)] mb-3">
         Tell the tradesperson what changed. They'll see this in their inbox.
       </p>

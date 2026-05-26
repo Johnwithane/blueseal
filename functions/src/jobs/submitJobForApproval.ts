@@ -27,12 +27,19 @@ const Input = z.object({
   noteToClient: z.string().max(500).default(""),
 });
 
+interface UpfrontFeeOnJob {
+  amountCents: number;
+  paidAt: Timestamp | null;
+  appliedInvoiceId: string | null;
+}
+
 interface JobData {
   tradespersonId: string;
   clientId: string;
   title: string;
   status: string;
   chatId: string;
+  upfrontFee?: UpfrontFeeOnJob | null;
 }
 
 interface TimeEntryData {
@@ -72,7 +79,11 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
  * across the boundary tangles the build. Keep them in lockstep — if the
  * math changes, change both.
  */
-function computeTotals(items: LineItem[], discount: Discount | null) {
+function computeTotals(
+  items: LineItem[],
+  discount: Discount | null,
+  upfrontFeeCreditCents = 0,
+) {
   let subtotal = 0;
   for (const li of items) subtotal += li.quantity * li.unitPrice;
 
@@ -93,7 +104,14 @@ function computeTotals(items: LineItem[], discount: Discount | null) {
     taxTotal += Math.round(lineSub * factor * li.taxRate);
   }
 
-  return { subtotal, discountAmount, taxTotal, total: subtotal - discountAmount + taxTotal };
+  const totalBeforeCredit = subtotal - discountAmount + taxTotal;
+  const credit = Math.max(0, Math.round(upfrontFeeCreditCents));
+  return {
+    subtotal,
+    discountAmount,
+    taxTotal,
+    total: Math.max(0, totalBeforeCredit - credit),
+  };
 }
 
 /**
@@ -245,9 +263,34 @@ export const submitJobForApproval = onCall({ enforceAppCheck: false }, async (re
   }
 
   const mergedLines: LineItem[] = [...preservedLines, ...pulledLines, ...extraLineItems];
-  const totals = computeTotals(mergedLines, discount);
+  // Upfront fee credit — only honoured when the fee has actually been paid
+  // (paidAt set by markUpfrontFeePaid / clientMarkUpfrontFeePaid).
+  const upfrontFee = job.upfrontFee ?? null;
+  const upfrontCreditCents =
+    upfrontFee && upfrontFee.amountCents > 0 && upfrontFee.paidAt
+      ? upfrontFee.amountCents
+      : 0;
+  const totals = computeTotals(mergedLines, discount, upfrontCreditCents);
+  const upfrontFeeCredit =
+    upfrontCreditCents > 0 && upfrontFee?.paidAt
+      ? {
+          amountCents: upfrontCreditCents,
+          sourceQuoteId: jobId,
+          paidAt: upfrontFee.paidAt,
+        }
+      : null;
 
-  if (mergedLines.length === 0 || totals.total <= 0) {
+  if (mergedLines.length === 0) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Nothing to bill — add time, expenses, or a custom line item before finishing.",
+    );
+  }
+  // Pre-credit total has to clear zero. The post-credit total CAN be zero
+  // (or close to it) when the upfront fee already covered the whole job —
+  // that's a valid outcome, not a failed precondition.
+  const preCreditTotal = totals.subtotal - totals.discountAmount + totals.taxTotal;
+  if (preCreditTotal <= 0) {
     throw new HttpsError(
       "failed-precondition",
       "Nothing to bill — add time, expenses, or a custom line item before finishing.",
@@ -305,8 +348,12 @@ export const submitJobForApproval = onCall({ enforceAppCheck: false }, async (re
       paymentInstructions: tradie.paymentInstructions ?? "",
       paymentMethod: "manual",
       recurring: null,
+      upfrontFeeCredit,
     });
     batch.update(tradieRef, { nextInvoiceNumber: seq + 1 });
+    if (upfrontFeeCredit && !upfrontFee?.appliedInvoiceId) {
+      batch.update(jobRef, { "upfrontFee.appliedInvoiceId": invoiceRef.id });
+    }
   } else {
     batch.update(invoiceRef, {
       lineItems: mergedLines,
@@ -315,7 +362,13 @@ export const submitJobForApproval = onCall({ enforceAppCheck: false }, async (re
       discountAmount: totals.discountAmount,
       taxTotal: totals.taxTotal,
       total: totals.total,
+      // Refresh the credit on re-submits so a quote-side change before
+      // approval propagates. No-op when nothing changed.
+      upfrontFeeCredit,
     });
+    if (upfrontFeeCredit && !upfrontFee?.appliedInvoiceId) {
+      batch.update(jobRef, { "upfrontFee.appliedInvoiceId": invoiceRef.id });
+    }
   }
 
   batch.update(jobRef, {

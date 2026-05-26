@@ -9,6 +9,7 @@ import {
   subscribeQuote,
 } from "@/firebase/services/quotes";
 import { useToast } from "@/composables/useToast";
+import { useFormatters } from "@/composables/useFormatters";
 import { humanizeError } from "@/utils/errors";
 import type { QuoteDoc, WithId } from "@/firebase/interfaces";
 
@@ -21,6 +22,7 @@ const emit = defineEmits<{
 }>();
 
 const toast = useToast();
+const { money } = useFormatters();
 const accepting = ref(false);
 const declining = ref(false);
 
@@ -53,6 +55,14 @@ const showActions = computed(() => {
   // flash of the action state.
   if (!quote.value) return true;
   return quote.value.status === "sent" || quote.value.status === "viewed";
+});
+
+// Upfront-fee snapshot from the live quote. Drives the "$X required
+// before work starts" copy on the accept button so the client understands
+// they're committing to a deposit before the tradesperson picks up tools.
+const upfrontFeeCents = computed<number>(() => {
+  const fee = quote.value?.upfrontFee;
+  return fee && fee.amountCents > 0 ? fee.amountCents : 0;
 });
 
 async function onAccept() {
@@ -114,6 +124,15 @@ async function onSubmitDecline() {
           Read through the breakdown below. Accept to lock it in and let the
           tradesperson schedule, or ask to discuss if anything needs changing.
         </p>
+        <div
+          v-if="upfrontFeeCents > 0"
+          class="mt-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+        >
+          <i class="pi pi-wallet text-amber-700 mr-1"></i>
+          Accepting commits you to pay
+          <span class="font-semibold">{{ money(upfrontFeeCents) }}</span>
+          upfront before work begins. It'll be credited against the final invoice.
+        </div>
       </div>
     </div>
 
@@ -127,7 +146,7 @@ async function onSubmitDecline() {
         @click="openDeclineDialog"
       />
       <Button
-        label="Accept quote"
+        :label="upfrontFeeCents > 0 ? `Accept — ${money(upfrontFeeCents)} upfront` : 'Accept quote'"
         icon="pi pi-check"
         severity="success"
         :loading="accepting"

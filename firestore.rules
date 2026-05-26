@@ -436,9 +436,20 @@ service cloud.firestore {
         // Bid-blind: post-owning client OR the applicant themselves OR admin.
         // CollectionGroup queries auto-filter via the same predicate — a tradie
         // querying applications where tradespersonId == uid gets only their own.
+        //
+        // `resource == null` short-circuit: the tradie's JobPostDetailView
+        // subscribes to applications/{theirUid} on mount, BEFORE they've
+        // applied. Without the null guard the rule evaluator throws on
+        // `resource.data.tradespersonId` and Firestore reports
+        // permission-denied — turning "no application yet" into an
+        // uncaught snapshot-listener error in the console. Same pattern
+        // /quotes and /invoices already use. We gate the missing-doc read
+        // on `tradieId == uid()` so it can only be used to probe one's
+        // own slot, not to enumerate other tradies' application IDs.
         allow read: if isAdmin()
-          || resource.data.tradespersonId == uid()
-          || (isSignedIn() && resource.data.clientId == uid());
+          || (resource == null && isSignedIn() && tradieId == uid())
+          || (resource != null && resource.data.tradespersonId == uid())
+          || (resource != null && isSignedIn() && resource.data.clientId == uid());
         allow create, update, delete: if false;  // marketplace callables only
       }
     }
@@ -594,11 +605,23 @@ service cloud.firestore {
     // admin read; nobody writes from the client — every state transition
     // (submission, reveal, lock) flows through the Cloud Functions side.
     match /reviewPairs/{jobId} {
-      allow read: if isSignedIn() && (
-        resource.data.clientId == uid()
-        || resource.data.tradespersonId == uid()
-        || isAdmin()
-      );
+      // `resource == null` short-circuit: JobDetailView subscribes to
+      // reviewPairs/{jobId} long before the pair is created (the doc only
+      // appears once a side marks paid via ensureReviewPair). Without the
+      // null guard the rule evaluator throws on `resource.data.clientId`
+      // and Firestore reports permission-denied — spamming the console
+      // with a retrying snapshot-listener error for every open job. Gate
+      // the missing-doc read on the requester being a party to the
+      // parent job so we don't leak whether arbitrary job ids exist.
+      allow read: if isAdmin()
+        || (resource != null && isSignedIn() && (
+             resource.data.clientId == uid()
+             || resource.data.tradespersonId == uid()
+           ))
+        || (resource == null && isSignedIn()
+             && exists(/databases/$(database)/documents/jobs/$(jobId))
+             && (jobDoc(jobId).data.clientId == uid()
+                 || jobDoc(jobId).data.tradespersonId == uid()));
       allow create, update, delete: if false;
     }
 

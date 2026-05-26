@@ -18,20 +18,33 @@ interface JobData {
   chatId: string;
 }
 
+interface QuoteUpfrontFeeData {
+  type: "fixed" | "percent";
+  amountCents: number;
+  bps?: number;
+}
+
 interface QuoteData {
   quoteNumber: string;
   total: number;
   status: string;
+  upfrontFee?: QuoteUpfrontFeeData | null;
 }
 
 /**
- * Client accepts the quote. Atomically transitions the job straight to
- * "in_progress" (the scheduling step is no longer a status gate — date
- * pick is metadata the tradesperson can fill in from the Schedule tab)
- * and the quote doc to "accepted".
+ * Client accepts the quote. Atomically transitions the job to "in_progress"
+ * (the scheduling step is no longer a status gate — date pick is metadata
+ * the tradesperson can fill in from the Schedule tab) and the quote doc to
+ * "accepted".
+ *
+ * If the accepted quote required an upfront fee, the job lands in
+ * "awaiting_upfront_payment" instead — work doesn't start until the fee is
+ * marked paid via markUpfrontFeePaid / clientMarkUpfrontFeePaid (or the
+ * Stripe Connect dispatcher, once that's enabled).
  *
  * onJobUpdated suppresses its generic line for the quoted → in_progress
- * transition (richer message posted here).
+ * AND the quoted → awaiting_upfront_payment transitions (richer messages
+ * are posted here).
  */
 export const clientAcceptQuote = onCall({ enforceAppCheck: false }, async (req) => {
   const uid = requireRole(req, "client");
@@ -72,7 +85,27 @@ export const clientAcceptQuote = onCall({ enforceAppCheck: false }, async (req) 
       throw new HttpsError("failed-precondition", "Quote has zero total.");
     }
 
-    tx.update(jobRef, { status: "in_progress" });
+    const upfront = quote.upfrontFee ?? null;
+    const requiresUpfrontPayment = upfront != null && upfront.amountCents > 0;
+
+    if (requiresUpfrontPayment) {
+      tx.update(jobRef, {
+        status: "awaiting_upfront_payment",
+        upfrontFee: {
+          amountCents: upfront!.amountCents,
+          source: upfront!.type,
+          // Manual is the only resolution path live today; the Stripe webhook
+          // dispatcher will overwrite paymentMethod + paidBy when Connect is
+          // enabled. Mirrors InvoiceDoc.paymentMethod for consistency.
+          paymentMethod: "manual",
+          paidAt: null,
+          paidBy: null,
+          appliedInvoiceId: null,
+        },
+      });
+    } else {
+      tx.update(jobRef, { status: "in_progress" });
+    }
     tx.update(quoteRef, {
       status: "accepted",
       acceptedAt: FieldValue.serverTimestamp(),
@@ -83,21 +116,25 @@ export const clientAcceptQuote = onCall({ enforceAppCheck: false }, async (req) 
       chatId: job.chatId,
       quoteNumber: quote.quoteNumber,
       total: quote.total,
+      upfrontFeeCents: requiresUpfrontPayment ? upfront!.amountCents : 0,
     };
   });
 
   if (result.chatId) {
-    await postSystemMessage(
-      result.chatId,
-      `Client accepted quote ${result.quoteNumber} ($${(result.total / 100).toFixed(2)}). Job is now active — invoice when the work is done.`,
-    );
+    const message = result.upfrontFeeCents > 0
+      ? `Client accepted quote ${result.quoteNumber} ($${(result.total / 100).toFixed(2)}). $${(result.upfrontFeeCents / 100).toFixed(2)} upfront fee due before work begins.`
+      : `Client accepted quote ${result.quoteNumber} ($${(result.total / 100).toFixed(2)}). Job is now active — invoice when the work is done.`;
+    await postSystemMessage(result.chatId, message);
   }
 
   await notify({
     userId: result.tradespersonId,
     type: "invoice_sent",
     title: "Client accepted your quote",
-    body: `${result.quoteNumber} ($${(result.total / 100).toFixed(2)}). Job is now active — invoice when finished.`,
+    body:
+      result.upfrontFeeCents > 0
+        ? `${result.quoteNumber} accepted. Awaiting $${(result.upfrontFeeCents / 100).toFixed(2)} upfront fee before you start.`
+        : `${result.quoteNumber} ($${(result.total / 100).toFixed(2)}). Job is now active — invoice when finished.`,
     link: `/jobs/${jobId}`,
     actorUid: uid,
     jobId,

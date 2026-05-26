@@ -65,7 +65,7 @@ interface JobPayload {
   clientPhotoURL: string | null;
   tradespersonName: string;
   tradespersonPhotoURL: string | null;
-  status: "accepted";
+  status: "requested";
   trade: string;
   title: string;
   description: string;
@@ -176,7 +176,11 @@ export const acceptApplication = onCall({ enforceAppCheck: false }, async (req) 
           (tradie.companyName ?? "").trim() ||
           "Tradesperson",
         tradespersonPhotoURL: tradie.photoURL ?? null,
-        status: "accepted",
+        // Marketplace jobs skip the "accepted" intake-gate state — the post
+        // already collected description + photos + address, so there's no
+        // trade-specific brief to wait on. Drop straight into "requested"
+        // so the tradesperson can prepare a quote immediately.
+        status: "requested",
         trade: post.trade,
         title: post.title,
         description: post.description,

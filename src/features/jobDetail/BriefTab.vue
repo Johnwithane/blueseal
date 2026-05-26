@@ -1,9 +1,12 @@
 <script setup lang="ts">
+import { ref, watch } from "vue";
 import { RouterLink } from "vue-router";
 import Avatar from "primevue/avatar";
 import Button from "primevue/button";
 import Tag from "primevue/tag";
 import Textarea from "primevue/textarea";
+import { ref as storageRef, getDownloadURL } from "firebase/storage";
+import { storage } from "@/firebase/config";
 import IntakeFormRenderer from "@/components/IntakeFormRenderer.vue";
 import VerifiedBadge from "@/components/VerifiedBadge.vue";
 import type {
@@ -25,6 +28,30 @@ const props = defineProps<{
   returningToApplicants: boolean;
   updatingLog: boolean;
 }>();
+
+// Intake photos are stored as Firebase Storage paths (e.g.
+// "jobs/<jobId>/intake/foo.webp"), not download URLs — bind them straight
+// to <img :src> and the browser tries to fetch a relative path off the
+// current origin and renders nothing. Resolve each path to a download URL
+// once and cache by path.
+const photoUrls = ref<Map<string, string>>(new Map());
+watch(
+  () => props.job.intakePhotos,
+  async (paths) => {
+    if (!paths?.length) return;
+    for (const path of paths) {
+      if (photoUrls.value.has(path)) continue;
+      try {
+        const url = await getDownloadURL(storageRef(storage, path));
+        photoUrls.value.set(path, url);
+      } catch {
+        /* missing — skip */
+      }
+    }
+    photoUrls.value = new Map(photoUrls.value);
+  },
+  { immediate: true },
+);
 
 const intakeDraft = defineModel<Record<string, unknown>>("intakeDraft", { required: true });
 const privateNotes = defineModel<string>("privateNotes", { required: true });
@@ -101,12 +128,27 @@ function tradieAvatarInitial() {
         v-if="job.intakePhotos.length"
         class="grid grid-cols-3 sm:grid-cols-4 gap-2 mt-3"
       >
-        <a v-for="p in job.intakePhotos" :key="p" :href="p" target="_blank" rel="noopener">
-          <img :src="p" class="aspect-square object-cover rounded" alt="" />
+        <a
+          v-for="p in job.intakePhotos"
+          :key="p"
+          :href="photoUrls.get(p) || '#'"
+          target="_blank"
+          rel="noopener"
+          class="aspect-square rounded overflow-hidden bg-[color:var(--bs-bg)] border border-[color:var(--bs-border)]"
+        >
+          <img
+            v-if="photoUrls.get(p)"
+            :src="photoUrls.get(p)"
+            class="h-full w-full object-cover"
+            alt=""
+          />
         </a>
       </div>
 
-      <div v-if="intakeFields.length" class="mt-4">
+      <!-- Marketplace-sourced jobs skip the trade-specific intake entirely
+           — the post description + photos above already serve that purpose.
+           Only direct-booked jobs (no sourcePostId) render the intake form. -->
+      <div v-if="intakeFields.length && !job.sourcePostId" class="mt-4">
         <h4 class="font-medium text-sm mb-2">Trade-specific details</h4>
         <IntakeFormRenderer
           v-if="isClient && job.status === 'accepted'"

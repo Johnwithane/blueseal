@@ -342,10 +342,18 @@ export interface IntakeFormSchemaDoc {
 // Client-quote-accept jumps the job straight from "quoted" to "in_progress" —
 // scheduling is metadata (scheduledStart/End) on an active job, not a
 // status gate of its own.
+// "awaiting_upfront_payment" sits between "quoted" and "in_progress" when the
+// accepted quote required an upfront fee. The client accepted the quote but
+// work can't begin until the fee is collected; markUpfrontFeePaid /
+// clientMarkUpfrontFeePaid advance the job to "in_progress" once it's settled.
+// When Stripe Connect is enabled the dispatcher resolves it automatically.
+// Pre-existing jobs predate the status entirely; the kanban falls back to the
+// generic status label for unknown values via STATUS_LABEL.
 export type JobStatus =
   | "accepted"
   | "requested"
   | "quoted"
+  | "awaiting_upfront_payment"
   | "in_progress"
   | "awaiting_client_approval"
   | "awaiting_payment"
@@ -379,8 +387,12 @@ export interface JobDoc {
   trade: string;
   title: string;
   description: string;
-  // Empty {} on jobs created via the marketplace until the client completes the
-  // trade-specific intake form (status transitions accepted → requested).
+  // Marketplace-originated jobs (sourcePostId set) intentionally leave this
+  // as {} — the post already collected description + photos + address, so
+  // no trade-specific intake is gathered and the job goes straight to
+  // "requested". Direct-booked jobs populate this from the intake form on
+  // creation. Legacy marketplace jobs created before the skip-intake change
+  // may still carry the empty-object placeholder.
   intakeFormData: Record<string, unknown>;
   intakePhotos: string[];
   address: JobAddress;
@@ -429,6 +441,25 @@ export interface JobDoc {
   // as null (= not archived).
   clientArchivedAt?: Timestamp | null;
   tradespersonArchivedAt?: Timestamp | null;
+  // Quote-required upfront fee, snapshotted from the quote at accept time
+  // (clientAcceptQuote). When present and `paidAt` is null, the job sits in
+  // status "awaiting_upfront_payment" — markUpfrontFeePaid (tradesperson) or
+  // clientMarkUpfrontFeePaid (client) advances it to "in_progress" and stamps
+  // paidAt + paidBy. `paymentMethod` mirrors InvoiceDoc — "manual" for the
+  // mark-paid path, "stripe" once Connect goes live (the webhook dispatcher
+  // resolves it automatically and sets paidBy = "stripe"). `appliedInvoiceId`
+  // is back-linked by onJobCompleted when the auto-drafted invoice consumes
+  // the credit, so a second invoice can never double-apply it.
+  upfrontFee?: UpfrontFeeState | null;
+}
+
+export interface UpfrontFeeState {
+  amountCents: number;
+  source: "fixed" | "percent";
+  paymentMethod: "manual" | "stripe";
+  paidAt: Timestamp | null;
+  paidBy: "tradesperson_marked" | "client_marked" | "stripe" | null;
+  appliedInvoiceId: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -820,6 +851,19 @@ export interface InvoiceDiscount {
   label: string | null;
 }
 
+// Credit applied to a final invoice for an upfront fee already collected on
+// the underlying job. Mirrors the InvoiceDiscount shape (structured, not a
+// negative line item) so totals math stays unambiguous and the PDF can render
+// it on its own conditional row between tax and total. Written by
+// onJobCompleted from the job's UpfrontFeeState; the invoice editor renders
+// it read-only and recomputeTotals subtracts it from the final total
+// (clamped to 0). Null when the job had no upfront fee.
+export interface InvoiceUpfrontFeeCredit {
+  amountCents: number;
+  sourceQuoteId: string;
+  paidAt: Timestamp;
+}
+
 export interface InvoiceDoc {
   tradespersonId: string;
   clientId: string;
@@ -850,6 +894,11 @@ export interface InvoiceDoc {
   // cutover (they continue to support manual "mark paid"). Always set on
   // invoices created after the cutover. Server-managed.
   payment?: InvoicePaymentState | null;
+  // Credit for an upfront fee collected at quote-accept time, snapshotted by
+  // onJobCompleted from the job's UpfrontFeeState. Read-only in the editor;
+  // subtracted from the final total after tax (clamped to 0). Null on
+  // invoices for jobs that had no upfront fee.
+  upfrontFeeCredit?: InvoiceUpfrontFeeCredit | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -912,6 +961,19 @@ export type QuoteStatus =
   | "expired"
   | "withdrawn";
 
+// Tradesperson-required upfront fee on a quote. Optional. When the client
+// accepts a quote with this set, the job lands in "awaiting_upfront_payment"
+// (not "in_progress") until the fee is collected. The amount in cents is
+// always snapshotted server-side at submitQuote time — for `percent` we keep
+// the bps for display ("25% upfront") AND the dollar value so a later
+// line-item edit doesn't drift the agreed-upon fee.
+//
+// Bps cap is 5000 (50%) — see submitQuote validation. Fixed amounts are
+// clamped to the pre-tax subtotal.
+export type QuoteUpfrontFee =
+  | { type: "fixed"; amountCents: number }
+  | { type: "percent"; bps: number; amountCents: number };
+
 export interface QuoteDoc {
   tradespersonId: string;
   clientId: string;
@@ -925,6 +987,8 @@ export interface QuoteDoc {
   taxTotal: number;
   total: number;
   currency: string;
+  // Optional upfront fee required before work begins. See QuoteUpfrontFee.
+  upfrontFee?: QuoteUpfrontFee | null;
   // Optional estimate hint shown alongside the totals — useful for hourly
   // ranges ("about 4-6 hours"). Free-form so tradies can write whatever
   // qualifier fits.

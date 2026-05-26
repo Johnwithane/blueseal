@@ -133,6 +133,14 @@ function discountSnapshot(): InvoiceDiscount | null {
   };
 }
 
+// Upfront fee credit snapshotted onto the invoice at draft time. Read-only
+// in the editor (the source of truth is the job's UpfrontFeeState — surfacing
+// edit controls here would let a tradesperson rewrite the agreed-upon fee
+// after the client already paid it).
+const upfrontFeeCreditCents = computed<number>(
+  () => invoice.value?.upfrontFeeCredit?.amountCents ?? 0,
+);
+
 const totals = computed(() =>
   recomputeTotals(
     items.value.map((li) => ({
@@ -142,6 +150,7 @@ const totals = computed(() =>
       taxRate: li.taxRate,
     })),
     discountSnapshot(),
+    upfrontFeeCreditCents.value,
   ),
 );
 
@@ -451,6 +460,17 @@ async function markPaid() {
           <tr>
             <td colspan="4" class="py-1 text-right text-[color:var(--bs-muted)]">Tax</td>
             <td class="py-1 text-right">{{ money(totals.taxTotal) }}</td>
+            <td v-if="props.canEdit"></td>
+          </tr>
+          <!-- Upfront-fee credit row. Mirrors the structural pattern of the
+               discount row above: conditional, on its own line, deducted
+               with a leading minus so the math reads naturally. Read-only —
+               the source is the job's UpfrontFeeState. -->
+          <tr v-if="upfrontFeeCreditCents > 0" class="text-[color:var(--bs-blue-dark)]">
+            <td colspan="4" class="py-1 text-right">
+              Less upfront fee paid
+            </td>
+            <td class="py-1 text-right">−{{ money(upfrontFeeCreditCents) }}</td>
             <td v-if="props.canEdit"></td>
           </tr>
           <tr>

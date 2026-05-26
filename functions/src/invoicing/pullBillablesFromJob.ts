@@ -14,6 +14,8 @@ interface InvoiceLike {
   jobId: string;
   status: string;
   lineItems: LineItem[];
+  discount?: { type: "percent" | "fixed"; value: number } | null;
+  upfrontFeeCredit?: { amountCents: number } | null;
 }
 
 interface LineItem {
@@ -144,18 +146,37 @@ export const pullBillablesFromJob = onCall({ enforceAppCheck: false }, async (re
   }
 
   // ---------- recompute totals on the merged line set ----------
+  // Apply the existing whole-invoice discount + upfront-fee credit so a
+  // pull doesn't accidentally wipe either deduction.
   const merged: LineItem[] = [...invoice.lineItems, ...newLines];
   let subtotal = 0;
+  for (const li of merged) subtotal += li.quantity * li.unitPrice;
+  let discountAmount = 0;
+  if (invoice.discount && subtotal > 0) {
+    if (invoice.discount.type === "percent") {
+      const pct = Math.max(0, Math.min(100, invoice.discount.value));
+      discountAmount = Math.round((subtotal * pct) / 100);
+    } else {
+      discountAmount = Math.max(0, Math.min(subtotal, Math.round(invoice.discount.value)));
+    }
+  }
+  const factor = subtotal > 0 ? (subtotal - discountAmount) / subtotal : 1;
   let taxTotal = 0;
   for (const li of merged) {
     const sub = li.quantity * li.unitPrice;
-    subtotal += sub;
-    taxTotal += Math.round(sub * li.taxRate);
+    taxTotal += Math.round(sub * factor * li.taxRate);
   }
-  const total = subtotal + taxTotal;
+  const creditAmount = Math.max(0, invoice.upfrontFeeCredit?.amountCents ?? 0);
+  const total = Math.max(0, subtotal - discountAmount + taxTotal - creditAmount);
 
   const batch = db.batch();
-  batch.update(invoiceRef, { lineItems: merged, subtotal, taxTotal, total });
+  batch.update(invoiceRef, {
+    lineItems: merged,
+    subtotal,
+    discountAmount,
+    taxTotal,
+    total,
+  });
   for (const { id } of entryStamps) {
     batch.update(jobRef.collection("timeEntries").doc(id), {
       invoicedAt: FieldValue.serverTimestamp(),

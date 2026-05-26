@@ -17,6 +17,8 @@ describe("recomputeTotals", () => {
       subtotal: 0,
       discountAmount: 0,
       taxTotal: 0,
+      totalBeforeCredit: 0,
+      upfrontFeeCreditAmount: 0,
       total: 0,
     });
   });
@@ -85,5 +87,46 @@ describe("recomputeTotals", () => {
     expect(t.discountAmount).toBe(0);
     expect(t.taxTotal).toBe(0);
     expect(t.total).toBe(0);
+  });
+
+  describe("upfront fee credit", () => {
+    it("subtracts the credit from the post-tax total", () => {
+      // $100 labour + 13% HST = $113 → less $25 upfront fee paid = $88
+      const t = recomputeTotals([labour], null, cents(25));
+      expect(t.totalBeforeCredit).toBe(cents(113));
+      expect(t.upfrontFeeCreditAmount).toBe(cents(25));
+      expect(t.total).toBe(cents(88));
+    });
+
+    it("clamps the final total to zero when the credit exceeds the bill", () => {
+      // $100 labour + 13% HST = $113 → less $500 already paid = $0 (not negative)
+      const t = recomputeTotals([labour], null, cents(500));
+      expect(t.totalBeforeCredit).toBe(cents(113));
+      expect(t.upfrontFeeCreditAmount).toBe(cents(500));
+      expect(t.total).toBe(0);
+    });
+
+    it("does not double-discount — tax still computed on the post-discount base, not on the credit", () => {
+      // Without the credit: $100 line, 10% discount, 13% HST → $101.70 total.
+      // With $20 credit applied AFTER tax: $101.70 − $20 = $81.70 total.
+      // The credit must not change subtotal/discountAmount/taxTotal.
+      const t = recomputeTotals(
+        [labour],
+        { type: "percent", value: 10, label: null },
+        cents(20),
+      );
+      expect(t.subtotal).toBe(cents(100));
+      expect(t.discountAmount).toBe(cents(10));
+      expect(t.taxTotal).toBe(cents(11.7));
+      expect(t.totalBeforeCredit).toBe(cents(101.7));
+      expect(t.upfrontFeeCreditAmount).toBe(cents(20));
+      expect(t.total).toBe(cents(81.7));
+    });
+
+    it("defaults to zero credit when omitted (backwards compatible)", () => {
+      const t = recomputeTotals([labour]);
+      expect(t.upfrontFeeCreditAmount).toBe(0);
+      expect(t.total).toBe(cents(113));
+    });
   });
 });

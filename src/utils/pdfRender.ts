@@ -40,6 +40,12 @@ interface RenderTotals {
   discount: InvoiceDiscount | null;
   discountAmount: number;
   taxTotal: number;
+  /**
+   * Upfront fee that was already collected and is being credited against this
+   * invoice. Optional + zero-tolerant so quote rendering (which never carries
+   * a credit) doesn't have to thread an extra value through.
+   */
+  upfrontFeeCreditAmount?: number;
   total: number;
   currency: string;
 }
@@ -402,7 +408,10 @@ async function renderPdf(
   const valueX = totalsX + totalsBoxWidth - 16;
   const rowHeight = 18;
   const hasDiscount = totals.discountAmount > 0;
-  const innerRows = 2 + (hasDiscount ? 1 : 0); // subtotal + tax (+ discount)
+  const upfrontCreditCents = Math.max(0, totals.upfrontFeeCreditAmount ?? 0);
+  const hasUpfrontCredit = upfrontCreditCents > 0;
+  // subtotal + tax (+ discount) (+ upfront credit)
+  const innerRows = 2 + (hasDiscount ? 1 : 0) + (hasUpfrontCredit ? 1 : 0);
   const totalsBoxHeight = innerRows * rowHeight + 50;
 
   doc.setDrawColor(...BRAND.border);
@@ -435,6 +444,15 @@ async function renderPdf(
     totalsRow(discountLabel, `-${fmtMoney(totals.discountAmount, totals.currency)}`);
   }
   totalsRow("Tax", fmtMoney(totals.taxTotal, totals.currency));
+  if (hasUpfrontCredit) {
+    // Upfront fee credit. Conditional row mirroring the discount layout —
+    // deducted from the post-tax total so the final figure matches what
+    // the client owes net of the upfront fee they already paid.
+    totalsRow(
+      "Less upfront fee paid",
+      `-${fmtMoney(upfrontCreditCents, totals.currency)}`,
+    );
+  }
 
   // Extra breathing room between Tax and Total — divider sits in the
   // middle of the gap, Total's bold 12.5pt cap-height needs clear space
@@ -518,6 +536,7 @@ export async function renderInvoicePdfBlob(
       discount: invoice.discount,
       discountAmount: invoice.discountAmount,
       taxTotal: invoice.taxTotal,
+      upfrontFeeCreditAmount: invoice.upfrontFeeCredit?.amountCents ?? 0,
       total: invoice.total,
       currency: invoice.currency || "CAD",
     },

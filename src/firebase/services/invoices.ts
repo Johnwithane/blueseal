@@ -23,23 +23,40 @@ export interface InvoiceTotals {
   subtotal: number; // pre-discount sum of line subs (cents)
   discountAmount: number; // cents subtracted; 0 when discount is null
   taxTotal: number;
+  /**
+   * Pre-credit total: subtotal − discountAmount + taxTotal. Useful when the
+   * caller wants the line-item-based total without the upfront-fee deduction
+   * (e.g. a tax-base display, or comparing against the quote).
+   */
+  totalBeforeCredit: number;
+  /** Upfront fee credit subtracted from totalBeforeCredit. 0 when none. */
+  upfrontFeeCreditAmount: number;
+  /** Final total — clamped to zero so a credit larger than the bill never goes negative. */
   total: number;
 }
 
 /**
- * Compute invoice totals from line items + optional whole-invoice discount.
+ * Compute invoice totals from line items + optional whole-invoice discount
+ * + optional upfront-fee credit (snapshot of an upfront fee collected
+ * earlier in the job lifecycle).
  *
  * Tax is applied to the post-discount base, proportionally per line — the
  * Canadian retail convention ("10% off $100, then HST on $90"). Mixed tax
  * rates across lines are preserved by scaling each line's taxable base by
  * the same discount factor instead of merging everything into one rate.
  *
- * Pre-discount `subtotal` is exposed separately so the rendered invoice can
- * show the standard four-row breakdown: subtotal · discount · tax · total.
+ * Upfront-fee credit is subtracted AFTER tax — the upfront fee was already
+ * paid (and tax already applied) at that time, so subtracting before tax
+ * would over-tax the remainder.
+ *
+ * Pre-discount `subtotal` and pre-credit `totalBeforeCredit` are exposed
+ * separately so the rendered invoice can show the full breakdown:
+ * subtotal · discount · tax · total-before-credit · credit · final-total.
  */
 export function recomputeTotals(
   items: LineItem[],
   discount: InvoiceDiscount | null = null,
+  upfrontFeeCreditCents = 0,
 ): InvoiceTotals {
   let subtotal = 0;
   for (const li of items) subtotal += li.quantity * li.unitPrice;
@@ -61,8 +78,10 @@ export function recomputeTotals(
     taxTotal += Math.round(lineSub * factor * li.taxRate);
   }
 
-  const total = subtotal - discountAmount + taxTotal;
-  return { subtotal, discountAmount, taxTotal, total };
+  const totalBeforeCredit = subtotal - discountAmount + taxTotal;
+  const upfrontFeeCreditAmount = Math.max(0, Math.round(upfrontFeeCreditCents));
+  const total = Math.max(0, totalBeforeCredit - upfrontFeeCreditAmount);
+  return { subtotal, discountAmount, taxTotal, totalBeforeCredit, upfrontFeeCreditAmount, total };
 }
 
 export async function getInvoice(id: string): Promise<WithId<InvoiceDoc> | null> {
@@ -79,13 +98,30 @@ export function subscribeInvoice(
   );
 }
 
+/**
+ * Persisted-shape projection of recomputeTotals. recomputeTotals returns the
+ * extra `totalBeforeCredit` / `upfrontFeeCreditAmount` fields for display
+ * convenience but InvoiceDoc doesn't carry them — pick only what the doc
+ * actually persists. Keeps writes from depositing rogue fields.
+ */
+function persistableTotals(totals: ReturnType<typeof recomputeTotals>) {
+  return {
+    subtotal: totals.subtotal,
+    discountAmount: totals.discountAmount,
+    taxTotal: totals.taxTotal,
+    total: totals.total,
+  };
+}
+
 export async function updateInvoiceLineItems(id: string, items: LineItem[]): Promise<void> {
-  // Re-read the live discount so a line-items edit doesn't accidentally
-  // wipe a previously-applied discount on the same write.
+  // Re-read the live discount + upfrontFeeCredit so a line-items edit doesn't
+  // accidentally wipe either deduction on the same write.
   const snap = await getDoc(invRef(id));
-  const discount = snap.exists() ? (snap.data().discount ?? null) : null;
-  const totals = recomputeTotals(items, discount);
-  await updateDoc(doc(db, "invoices", id), { lineItems: items, ...totals });
+  const data = snap.exists() ? snap.data() : null;
+  const discount = data?.discount ?? null;
+  const creditCents = data?.upfrontFeeCredit?.amountCents ?? 0;
+  const totals = recomputeTotals(items, discount, creditCents);
+  await updateDoc(doc(db, "invoices", id), { lineItems: items, ...persistableTotals(totals) });
 }
 
 /** Apply or clear the whole-invoice discount and recompute totals. */
@@ -96,8 +132,9 @@ export async function updateInvoiceDiscount(
   const snap = await getDoc(invRef(id));
   if (!snap.exists()) return;
   const items = snap.data().lineItems ?? [];
-  const totals = recomputeTotals(items, discount);
-  await updateDoc(doc(db, "invoices", id), { discount, ...totals });
+  const creditCents = snap.data().upfrontFeeCredit?.amountCents ?? 0;
+  const totals = recomputeTotals(items, discount, creditCents);
+  await updateDoc(doc(db, "invoices", id), { discount, ...persistableTotals(totals) });
 }
 
 export async function markInvoicePaid(id: string): Promise<void> {

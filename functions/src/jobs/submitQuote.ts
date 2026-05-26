@@ -21,6 +21,23 @@ const DiscountSchema = z.object({
   label: z.string().max(60).nullable(),
 });
 
+// Upfront fee input — discriminated union so the client can pass either
+// shape unambiguously. amountCents is the dollar value at submit time;
+// bps (basis points, 0–5000 = 0–50%) is only present for "percent".
+// We re-derive amountCents server-side from the computed subtotal so a
+// malicious client can't underpay relative to the quote they're agreeing to.
+const UpfrontFeeSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("fixed"),
+    amountCents: z.number().int().min(1).max(100_000_000),
+  }),
+  z.object({
+    type: z.literal("percent"),
+    // 50% cap — see Quote upfront fee plan. 1bps = 0.01%.
+    bps: z.number().int().min(1).max(5000),
+  }),
+]);
+
 const Input = z.object({
   jobId: z.string().min(1).max(128),
   lineItems: z.array(LineItemSchema).min(1).max(40),
@@ -29,6 +46,7 @@ const Input = z.object({
   validUntilDays: z.number().int().min(1).max(180).default(14),
   terms: z.string().max(2000).default(""),
   noteToClient: z.string().max(500).default(""),
+  upfrontFee: UpfrontFeeSchema.nullable().default(null),
 });
 
 interface JobData {
@@ -104,8 +122,16 @@ export const submitQuote = onCall({ enforceAppCheck: false }, async (req) => {
   const uid = requireRole(req, "tradesperson");
   const parsed = Input.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);
-  const { jobId, lineItems, discount, estimatedHours, validUntilDays, terms, noteToClient } =
-    parsed.data;
+  const {
+    jobId,
+    lineItems,
+    discount,
+    estimatedHours,
+    validUntilDays,
+    terms,
+    noteToClient,
+    upfrontFee: upfrontFeeInput,
+  } = parsed.data;
 
   const jobRef = db.doc(`jobs/${jobId}`);
   const quoteRef = db.doc(`quotes/${jobId}`);
@@ -141,6 +167,33 @@ export const submitQuote = onCall({ enforceAppCheck: false }, async (req) => {
   const totals = computeTotals(lineItems, discount);
   if (totals.total <= 0) {
     throw new HttpsError("failed-precondition", "Quote total must be greater than zero.");
+  }
+
+  // Resolve upfront fee against the same subtotal the client will see on the
+  // accepted quote. For percent we re-derive amountCents server-side from
+  // (subtotal − discountAmount) so the dollar value is always tied to the
+  // quote's pre-tax basis (consistent with how InvoiceDiscount applies). For
+  // fixed we accept the client's amountCents but clamp to the pre-tax
+  // discounted subtotal so the fee can't exceed the quote itself.
+  const preTaxBase = Math.max(0, totals.subtotal - totals.discountAmount);
+  let upfrontFee: { type: "fixed" | "percent"; bps?: number; amountCents: number } | null = null;
+  if (upfrontFeeInput) {
+    if (upfrontFeeInput.type === "percent") {
+      const cents = Math.round((preTaxBase * upfrontFeeInput.bps) / 10_000);
+      if (cents <= 0) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Upfront fee resolves to zero — increase the percentage or pick a fixed amount.",
+        );
+      }
+      upfrontFee = { type: "percent", bps: upfrontFeeInput.bps, amountCents: cents };
+    } else {
+      const cents = Math.min(upfrontFeeInput.amountCents, preTaxBase);
+      if (cents <= 0) {
+        throw new HttpsError("failed-precondition", "Upfront fee must be greater than zero.");
+      }
+      upfrontFee = { type: "fixed", amountCents: cents };
+    }
   }
 
   const validUntilMs = Date.now() + validUntilDays * 24 * 60 * 60 * 1000;
@@ -181,6 +234,7 @@ export const submitQuote = onCall({ enforceAppCheck: false }, async (req) => {
       acceptedAt: null,
       declinedAt: null,
       pdfUrl: null,
+      upfrontFee,
     });
     batch.update(tradieRef, { nextQuoteNumber: seq + 1 });
   } else {
@@ -205,6 +259,7 @@ export const submitQuote = onCall({ enforceAppCheck: false }, async (req) => {
       acceptedAt: null,
       // Keep declinedReason on the record so the tradesperson sees the
       // history during revision; clear it once accepted.
+      upfrontFee,
     });
   }
 
@@ -220,7 +275,12 @@ export const submitQuote = onCall({ enforceAppCheck: false }, async (req) => {
       : `${tradieName} sent you a quote.`;
   const totalLine = `Total: $${(totals.total / 100).toFixed(2)} — valid until ${formatDate(validUntil)}.`;
   const noteLine = noteToClient.trim() ? `Note: "${noteToClient.trim()}"` : "";
-  const message = [intro, noteLine, totalLine, "Review and accept on the job page."]
+  const upfrontLine = upfrontFee
+    ? `Upfront fee required to start: $${(upfrontFee.amountCents / 100).toFixed(2)}${
+        upfrontFee.type === "percent" ? ` (${(upfrontFee.bps! / 100).toFixed(0)}%)` : ""
+      }.`
+    : "";
+  const message = [intro, noteLine, totalLine, upfrontLine, "Review and accept on the job page."]
     .filter(Boolean)
     .join("\n");
 

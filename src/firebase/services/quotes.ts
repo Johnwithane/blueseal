@@ -63,12 +63,25 @@ export function subscribeQuote(
   );
 }
 
+// Quotes carry their own QuoteDoc shape that doesn't include the
+// upfront-fee-credit fields (those live on invoices). Persist just the
+// subtotal/discountAmount/taxTotal/total to keep doc shape clean — the
+// extra display fields recomputeTotals returns are for the editor UI only.
+function persistableQuoteTotals(totals: ReturnType<typeof recomputeTotals>) {
+  return {
+    subtotal: totals.subtotal,
+    discountAmount: totals.discountAmount,
+    taxTotal: totals.taxTotal,
+    total: totals.total,
+  };
+}
+
 /** Tradesperson edit of quote line items (only valid in draft/sent states). */
 export async function updateQuoteLineItems(id: string, items: LineItem[]): Promise<void> {
   const snap = await getDoc(quoteRef(id));
   const discount = snap.exists() ? (snap.data().discount ?? null) : null;
   const totals = recomputeTotals(items, discount);
-  await updateDoc(doc(db, "quotes", id), { lineItems: items, ...totals });
+  await updateDoc(doc(db, "quotes", id), { lineItems: items, ...persistableQuoteTotals(totals) });
 }
 
 export async function updateQuoteDiscount(
@@ -79,7 +92,7 @@ export async function updateQuoteDiscount(
   if (!snap.exists()) return;
   const items = snap.data().lineItems ?? [];
   const totals = recomputeTotals(items, discount);
-  await updateDoc(doc(db, "quotes", id), { discount, ...totals });
+  await updateDoc(doc(db, "quotes", id), { discount, ...persistableQuoteTotals(totals) });
 }
 
 /** Soft signal: client viewed the quote. Only stamps on transition from sent → viewed. */
@@ -97,6 +110,14 @@ export async function markQuoteViewed(id: string): Promise<void> {
 // functions/src/jobs/{submitQuote,clientAcceptQuote,clientDeclineQuote}.ts.
 // ---------------------------------------------------------------------------
 
+// Upfront fee submit-shape (input side). The dollar amount on `fixed` is the
+// authoritative value; `percent` carries bps (1bps = 0.01%, capped 0–5000 =
+// 0–50%) and the server re-derives the cents from the pre-tax subtotal so
+// the snapshot can never drift below the agreed-upon percentage.
+export type SubmitQuoteUpfrontFee =
+  | { type: "fixed"; amountCents: number }
+  | { type: "percent"; bps: number };
+
 export interface SubmitQuoteInput {
   jobId: string;
   lineItems: LineItem[];
@@ -105,6 +126,7 @@ export interface SubmitQuoteInput {
   validUntilDays?: number; // days from now; server clamps to 1-180
   terms?: string;
   noteToClient?: string;
+  upfrontFee?: SubmitQuoteUpfrontFee | null;
 }
 
 export async function submitQuote(

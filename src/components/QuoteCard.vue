@@ -130,7 +130,7 @@ const STATUS_LABEL: Record<QuoteStatus, string> = {
 
 const KIND_LABEL: Record<LineItemKind, string> = {
   hourly: "Hourly",
-  labour: "Labour",
+  labour: "Flat rate",
   materials: "Materials",
 };
 const KIND_ICON: Record<LineItemKind, string> = {
@@ -246,6 +246,22 @@ const KIND_ICON: Record<LineItemKind, string> = {
         <tr>
           <td colspan="2" class="py-1 text-right font-semibold">Total</td>
           <td class="py-1 text-right font-bold">{{ money(quote.total) }}</td>
+        </tr>
+        <!-- Upfront fee — conditional row tucked under the total. It's
+             not subtracted from the quote total (the total is the agreed
+             full price); it's a precondition before work starts that
+             will credit against the final invoice. -->
+        <tr
+          v-if="quote.upfrontFee && quote.upfrontFee.amountCents > 0"
+          class="text-[color:var(--bs-blue-dark)]"
+        >
+          <td colspan="2" class="py-1 text-right text-xs">
+            <i class="pi pi-wallet text-[10px]"></i>
+            Upfront fee before work starts
+          </td>
+          <td class="py-1 text-right font-semibold text-xs">
+            {{ money(quote.upfrontFee.amountCents) }}
+          </td>
         </tr>
       </tfoot>
     </table>
