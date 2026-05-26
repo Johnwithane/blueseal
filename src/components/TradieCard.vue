@@ -6,6 +6,7 @@ import Tag from "primevue/tag";
 import type { TradespersonDoc, WithId } from "@/firebase/interfaces";
 import { tradeLabel } from "@/data/trades";
 import { useFormatters } from "@/composables/useFormatters";
+import VerifiedBadge from "@/components/VerifiedBadge.vue";
 
 const props = defineProps<{
   tradie: WithId<TradespersonDoc> & { distanceKm?: number };
@@ -59,8 +60,16 @@ const wsibLive = computed(() => {
             {{ props.tradie.displayName?.trim() || tradeLabel(props.tradie.trades[0]) }}
           </span>
           <Tag v-if="props.tradie.idVerified" value="ID verified" severity="success" />
-          <Tag v-if="insuranceLive" value="Insured" severity="info" />
-          <Tag v-if="wsibLive" value="WSIB" severity="info" />
+          <VerifiedBadge
+            v-if="insuranceLive"
+            kind="insurance"
+            :expires-at="props.tradie.insuranceExpiresAt"
+          />
+          <VerifiedBadge
+            v-if="wsibLive"
+            kind="wsib"
+            :expires-at="props.tradie.wsibExpiresAt"
+          />
         </div>
         <div class="text-xs text-[color:var(--bs-muted)] mt-0.5">
           {{ props.tradie.trades.map(tradeLabel).join(" • ") }}

@@ -5,6 +5,7 @@ import Button from "primevue/button";
 import Tag from "primevue/tag";
 import Textarea from "primevue/textarea";
 import IntakeFormRenderer from "@/components/IntakeFormRenderer.vue";
+import VerifiedBadge from "@/components/VerifiedBadge.vue";
 import type {
   IntakeField,
   JobDoc,
@@ -72,8 +73,16 @@ function tradieAvatarInitial() {
           </div>
           <div class="flex flex-wrap items-center gap-1 mt-2">
             <Tag v-if="tradieInfo?.idVerified" value="ID verified" severity="success" />
-            <Tag v-if="tradieInsuranceLive" value="Insured" severity="info" />
-            <Tag v-if="tradieWsibLive" value="WSIB" severity="info" />
+            <VerifiedBadge
+              v-if="tradieInsuranceLive"
+              kind="insurance"
+              :expires-at="tradieInfo?.insuranceExpiresAt"
+            />
+            <VerifiedBadge
+              v-if="tradieWsibLive"
+              kind="wsib"
+              :expires-at="tradieInfo?.wsibExpiresAt"
+            />
           </div>
         </div>
       </div>

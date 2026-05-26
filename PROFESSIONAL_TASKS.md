@@ -20,12 +20,13 @@ The implementation plan lives at `/root/.claude/plans/ok-so-right-now-majestic-m
 
 #### [ ] Review the rewritten Terms of Service
 
-- **Why:** [legal/terms-of-service.md](legal/terms-of-service.md) sections 3, 7, 8, and 9 are being substantially rewritten for the new model: mandatory in-app payment, anti-circumvention with teeth, platform fee schedule, removal of the subscription section. We need a lawyer-reviewed pass before publishing the new ToS to users.
+- **Why:** [legal/terms-of-service.md](legal/terms-of-service.md) has been substantially rewritten for the new model: §§ 7–9 now cover mandatory in-app payment via Stripe Connect, a limited-payment-agency clause, the live 12% platform fee, refunds/disputes/chargebacks (including who absorbs lost chargebacks), and tax responsibility. The old AI subscription section was removed; the AI-output disclaimer moved into § 14. § 4 was hardened with insurance/WSIB assumption-of-risk and badge disclaimers. We need a lawyer-reviewed pass before publishing the new ToS to users.
 - **What we need from you:**
   - Confirm enforceability of "paying outside the platform for work introduced on the platform = ToS violation" under BC contract law (and federally where applicable).
   - Sanity-check the marketplace positioning — Blue Seal should be a "platform / introducer" and explicitly NOT a "service provider" for the underlying trades work. We want our liability surface limited to platform conduct (uptime, payment processing, vetting reasonable care), not to the quality of the underlying trade.
   - Review arbitration / governing-law / class-action waiver clauses in the new payment context.
   - Confirm refund + chargeback policy language: who can initiate, timelines, our role in the dispute, what evidence Blue Seal provides to Stripe vs. what the tradesperson provides.
+  - Pressure-test the insurance / WCB liability shield in §§ 2.4, 4, 4.1, 4.2, 14, and 16. Insurance upload is optional and shows an "Insured" badge on public profiles + search after admin review. Confirm the badge disclaimers + assumption-of-risk language are strong enough to defeat a negligent-misrepresentation claim from a Client who relied on the badge and was harmed by an uninsured or lapsed-cover Tradesperson. Recommend any additional UI-side disclosure that should accompany the badge.
 - **Verify:** Signed-off draft published at [legal/terms-of-service.md](legal/terms-of-service.md). Clients re-accept on next sign-in via the existing `termsAcceptedVersion` mechanism on `users/{uid}`.
 
 #### [ ] Review the updated Privacy Policy

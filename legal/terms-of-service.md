@@ -1,11 +1,11 @@
 # Blue Seal — Terms of Service
 
 **Effective date:** 2026-05-21
-**Last updated:** 2026-05-21
+**Last updated:** 2026-05-26
 
 These Terms of Service ("**Terms**") are a binding agreement between you and **Blue Seal App** ("**Blue Seal**", "**we**", "**us**", "**our**"). They govern your access to and use of the Blue Seal progressive web application, websites under https://blueseal.app, and related services (together, the "**Service**").
 
-**Please read these Terms carefully.** They include important provisions about how the Service works, what you can and cannot do, our role as a marketplace (and what we are *not* responsible for), payments, the dispute-resolution process and an arbitration clause (§ 17), and limits on our liability (§ 14).
+**Please read these Terms carefully.** They include important provisions about how the Service works, what you can and cannot do, our role as a marketplace (and what we are *not* responsible for), payments, the dispute-resolution process and an arbitration clause (§ 17), and limits on our liability (§§ 14–15).
 
 **By creating an account, ticking the agreement checkbox at signup, or otherwise using the Service, you confirm that you have read, understood and agreed to these Terms and to our [Privacy Policy](./privacy-policy.md).** If you do not agree, do not use the Service.
 
@@ -13,7 +13,7 @@ These Terms of Service ("**Terms**") are a binding agreement between you and **B
 
 ## 1. The Service: what Blue Seal is, and what it is not
 
-Blue Seal is a two-sided marketplace that **introduces** clients ("**Clients**") to verified tradespeople ("**Tradespeople**", or "**Tradies**") and gives them tools to coordinate, document and bill for work. We charge Tradespeople for optional AI tools by subscription, and (in future) take a platform fee on in-app payments.
+Blue Seal is a two-sided marketplace that **introduces** clients ("**Clients**") to verified tradespeople ("**Tradespeople**", or "**Tradies**") and gives them tools to coordinate, document and bill for work. Our revenue comes from a **platform fee on in-app payments** processed through the Service (see § 9). The AI-powered tools available through the Service are included for verified Tradespeople at no additional charge.
 
 **We are an introducer and tooling provider — not the contractor.** Specifically:
 
@@ -57,8 +57,10 @@ If you sign up as a Tradesperson, you must additionally:
 
 - submit at least one valid trade certification per trade you list, with truthful issuing-body and expiry information;
 - submit a clear copy of a government-issued photo ID for identity verification;
-- only list trades that you are legally permitted to perform in your service area; and
-- maintain the truthfulness of your profile (including service area and pricing) throughout your use of the Service.
+- only list trades that you are legally permitted to perform in your service area;
+- maintain the truthfulness of your profile (including service area and pricing) throughout your use of the Service;
+- acknowledge that you are solely responsible for obtaining and maintaining any liability insurance, workers'-compensation coverage (WSIB, WorkSafeBC, WCB, or the equivalent in your province), business licences, and permits required by law for the work you perform, and for any injury, death, property damage, economic loss, or other harm caused or contributed to by your work — whether or not you are insured or hold any such coverage at the time; and
+- if you upload proof of insurance or a workers'-compensation clearance certificate for verification, confirm that the document is genuine and that the information you provide about it (insurer or board, policy or clearance number, coverage amount, expiry date, jurisdiction) is accurate, and promptly upload a replacement or notify us at contact@blueseal.app if the policy or clearance is cancelled, suspended, lapses, is materially changed, or ceases to cover the work you offer through the Service.
 
 Your profile remains hidden from Clients until our team has reviewed and approved your certification(s) and ID. We may request additional information, reject an application, or revoke approval at any time if we have reason to doubt its accuracy.
 
@@ -98,12 +100,34 @@ Blue Seal carries out the following verification before a Tradesperson's profile
 **What our verification does *not* do:**
 
 - it does **not** validate the certificate with the issuing body in real time (issuance and revocation can change);
-- it does **not** verify that the Tradesperson holds liability insurance, WCB coverage, business licences, or any other permits that may be required by law for the work they offer (insurance proof is on our roadmap but not part of MVP);
+- it does **not** verify or require liability insurance, workers'-compensation coverage, business licences, or any other permits required by law for the work a Tradesperson offers — those are **optional** uploads (see § 4.1 below) and are **not** a condition of using the Service;
 - it does **not** include a criminal background check;
 - it does **not** include verification of references; and
 - it is **not** a guarantee of the quality, safety, or outcome of any work performed.
 
-Clients should perform their own diligence, ask for proof of insurance and any required licences before work begins, and request written quotes and contracts for significant work. **You are responsible for satisfying yourself that any Tradesperson you hire is qualified and insured for the specific work you need.**
+### 4.1 Optional insurance and workers'-compensation verification
+
+A Tradesperson may, at their option, upload proof of general-liability insurance and/or a workers'-compensation clearance certificate (WSIB, WorkSafeBC, WCB, or the equivalent) for review. Where they do, a human administrator confirms only that:
+
+- the document, on its face, appears authentic; and
+- the information the Tradesperson supplied (insurer or board, policy or clearance number, coverage amount, expiry date) matches the document.
+
+If accepted, a corresponding badge (such as "Insured") may be displayed on the Tradesperson's public profile and in search results until the recorded expiry date passes. **This review and any resulting badge do not constitute a guarantee or warranty.** In particular, we do **not**:
+
+- confirm the policy or clearance with the issuing insurer or workers'-compensation board, in real time or otherwise;
+- detect that a policy or clearance has been cancelled, suspended, withdrawn, or materially changed after the document was reviewed;
+- assess whether the coverage amount, jurisdiction, scope, exclusions, deductibles, or sub-limits are adequate for any particular job; or
+- take any responsibility for the underlying coverage or for the Tradesperson's continued compliance with their disclosure obligations to us.
+
+The presence of a badge does **not** confirm that a Tradesperson is currently insured for the work you have in mind. The absence of a badge does **not** confirm that a Tradesperson is uninsured. Trust badges are a starting point for your own diligence, **not a substitute for it**.
+
+### 4.2 Client responsibility and assumption of risk
+
+Beyond our verification, Clients should request **current** proof of insurance and any required licences **directly from the Tradesperson** before work begins, confirm the policy with the issuing insurer where the work warrants it, and require written quotes and contracts for any significant work.
+
+**You are responsible for satisfying yourself that any Tradesperson you hire is qualified, licensed, and insured for the specific work you need, and you assume all risk arising from a decision to engage a Tradesperson who is not insured, under-insured, or unable to satisfy a judgment for that work — including where the Tradesperson has not uploaded proof of insurance to the Service, where the uploaded proof has expired, been withdrawn, or been rejected, or where the underlying policy or clearance has lapsed, been cancelled, or otherwise ceased to apply since it was reviewed.**
+
+**Blue Seal does not require Tradespeople to carry liability insurance, workers'-compensation coverage, business licences, or any other permits as a condition of using the Service. To the maximum extent permitted by law, Blue Seal is not liable for any injury, death, property damage, economic loss, or other harm caused or contributed to by a Tradesperson's lack of, inadequate, lapsed, cancelled, or otherwise inapplicable insurance, workers'-compensation coverage, licences, or permits — including where Blue Seal has reviewed a related document or displayed a trust badge.**
 
 ---
 
@@ -153,31 +177,74 @@ Neither party may offer or accept anything of value in exchange for a positive r
 
 ---
 
-## 7. Payments between Client and Tradesperson
+## 7. Payments through the Service
 
-For the MVP, payment between Clients and Tradespeople happens **outside the Service**. Tradespeople include payment instructions on the invoices they send. **Blue Seal is not a party to that payment, does not hold funds, and is not responsible for non-payment, chargebacks, fraud, or any dispute arising from the payment itself**, except as required by law.
+### 7.1 In-app payment is the only sanctioned method
 
-In a future release we will offer in-app payment via Stripe Connect; when that becomes available a separate fee schedule and Stripe Connected Account Agreement will apply, and we will give you advance notice.
+For work formed through the Service, **payment is processed in-app through Stripe Connect**, our third-party payments provider. In-app payment is the only payment method the Service supports for jobs initiated on the Service. Soliciting, collecting, or making payment for such work off-platform breaches § 3 (no circumvention) and may result in suspension, termination, and a claim for the platform fees that would otherwise have applied.
+
+### 7.2 Tradesperson onboarding with Stripe
+
+Before a Tradesperson can send a payable invoice through the Service, they must complete Stripe Connect Express onboarding through Stripe's hosted flow. During that flow Stripe collects identity, business, and banking information **directly from the Tradesperson** under Stripe's own privacy and identity-verification standards — Blue Seal does not handle or store that information. The Tradesperson must also accept Stripe's [Connected Account Agreement](https://stripe.com/connect-account/legal/full) ("**CAA**"), which governs the relationship between the Tradesperson and Stripe. **In case of conflict between these Terms and the CAA on payments-specific matters (including payout timing, reserves, account freezes, and dispute mechanics), the CAA controls.**
+
+### 7.3 Payment flow
+
+When a Tradesperson sends an invoice for completed work, Stripe creates a payment intent for the **full invoice amount** in Canadian dollars (the only currency the Service supports at this stage). When the Client pays, Stripe charges the Client and, at the time of capture, splits the proceeds: Blue Seal's platform fee (see § 9) is retained as an application fee, and the remainder is transferred to the Tradesperson's connected Stripe account. **Blue Seal does not at any point hold the gross proceeds of any job in its own accounts.** Payouts from the Tradesperson's connected account to their bank are handled by Stripe on Stripe's standard schedule and are governed by the CAA.
+
+### 7.4 Limited payment agency
+
+For in-app payments processed through the Service only, the Tradesperson appoints Blue Seal as the Tradesperson's **limited payment agent**, for the sole purpose of accepting Client payments on the Tradesperson's behalf through Stripe and arranging for the net amount to be transferred to the Tradesperson's connected Stripe account. **A Client's payment to Stripe through the Service constitutes payment to the Tradesperson** and discharges the Client's obligation to pay the Tradesperson for the amount paid, **even if Blue Seal or the Tradesperson does not actually receive that amount** (for example, because of fraud, a Stripe payout failure, an account freeze imposed by Stripe, or a downstream banking issue). Recovery of any such amount is a matter between Stripe, the Tradesperson, and the relevant financial institutions; Blue Seal will provide reasonable assistance but does not undertake to recover it.
+
+### 7.5 Failed or incomplete payments
+
+A Client whose card is declined or whose payment otherwise fails remains liable to the Tradesperson for the unpaid amount under the contract for work between them. Blue Seal is not a creditor or collection agent, does not guarantee payment to the Tradesperson, and does not undertake to recover unpaid invoices.
+
+### 7.6 Not a financial institution
+
+The Service is not a money-services business, a deposit-taking institution, an investment dealer, a lender, or any other regulated financial institution. Blue Seal does not provide financial, tax, accounting, or legal advice through the Service.
 
 ---
 
-## 8. Tradesperson subscription for AI tools
+## 8. Refunds, disputes, and chargebacks
 
-Tradespeople may subscribe to Blue Seal's AI tools for an additional fee, currently **[AI SUBSCRIPTION PRICE] (CAD) per month**, billed in advance via Stripe.
+### 8.1 Refunds
 
-- Subscriptions renew automatically each month until cancelled.
-- You can cancel at any time from your account; cancellation takes effect at the end of the then-current billing period.
-- Fees already paid are **non-refundable** except where required by law or where we cancel a billing period for our own convenience.
-- We may change subscription fees with at least **30 days' notice**; changes apply at your next renewal.
-- Subscription tax (GST/PST/HST) will be added where applicable.
+A Tradesperson may issue a full or partial refund on a paid invoice through Stripe. When a refund is issued, Stripe also returns the proportional share of Blue Seal's platform fee to the Client, so Blue Seal does not retain a fee on refunded amounts. **Whether to issue a refund, and on what terms, is a matter between the Client and the Tradesperson.** Blue Seal does not adjudicate refund requests, does not initiate refunds on a Client's behalf, and does not undertake to compel a Tradesperson to issue one. Nothing in this section limits any non-waivable refund or remedy a Client has under applicable consumer-protection law.
 
-AI outputs are produced by a third-party large language model (Google's Gemini, via Firebase AI Logic). Outputs may be **inaccurate, incomplete or out-of-date**, and Tradespeople must use professional judgment before relying on them. Tradespeople remain solely responsible for any quote, diagnosis, or summary they send to a Client — including content generated by AI tools.
+### 8.2 Card disputes and chargebacks
+
+A Client who paid by card may dispute a charge with their card issuer (a "**chargeback**"). When a chargeback is opened, Stripe withdraws the disputed amount from the Tradesperson's connected Stripe account pending the outcome, and Blue Seal mirrors the dispute status onto the affected invoice so the parties and Blue Seal administrators can see it. **Evidence and the response to the chargeback are submitted to Stripe by the Tradesperson** (Blue Seal may, where Stripe permits and at our sole discretion, supplement that evidence). The card issuer — **not Blue Seal, and not Stripe** — decides the outcome.
+
+- If the chargeback is **won**, the disputed amount is returned to the Tradesperson's connected Stripe account and the invoice returns to its paid status.
+- If the chargeback is **lost**, the disputed amount is retained by the Client (or refunded to them by their issuer) through their connected Stripe account. **The Tradesperson absorbs the loss. Blue Seal does not indemnify the Tradesperson for lost chargebacks**, and the Tradesperson's commercial recourse against the Client (if any) is between them and the Client.
+
+### 8.3 Fraud and third-party loss
+
+To the maximum extent permitted by law, **Blue Seal is not liable to any User for losses caused by**: payment fraud or attempted fraud; identity theft; mistaken or duplicate payments; banking errors; outages, throttling, or downtime affecting Stripe or any card network; account freezes, reserves, or terminations imposed by Stripe under the CAA; or any other act or omission of Stripe, a card issuer, an acquiring bank, or any other financial-services provider. Recourse for any such loss is between the User and the relevant third party.
 
 ---
 
-## 9. Platform fees (future)
+## 9. Platform fee, taxes, and changes
 
-When in-app payments are launched, Blue Seal will charge Tradespeople a platform fee on jobs paid through the Service. The fee, applicable taxes, and how it is collected will be set out in a separate fee schedule and surfaced in-app **before you opt in**. You acknowledge that the "no-circumvention" obligation in § 3 applies to attempts to avoid these fees.
+### 9.1 Platform fee
+
+Blue Seal currently charges a **platform fee equal to 12% of the invoice total**, deducted from the amount transferred to the Tradesperson's connected Stripe account at the time the Client's payment is captured. The platform fee that applies to each invoice is the fee snapshotted on that invoice at the moment it is sent; changes to the fee do not retroactively affect invoices already sent.
+
+### 9.2 Stripe processing fees
+
+Stripe charges its own processing fees on each payment, deducted by Stripe under the CAA. Those fees are separate from Blue Seal's platform fee and are not retained by Blue Seal.
+
+### 9.3 Changes to the platform fee
+
+We may change the platform fee from time to time. Where we do, we will give Tradespeople **at least 30 days' notice** through the Service or by email; the new fee will apply to invoices sent after the effective date. A Tradesperson who does not accept a fee change may stop using the Service before the effective date.
+
+### 9.4 Fee Schedule (when published)
+
+We may publish a separate **Fee Schedule** setting out the platform fee, worked examples, and any further fee mechanics in more detail. Where published, the Fee Schedule forms part of these Terms; in case of conflict between this § 9 and the published Fee Schedule, the Fee Schedule controls.
+
+### 9.5 Taxes
+
+The Tradesperson is solely responsible for charging, collecting, reporting, and remitting any GST, HST, PST, QST, or other tax that applies to the work they perform, including configuring the correct tax amount on each invoice they send through the Service. **Blue Seal does not calculate, collect, or remit tax on the underlying work performed by a Tradesperson.** Blue Seal handles any tax it itself owes in connection with the platform fee on its own account. **You should consult a tax professional if you are unsure how tax should be set up on your invoices.**
 
 ---
 
@@ -185,7 +252,7 @@ When in-app payments are launched, Blue Seal will charge Tradespeople a platform
 
 ### 10.1 By you
 
-You may stop using the Service at any time and may close your account from your settings or by emailing contact@blueseal.app. Closing your account does not terminate any pending obligations (e.g., paying for completed work or your current subscription period), and we may retain information as set out in our Privacy Policy.
+You may stop using the Service at any time and may close your account from your settings or by emailing contact@blueseal.app. Closing your account does not terminate any pending obligations (including paying for completed work, settling open invoices, or responding to an open chargeback), and we may retain information as set out in our Privacy Policy.
 
 ### 10.2 By us
 
@@ -197,11 +264,11 @@ We may suspend, restrict, or terminate your account or your access to part of th
 - you have not used your account for an extended period (we will give notice before doing this for inactivity); or
 - we discontinue the Service or a feature, in which case we will give reasonable notice.
 
-If we terminate or suspend your account because of a breach of these Terms, we are not required to refund any fees already paid. If we terminate an active AI subscription for our own convenience (e.g., we discontinue the AI feature), we will refund the unused portion of the current billing period.
+If we terminate or suspend your account because of a breach of these Terms, we are not required to refund any platform fees already retained on invoices paid before the termination. Stripe's own treatment of any in-flight payments, payouts, reserves, or disputed amounts on a terminated Tradesperson's connected Stripe account is governed by the CAA, not by these Terms.
 
 ### 10.3 Effect of termination
 
-On termination, your right to use the Service ends. The following sections survive termination: §§ 5.3 (limited licence to remaining content), 5.4, 5.5, 7, 9 (in respect of fees already accrued), 11–18.
+On termination, your right to use the Service ends. The following sections survive termination: §§ 5.3 (limited licence to remaining content), 5.4, 5.5, 7–9 (in respect of payments made, fees accrued, and refunds, disputes or chargebacks open at or arising after termination), 11–18.
 
 ---
 
@@ -228,6 +295,10 @@ We work to keep the Service available, but we do not guarantee uninterrupted, er
 **To the maximum extent permitted by law, the Service is provided "as is" and "as available", with all faults and without warranty of any kind**, whether express, implied, statutory, or otherwise, including any implied warranties of merchantability, fitness for a particular purpose, title, non-infringement, or arising from a course of dealing. We do not warrant that the Service will meet your requirements, be uninterrupted, secure, accurate, complete, or free of viruses or other harmful components.
 
 **We make no warranty about the conduct, qualifications, performance, or reliability of any User**, including any Tradesperson, and we expressly disclaim any liability for any act or omission of any User. The decision to hire any Tradesperson, and the supervision of and payment for any work performed, is solely the Client's responsibility.
+
+Without limiting the foregoing, **we make no warranty about any Tradesperson's insurance, workers'-compensation coverage, business licences, or permits**, including documents that have been uploaded to the Service and accepted by our administrators. Any "Insured" or similar trust badge displayed on the Service reflects only that a document supplied by the Tradesperson was reviewed and accepted **at the time it was uploaded** — it does not confirm that the underlying policy or clearance is current, has not been cancelled, has not lapsed, or covers the specific work in question. Any representation a Tradesperson makes to a Client about their insurance, coverage, or licensing is that Tradesperson's representation, not ours, and is made outside the Service.
+
+**AI-powered tools.** Some features of the Service use third-party large-language-model providers (currently Google's Gemini, accessed via Firebase AI Logic) to generate text such as draft quotes, diagnoses, summaries, or chat responses. **AI-generated outputs may be inaccurate, incomplete, or out-of-date, and may "hallucinate" facts that are not true.** A Tradesperson who uses an AI tool through the Service must apply their own professional judgement before relying on, sending, or acting on any AI output, and remains solely responsible for any quote, diagnosis, summary, message, or other communication sent to a Client — including where its text was generated or assisted by an AI tool. Blue Seal does not warrant the accuracy, fitness for any purpose, or non-infringement of any AI output, and is not liable for any decision, communication, or loss resulting from reliance on one.
 
 Nothing in these Terms excludes or limits any liability or right that cannot be excluded or limited under the law that applies to you, including under the BC *Business Practices and Consumer Protection Act* or the federal *Competition Act*.
 

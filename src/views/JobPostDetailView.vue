@@ -36,6 +36,7 @@ import { submitApplicationSchema } from "@/validation/schemas";
 import { useToast } from "@/composables/useToast";
 import { useFormatters } from "@/composables";
 import { humanizeError } from "@/utils/errors";
+import VerifiedBadge from "@/components/VerifiedBadge.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -410,20 +411,18 @@ const visibleApplications = computed(() =>
                   >
                     <i class="pi pi-verified text-[10px]" />Cert
                   </span>
-                  <span
+                  <VerifiedBadge
                     v-if="applicantTradies.get(app.tradespersonId)!.insuranceVerified"
-                    class="inline-flex items-center gap-1 text-[10px] font-medium bg-violet-100 text-violet-800 rounded-full px-1.5 py-0.5"
-                    title="Liability insurance verified"
-                  >
-                    <i class="pi pi-shield text-[10px]" />Insured
-                  </span>
-                  <span
+                    kind="insurance"
+                    variant="pill"
+                    :expires-at="applicantTradies.get(app.tradespersonId)!.insuranceExpiresAt"
+                  />
+                  <VerifiedBadge
                     v-if="applicantTradies.get(app.tradespersonId)!.wsibVerified"
-                    class="inline-flex items-center gap-1 text-[10px] font-medium bg-amber-100 text-amber-800 rounded-full px-1.5 py-0.5"
-                    title="WSIB coverage verified"
-                  >
-                    <i class="pi pi-check-circle text-[10px]" />WSIB
-                  </span>
+                    kind="wsib"
+                    variant="pill"
+                    :expires-at="applicantTradies.get(app.tradespersonId)!.wsibExpiresAt"
+                  />
                 </div>
               </div>
               <div class="text-right">

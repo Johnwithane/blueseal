@@ -22,6 +22,7 @@ import { useFormatters } from "@/composables/useFormatters";
 import { useAuthStore } from "@/stores/auth";
 import { useToast } from "@/composables/useToast";
 import CalendarView from "@/components/CalendarView.vue";
+import VerifiedBadge from "@/components/VerifiedBadge.vue";
 
 const route = useRoute();
 const tradie = ref<WithId<TradespersonDoc> | null>(null);
@@ -190,8 +191,16 @@ onMounted(async () => {
             </div>
             <div class="mt-2 flex flex-wrap items-center gap-1">
               <Tag v-if="tradie.idVerified" value="ID verified" severity="success" />
-              <Tag v-if="insuranceLive" value="Insured" severity="info" icon="pi pi-verified" />
-              <Tag v-if="wsibLive" value="WSIB verified" severity="info" icon="pi pi-shield" />
+              <VerifiedBadge
+                v-if="insuranceLive"
+                kind="insurance"
+                :expires-at="tradie.insuranceExpiresAt"
+              />
+              <VerifiedBadge
+                v-if="wsibLive"
+                kind="wsib"
+                :expires-at="tradie.wsibExpiresAt"
+              />
             </div>
             <div v-if="tradesWithYears.length" class="mt-2 flex flex-wrap items-center gap-1">
               <span
