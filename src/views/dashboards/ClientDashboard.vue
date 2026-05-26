@@ -4,7 +4,7 @@ import { RouterLink } from "vue-router";
 import Button from "primevue/button";
 import SelectButton from "primevue/selectbutton";
 import Tag from "primevue/tag";
-import JobCounterparty from "@/components/JobCounterparty.vue";
+import JobList from "@/components/JobList.vue";
 import { useAuthStore } from "@/stores/auth";
 import { subscribeClientJobs } from "@/firebase/services/jobs";
 import { subscribeMyJobPosts } from "@/firebase/services/jobPosts";
@@ -22,6 +22,11 @@ const viewOptions = [
   { label: "Posted jobs", value: "posts" },
 ];
 
+// Per-party archive view for "My jobs". Posts have their own status
+// lifecycle (open / closed / cancelled / expired) and aren't archived
+// per-party — kept out of this toggle for now.
+const showArchived = ref(false);
+
 let unsubJobs: (() => void) | null = null;
 let unsubPosts: (() => void) | null = null;
 
@@ -37,18 +42,6 @@ onUnmounted(() => {
   unsubPosts?.();
 });
 
-const statusSeverity: Record<string, "info" | "success" | "warn" | "danger" | "secondary"> = {
-  accepted: "info",
-  requested: "info",
-  quoted: "warn",
-  scheduled: "success",
-  in_progress: "success",
-  awaiting_payment: "warn",
-  complete: "success",
-  reviewed: "secondary",
-  cancelled: "danger",
-};
-
 const postStatusSeverity: Record<string, "info" | "success" | "warn" | "danger" | "secondary"> = {
   open: "info",
   closed: "success",
@@ -56,8 +49,12 @@ const postStatusSeverity: Record<string, "info" | "success" | "warn" | "danger" 
   expired: "danger",
 };
 
-const visibleJobs = computed(() => jobs.value);
-const visiblePosts = computed(() => posts.value);
+// Has the client archived anything? Used to hide the "View archived"
+// button on accounts that haven't touched any jobs yet — avoids a dead
+// button on day one.
+const hasArchived = computed(() =>
+  jobs.value.some((j) => j.clientArchivedAt != null),
+);
 
 function formatBudget(min: number, max: number): string {
   const fmt = (cents: number) =>
@@ -90,7 +87,10 @@ function formatBudget(min: number, max: number): string {
 
     <!-- MY JOBS -->
     <template v-if="view === 'jobs'">
-      <div v-if="visibleJobs.length === 0" class="bs-empty">
+      <div
+        v-if="jobs.length === 0"
+        class="bs-empty"
+      >
         <i class="pi pi-inbox text-3xl mb-2 block"></i>
         <p>No active jobs. Post a job to get bids, or pick a specific tradesperson to send a direct request.</p>
         <div class="flex gap-2 justify-center mt-3">
@@ -103,37 +103,26 @@ function formatBudget(min: number, max: number): string {
         </div>
       </div>
 
-      <div v-else class="grid sm:grid-cols-2 gap-4">
-        <RouterLink
-          v-for="job in visibleJobs"
-          :key="job.id"
-          :to="{ name: 'JobDetail', params: { id: job.id } }"
-          class="bs-card p-5 hover:shadow-md transition-shadow no-underline text-inherit"
+      <template v-else>
+        <div
+          v-if="hasArchived || showArchived"
+          class="mb-3 flex items-center justify-end"
         >
-          <div class="flex items-start justify-between gap-3">
-            <div>
-              <div class="font-semibold">{{ job.title }}</div>
-              <div class="text-xs text-[color:var(--bs-muted)]">
-                {{ tradeLabel(job.trade) }} • {{ relativeTime(job.createdAt) }}
-              </div>
-            </div>
-            <Tag :value="job.status" :severity="statusSeverity[job.status] ?? 'info'" />
-          </div>
-          <p class="text-sm mt-2 text-[color:var(--bs-muted)] line-clamp-2">{{ job.description }}</p>
-          <div class="mt-3 pt-3 border-t border-[color:var(--bs-border)]">
-            <JobCounterparty
-              role="tradesperson"
-              :name="job.tradespersonName"
-              :photo-url="job.tradespersonPhotoURL"
-            />
-          </div>
-        </RouterLink>
-      </div>
+          <Button
+            :label="showArchived ? 'Back to active jobs' : 'View archived'"
+            :icon="showArchived ? 'pi pi-arrow-left' : 'pi pi-inbox'"
+            text
+            size="small"
+            @click="showArchived = !showArchived"
+          />
+        </div>
+        <JobList :jobs="jobs" viewer-role="client" :show-archived="showArchived" />
+      </template>
     </template>
 
     <!-- POSTED JOBS -->
     <template v-else>
-      <div v-if="visiblePosts.length === 0" class="bs-empty">
+      <div v-if="posts.length === 0" class="bs-empty">
         <i class="pi pi-megaphone text-3xl mb-2 block"></i>
         <p>You haven't posted any jobs yet.</p>
         <RouterLink to="/jobs/post" class="inline-block mt-3">
@@ -143,7 +132,7 @@ function formatBudget(min: number, max: number): string {
 
       <div v-else class="grid sm:grid-cols-2 gap-4">
         <RouterLink
-          v-for="post in visiblePosts"
+          v-for="post in posts"
           :key="post.id"
           :to="{ name: 'JobPostDetail', params: { postId: post.id } }"
           class="bs-card p-5 hover:shadow-md transition-shadow no-underline text-inherit"

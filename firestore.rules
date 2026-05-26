@@ -280,6 +280,24 @@ service cloud.firestore {
           resource.data.tradespersonId == uid()
           || isAdmin()
           || request.resource.data.privateNotes == resource.data.privateNotes
+        )
+        // Per-party archive: each party may set/clear only their own
+        // archive timestamp. Admin can touch either. `.get(field, null)`
+        // is required because the fields are optional and pre-existing
+        // jobs predate them — without the default, the rule evaluator
+        // throws "Property foo is undefined" on legacy docs and locks
+        // every update out.
+        && (
+          resource.data.clientId == uid()
+          || isAdmin()
+          || request.resource.data.get('clientArchivedAt', null)
+              == resource.data.get('clientArchivedAt', null)
+        )
+        && (
+          resource.data.tradespersonId == uid()
+          || isAdmin()
+          || request.resource.data.get('tradespersonArchivedAt', null)
+              == resource.data.get('tradespersonArchivedAt', null)
         );
       allow delete: if isAdmin();
 

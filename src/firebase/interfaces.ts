@@ -403,6 +403,14 @@ export interface JobDoc {
   // JobDetailView short-circuits server-side when this is within a 1-hour
   // cooldown.
   privateNotesLastAutoUpdateAt: Timestamp | null;
+  // Per-party user-initiated archive. Each party can hide a job from their
+  // own dashboard's default list without affecting the other side's view —
+  // the underlying job doc and its chat/invoice/etc remain intact. Rules
+  // enforce that each party can only set/clear their own field. Optional
+  // because pre-existing jobs predate the fields; readers treat undefined
+  // as null (= not archived).
+  clientArchivedAt?: Timestamp | null;
+  tradespersonArchivedAt?: Timestamp | null;
 }
 
 // ---------------------------------------------------------------------------
