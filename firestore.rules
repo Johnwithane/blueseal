@@ -76,28 +76,44 @@ service cloud.firestore {
       // change freely as long as it stays inside `roles`. Legacy single-`role`
       // docs (pre-multi-role cutover) are tolerated so existing accounts can
       // still edit their profile until they're back-filled.
+      //
+      // Field-equality checks use `.get(field, null)` so legacy docs that
+      // pre-date a later-added field don't trip the rule evaluator. Without
+      // the default, `resource.data.foo` on a missing field throws
+      // "Property foo is undefined" and Firestore reports it to the client
+      // as permission-denied — locking accounts created before the field
+      // existed (e.g. before `deletedAt`, `termsAcceptedAt`,
+      // `termsAcceptedVersion`, the `clientRating*` aggregates) out of every
+      // self-edit including display name + photo. With `.get(..., null)`,
+      // missing-on-both-sides compares equal so the doc keeps editing; any
+      // attempt to *add* one of these server-managed fields still mismatches
+      // and fails the rule. Same pattern is documented inline on
+      // /tradespeople for payouts / paidJobsCount / paidLifetimeCents.
       allow update: if isOwner(userId)
         && (
-          // New shape
+          // New shape. `activeRole` defaults to the first role when missing
+          // so a partially-migrated doc (has `roles` but no `activeRole`)
+          // still lets the owner edit their profile — the default is always
+          // in `roles` so the `in` check passes.
           (resource.data.roles is list
             && request.resource.data.roles == resource.data.roles
-            && request.resource.data.activeRole in resource.data.roles)
+            && request.resource.data.get('activeRole', resource.data.roles[0]) in resource.data.roles)
           ||
           // Legacy shape — role field is immutable, no roles/activeRole yet.
           (!('roles' in resource.data)
             && request.resource.data.role == resource.data.role)
         )
-        && request.resource.data.email == resource.data.email
-        && request.resource.data.clientRatingAvg == resource.data.clientRatingAvg
-        && request.resource.data.clientRatingCount == resource.data.clientRatingCount
-        && request.resource.data.emailVerified == resource.data.emailVerified
-        && request.resource.data.createdAt == resource.data.createdAt
-        && request.resource.data.termsAcceptedAt == resource.data.termsAcceptedAt
-        && request.resource.data.termsAcceptedVersion == resource.data.termsAcceptedVersion
+        && request.resource.data.get('email', null) == resource.data.get('email', null)
+        && request.resource.data.get('clientRatingAvg', null) == resource.data.get('clientRatingAvg', null)
+        && request.resource.data.get('clientRatingCount', null) == resource.data.get('clientRatingCount', null)
+        && request.resource.data.get('emailVerified', null) == resource.data.get('emailVerified', null)
+        && request.resource.data.get('createdAt', null) == resource.data.get('createdAt', null)
+        && request.resource.data.get('termsAcceptedAt', null) == resource.data.get('termsAcceptedAt', null)
+        && request.resource.data.get('termsAcceptedVersion', null) == resource.data.get('termsAcceptedVersion', null)
         // deletedAt is server-managed via the requestAccountDeletion callable
         // (admin SDK bypasses rules). Owner cannot grant themselves a
         // deletion or un-do one — keeps the path deliberate and auditable.
-        && request.resource.data.deletedAt == resource.data.deletedAt;
+        && request.resource.data.get('deletedAt', null) == resource.data.get('deletedAt', null);
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
@@ -132,6 +148,19 @@ service cloud.firestore {
         && request.resource.data.ratingCount == resource.data.ratingCount
         && request.resource.data.ratingDimensions == resource.data.ratingDimensions
         && request.resource.data.nextInvoiceNumber == resource.data.nextInvoiceNumber
+        // Invoice/quote numbering customisation (prefixes + the lazily-
+        // added quote counter) is server-managed via the
+        // `setInvoiceNumbering` callable — owner can't rewrite the
+        // prefix or skip the sequence from the client. `.get(field, null)`
+        // is required because all three are optional on legacy docs that
+        // pre-date the customisation feature; without the default the
+        // rule evaluator throws and locks out every existing tradie.
+        && request.resource.data.get('invoicePrefix', null)
+             == resource.data.get('invoicePrefix', null)
+        && request.resource.data.get('quotePrefix', null)
+             == resource.data.get('quotePrefix', null)
+        && request.resource.data.get('nextQuoteNumber', null)
+             == resource.data.get('nextQuoteNumber', null)
         && request.resource.data.approvedAt == resource.data.approvedAt
         // Stripe Connect state + verified-earnings stats are server-managed
         // (webhook dispatcher + payment_intent.succeeded handler). Use
