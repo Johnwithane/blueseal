@@ -1,16 +1,29 @@
 /**
- * Client-side image compression to WebP.
+ * Client-side image compression for upload.
  *
- * - All uploads must pass through this. Storage rules reject anything that
- *   isn't `image/webp` (or `application/pdf` for certs/ID).
+ * - All image uploads must pass through this. Storage rules reject anything
+ *   that isn't `image/webp` or `image/jpeg` (or `application/pdf` for
+ *   certs/ID/receipts).
+ * - Prefers WebP for size, falls back to JPEG when the browser doesn't
+ *   encode WebP (see fallback note below).
  * - Uses an HTMLImageElement so HEIC works on iOS Safari (which decodes it
  *   natively) — `createImageBitmap` is less forgiving for HEIC.
+ *
+ * iOS Safari < 16.4 silently ignores `canvas.toBlob(..., "image/webp")`
+ * and produces a PNG instead. The resulting blob's `type` is `image/png`,
+ * but it's still non-null so the previous version of this function happily
+ * wrapped it in a File claiming to be `image/webp`. At the default 2048px
+ * cap a PNG of a phone-camera shot lands at 4–8 MB and trips Storage's
+ * 4 MB size limit (a generic "User does not have permission to access ..."
+ * error to the user). JPEG fallback fixes that: similar size to WebP for
+ * photographic content, supported by every browser that can render an
+ * `<img>`, and Storage rules accept it.
  */
 
 export interface CompressOptions {
   /** Longest-edge cap in pixels. Larger images are scaled down preserving aspect. */
   maxDimension?: number;
-  /** WebP quality 0..1. */
+  /** Encoder quality 0..1. Applied to both WebP and the JPEG fallback. */
   quality?: number;
 }
 
@@ -43,13 +56,25 @@ export async function compressToWebp(
   if (!ctx) throw new Error("Canvas 2D context unavailable");
   ctx.drawImage(img, 0, 0, w, h);
 
-  const blob = await new Promise<Blob | null>((resolve) =>
+  // Try WebP. Inspect blob.type rather than trusting non-null — old iOS
+  // Safari hands back a PNG (or whatever its default encoder is) silently.
+  let blob = await new Promise<Blob | null>((resolve) =>
     canvas.toBlob(resolve, "image/webp", quality),
   );
-  if (!blob) throw new Error("WebP encoding failed (browser may not support it)");
+  if (!blob || blob.type !== "image/webp") {
+    blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", quality),
+    );
+  }
+  if (!blob) throw new Error("Image encoding failed (browser supports neither WebP nor JPEG)");
 
   const baseName = file.name.replace(/\.[^.]+$/, "");
-  return new File([blob], `${baseName}.webp`, { type: "image/webp" });
+  // Match the extension to the actual blob type so the Storage rule's
+  // filename check (e.g. `.*\.webp` / `.*\.(jpg|jpeg)`) lines up with the
+  // contentType check. A WebP-named file with JPEG bytes would fail one
+  // half of the rule on otherwise-valid uploads.
+  const ext = blob.type === "image/webp" ? "webp" : "jpg";
+  return new File([blob], `${baseName}.${ext}`, { type: blob.type });
 }
 
 /**

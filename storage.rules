@@ -19,14 +19,24 @@ service firebase.storage {
     // contentType is attacker-controllable; the filename extension provides a
     // second signal and a Cloud Function should additionally inspect magic
     // bytes on finalize.
-    function isWebp() {
-      return request.resource.contentType == 'image/webp'
-        && request.resource.name.lower().matches('.*\\.webp');
+    //
+    // We accept WebP *or* JPEG. The client pipeline (src/utils/image.ts)
+    // prefers WebP for size, but iOS Safari < 16.4 silently ignores the
+    // `image/webp` hint in `canvas.toBlob` — the resulting File would
+    // otherwise be a PNG mislabeled as WebP and exceed the 4 MB size cap
+    // at the default 2048px dimension. The fallback re-encodes to JPEG,
+    // which every Safari version supports and which is similar in size to
+    // WebP for photographic content.
+    function isCompressedImage() {
+      return (request.resource.contentType == 'image/webp'
+              && request.resource.name.lower().matches('.*\\.webp'))
+          || (request.resource.contentType == 'image/jpeg'
+              && request.resource.name.lower().matches('.*\\.(jpg|jpeg)'));
     }
-    function isWebpOrPdf() {
-      return isWebp()
-        || (request.resource.contentType == 'application/pdf'
-            && request.resource.name.lower().matches('.*\\.pdf'));
+    function isCompressedImageOrPdf() {
+      return isCompressedImage()
+          || (request.resource.contentType == 'application/pdf'
+              && request.resource.name.lower().matches('.*\\.pdf'));
     }
 
     // Lookup helpers — Storage rules can call into Firestore.
@@ -49,7 +59,7 @@ service firebase.storage {
     // User avatars — owner write, world read. WebP only.
     match /users/{userId}/profile/{file=**} {
       allow read: if true;
-      allow write: if isOwner(userId) && smallSizeOk() && isWebp();
+      allow write: if isOwner(userId) && smallSizeOk() && isCompressedImage();
     }
 
     // PIPEDA data exports — server-written (exportMyData callable). Owner
@@ -63,37 +73,46 @@ service firebase.storage {
     // Tradesperson portfolio — owner write, world read (gated by isVisible elsewhere). WebP only.
     match /tradespeople/{tradieId}/portfolio/{file=**} {
       allow read: if true;
-      allow write: if isOwner(tradieId) && smallSizeOk() && isWebp();
+      allow write: if isOwner(tradieId) && smallSizeOk() && isCompressedImage();
+    }
+
+    // Tradesperson company logo — owner write, world read. Shown at the
+    // top of generated invoice / quote PDFs and on the invoice card UI.
+    // WebP only to match the portfolio convention; upload pipeline
+    // compresses any uploaded PNG/JPG to WebP before write.
+    match /tradespeople/{tradieId}/logo/{file=**} {
+      allow read: if true;
+      allow write: if isOwner(tradieId) && smallSizeOk() && isCompressedImage();
     }
 
     // Certifications — owner write, admin + owner read. WebP or PDF.
     match /tradespeople/{tradieId}/certs/{file=**} {
       allow read: if isOwner(tradieId) || isAdmin();
-      allow write: if isOwner(tradieId) && docSizeOk() && isWebpOrPdf();
+      allow write: if isOwner(tradieId) && docSizeOk() && isCompressedImageOrPdf();
     }
 
     // ID verification — owner write, ADMIN-ONLY READ. WebP or PDF.
     match /tradespeople/{tradieId}/id/{file=**} {
       allow read: if isAdmin();
-      allow write: if isOwner(tradieId) && docSizeOk() && isWebpOrPdf();
+      allow write: if isOwner(tradieId) && docSizeOk() && isCompressedImageOrPdf();
     }
 
     // Insurance certificate — owner write, owner + admin read. WebP or PDF.
     match /tradespeople/{tradieId}/insurance/{file=**} {
       allow read: if isOwner(tradieId) || isAdmin();
-      allow write: if isOwner(tradieId) && docSizeOk() && isWebpOrPdf();
+      allow write: if isOwner(tradieId) && docSizeOk() && isCompressedImageOrPdf();
     }
 
     // WSIB / provincial workers'-comp clearance — same shape as insurance.
     match /tradespeople/{tradieId}/wsib/{file=**} {
       allow read: if isOwner(tradieId) || isAdmin();
-      allow write: if isOwner(tradieId) && docSizeOk() && isWebpOrPdf();
+      allow write: if isOwner(tradieId) && docSizeOk() && isCompressedImageOrPdf();
     }
 
     // Job intake photos — parties of the job + admin only.
     match /jobs/{jobId}/intake/{file=**} {
       allow read: if isSignedIn() && (jobParty(jobId) || isAdmin());
-      allow write: if isSignedIn() && jobParty(jobId) && smallSizeOk() && isWebp();
+      allow write: if isSignedIn() && jobParty(jobId) && smallSizeOk() && isCompressedImage();
     }
 
     // Job expense receipts — tradie + admin only. Critically NOT readable
@@ -108,7 +127,7 @@ service firebase.storage {
     }
     match /jobs/{jobId}/receipts/{file=**} {
       allow read: if isSignedIn() && (isJobTradie(jobId) || isAdmin());
-      allow write: if isSignedIn() && isJobTradie(jobId) && docSizeOk() && isWebpOrPdf();
+      allow write: if isSignedIn() && isJobTradie(jobId) && docSizeOk() && isCompressedImageOrPdf();
     }
 
     // Job-post photos — uploaded before the post doc exists (client picks a
@@ -120,13 +139,13 @@ service firebase.storage {
     // signed-in user; the Firestore post-read rules gate discovery.
     match /jobPosts/{postId}/photos/{file=**} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn() && smallSizeOk() && isWebp();
+      allow write: if isSignedIn() && smallSizeOk() && isCompressedImage();
     }
 
     // Chat photo attachments — parties of the chat + admin.
     match /chats/{chatId}/{file=**} {
       allow read: if isSignedIn() && (chatParty(chatId) || isAdmin());
-      allow write: if isSignedIn() && chatParty(chatId) && smallSizeOk() && isWebp();
+      allow write: if isSignedIn() && chatParty(chatId) && smallSizeOk() && isCompressedImage();
     }
 
     // Invoice PDFs — generated server-side; parties read only.
