@@ -706,7 +706,7 @@ function onReturnToApplicants() {
         />
         <Button
           v-else-if="job.status === 'in_progress'"
-          label="Create and send invoice"
+          label="Create invoice"
           icon="pi pi-receipt"
           class="w-full"
           size="large"

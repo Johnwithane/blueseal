@@ -132,7 +132,7 @@ const emit = defineEmits<{
       <p class="text-sm font-medium">No invoice yet</p>
       <p class="text-xs text-[color:var(--bs-muted)] mt-1">
         The invoice draft is generated when the tradesperson uses
-        <span class="font-medium">Create and send invoice</span>.
+        <span class="font-medium">Create invoice</span>.
       </p>
     </div>
 
