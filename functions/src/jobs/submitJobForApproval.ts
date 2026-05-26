@@ -314,6 +314,11 @@ export const submitJobForApproval = onCall({ enforceAppCheck: false }, async (re
     status: "awaiting_client_approval",
     clientApprovalRequestedAt: FieldValue.serverTimestamp(),
     clientApprovedAt: null,
+    // Clear any prior "changes requested" signal so the tradesperson-side
+    // banner / "Update invoice" CTA disappears once the revised wrap-up
+    // is back in the client's court.
+    clientChangesRequestedAt: null,
+    clientChangesRequestedReason: null,
   });
 
   await batch.commit();

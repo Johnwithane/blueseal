@@ -27,6 +27,7 @@ import FinishJobSheet from "@/components/FinishJobSheet.vue";
 import ClientApprovalBanner from "@/components/ClientApprovalBanner.vue";
 import QuoteSheet from "@/components/QuoteSheet.vue";
 import ClientQuoteApprovalBanner from "@/components/ClientQuoteApprovalBanner.vue";
+import TradieChangesRequestedBanner from "@/components/TradieChangesRequestedBanner.vue";
 import { SEED_INTAKE_SCHEMAS } from "@/data/intakeSchemas";
 import { getIntakeSchema } from "@/firebase/services/intakeFormSchemas";
 import type { IntakeField } from "@/firebase/interfaces";
@@ -579,6 +580,20 @@ function onReturnToApplicants() {
         @decided="load"
       />
 
+      <!-- Changes-requested loopback. Mirrors the quote decline -> revise
+           pattern: tradie sees the change reason + an "Update invoice"
+           CTA; client sees a passive "waiting on revised invoice" stub.
+           Driven by clientChangesRequestedAt on the job — set by
+           clientRequestChanges, cleared again by submitJobForApproval. -->
+      <TradieChangesRequestedBanner
+        v-if="job.status === 'in_progress' && job.clientChangesRequestedAt"
+        :job="job"
+        :is-tradie="isTradie"
+        :is-client="isClient"
+        class="mb-4"
+        @update-invoice="showFinishSheet = true"
+      />
+
       <!-- Active-job booking confirmation. Once a date is set on an
            active job, the booking is the most important piece of info
            on the page — surface it in the banners rail rather than
@@ -706,8 +721,8 @@ function onReturnToApplicants() {
         />
         <Button
           v-else-if="job.status === 'in_progress'"
-          label="Create invoice"
-          icon="pi pi-receipt"
+          :label="job.clientChangesRequestedAt ? 'Update invoice' : 'Create invoice'"
+          :icon="job.clientChangesRequestedAt ? 'pi pi-pencil' : 'pi pi-receipt'"
           class="w-full"
           size="large"
           @click="showFinishSheet = true"

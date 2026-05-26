@@ -363,6 +363,13 @@ export interface JobDoc {
   // Set by clientApproveJob — locks in the moment the client signed off so
   // any later dispute can reference the approval timeline.
   clientApprovedAt: Timestamp | null;
+  // Set by clientRequestChanges when the client kicks the wrap-up back to
+  // the tradesperson with a change request. Drives the tradesperson-side
+  // "client requested changes" banner + the "Update invoice" CTA. Cleared
+  // by the next submitJobForApproval so the loop can repeat cleanly.
+  // Optional because pre-existing jobs may not have the field.
+  clientChangesRequestedAt?: Timestamp | null;
+  clientChangesRequestedReason?: string | null;
   cancelledAt: Timestamp | null;
   cancelledReason: string | null;
   // uid of the party who cancelled — used by onJobCancelled trigger to pick

@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { FieldValue } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { z } from "zod";
 import { db } from "../lib/admin";
@@ -24,9 +25,12 @@ interface JobData {
  * tradesperson can re-finish once they've adjusted) and posts the reason
  * into the job chat so the discussion thread has it on the record.
  *
- * clientApprovalRequestedAt is cleared so a subsequent submitJobForApproval
- * starts a fresh timeline. The invoice draft is preserved as-is — the
- * tradesperson can edit it in place rather than rebuild from scratch.
+ * clientApprovalRequestedAt is cleared and clientChangesRequestedAt/Reason
+ * are stamped so the tradesperson-side UI can render a "changes requested"
+ * banner + flip the sticky CTA from "Create invoice" to "Update invoice".
+ * Both fields get cleared again on the next submitJobForApproval. The
+ * invoice draft is preserved as-is — the tradesperson can edit it in
+ * place rather than rebuild from scratch.
  *
  * onJobUpdated suppresses its generic status-changed line here.
  */
@@ -54,6 +58,8 @@ export const clientRequestChanges = onCall({ enforceAppCheck: false }, async (re
     tx.update(jobRef, {
       status: "in_progress",
       clientApprovalRequestedAt: null,
+      clientChangesRequestedAt: FieldValue.serverTimestamp(),
+      clientChangesRequestedReason: reason,
     });
     return { tradespersonId: job.tradespersonId, chatId: job.chatId };
   });
