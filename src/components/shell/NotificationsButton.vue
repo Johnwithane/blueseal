@@ -170,7 +170,9 @@ async function onMarkAllRead() {
   line-height: 1;
 }
 
-/* Bottom-bar tab variant — matches BottomNav.vue's `.shell-tab` style. */
+/* Bottom-bar tab variant — matches BottomNav.vue's `.bottom-tab` style.
+   Padding (including iOS safe-area-inset-bottom) lives on the tab so the
+   active blue fill reaches the screen edge. */
 .shell-tab {
   flex: 1 1 0;
   min-width: 0;
@@ -185,6 +187,7 @@ async function onMarkAllRead() {
   font-size: 0.6875rem;
   font-weight: 500;
   padding: 0.25rem 0.125rem;
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
   cursor: pointer;
   min-height: 48px;
   transition: color 120ms ease;
@@ -196,12 +199,16 @@ async function onMarkAllRead() {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Matches BottomNav.vue's `.bottom-tab--active` — solid blue block filling
+   the tab cell edge-to-edge. Only colors change (no margin/radius shift)
+   so the icon doesn't reposition on selection. */
 .shell-tab--active {
-  color: var(--bs-text);
+  color: white;
+  background: var(--bs-blue);
   font-weight: 600;
 }
 .shell-tab--active .shell-tab__icon {
-  color: var(--bs-blue);
+  color: white;
 }
 .shell-tab__icon {
   font-size: 1.25rem;

@@ -65,10 +65,12 @@ export function useNavItems(): {
     if (!auth.isAuthenticated) return [];
 
     if (auth.activeRole === "tradesperson") {
-      // Side panel is daily-action focused: Jobs/Browse/Notifications/
-      // Recommendations. Account + Payouts live behind the avatar profile
-      // link at the bottom of the panel (and the mobile Profile tab),
-      // which routes straight to /account. Browse sits before
+      // Side panel is daily-action focused: Jobs/Browse/Profile/
+      // Notifications/Recommendations. Profile is duplicated here (it also
+      // appears as the avatar at the bottom of the panel) because tradies
+      // wanted a labelled row in the main list — the avatar alone was easy
+      // to miss. On mobile the bottom bar already has a Profile tab, so
+      // this row is desktop-only (`mobile: false`). Browse sits before
       // Notifications so the bottom-bar order reads Jobs → Browse →
       // Alerts → Profile, putting work-acquisition actions ahead of
       // passive notifications.
@@ -89,6 +91,14 @@ export function useNavItems(): {
           to: "/jobs/browse",
           mobile: true,
           matches: prefix("/jobs/browse"),
+        },
+        {
+          key: "profile",
+          label: "Profile",
+          icon: "pi-user",
+          to: "/account",
+          mobile: false,
+          matches: exact("/account"),
         },
         {
           key: "notifications",

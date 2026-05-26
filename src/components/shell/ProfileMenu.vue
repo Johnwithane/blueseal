@@ -125,12 +125,16 @@ const isActive = computed(() => route.path === "/account");
   font-size: 0.6875rem;
   font-weight: 500;
   padding: 0.25rem 0.125rem;
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
   text-decoration: none;
   min-height: 48px;
   transition: color 120ms ease;
 }
+/* Matches BottomNav.vue's `.bottom-tab--active` — solid blue block. Only
+   colors change so the avatar and label stay put on selection. */
 .profile-tab--active {
-  color: var(--bs-text);
+  color: white;
+  background: var(--bs-blue);
   font-weight: 600;
 }
 .profile-tab__label {

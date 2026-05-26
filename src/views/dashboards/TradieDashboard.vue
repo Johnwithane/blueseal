@@ -306,19 +306,21 @@ const awaitingVerificationMessage = computed(() => {
          stay fixed in place across view switches. -->
     <div
       v-if="tradie?.isVisible && view === 'calendar'"
-      class="flex flex-wrap items-center gap-2 mb-4"
+      class="flex items-center gap-2 mb-4"
     >
       <Button
-        label="Manage availability"
+        label="Availability"
         icon="pi pi-clock"
         outlined
+        class="flex-1 min-w-0"
         @click="openAvailabilityEditor"
       />
       <Button
-        label="Block off time"
+        label="Block time"
         icon="pi pi-ban"
         outlined
         severity="danger"
+        class="flex-1 min-w-0"
         @click="openBlockEditor"
       />
     </div>
