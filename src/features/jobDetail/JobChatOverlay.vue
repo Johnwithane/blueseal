@@ -7,6 +7,7 @@ import AssistantQuickPrompts from "@/components/assistant/AssistantQuickPrompts.
 import AssistantComposer from "@/components/assistant/AssistantComposer.vue";
 import { useAssistantStore } from "@/stores/assistant";
 import { useAuthStore } from "@/stores/auth";
+import { useNotificationsStore } from "@/stores/notifications";
 import type { JobDoc, WithId } from "@/firebase/interfaces";
 
 const props = defineProps<{
@@ -18,6 +19,7 @@ const visible = defineModel<boolean>("visible", { required: true });
 
 const auth = useAuthStore();
 const assistant = useAssistantStore();
+const notifs = useNotificationsStore();
 
 // Sub-tab inside the overlay. Clients only get Chat — AI is tradie-only
 // (see AssistantBubble.vue's `visible` rule). Defaults to Chat so the
@@ -60,7 +62,22 @@ watch(visible, (v) => {
 
 // Tear down the assistant context when the overlay closes for the last
 // time — keeps stale job-scoped threads from leaking into the next view.
-onBeforeUnmount(() => assistant.reset());
+onBeforeUnmount(() => {
+  assistant.reset();
+  notifs.setActiveChat(null);
+});
+
+// Tell the global notification-toast watcher to suppress `message_received`
+// pops for THIS chat while the user is actively reading it. Only active
+// when the chat sub-tab is the visible one — if the user flips to AI, the
+// chat thread isn't on screen, so the toast is useful again.
+watch(
+  [visible, sub],
+  ([v, s]) => {
+    notifs.setActiveChat(v && s === "chat" ? props.job.chatId : null);
+  },
+  { immediate: true },
+);
 
 // Lock the page body scroll while the overlay is open so the chat owns the
 // viewport. Restore on close. Effectful, so we use a watch.

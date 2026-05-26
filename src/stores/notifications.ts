@@ -23,6 +23,12 @@ interface State {
   // dev (vite HMR re-runs App.vue's onMounted).
   unsub: (() => void) | null;
   started: boolean;
+  // Chat the user is *actively reading* right now (chat sub-tab visible in
+  // the JobChatOverlay). Set by the overlay, cleared on close / AI sub-tab /
+  // unmount. The App.vue toast watcher uses this to suppress `message_received`
+  // toasts for the chat the user is already looking at — the inbox doc is
+  // still written so the bell badge survives if they navigate away.
+  activeChatId: string | null;
 }
 
 export const useNotificationsStore = defineStore("notifications", {
@@ -31,6 +37,7 @@ export const useNotificationsStore = defineStore("notifications", {
     loading: false,
     unsub: null,
     started: false,
+    activeChatId: null,
   }),
 
   getters: {
@@ -117,6 +124,10 @@ export const useNotificationsStore = defineStore("notifications", {
         }
       }
       router.push(link);
+    },
+
+    setActiveChat(chatId: string | null) {
+      this.activeChatId = chatId;
     },
 
     async markAllRead() {
