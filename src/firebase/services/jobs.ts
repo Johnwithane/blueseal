@@ -262,6 +262,7 @@ export interface InvoicePartyInfo {
     address: string | null;
     phone: string | null;
     email: string | null;
+    gstNumber: string | null;
   };
   client: {
     name: string;

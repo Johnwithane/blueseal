@@ -21,6 +21,7 @@ export interface PartyInfo {
     address: string | null;
     phone: string | null;
     email: string | null;
+    gstNumber: string | null;
   };
   client: {
     name: string;
@@ -197,7 +198,9 @@ async function renderPdf(
   const rightX = margin + colWidth + panelGap;
   const panelPadX = 14;
   const panelPadY = 14;
-  const panelHeight = 96;
+  // Fixed-height panel sized to fit: heading + name + companyName + up to
+  // 4 contact lines (address, phone, email, GST/HST) without overflow.
+  const panelHeight = 112;
 
   doc.setDrawColor(...BRAND.border);
   doc.setFillColor(...BRAND.paperAlt);
@@ -254,6 +257,11 @@ async function renderPdf(
       party.tradesperson.address,
       party.tradesperson.phone,
       party.tradesperson.email,
+      // CRA documentary requirement — GST/HST registrants must show their
+      // number on invoices for clients to claim input tax credits.
+      party.tradesperson.gstNumber
+        ? `GST/HST: ${party.tradesperson.gstNumber}`
+        : null,
     ],
   );
   writePartyBlock(
@@ -284,13 +292,21 @@ async function renderPdf(
   }
 
   // ============== LINE ITEMS TABLE ==============
-  const tableBody = lineItems.map((li) => [
-    li.description,
-    li.quantity.toString(),
-    fmtMoney(li.unitPrice, totals.currency),
-    `${(li.taxRate * 100).toFixed(1)}%`,
-    fmtMoney(li.quantity * li.unitPrice, totals.currency),
-  ]);
+  // Line total includes tax — `Qty × Unit price × (1 + taxRate)` — so a
+  // row with "Tax 13 %" visibly reflects that 13 % in its line total.
+  // The pre-tax subtotal + tax breakdown still appears in the totals
+  // card so the math stays auditable.
+  const tableBody = lineItems.map((li) => {
+    const lineSubtotal = li.quantity * li.unitPrice;
+    const lineWithTax = Math.round(lineSubtotal * (1 + li.taxRate));
+    return [
+      li.description,
+      li.quantity.toString(),
+      fmtMoney(li.unitPrice, totals.currency),
+      `${(li.taxRate * 100).toFixed(1)}%`,
+      fmtMoney(lineWithTax, totals.currency),
+    ];
+  });
 
   autoTable(doc, {
     startY: cursorY,
@@ -331,7 +347,7 @@ async function renderPdf(
   const rowHeight = 18;
   const hasDiscount = totals.discountAmount > 0;
   const innerRows = 2 + (hasDiscount ? 1 : 0); // subtotal + tax (+ discount)
-  const totalsBoxHeight = innerRows * rowHeight + 42;
+  const totalsBoxHeight = innerRows * rowHeight + 50;
 
   doc.setDrawColor(...BRAND.border);
   doc.setFillColor(...BRAND.bluePanel);
@@ -364,10 +380,13 @@ async function renderPdf(
   }
   totalsRow("Tax", fmtMoney(totals.taxTotal, totals.currency));
 
-  // Divider line above the bolded Total row
+  // Extra breathing room between Tax and Total — divider sits in the
+  // middle of the gap, Total's bold 12.5pt cap-height needs clear space
+  // above so it doesn't graze the divider line.
+  totalsY += 8;
   doc.setDrawColor(...BRAND.blue);
   doc.setLineWidth(0.8);
-  doc.line(labelX, totalsY - 9, valueX, totalsY - 9);
+  doc.line(labelX, totalsY - 12, valueX, totalsY - 12);
   doc.setLineWidth(0.5);
   totalsRow("Total", fmtMoney(totals.total, totals.currency), {
     bold: true,

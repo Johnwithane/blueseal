@@ -145,11 +145,17 @@ export interface TradespersonDoc {
   // sole proprietors who'd rather not show their home address on
   // paperwork; falls back to primaryAddressText when blank. businessPhone
   // is a separate line so the client can reach the trade's billing
-  // contact directly. Both optional only because pre-existing tradesperson
-  // docs predate the fields; new docs default to null + the UI nudges the
+  // contact directly. gstNumber is the tradesperson's CRA GST/HST
+  // registration (format like "123456789RT0001") — optional because
+  // small suppliers under the $30k threshold aren't required to register,
+  // but tradies who are registered must show it on invoices per CRA's
+  // documentary requirements for clients claiming input tax credits.
+  // All three optional only because pre-existing tradesperson docs
+  // predate the fields; new docs default to null + the UI nudges the
   // owner to fill them.
   businessAddress?: string | null;
   businessPhone?: string | null;
+  gstNumber?: string | null;
   portfolioPhotos: string[];
   ratingAvg: number;
   ratingCount: number;

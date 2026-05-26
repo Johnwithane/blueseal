@@ -383,7 +383,11 @@ async function markPaid() {
               <InputNumber v-if="props.canEdit" v-model="li.taxRate" :min="0" :max="0.5" :max-fraction-digits="3" :input-class="'text-right w-16'" />
               <span v-else>{{ (li.taxRate * 100).toFixed(1) }}%</span>
             </td>
-            <td class="py-1.5 text-right">{{ money(cents(li.quantity * li.unitPriceDollars)) }}</td>
+            <!-- Line total includes tax (qty × unit × (1 + taxRate)) so
+                 the column reflects the per-line "Tax %" without the
+                 client having to do mental math. The bottom totals card
+                 still shows the pre-tax subtotal + tax breakdown. -->
+            <td class="py-1.5 text-right">{{ money(Math.round(cents(li.quantity * li.unitPriceDollars) * (1 + (li.taxRate ?? 0)))) }}</td>
             <td v-if="props.canEdit" class="py-1.5 text-right">
               <Button text icon="pi pi-times" size="small" severity="danger" aria-label="Remove line" @click="removeItem(i)" />
             </td>

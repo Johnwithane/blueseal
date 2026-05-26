@@ -41,6 +41,18 @@ const showPayDialog = ref(false);
 function openPayDialog() {
   showPayDialog.value = true;
 }
+
+// Job statuses where the invoice should be read-only for the tradesperson.
+// awaiting_client_approval: client is reviewing the exact submitted version.
+// awaiting_payment / complete / reviewed: client has signed off on the total.
+// Editing under them would diverge what's been agreed/paid.
+const lockedStatuses = new Set<JobDoc["status"]>([
+  "awaiting_client_approval",
+  "awaiting_payment",
+  "complete",
+  "reviewed",
+  "cancelled",
+]);
 </script>
 
 <template>
@@ -156,11 +168,18 @@ function openPayDialog() {
     </div>
 
     <!-- Invoice first — once it exists it's the artifact the conversation
-         is really about. Renders only when one exists. -->
+         is really about. Renders only when one exists.
+         canEdit gates write controls on top of the tradesperson check:
+         once the client has approved + the invoice is sent for payment,
+         the line items are locked. Editing under the client's feet after
+         they've approved a specific total would be misleading; if the
+         tradesperson needs to revise post-approval they go through a
+         cancel/re-quote loop instead. Reviewed = same lock, just past
+         payment. -->
     <InvoiceEditor
       v-if="invoiceId"
       :invoice-id="invoiceId"
-      :can-edit="isTradie"
+      :can-edit="isTradie && !lockedStatuses.has(job.status)"
       :tradesperson-name="resolvedTradespersonName"
       :client-name="resolvedClientName"
     />

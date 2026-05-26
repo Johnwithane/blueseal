@@ -32,6 +32,7 @@ interface TradespersonData {
   primaryAddressText?: string | null;
   businessAddress?: string | null;
   businessPhone?: string | null;
+  gstNumber?: string | null;
 }
 
 interface PartyInfoResult {
@@ -41,6 +42,7 @@ interface PartyInfoResult {
     address: string | null;
     phone: string | null;
     email: string | null;
+    gstNumber: string | null;
   };
   client: {
     name: string;
@@ -124,6 +126,7 @@ export const getInvoicePartyInfo = onCall(
         address: tradieAddress,
         phone: tradieDoc.businessPhone?.trim() || tradieUser.phone?.trim() || null,
         email: tradieUser.email?.trim() || null,
+        gstNumber: tradieDoc.gstNumber?.trim() || null,
       },
       client: {
         name: clientName,

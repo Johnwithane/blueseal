@@ -76,6 +76,7 @@ const languages = ref<string[]>([]);
 // optionally overrides the primary address; blank falls back to it.
 const businessAddress = ref("");
 const businessPhone = ref("");
+const gstNumber = ref("");
 const savingTradieProfile = ref(false);
 
 // Privacy section state (PIPEDA — export + delete)
@@ -178,6 +179,7 @@ onMounted(async () => {
       languages.value = Array.isArray(t.languages) ? [...t.languages] : [];
       businessAddress.value = t.businessAddress ?? "";
       businessPhone.value = t.businessPhone ?? "";
+      gstNumber.value = t.gstNumber ?? "";
     }
   }
   // About me: canonical home is users.bio. Pre-existing tradies have their
@@ -238,12 +240,14 @@ async function saveTradieProfile() {
       languages: languages.value,
       businessAddress: businessAddress.value.trim() || null,
       businessPhone: businessPhone.value.trim() || null,
+      gstNumber: gstNumber.value.trim() || null,
     });
     if (tradie.value) {
       tradie.value.companyName = companyName.value.trim() || null;
       tradie.value.languages = [...languages.value];
       tradie.value.businessAddress = businessAddress.value.trim() || null;
       tradie.value.businessPhone = businessPhone.value.trim() || null;
+      tradie.value.gstNumber = gstNumber.value.trim() || null;
     }
     toast.success("Tradesperson profile saved");
   } catch (e) {
@@ -672,6 +676,22 @@ async function grantAdminAllRoles() {
                   <p class="mt-1 text-xs text-[color:var(--bs-muted)]">
                     A direct billing number. Different from your personal
                     profile phone — leave blank to skip.
+                  </p>
+                </div>
+                <div>
+                  <label class="text-sm font-medium">
+                    GST / HST number
+                    <span class="text-xs text-[color:var(--bs-muted)] font-normal">Strongly recommended</span>
+                  </label>
+                  <InputText
+                    v-model="gstNumber"
+                    class="mt-1 w-full"
+                    placeholder="123456789 RT 0001"
+                  />
+                  <p class="mt-1 text-xs text-[color:var(--bs-muted)]">
+                    Your CRA registration number. Required on invoices for
+                    clients to claim input tax credits. Leave blank only if
+                    you're a small supplier (under $30k/yr) and not registered.
                   </p>
                 </div>
               </div>

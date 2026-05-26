@@ -215,7 +215,10 @@ const KIND_ICON: Record<LineItemKind, string> = {
               {{ li.quantity }} × {{ money(li.unitPrice) }}
             </template>
           </td>
-          <td class="py-1.5 text-right">{{ money(li.quantity * li.unitPrice) }}</td>
+          <!-- Line total includes tax to match the InvoiceEditor + PDF
+               convention. Pre-tax subtotal is shown in the totals
+               block below so the math is still auditable. -->
+          <td class="py-1.5 text-right">{{ money(Math.round(li.quantity * li.unitPrice * (1 + (li.taxRate ?? 0)))) }}</td>
         </tr>
       </tbody>
       <tfoot class="border-t">
