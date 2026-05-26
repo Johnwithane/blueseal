@@ -91,6 +91,29 @@ interface UserContact {
   newJobPostingEnabled: boolean;
 }
 
+interface ActorSnapshot {
+  photoURL: string | null;
+  displayName: string | null;
+}
+
+// Reads the actor's avatar + name for denormalization onto the notification.
+// Returns nulls on any failure — a notification miss must never break the
+// triggering action, and the UI falls back to the type icon when these are
+// null.
+async function getActorSnapshot(uid: string): Promise<ActorSnapshot> {
+  try {
+    const snap = await db.doc(`users/${uid}`).get();
+    const data = snap.data() as { photoURL?: string | null; displayName?: string | null } | undefined;
+    return {
+      photoURL: data?.photoURL ?? null,
+      displayName: data?.displayName ?? null,
+    };
+  } catch (err) {
+    logger.warn("notify: failed to load actor snapshot", { uid, err });
+    return { photoURL: null, displayName: null };
+  }
+}
+
 async function getUserContact(uid: string): Promise<UserContact> {
   try {
     const snap = await db.doc(`users/${uid}`).get();
@@ -159,6 +182,13 @@ export async function notify(input: NotifyInput): Promise<void> {
     if (!contact.newJobPostingEnabled) return;
   }
 
+  // Denormalize the actor's avatar + display name onto the notification so
+  // the inbox can render a profile picture per row without a users/{actorUid}
+  // read per item. Only when actorUid is set; defaults to nulls otherwise.
+  const actorSnapshot = input.actorUid
+    ? await getActorSnapshot(input.actorUid)
+    : { photoURL: null, displayName: null };
+
   // In-app inbox always.
   try {
     await db.collection("notifications").add({
@@ -173,6 +203,8 @@ export async function notify(input: NotifyInput): Promise<void> {
       jobId: input.jobId ?? null,
       chatId: input.chatId ?? null,
       actorUid: input.actorUid ?? null,
+      actorPhotoURL: actorSnapshot.photoURL,
+      actorDisplayName: actorSnapshot.displayName,
       recipientRole: input.recipientRole ?? null,
     });
   } catch (err) {

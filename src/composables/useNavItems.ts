@@ -31,6 +31,16 @@ function prefix(path: string) {
     r.path === path || r.path.startsWith(path + "/");
 }
 
+// "Jobs" should stay highlighted whenever the user is on the dashboard OR
+// inside a job (the per-job kanban /jobs/:id and the client's posted-job
+// review /jobs/posted/:postId) — those are reached *from* the Jobs list.
+// Excludes /jobs/post and /jobs/browse, which have their own nav items.
+function jobsMatcher(r: RouteLocationNormalizedLoaded): boolean {
+  if (r.path === "/dashboard" || r.path.startsWith("/dashboard/")) return true;
+  if (r.path === "/jobs/post" || r.path === "/jobs/browse") return false;
+  return r.path.startsWith("/jobs/");
+}
+
 /**
  * Role-aware nav-item source. The side panel and bottom bar both consume this
  * — the bottom bar filters down to items with `mobile: true`. Items are
@@ -69,7 +79,7 @@ export function useNavItems(): {
           icon: "pi-home",
           to: "/dashboard",
           mobile: true,
-          matches: (r) => r.path === "/dashboard" || r.path.startsWith("/dashboard/"),
+          matches: jobsMatcher,
         },
         {
           key: "browse",
@@ -177,7 +187,7 @@ export function useNavItems(): {
         icon: "pi-home",
         to: "/dashboard",
         mobile: true,
-        matches: (r) => r.path === "/dashboard" || r.path.startsWith("/dashboard/"),
+        matches: jobsMatcher,
       },
       {
         key: "notifications",

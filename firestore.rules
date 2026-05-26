@@ -415,7 +415,9 @@ service cloud.firestore {
         && request.resource.data.actorUid == resource.data.actorUid
         // .get(..., null) handles legacy docs that pre-date the field —
         // both sides resolve to null so the equality check holds.
-        && request.resource.data.get('recipientRole', null) == resource.data.get('recipientRole', null);
+        && request.resource.data.get('recipientRole', null) == resource.data.get('recipientRole', null)
+        && request.resource.data.get('actorPhotoURL', null) == resource.data.get('actorPhotoURL', null)
+        && request.resource.data.get('actorDisplayName', null) == resource.data.get('actorDisplayName', null);
       allow create, delete: if false;
     }
 

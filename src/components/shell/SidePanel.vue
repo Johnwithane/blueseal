@@ -3,6 +3,7 @@ import { RouterLink } from "vue-router";
 import { useNavItems } from "@/composables/useNavItems";
 import NotificationsButton from "@/components/shell/NotificationsButton.vue";
 import ProfileMenu from "@/components/shell/ProfileMenu.vue";
+import RoleSwitcher from "@/components/shell/RoleSwitcher.vue";
 
 const { sideItems, isActive } = useNavItems();
 </script>
@@ -33,6 +34,10 @@ const { sideItems, isActive } = useNavItems();
         </RouterLink>
       </template>
     </nav>
+
+    <!-- Multi-role users get a segmented pill toggle just above the profile
+         row. The component self-hides when the user holds only one role. -->
+    <RoleSwitcher />
 
     <div class="side-panel__profile">
       <ProfileMenu variant="side" />
@@ -101,12 +106,18 @@ const { sideItems, isActive } = useNavItems();
   color: var(--bs-text);
   background: var(--bs-surface-alt);
 }
-.side-row--active {
-  color: var(--bs-text);
+/* Active row: solid blue pill with white text/icon. Beats the previous
+   subtle-bold styling, which was too easy to miss against the white panel
+   background. The active state still wins over hover because `:hover` only
+   sets background (this rule is more specific). */
+.side-row--active,
+.side-row--active:hover {
+  color: white;
+  background: var(--bs-blue);
   font-weight: 600;
 }
 .side-row--active .side-row__icon {
-  color: var(--bs-blue);
+  color: white;
 }
 .side-row__icon {
   font-size: 1.125rem;

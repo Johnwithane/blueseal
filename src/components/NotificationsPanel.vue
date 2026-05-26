@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import Avatar from "primevue/avatar";
 import type { NotificationDoc, NotificationType, WithId } from "@/firebase/interfaces";
 import { useFormatters } from "@/composables/useFormatters";
 
@@ -53,6 +54,14 @@ const ICON: Record<NotificationType, string> = {
 function iconFor(type: NotificationType): string {
   return ICON[type] ?? "pi pi-bell";
 }
+
+// Initial used for the avatar fallback when the actor has a denormalized
+// displayName but no photoURL (or the photo fails to load). Falls back to
+// "?" rather than blank so the circle is never visually empty.
+function initialFor(name: string | null): string {
+  const trimmed = (name ?? "").trim();
+  return trimmed.length > 0 ? trimmed.slice(0, 1).toUpperCase() : "?";
+}
 </script>
 
 <template>
@@ -91,7 +100,31 @@ function iconFor(type: NotificationType): string {
         :class="{ 'bg-[color:var(--bs-surface-alt)]/40': !n.read }"
         @click="emit('open', n)"
       >
+        <!--
+          When the notification carries an actor snapshot (tradie messaging
+          their client, client accepting a quote, recommendation accepted,
+          etc.) show that person's avatar so the row is immediately
+          recognisable. System / actor-less notifications (vetting,
+          invoice-paid webhooks, legacy docs) fall back to the type icon.
+        -->
+        <template v-if="n.actorPhotoURL || n.actorDisplayName">
+          <Avatar
+            v-if="n.actorPhotoURL"
+            :image="n.actorPhotoURL"
+            shape="circle"
+            class="mt-0.5 flex-none"
+            style="width: 1.75rem; height: 1.75rem;"
+          />
+          <Avatar
+            v-else
+            :label="initialFor(n.actorDisplayName)"
+            shape="circle"
+            class="mt-0.5 flex-none"
+            style="width: 1.75rem; height: 1.75rem; background-color: var(--bs-blue); color: white; font-weight: 600;"
+          />
+        </template>
         <span
+          v-else
           class="mt-0.5 inline-flex h-7 w-7 flex-none items-center justify-center rounded-full text-sm"
           :class="
             n.read
