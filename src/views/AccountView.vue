@@ -257,6 +257,45 @@ async function saveTradieProfile() {
   }
 }
 
+// Share the tradie's public profile link. Uses the native share sheet
+// on mobile (iOS/Android picker) and falls back to clipboard on desktop
+// where the Web Share API isn't available. Guarded against sharing a
+// profile that isn't publicly viewable yet — pre-vetting links 404 for
+// recipients and would be confusing to share.
+async function shareProfile() {
+  if (!auth.fbUser) return;
+  if (tradie.value && !tradie.value.isVisible) {
+    toast.info(
+      "Profile not public yet",
+      "Finish verification before sharing your link with clients.",
+    );
+    return;
+  }
+  const href = router.resolve({
+    name: "TradieProfile",
+    params: { uid: auth.fbUser.uid },
+  }).href;
+  const url =
+    typeof window !== "undefined" ? window.location.origin + href : href;
+  const title = displayName.value
+    ? `${displayName.value} on Blue Seal`
+    : "My Blue Seal profile";
+  if (typeof navigator !== "undefined" && "share" in navigator) {
+    try {
+      await navigator.share({ url, title });
+      return;
+    } catch {
+      /* user cancelled — fall through to clipboard */
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    toast.success("Link copied to clipboard");
+  } catch {
+    toast.error("Couldn't copy link");
+  }
+}
+
 async function onPhotoChange(e: Event) {
   if (!auth.fbUser) return;
   const target = e.target as HTMLInputElement;
@@ -452,6 +491,38 @@ async function grantAdminAllRoles() {
 
 <template>
   <section class="bs-container max-w-2xl py-6">
+    <!-- Tradesperson quick-actions. Lives above the tab bar so the public
+         profile is always one tap away regardless of which tab is open —
+         View + Share are the two things tradies most often need from this
+         page. Slim by design (single row, small buttons) so it doesn't
+         dominate above the tab nav. -->
+    <div
+      v-if="auth.hasTradieRole && auth.fbUser"
+      class="bs-card mb-3 flex items-center gap-2 p-3 sm:p-4"
+    >
+      <div class="flex-1 min-w-0">
+        <div class="text-sm font-semibold leading-tight">Your public profile</div>
+        <div class="mt-0.5 hidden text-xs text-[color:var(--bs-muted)] sm:block">
+          What clients see — preview the page or share the link.
+        </div>
+      </div>
+      <RouterLink
+        :to="{ name: 'TradieProfile', params: { uid: auth.fbUser.uid } }"
+        aria-label="View your public profile"
+      >
+        <Button label="View" icon="pi pi-eye" size="small" outlined />
+      </RouterLink>
+      <Button
+        label="Share"
+        icon="pi pi-share-alt"
+        size="small"
+        outlined
+        severity="secondary"
+        aria-label="Share your public profile link"
+        @click="shareProfile"
+      />
+    </div>
+
     <!-- Sticky tab bar. Mirrors JobTabBar's pattern: icons-only on mobile,
          icon+label on desktop, blue underline for the active tab. Tab state
          is reflected in ?tab= so reloads and deep links stay put. The tab
@@ -557,40 +628,14 @@ async function grantAdminAllRoles() {
 
     <!-- TRADESPERSON TAB ------------------------------------------------ -->
     <div v-if="auth.hasTradieRole" v-show="activeTab === 'tradesperson'">
-      <!-- View-my-profile shortcut stays as a non-collapsible card at the
-           top — it's a quick link, not a section. Owner read always passes
-           regardless of isVisible, so the tradesperson can preview their
-           page even pre-vetting; TradieProfileView shows a banner in that
-           state. -->
-      <div v-if="auth.fbUser" class="bs-card p-5 flex items-start gap-3">
-        <i
-          class="pi pi-user text-2xl mt-0.5 text-[color:var(--bs-blue)]"
-          aria-hidden="true"
-        ></i>
-        <div class="flex-1 min-w-0">
-          <h2 class="text-lg font-semibold">Your public profile</h2>
-          <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
-            Preview the page clients see when they land on your profile.
-          </p>
-        </div>
-        <RouterLink
-          :to="{ name: 'TradieProfile', params: { uid: auth.fbUser.uid } }"
-          class="shrink-0"
-        >
-          <Button
-            label="View my profile"
-            icon="pi pi-arrow-right"
-            icon-pos="right"
-            outlined
-          />
-        </RouterLink>
-      </div>
+      <!-- The "View / Share public profile" quick-action lives above the
+           tab row so it's reachable from every tab, not just this one. -->
 
       <!-- Accordion of trade-specific sections. All closed by default
            (no `value` set) and `:multiple="false"` (default) so only one
            panel opens at a time — reduces visual noise for tradies who
            rarely touch most of these. -->
-      <Accordion class="mt-4">
+      <Accordion>
         <AccordionPanel value="trade-profile">
           <AccordionHeader>
             <span class="flex items-center gap-2">
