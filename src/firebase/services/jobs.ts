@@ -338,12 +338,29 @@ export async function findJobIdByChatId(
   return asTradie.empty ? null : asTradie.docs[0].id;
 }
 
-export async function listJobsForTradie(tradieUid: string): Promise<WithId<JobDoc>[]> {
+export async function listJobsForTradie(
+  tradieUid: string,
+  max = 200,
+): Promise<WithId<JobDoc>[]> {
   const q = query(
     jobsCol(),
     where("tradespersonId", "==", tradieUid),
     orderBy("createdAt", "desc"),
-    limit(200),
+    limit(max),
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+export async function listJobsForClient(
+  clientUid: string,
+  max = 200,
+): Promise<WithId<JobDoc>[]> {
+  const q = query(
+    jobsCol(),
+    where("clientId", "==", clientUid),
+    orderBy("createdAt", "desc"),
+    limit(max),
   );
   const snap = await getDocs(q);
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
