@@ -9,6 +9,23 @@ const INVOICE_TAB_TYPES = new Set<NotificationDoc["type"]>([
   "invoice_payment_failed",
   "invoice_refunded",
   "dispute_opened",
+  "review_received",
+  "review_requested",
+  "review_reminder",
+  "review_revealed",
+]);
+
+// Mutual-review notifications also pop the review modal automatically via
+// the ?review=1 query — JobDetailView watches for it and opens the
+// ReviewPrompt dialog directly so the click → modal experience is one tap.
+// review_received is the legacy single-side "your peer left a review"
+// notification; treat it the same as the new mutual flow so existing
+// notifications keep working.
+const REVIEW_MODAL_TYPES = new Set<NotificationDoc["type"]>([
+  "review_received",
+  "review_requested",
+  "review_reminder",
+  "review_revealed",
 ]);
 
 /**
@@ -55,6 +72,7 @@ export function resolveNotificationLink(
   const qs = new URLSearchParams(existingQs);
   if (notif.type === "message_received") qs.set("chat", "open");
   else if (INVOICE_TAB_TYPES.has(notif.type)) qs.set("tab", "invoice");
+  if (REVIEW_MODAL_TYPES.has(notif.type)) qs.set("review", "1");
   const query = qs.toString();
   return query ? `${pathname}?${query}` : pathname;
 }

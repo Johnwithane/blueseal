@@ -44,6 +44,15 @@
       ]
     },
     {
+      "collectionGroup": "reviews",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tradespersonId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "revealedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "tradespeople",
       "queryScope": "COLLECTION",
       "fields": [

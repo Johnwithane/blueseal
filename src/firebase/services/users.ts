@@ -4,6 +4,7 @@ import {
   getDoc,
   getDocs,
   limit as fbLimit,
+  orderBy,
   query,
   serverTimestamp,
   setDoc,
@@ -95,62 +96,95 @@ export async function createUser(opts: {
   });
 }
 
+// How many user docs we pull for the partial-name/partial-email fallback.
+// Admin can read every user doc (rules), so the cost is fan-out reads —
+// fine at MVP scale. Bump or switch to an external search index when the
+// user table outgrows this.
+const USER_SEARCH_FETCH_CAP = 500;
+
 /**
- * Admin user lookup. Tries to detect what kind of identifier was pasted
- * and runs the matching query; falls back across the three when the
- * format is ambiguous so support staff can paste in anything. Returns
- * up to 10 matches to keep the rendering tight.
+ * Admin user lookup. Tries exact match on UID, email, and phone first
+ * (cheap, deterministic). If the input doesn't unambiguously look like
+ * one of those, OR none of them matched, falls back to a case-insensitive
+ * substring scan over up to USER_SEARCH_FETCH_CAP recent users — matching
+ * either `displayName` or `email`. Returns up to 10 results.
+ *
+ * Firestore can't do contains/prefix search on strings without an
+ * external index, so the substring path is client-side filtering against
+ * a paged read. At MVP scale that's the simplest thing that works; once
+ * /users grows past ~1k we'll switch to Algolia/Typesense.
  */
 export async function searchUsers(input: string): Promise<WithId<UserDoc>[]> {
   const value = input.trim();
   if (!value) return [];
   const usersCol = collection(db, "users").withConverter(typedConverter<UserDoc>());
 
-  // Cheap exact-match queries — Firestore can't do contains/prefix search
-  // on strings without an external index. Email + phone + UID are exact
-  // by their nature so this is the right shape for a support-lookup UX.
   const looksLikeEmail = /@/.test(value);
   const looksLikePhone = /^[+\d][\d\s\-()]+$/.test(value);
+
+  const results: WithId<UserDoc>[] = [];
+  const seen = new Set<string>();
+  const push = (doc: WithId<UserDoc>) => {
+    if (seen.has(doc.id)) return;
+    seen.add(doc.id);
+    results.push(doc);
+  };
 
   // 1. UID — try a direct doc read first. Cheapest; works for any input
   //    that happens to be a Firebase Auth uid (~28 chars, no @).
   if (!looksLikeEmail && value.length >= 20 && value.length <= 64) {
     const direct = await getUser(value);
-    if (direct) return [direct];
+    if (direct) push(direct);
   }
 
-  const results: WithId<UserDoc>[] = [];
-  const seen = new Set<string>();
-
+  // 2. Exact email — emails are stored lowercase on signup so we
+  //    normalise the input before comparing.
   if (looksLikeEmail) {
     const snap = await getDocs(
       query(usersCol, where("email", "==", value.toLowerCase()), fbLimit(10)),
     );
-    for (const d of snap.docs) {
-      if (seen.has(d.id)) continue;
-      seen.add(d.id);
-      results.push({ id: d.id, ...d.data() });
-    }
+    for (const d of snap.docs) push({ id: d.id, ...d.data() });
   }
 
+  // 3. Exact phone — phone may have been stored with or without
+  //    formatting, so we try both the raw and a digits-only variant.
   if (looksLikePhone) {
-    // Phone may have been stored with or without formatting; the
-    // searchable field is whatever the user entered on signup, so we
-    // try both raw + stripped.
     const stripped = value.replace(/[^\d+]/g, "");
     for (const candidate of [value, stripped]) {
       const snap = await getDocs(
         query(usersCol, where("phone", "==", candidate), fbLimit(10)),
       );
-      for (const d of snap.docs) {
-        if (seen.has(d.id)) continue;
-        seen.add(d.id);
-        results.push({ id: d.id, ...d.data() });
-      }
+      for (const d of snap.docs) push({ id: d.id, ...d.data() });
     }
   }
 
-  return results;
+  // 4. Partial name / partial email fallback — scan a bounded page of
+  //    users and filter client-side. Always runs in addition to the
+  //    exact-match branches so a typo'd email or a name that looks like
+  //    a UID still surfaces matches.
+  const needle = value.toLowerCase();
+  const snap = await getDocs(
+    query(usersCol, orderBy("createdAt", "desc"), fbLimit(USER_SEARCH_FETCH_CAP)),
+  );
+  const partial: Array<{ doc: WithId<UserDoc>; rank: number }> = [];
+  for (const d of snap.docs) {
+    const data = d.data();
+    const name = (data.displayName ?? "").toLowerCase();
+    const email = (data.email ?? "").toLowerCase();
+    if (!name && !email) continue;
+    if (name.startsWith(needle) || email.startsWith(needle)) {
+      partial.push({ doc: { id: d.id, ...data }, rank: 0 });
+    } else if (name.includes(needle) || email.includes(needle)) {
+      partial.push({ doc: { id: d.id, ...data }, rank: 1 });
+    }
+  }
+  partial.sort((a, b) => a.rank - b.rank);
+  for (const m of partial) {
+    if (results.length >= 10) break;
+    push(m.doc);
+  }
+
+  return results.slice(0, 10);
 }
 
 /** Save per-channel notification opt-outs. Owner-writable per Firestore rules. */

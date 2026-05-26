@@ -576,7 +576,14 @@ export interface MessageDoc {
 }
 
 // ---------------------------------------------------------------------------
-// reviews/{reviewId} (public)
+// reviews/{reviewId} (public, client -> tradesperson)
+// AirBnB-style mutual-blind: a review is invisible to its subject (the
+// tradesperson) until BOTH parties have submitted OR the 14-day window
+// elapses. `revealedAt` is the gate — null = still hidden, Timestamp =
+// went live (rules + queries filter on it). The author always sees their
+// own review regardless. Pre-cutover reviews may have no field; rules
+// treat that as null (hidden to counterparty) — backfill before launch
+// if any pre-cutover reviews must remain public.
 // ---------------------------------------------------------------------------
 export interface ReviewDoc {
   jobId: string;
@@ -592,10 +599,20 @@ export interface ReviewDoc {
   text: string;
   createdAt: Timestamp;
   status: "active" | "flagged" | "hidden";
+  // Server-stamped by revealPair (lib/reviewPair.ts) when the counterparty
+  // also submits OR the scheduled nudge force-reveals after the deadline.
+  // Aggregation onto the tradie's ratingAvg only runs at reveal time.
+  revealedAt: Timestamp | null;
 }
 
 // ---------------------------------------------------------------------------
-// clientReviews/{reviewId} (private, tradies only)
+// clientReviews/{reviewId} (private, tradie -> client; reveal-gated to client)
+// Mirror of ReviewDoc on the private side. Reads:
+//   - author (tradesperson) always
+//   - subject (client) only after revealedAt is set
+//   - admin always
+//   - other tradies (future "have you worked with this client" lookup) —
+//     gated on revealedAt + status (same as the public side).
 // ---------------------------------------------------------------------------
 export interface ClientReviewDoc {
   jobId: string;
@@ -610,6 +627,45 @@ export interface ClientReviewDoc {
     payment: number;
   };
   createdAt: Timestamp;
+  revealedAt: Timestamp | null;
+}
+
+// ---------------------------------------------------------------------------
+// reviewPairs/{jobId}
+// One doc per completed job — doc id = jobId (deterministic, same pattern
+// as invoices). Created by markJobPaid / clientMarkPaid when the invoice
+// flips to paid. Tracks who has submitted, when the 14-day window closes,
+// when both reviews went live, and the nudge cadence.
+//
+// `locked` flips true once the deadline passes (scheduled nudge force-
+// reveals whatever's been submitted and stops accepting new reviews).
+// Without `locked`, a late client could still leave a review after seeing
+// the tradesperson's already-revealed score — defeating the blind reveal.
+// ---------------------------------------------------------------------------
+export interface ReviewPairDoc {
+  jobId: string;
+  clientId: string;
+  tradespersonId: string;
+  invoicePaidAt: Timestamp;
+  // invoicePaidAt + 14 days. Stored explicitly so the scheduled nudge can
+  // do a `where("deadlineAt", "<=", now)` sweep without re-computing.
+  deadlineAt: Timestamp;
+  clientSubmittedAt: Timestamp | null;
+  tradieSubmittedAt: Timestamp | null;
+  // Pointers back to the underlying review docs so revealPair can flip
+  // both revealedAt fields in one transaction.
+  clientReviewId: string | null; // ref into reviews/{id}
+  tradieReviewId: string | null; // ref into clientReviews/{id}
+  revealedAt: Timestamp | null;
+  // Daily-nudge bookkeeping. lastNudgedAt prevents the scheduled function
+  // from sending a second reminder in the same UTC day if its window
+  // overlaps; nudgeCount caps the run-rate (sanity ceiling on bug-spiral).
+  lastNudgedAt: Timestamp | null;
+  nudgeCount: number;
+  // True once the deadline elapsed and the pair was force-revealed. No
+  // more submissions accepted past this point (enforced by the create
+  // rule on reviews/clientReviews which reads the pair doc).
+  locked: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -1024,6 +1080,16 @@ export type NotificationType =
   | "invoice_refunded"
   | "dispute_opened"
   | "review_received"
+  // Mutual-review loop. `review_requested` fires when the invoice flips
+  // to paid (both parties asked to leave a review). `review_reminder`
+  // fires from the daily scheduled nudge at days 3/7/13 of the 14-day
+  // window. `review_revealed` fires when the counterparty's review
+  // becomes visible (either because both submitted or the deadline
+  // forced reveal). All three link to /jobs/{id}?review=1&tab=invoice so
+  // the click lands on the modal directly.
+  | "review_requested"
+  | "review_reminder"
+  | "review_revealed"
   // "vouch_*" stay listed for back-compat with notifications written before
   // the Recommendations rename; new writes use the "recommendation_*"
   // variants. Both render with the same icon in NotificationsPanel.

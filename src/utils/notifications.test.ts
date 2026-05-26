@@ -68,6 +68,21 @@ describe("resolveNotificationLink", () => {
     expect(resolveNotificationLink(linkFor("job_cancelled", "/jobs/abc"))).toBe("/jobs/abc");
     expect(resolveNotificationLink(linkFor("job_requested", "/jobs/abc"))).toBe("/jobs/abc");
   });
+
+  it("appends ?tab=invoice&review=1 for mutual-review notifications", () => {
+    expect(resolveNotificationLink(linkFor("review_requested", "/jobs/abc"))).toBe(
+      "/jobs/abc?tab=invoice&review=1",
+    );
+    expect(resolveNotificationLink(linkFor("review_reminder", "/jobs/abc"))).toBe(
+      "/jobs/abc?tab=invoice&review=1",
+    );
+    expect(resolveNotificationLink(linkFor("review_revealed", "/jobs/abc"))).toBe(
+      "/jobs/abc?tab=invoice&review=1",
+    );
+    expect(resolveNotificationLink(linkFor("review_received", "/jobs/abc"))).toBe(
+      "/jobs/abc?tab=invoice&review=1",
+    );
+  });
 });
 
 describe("shouldSwitchRoleForNotification", () => {

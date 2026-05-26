@@ -5,7 +5,7 @@ import { RouterLink } from "vue-router";
 import QuoteCard from "@/components/QuoteCard.vue";
 import InvoiceEditor from "@/components/InvoiceEditor.vue";
 import ExpensesCard from "@/components/ExpensesCard.vue";
-import ReviewPrompt from "@/components/ReviewPrompt.vue";
+import MutualReviewCard from "@/components/MutualReviewCard.vue";
 import PayInvoiceDialog from "@/components/PayInvoiceDialog.vue";
 import type { JobDoc, WithId } from "@/firebase/interfaces";
 
@@ -27,6 +27,10 @@ const props = defineProps<{
   // for the other side when available) and passes the strings here.
   resolvedTradespersonName: string;
   resolvedClientName: string;
+  // Bumped each time JobDetailView sees ?review=1 in the URL — passed
+  // straight through to MutualReviewCard so the deep link auto-opens
+  // the review modal even on subsequent visits.
+  reviewAutoOpenSignal?: number;
 }>();
 
 const emit = defineEmits<{
@@ -218,14 +222,18 @@ const lockedStatuses = new Set<JobDoc["status"]>([
       :tradesperson-id="job.tradespersonId"
     />
 
-    <!-- Mutual review after payment + completion. -->
-    <div v-if="job.status === 'complete' || job.status === 'reviewed'" class="bs-card p-3">
-      <h3 class="font-semibold text-sm mb-2">Reviews</h3>
-      <ReviewPrompt
-        :job="job"
-        :as-role="isClient ? 'client' : 'tradesperson'"
-        @reviewed="emit('reviewed')"
-      />
-    </div>
+    <!-- AirBnB-style mutual review: surface a stateful banner that owns
+         the whole review loop (request → waiting → reveal). Lives here
+         rather than inside JobDetailView so it sits next to the invoice
+         it relates to — the user only thinks about reviewing right after
+         they see the invoice closed out. -->
+    <MutualReviewCard
+      v-if="job.status === 'complete' || job.status === 'reviewed'"
+      :job="job"
+      :is-client="isClient"
+      :is-tradie="isTradie"
+      :auto-open-signal="reviewAutoOpenSignal"
+      @reviewed="emit('reviewed')"
+    />
   </div>
 </template>

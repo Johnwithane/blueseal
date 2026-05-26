@@ -474,43 +474,83 @@ service cloud.firestore {
     }
 
     // ---------- public reviews (client -> tradie) ----------
+    // AirBnB-style mutual-blind reveal: the subject (tradesperson) cannot
+    // see a review until BOTH sides have submitted, or the 14-day window
+    // expires. `revealedAt` is the gate — null = hidden, Timestamp = live.
+    // Author (client) always sees their own; admin sees everything.
+    // Pre-cutover reviews may not carry the field — `.get('revealedAt', null)`
+    // treats them as hidden to the counterparty by default; backfill before
+    // launch if any of them need to be public retroactively.
     match /reviews/{reviewId} {
-      // Hide flagged/hidden moderated reviews from the public; surface to parties + admin.
-      allow read: if resource.data.status == 'active'
-                  || isAdmin()
-                  || (isSignedIn() && (
-                       resource.data.clientId == uid()
-                       || resource.data.tradespersonId == uid()
-                     ));
+      allow read: if isAdmin()
+        || (isSignedIn() && resource.data.clientId == uid())  // author always
+        || (resource.data.get('revealedAt', null) != null && (
+             resource.data.status == 'active'                  // world (active only)
+             || (isSignedIn() && resource.data.tradespersonId == uid())
+           ));
+      // Create still bound to the job parties + active status. New: revealedAt
+      // must be null on create (reveal is server-only), and the pair must not
+      // already be locked (deadline passed = no more submissions).
       allow create: if isClient()
         && request.resource.data.clientId == uid()
         && request.resource.data.status == 'active'
+        && request.resource.data.get('revealedAt', null) == null
         && request.resource.data.rating is int
         && request.resource.data.rating >= 1
         && request.resource.data.rating <= 5
         && exists(/databases/$(database)/documents/jobs/$(request.resource.data.jobId))
         && jobDoc(request.resource.data.jobId).data.clientId == uid()
         && jobDoc(request.resource.data.jobId).data.tradespersonId == request.resource.data.tradespersonId
-        && jobDoc(request.resource.data.jobId).data.status in ['complete', 'reviewed'];
+        && jobDoc(request.resource.data.jobId).data.status in ['complete', 'reviewed']
+        && (
+          // Pair may not exist yet (e.g. pre-cutover job, or the seeder
+          // raced) — allow either. If it does exist, it must not be locked.
+          !exists(/databases/$(database)/documents/reviewPairs/$(request.resource.data.jobId))
+          || get(/databases/$(database)/documents/reviewPairs/$(request.resource.data.jobId)).data.locked == false
+        );
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     // ---------- private client reviews (tradie -> client) ----------
+    // Same reveal contract as /reviews but inverted: author is the
+    // tradesperson; subject is the client.
     match /clientReviews/{reviewId} {
-      // Authoring tradie or admin can read; broader tradesperson access is gated
-      // by future "have you worked with this client" lookup once denormalization lands.
-      allow read: if isAdmin() || (isTradie() && resource.data.tradespersonId == uid());
+      allow read: if isAdmin()
+        || (isTradie() && resource.data.tradespersonId == uid())  // author always
+        || (resource.data.get('revealedAt', null) != null
+            && isSignedIn() && resource.data.clientId == uid());   // subject after reveal
       allow create: if isTradie()
         && request.resource.data.tradespersonId == uid()
+        && request.resource.data.get('revealedAt', null) == null
         && request.resource.data.rating is int
         && request.resource.data.rating >= 1
         && request.resource.data.rating <= 5
         && exists(/databases/$(database)/documents/jobs/$(request.resource.data.jobId))
         && jobDoc(request.resource.data.jobId).data.tradespersonId == uid()
         && jobDoc(request.resource.data.jobId).data.clientId == request.resource.data.clientId
-        && jobDoc(request.resource.data.jobId).data.status in ['complete', 'reviewed'];
+        && jobDoc(request.resource.data.jobId).data.status in ['complete', 'reviewed']
+        && (
+          !exists(/databases/$(database)/documents/reviewPairs/$(request.resource.data.jobId))
+          || get(/databases/$(database)/documents/reviewPairs/$(request.resource.data.jobId)).data.locked == false
+        );
       allow update, delete: if isAdmin();
+    }
+
+    // ---------- review pairs (mutual-review state machine; server-only writes) ----------
+    // One doc per completed job (id == jobId, same deterministic pattern as
+    // invoices). Created server-side by ensureReviewPair (called from
+    // markJobPaid + clientMarkPaid). Holds the 14-day deadline, who has
+    // submitted, the reveal timestamp, and the nudge bookkeeping. Parties +
+    // admin read; nobody writes from the client — every state transition
+    // (submission, reveal, lock) flows through the Cloud Functions side.
+    match /reviewPairs/{jobId} {
+      allow read: if isSignedIn() && (
+        resource.data.clientId == uid()
+        || resource.data.tradespersonId == uid()
+        || isAdmin()
+      );
+      allow create, update, delete: if false;
     }
 
     // ---------- bookings ----------

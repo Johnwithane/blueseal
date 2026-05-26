@@ -27,6 +27,7 @@ export { scheduledIdRetention } from "./vetting/scheduledIdRetention";
 // Reviews
 export { onReviewCreated } from "./reviews/onReviewCreated";
 export { onClientReviewCreated } from "./reviews/onClientReviewCreated";
+export { nudgeReviewPairs } from "./reviews/nudgeReviewPairs";
 
 // Chat
 export { onMessageCreated } from "./chat/onMessageCreated";

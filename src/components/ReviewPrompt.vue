@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import Button from "primevue/button";
 import Dialog from "primevue/dialog";
 import Textarea from "primevue/textarea";
@@ -11,16 +11,35 @@ import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 import { reviewSchema, clientReviewSchema } from "@/validation/schemas";
 
-const props = defineProps<{
-  job: WithId<JobDoc>;
-  asRole: "client" | "tradesperson";
-}>();
+const props = withDefaults(
+  defineProps<{
+    job: WithId<JobDoc>;
+    asRole: "client" | "tradesperson";
+    // Hide the local "Leave a review" trigger button — used when the
+    // parent (MutualReviewCard) owns the CTA and just wants the dialog
+    // available for programmatic opening via v-model:open.
+    hideTrigger?: boolean;
+    // External v-model for the open state so the deep-link auto-open
+    // (?review=1) can drive it from JobDetailView -> InvoiceTab -> here.
+    open?: boolean;
+  }>(),
+  { hideTrigger: false, open: false },
+);
 
-const emit = defineEmits<{ reviewed: [] }>();
+const emit = defineEmits<{
+  reviewed: [];
+  "update:open": [value: boolean];
+}>();
 
 const toast = useToast();
 
-const open = ref(false);
+const open = ref(props.open);
+// Two-way bridge so parent v-model:open works both directions —
+// programmatic deep-link open from JobDetailView, and Dialog close from
+// the user clicking Cancel / the X.
+watch(() => props.open, (v) => { open.value = v; });
+watch(open, (v) => { if (v !== props.open) emit("update:open", v); });
+
 const submitting = ref(false);
 const error = ref<string | null>(null);
 
@@ -104,7 +123,13 @@ async function submit() {
 </script>
 
 <template>
-  <Button label="Leave a review" icon="pi pi-star" outlined @click="open = true" />
+  <Button
+    v-if="!hideTrigger"
+    label="Leave a review"
+    icon="pi pi-star"
+    outlined
+    @click="open = true"
+  />
 
   <Dialog
     v-model:visible="open"

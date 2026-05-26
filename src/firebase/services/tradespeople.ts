@@ -39,38 +39,53 @@ export async function getTradesperson(uid: string): Promise<WithId<TradespersonD
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
 
+// Soft cap on how many visible-tradie docs we pull per search. At MVP
+// scale (dozens-to-low-hundreds of visible tradies) this is cheap enough
+// to filter client-side, which buys us case-insensitive substring
+// matching without an external search index. Bump to Algolia/Typesense
+// once we cross ~1k visible tradies.
+const TRADIE_SEARCH_FETCH_CAP = 500;
+
 /**
- * Prefix-search visible tradespeople by `displayName`. Used by the vouch
- * dialog so users find people already on Blue Seal before falling back to
- * an email invite. Firestore's range query is prefix-only and
- * case-sensitive — "Sam" matches "Sam Patel" but not "sam patel" or
- * "Patel". Good enough for the typical "I know their name" flow; full
- * fuzzy search would need an external index (Algolia/Typesense).
+ * Case-insensitive substring search of visible tradespeople by
+ * `displayName`. Used by the vouch dialog so users find people already
+ * on Blue Seal before falling back to an email invite. Firestore's range
+ * query is case-sensitive AND prefix-only, so we instead pull all
+ * visible tradies (capped) and filter in memory — "sam" matches "Sam
+ * Patel" and "Patel" matches "Sam Patel".
  *
  * The `isVisible == true` filter is mandatory: /tradespeople rules deny
  * read on hidden docs, and Firestore aborts the whole query if any row
  * is rule-blocked.
+ *
+ * Prefix matches rank above substring matches so "sam" → "Sam Patel"
+ * lands above "Joe Sampson". Caller passes the typed query unmodified.
  */
 export async function searchVisibleTradiesByName(
-  prefix: string,
+  q: string,
   max = 8,
 ): Promise<WithId<TradespersonDoc>[]> {
-  const p = prefix.trim();
-  if (!p) return [];
-  //  is a very high unicode code point — Firestore's idiomatic
-  // upper-bound for a startsWith range query.
-  const upper = p + "";
+  const trimmed = q.trim();
+  if (!trimmed) return [];
+  const needle = trimmed.toLowerCase();
   const snap = await getDocs(
     query(
       tradiesCol(),
       where("isVisible", "==", true),
-      where("displayName", ">=", p),
-      where("displayName", "<", upper),
       orderBy("displayName"),
-      fbLimit(max),
+      fbLimit(TRADIE_SEARCH_FETCH_CAP),
     ),
   );
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const matches: Array<{ doc: WithId<TradespersonDoc>; rank: number }> = [];
+  for (const d of snap.docs) {
+    const data = d.data();
+    const name = (data.displayName ?? "").toLowerCase();
+    if (!name) continue;
+    if (name.startsWith(needle)) matches.push({ doc: { id: d.id, ...data }, rank: 0 });
+    else if (name.includes(needle)) matches.push({ doc: { id: d.id, ...data }, rank: 1 });
+  }
+  matches.sort((a, b) => a.rank - b.rank);
+  return matches.slice(0, max).map((m) => m.doc);
 }
 
 // Live subscription to a tradesperson doc. Used by the global status banner

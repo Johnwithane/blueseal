@@ -1,96 +1,43 @@
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
-import { FieldValue } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
-import { db } from "../lib/admin";
-import { notify } from "../lib/notify";
+import { recordSubmission } from "../lib/reviewPair";
 
 interface ReviewLike {
-  tradespersonId: string;
-  clientId?: string;
   jobId?: string;
+  clientId?: string;
+  tradespersonId?: string;
   rating: number;
-  dimensions?: {
-    quality: number;
-    punctuality: number;
-    communication: number;
-    value: number;
-  };
-}
-
-const DIM_KEYS = ["quality", "punctuality", "communication", "value"] as const;
-
-function isValidScore(n: unknown): n is number {
-  return typeof n === "number" && Number.isFinite(n) && n >= 1 && n <= 5;
 }
 
 /**
- * Recompute aggregates on the tradie doc. Single-doc transaction prevents
- * race conditions when multiple reviews come in close together.
+ * Public review (client -> tradesperson) created. Delegates to the
+ * mutual-review pair so:
+ *   1. The pair gets stamped (`clientSubmittedAt` + `clientReviewId`).
+ *   2. If the tradesperson already submitted theirs, revealPair fires —
+ *      both reviews flip `revealedAt` and the tradie aggregate finally
+ *      updates. Otherwise the tradesperson is nudged to leave theirs.
+ *
+ * Aggregation no longer happens here — it lives in lib/reviewPair.ts
+ * `aggregateTradespersonRating`, which only runs at reveal. Keeping it
+ * in the on-create trigger would leak the hidden client score via the
+ * tradie's running average delta.
  */
 export const onReviewCreated = onDocumentCreated("reviews/{reviewId}", async (event) => {
+  const reviewId = event.params.reviewId;
   const r = event.data?.data() as ReviewLike | undefined;
-  if (!r?.tradespersonId) {
-    logger.warn("Review missing tradespersonId", { reviewId: event.params.reviewId });
+  if (!r?.tradespersonId || !r.clientId || !r.jobId) {
+    logger.warn("onReviewCreated: missing required ids; skipping", { reviewId });
     return;
   }
-  if (!isValidScore(r.rating)) {
-    logger.warn("Review rating out of bounds; skipping aggregate", {
-      reviewId: event.params.reviewId,
-      rating: r.rating,
+  try {
+    await recordSubmission({
+      jobId: r.jobId,
+      clientId: r.clientId,
+      tradespersonId: r.tradespersonId,
+      reviewId,
+      submittedBy: "client",
     });
-    return;
+  } catch (err) {
+    logger.error("onReviewCreated: recordSubmission failed", { reviewId, err });
   }
-
-  const tradieRef = db.doc(`tradespeople/${r.tradespersonId}`);
-  await db.runTransaction(async (tx) => {
-    const snap = await tx.get(tradieRef);
-    if (!snap.exists) {
-      logger.warn("Review references missing tradesperson", {
-        reviewId: event.params.reviewId,
-        tradespersonId: r.tradespersonId,
-      });
-      return;
-    }
-    const data = snap.data() as {
-      ratingAvg: number;
-      ratingCount: number;
-      ratingDimensions: Record<string, { avg: number; count: number }>;
-    };
-    const newCount = (data.ratingCount ?? 0) + 1;
-    const newAvg = ((data.ratingAvg ?? 0) * (data.ratingCount ?? 0) + r.rating) / newCount;
-
-    // Lock to the documented dimensions only; ignore extra/forged keys.
-    const dims: Record<string, { avg: number; count: number }> = {
-      ...(data.ratingDimensions ?? {}),
-    };
-    if (r.dimensions) {
-      for (const k of DIM_KEYS) {
-        const score = r.dimensions[k];
-        if (!isValidScore(score)) continue;
-        const prev = dims[k] ?? { avg: 0, count: 0 };
-        const next = prev.count + 1;
-        dims[k] = {
-          avg: (prev.avg * prev.count + score) / next,
-          count: next,
-        };
-      }
-    }
-    tx.update(tradieRef, {
-      ratingAvg: newAvg,
-      ratingCount: newCount,
-      ratingDimensions: dims,
-      lastReviewAt: FieldValue.serverTimestamp(),
-    });
-  });
-
-  await notify({
-    userId: r.tradespersonId,
-    type: "review_received",
-    title: `New ${r.rating}-star review`,
-    body: "A client left you a review. Tap to read it and reply.",
-    link: "/dashboard/tradie",
-    jobId: r.jobId ?? null,
-    actorUid: r.clientId ?? null,
-    recipientRole: "tradesperson",
-  });
 });

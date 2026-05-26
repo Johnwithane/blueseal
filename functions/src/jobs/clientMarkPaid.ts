@@ -6,6 +6,7 @@ import { db } from "../lib/admin";
 import { requireRole } from "../lib/auth";
 import { postSystemMessage } from "../lib/chatSystemMessage";
 import { notify } from "../lib/notify";
+import { ensureReviewPair } from "../lib/reviewPair";
 
 const Input = z.object({
   jobId: z.string().min(1).max(128),
@@ -104,6 +105,47 @@ export const clientMarkPaid = onCall({ enforceAppCheck: false }, async (req) => 
     recipientRole: "tradesperson",
     priority: "normal",
   });
+
+  // Mutual-review loop — same contract as markJobPaid (the other invoice-
+  // paid callable). ensureReviewPair is idempotent; we only fire the
+  // initial fan-out on the create branch so we don't double-prompt when
+  // both callables race.
+  try {
+    const { created } = await ensureReviewPair({
+      jobId,
+      clientId: uid,
+      tradespersonId: result.tradespersonId,
+    });
+    if (created) {
+      const reviewLink = `/jobs/${jobId}`;
+      await Promise.all([
+        notify({
+          userId: result.tradespersonId,
+          type: "review_requested",
+          title: "Leave a review for your client",
+          body: "Reviews stay hidden until both of you submit. You have 14 days.",
+          link: reviewLink,
+          jobId,
+          actorUid: uid,
+          recipientRole: "tradesperson",
+          priority: "normal",
+        }),
+        notify({
+          userId: uid,
+          type: "review_requested",
+          title: "Leave a review for your tradesperson",
+          body: "Reviews stay hidden until both of you submit. You have 14 days.",
+          link: reviewLink,
+          jobId,
+          actorUid: result.tradespersonId,
+          recipientRole: "client",
+          priority: "normal",
+        }),
+      ]);
+    }
+  } catch (err) {
+    logger.error("clientMarkPaid: review-pair seed failed", { jobId, err });
+  }
 
   logger.info("clientMarkPaid", { jobId, clientId: uid, invoiceNumber: result.invoiceNumber });
   return { ok: true };

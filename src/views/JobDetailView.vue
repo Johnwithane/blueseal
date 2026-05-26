@@ -230,6 +230,27 @@ watch(
   { immediate: true },
 );
 
+// Mutual-review deep link. Bell-icon clicks on review_* notifications
+// land here with `?review=1`; we bump a counter so MutualReviewCard's
+// watcher fires (it auto-opens the dialog on signal change). Counter
+// rather than a flag so the second visit re-opens — a flag would
+// silently no-op when ?review=1 stayed set across navigations.
+const reviewAutoOpenSignal = ref(0);
+watch(
+  () => route.query.review,
+  (v) => {
+    if (v !== "1") return;
+    reviewAutoOpenSignal.value += 1;
+    // Strip the query so a back+forward navigation doesn't auto-re-open
+    // forever. The signal is what drives the modal; the URL is just the
+    // transport, and it's served its purpose.
+    const next = { ...route.query };
+    delete next.review;
+    router.replace({ query: next });
+  },
+  { immediate: true },
+);
+
 // Sticky bottom CTA: tradie's primary action for the current status. Drives
 // the bottom padding on the section (so content isn't hidden behind the
 // fixed bar) and the bar's visibility. Stays visible across every tab —
@@ -697,6 +718,7 @@ function onReturnToApplicants() {
           :marking-paid="markingPaid"
           :resolved-tradesperson-name="resolvedTradespersonName"
           :resolved-client-name="resolvedClientName"
+          :review-auto-open-signal="reviewAutoOpenSignal"
           @mark-paid="onMarkPaid"
           @revise-quote="showQuoteSheet = true"
           @reviewed="load"

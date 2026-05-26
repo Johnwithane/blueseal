@@ -35,6 +35,12 @@ export type NotificationType =
   | "invoice_refunded"
   | "dispute_opened"
   | "review_received"
+  // Mutual-review loop. See src/firebase/interfaces.ts → NotificationType
+  // for the trigger semantics; these three drive the AirBnB-style blind-
+  // reveal review window.
+  | "review_requested"
+  | "review_reminder"
+  | "review_revealed"
   // "vouch_*" stay for back-compat with notifications written before the
   // Recommendations rename; new writes use the "recommendation_*" variants.
   | "vouch_requested"

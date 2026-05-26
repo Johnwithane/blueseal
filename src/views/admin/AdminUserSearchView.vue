@@ -48,7 +48,7 @@ function roleSeverity(role: string): "info" | "success" | "warn" {
 
     <header class="mt-2 mb-6">
       <p class="text-sm text-[color:var(--bs-muted)]">
-        Paste a UID, email, or phone number to look up an account. Used by support
+        Look up an account by name, email, phone, or UID. Used by support
         when a customer writes in.
       </p>
     </header>
@@ -59,7 +59,7 @@ function roleSeverity(role: string): "info" | "success" | "warn" {
         <InputText
           v-model="query"
           class="flex-1"
-          placeholder="email@example.com  ·  +15875551234  ·  Firebase UID"
+          placeholder="Name  ·  email@example.com  ·  +15875551234  ·  Firebase UID"
           autofocus
           @keydown.enter="runSearch"
         />
@@ -72,9 +72,10 @@ function roleSeverity(role: string): "info" | "success" | "warn" {
         />
       </div>
       <p class="mt-2 text-xs text-[color:var(--bs-muted)]">
-        Match is exact — email and phone need to be the same value the user
-        signed up with. Partial / name search would need a search index (not
-        wired yet).
+        Name and email accept partial matches (case-insensitive). Phone and
+        UID need to match exactly. Scans the most recent 500 accounts, so
+        a very old account that doesn't match by phone/UID/exact email may
+        be missed.
       </p>
     </div>
 

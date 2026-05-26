@@ -6,6 +6,7 @@ import { db } from "../lib/admin";
 import { requireRole } from "../lib/auth";
 import { postSystemMessage } from "../lib/chatSystemMessage";
 import { notify } from "../lib/notify";
+import { ensureReviewPair } from "../lib/reviewPair";
 
 const Input = z.object({
   jobId: z.string().min(1).max(128),
@@ -97,6 +98,51 @@ export const markJobPaid = onCall({ enforceAppCheck: false }, async (req) => {
     recipientRole: "client",
     priority: "normal",
   });
+
+  // Mutual-review loop — idempotent. Both this callable and clientMarkPaid
+  // call ensureReviewPair so whichever closes the invoice first seeds the
+  // 14-day window. Only fan the initial "leave a review" prompt out on
+  // the create branch; if the pair already existed (because the client
+  // marked paid moments earlier) the partner notification was already
+  // sent there.
+  try {
+    const { created } = await ensureReviewPair({
+      jobId,
+      clientId: result.clientId,
+      tradespersonId: uid,
+    });
+    if (created) {
+      const reviewLink = `/jobs/${jobId}`;
+      await Promise.all([
+        notify({
+          userId: uid,
+          type: "review_requested",
+          title: "Leave a review for your client",
+          body: "Reviews stay hidden until both of you submit. You have 14 days.",
+          link: reviewLink,
+          jobId,
+          actorUid: result.clientId,
+          recipientRole: "tradesperson",
+          priority: "normal",
+        }),
+        notify({
+          userId: result.clientId,
+          type: "review_requested",
+          title: "Leave a review for your tradesperson",
+          body: "Reviews stay hidden until both of you submit. You have 14 days.",
+          link: reviewLink,
+          jobId,
+          actorUid: uid,
+          recipientRole: "client",
+          priority: "normal",
+        }),
+      ]);
+    }
+  } catch (err) {
+    // Non-fatal — the job/invoice transition already committed. The
+    // scheduled nudge will fill in for a missed initial fan-out.
+    logger.error("markJobPaid: review-pair seed failed", { jobId, err });
+  }
 
   logger.info("markJobPaid", { jobId, tradespersonId: uid, invoiceNumber: result.invoiceNumber });
   return { ok: true };
