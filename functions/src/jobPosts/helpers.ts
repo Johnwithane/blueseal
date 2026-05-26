@@ -52,3 +52,12 @@ export function rateLimitKey(uid: string, action: string): string {
   const today = new Date().toISOString().slice(0, 10);
   return `${action}_${uid}_${today}`;
 }
+
+// First name only, used when denormalizing client identity onto broadly-
+// readable docs like /jobPosts. Splits on any whitespace and returns the
+// first non-empty token; empty / whitespace-only input falls back to
+// "Client" so callers always get a renderable label.
+export function firstNameOnly(displayName: string | null | undefined): string {
+  const first = (displayName ?? "").trim().split(/\s+/)[0] ?? "";
+  return first || "Client";
+}

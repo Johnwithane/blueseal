@@ -37,6 +37,7 @@ import { useToast } from "@/composables/useToast";
 import { useFormatters } from "@/composables";
 import { humanizeError } from "@/utils/errors";
 import VerifiedBadge from "@/components/VerifiedBadge.vue";
+import JobCounterparty from "@/components/JobCounterparty.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -284,6 +285,18 @@ const visibleApplications = computed(() =>
 
       <!-- POST BODY -->
       <article class="bs-card p-5 mt-4 space-y-4">
+        <!-- Client identity (hidden from the post owner — they already
+             know who they are). Browsing tradies see first-name + photo
+             so they know who they'd be working for before applying. -->
+        <div v-if="!isClient" class="pb-3 border-b border-[color:var(--bs-border)]">
+          <div class="text-xs text-[color:var(--bs-muted)] mb-1.5">Posted by</div>
+          <JobCounterparty
+            role="client"
+            :name="post.clientName"
+            :photo-url="post.clientPhotoURL"
+          />
+        </div>
+
         <p class="text-sm whitespace-pre-line">{{ post.description }}</p>
 
         <div class="grid grid-cols-2 gap-3 text-sm">

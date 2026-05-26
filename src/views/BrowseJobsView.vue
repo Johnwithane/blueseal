@@ -17,6 +17,7 @@ import type {
 } from "@/firebase/interfaces";
 import { TRADES, tradeLabel } from "@/data/trades";
 import { useFormatters } from "@/composables";
+import JobCounterparty from "@/components/JobCounterparty.vue";
 
 const auth = useAuthStore();
 const { relativeTime } = useFormatters();
@@ -183,6 +184,14 @@ function urgencyLabel(u: string): string {
               </div>
             </div>
             <Tag :value="urgencyLabel(post.urgency)" :severity="urgencyTone[post.urgency] ?? 'info'" />
+          </div>
+          <div class="mt-3">
+            <JobCounterparty
+              role="client"
+              size="small"
+              :name="post.clientName"
+              :photo-url="post.clientPhotoURL"
+            />
           </div>
           <p class="text-sm mt-2 text-[color:var(--bs-muted)] line-clamp-3">{{ post.description }}</p>
           <div class="mt-3 flex items-center justify-between text-xs">

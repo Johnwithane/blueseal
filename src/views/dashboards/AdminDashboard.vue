@@ -12,6 +12,10 @@ import {
   backfillReviewReviewers,
   type BackfillReviewReviewersResult,
 } from "@/firebase/services/reviews";
+import {
+  backfillJobPostClient,
+  type BackfillJobPostClientResult,
+} from "@/firebase/services/jobPosts";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 import type { TradespersonDoc, WithId } from "@/firebase/interfaces";
@@ -70,6 +74,33 @@ async function runReviewerBackfill() {
     toast.error("Reviewer backfill failed", humanizeError(err));
   } finally {
     backfillingReviewers.value = false;
+  }
+}
+
+// Job-post client backfill — fills clientName (first-name only) +
+// clientPhotoURL on /jobPosts docs that pre-date the denormalization in
+// createJobPost. New posts already carry these fields; this is the
+// one-shot to fix the browse-jobs feed so legacy posts stop rendering
+// the "Client" + initial-circle fallback. Idempotent.
+const backfillingJobPostClient = ref(false);
+const jobPostClientBackfillResult = ref<BackfillJobPostClientResult | null>(null);
+
+async function runJobPostClientBackfill() {
+  backfillingJobPostClient.value = true;
+  try {
+    jobPostClientBackfillResult.value = await backfillJobPostClient();
+    const r = jobPostClientBackfillResult.value;
+    toast.success(
+      "Job-post client backfill complete",
+      `Scanned ${r.scanned}, updated ${r.updated}, already present ${r.alreadyPresent}` +
+        (r.fallbackUsed > 0
+          ? ` · ${r.fallbackUsed} post${r.fallbackUsed === 1 ? "" : "s"} missing client, fell back to "Client".`
+          : "."),
+    );
+  } catch (err) {
+    toast.error("Job-post client backfill failed", humanizeError(err));
+  } finally {
+    backfillingJobPostClient.value = false;
   }
 }
 
@@ -182,6 +213,32 @@ onMounted(async () => {
             fell back to "Client"
           </template>
           ({{ reviewerBackfillResult.pages }} page{{ reviewerBackfillResult.pages === 1 ? "" : "s" }}).
+        </p>
+      </div>
+
+      <!-- Job-post client backfill: fills clientName (first-name only) +
+           clientPhotoURL on legacy /jobPosts docs so the browse-jobs
+           feed renders real names + photos. New posts already carry
+           these fields; this is the one-shot to fix history. Idempotent. -->
+      <div class="mt-3 flex flex-wrap items-center gap-3">
+        <Button
+          label="Backfill job-post clients"
+          icon="pi pi-user"
+          :loading="backfillingJobPostClient"
+          @click="runJobPostClientBackfill"
+        />
+        <p
+          v-if="jobPostClientBackfillResult"
+          class="text-sm text-[color:var(--bs-muted)] flex-1 min-w-[10rem]"
+        >
+          Last run: scanned <strong>{{ jobPostClientBackfillResult.scanned }}</strong>,
+          updated <strong>{{ jobPostClientBackfillResult.updated }}</strong>,
+          already present <strong>{{ jobPostClientBackfillResult.alreadyPresent }}</strong>
+          <template v-if="jobPostClientBackfillResult.fallbackUsed > 0">
+            · <strong>{{ jobPostClientBackfillResult.fallbackUsed }}</strong>
+            fell back to "Client"
+          </template>
+          ({{ jobPostClientBackfillResult.pages }} page{{ jobPostClientBackfillResult.pages === 1 ? "" : "s" }}).
         </p>
       </div>
     </div>

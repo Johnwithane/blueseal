@@ -5,7 +5,7 @@ import { z } from "zod";
 import { db } from "../lib/admin";
 import { requireRoleOrAdmin } from "../lib/auth";
 import { logAdminAction } from "../lib/audit";
-import { deriveGeohashes } from "./helpers";
+import { deriveGeohashes, firstNameOnly } from "./helpers";
 
 const caPostalRegex = /^[A-Za-z]\d[A-Za-z][\s-]?\d[A-Za-z]\d$/;
 const caFsaRegex = /^[A-Z]\d[A-Z]$/;
@@ -83,6 +83,17 @@ export const createJobPost = onCall({ enforceAppCheck: false }, async (req) => {
     input.addressPrivate.lng,
   );
 
+  // Denormalize the client's first name + avatar onto the public post so
+  // browsing tradies can see who they'd be working for without a
+  // cross-account /users read (blocked by rules). Lookup failures fall
+  // back to "Client" + null photo so the post still renders sensibly.
+  const userSnap = await db.doc(`users/${uid}`).get();
+  const userData = userSnap.data() as
+    | { displayName?: string; photoURL?: string | null }
+    | undefined;
+  const clientName = firstNameOnly(userData?.displayName);
+  const clientPhotoURL = userData?.photoURL ?? null;
+
   const now = Timestamp.now();
   const expiresAt = Timestamp.fromMillis(now.toMillis() + EXPIRY_DAYS * 24 * 60 * 60 * 1000);
 
@@ -92,6 +103,8 @@ export const createJobPost = onCall({ enforceAppCheck: false }, async (req) => {
   const batch = db.batch();
   batch.set(postRef, {
     clientId: uid,
+    clientName,
+    clientPhotoURL,
     status: "open",
     trade: input.trade,
     title: input.title,

@@ -524,6 +524,18 @@ export interface BudgetRange {
 
 export interface JobPostDoc {
   clientId: string;
+  // Denormalized at post-creation so vetted tradespeople browsing the feed
+  // see who they'd be working for without needing read access to /users
+  // (which is owner+admin only at the rule layer). Stored as the client's
+  // FIRST NAME ONLY — the post is broad-audience (every vetted tradie in
+  // radius can read it before any selection), so we trade the full name
+  // for less identifying info up-front. Once a tradie is selected the
+  // resulting JobDoc.clientName carries the full displayName for the
+  // matched pair. Optional — posts created before this field landed leave
+  // them undefined; the UI falls back to a generic "Client" + initial
+  // avatar (see JobCounterparty.vue).
+  clientName?: string | null;
+  clientPhotoURL?: string | null;
   status: JobPostStatus;
   trade: string;
   title: string;

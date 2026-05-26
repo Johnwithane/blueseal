@@ -166,3 +166,22 @@ export function distanceKmFrom(
   if (!postGeo) return null;
   return distanceBetween([center.lat, center.lng], [postGeo.lat, postGeo.lng]);
 }
+
+// Admin one-shot: backfill clientName (first-name only) + clientPhotoURL
+// onto legacy job posts that pre-date the denormalization. Idempotent.
+export interface BackfillJobPostClientResult {
+  scanned: number;
+  updated: number;
+  alreadyPresent: number;
+  pages: number;
+  fallbackUsed: number;
+}
+
+export async function backfillJobPostClient(): Promise<BackfillJobPostClientResult> {
+  const callable = httpsCallable<undefined, BackfillJobPostClientResult>(
+    functions,
+    "backfillJobPostClient",
+  );
+  const { data } = await callable();
+  return data;
+}
