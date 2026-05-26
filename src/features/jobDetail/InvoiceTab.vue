@@ -5,7 +5,6 @@ import { RouterLink } from "vue-router";
 import QuoteCard from "@/components/QuoteCard.vue";
 import InvoiceEditor from "@/components/InvoiceEditor.vue";
 import ExpensesCard from "@/components/ExpensesCard.vue";
-import MutualReviewCard from "@/components/MutualReviewCard.vue";
 import PayInvoiceDialog from "@/components/PayInvoiceDialog.vue";
 import type { JobDoc, WithId } from "@/firebase/interfaces";
 
@@ -27,23 +26,11 @@ const props = defineProps<{
   // for the other side when available) and passes the strings here.
   resolvedTradespersonName: string;
   resolvedClientName: string;
-  // The OTHER party from the signed-in user's perspective. Used by
-  // MutualReviewCard to render the personalized review modal header
-  // (avatar + "Leave {name} a review"). Resolved upstream so the
-  // photo-URL fallback chain (denormalized → public tradie doc →
-  // auth profile) lives in one place.
-  counterpartyName: string;
-  counterpartyPhotoUrl: string | null;
-  // Bumped each time JobDetailView sees ?review=1 in the URL — passed
-  // straight through to MutualReviewCard so the deep link auto-opens
-  // the review modal even on subsequent visits.
-  reviewAutoOpenSignal?: number;
 }>();
 
 const emit = defineEmits<{
   "mark-paid": [];
   "revise-quote": [];
-  reviewed: [];
   paid: [];
 }>();
 
@@ -229,20 +216,8 @@ const lockedStatuses = new Set<JobDoc["status"]>([
       :tradesperson-id="job.tradespersonId"
     />
 
-    <!-- AirBnB-style mutual review: surface a stateful banner that owns
-         the whole review loop (request → waiting → reveal). Lives here
-         rather than inside JobDetailView so it sits next to the invoice
-         it relates to — the user only thinks about reviewing right after
-         they see the invoice closed out. -->
-    <MutualReviewCard
-      v-if="job.status === 'complete' || job.status === 'reviewed'"
-      :job="job"
-      :is-client="isClient"
-      :is-tradie="isTradie"
-      :counterparty-name="counterpartyName"
-      :counterparty-photo-url="counterpartyPhotoUrl"
-      :auto-open-signal="reviewAutoOpenSignal"
-      @reviewed="emit('reviewed')"
-    />
+    <!-- Mutual review lives at the JobDetailView level (above the
+         tabs) so revealed reviews land at the top of every tab, not
+         buried under the invoice. Nothing to mount here. -->
   </div>
 </template>

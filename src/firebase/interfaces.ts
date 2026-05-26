@@ -588,6 +588,15 @@ export interface MessageDoc {
 export interface ReviewDoc {
   jobId: string;
   clientId: string;
+  // Denormalized at write time so the public tradesperson profile can
+  // render the reviewer's avatar + name without needing read access to
+  // /users/{clientId} (which is owner+admin only). Resolved from the
+  // signed-in client's auth profile when createReview runs. Optional
+  // on the type because reviews written before this denormalization
+  // landed don't carry them — UI falls back to a generic "Client" +
+  // initial in that case.
+  clientName?: string;
+  clientPhotoURL?: string | null;
   tradespersonId: string;
   rating: number; // 1-5
   dimensions: {
@@ -1111,6 +1120,18 @@ export interface NotificationDoc {
   jobId: string | null;
   chatId: string | null;
   actorUid: string | null;
+  // Denormalized snapshot of the actor's avatar + display name at the moment
+  // the notification was written. Lets the in-app inbox render a profile
+  // picture (e.g. the tradesperson who sent a message, the client who
+  // accepted a quote) without an extra users/{actorUid} read per row.
+  // Snapshot semantics: if the actor later changes their photo or name, old
+  // notifications keep the values they had at write-time. Null when the
+  // notification has no actor (system events like vetting decisions,
+  // invoice-paid webhooks) or when the actor's user doc was unreadable at
+  // write-time; legacy notifications created before this field existed are
+  // also null and the UI falls back to the type icon.
+  actorPhotoURL: string | null;
+  actorDisplayName: string | null;
   // Which role the user should be viewing as for the link to make sense.
   // Set by the Cloud Function that creates the notification — every call
   // site already knows who it's targeting and why. The notifications-bell

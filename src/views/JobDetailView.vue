@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter, RouterLink } from "vue-router";
 import Button from "primevue/button";
 import Tag from "primevue/tag";
@@ -36,6 +36,7 @@ import ClientApprovalBanner from "@/components/ClientApprovalBanner.vue";
 import QuoteSheet from "@/components/QuoteSheet.vue";
 import ClientQuoteApprovalBanner from "@/components/ClientQuoteApprovalBanner.vue";
 import TradieChangesRequestedBanner from "@/components/TradieChangesRequestedBanner.vue";
+import MutualReviewCard from "@/components/MutualReviewCard.vue";
 import { SEED_INTAKE_SCHEMAS } from "@/data/intakeSchemas";
 import { getIntakeSchema } from "@/firebase/services/intakeFormSchemas";
 import type { IntakeField } from "@/firebase/interfaces";
@@ -448,17 +449,19 @@ const mySubmittedAt = computed(() => {
   return null;
 });
 
-const reviewBannerVariant = computed<
-  "needsReview" | "waiting" | "revealed" | null
->(() => {
+const reviewBannerVariant = computed<"needsReview" | "waiting" | null>(() => {
   if (!isJobInReviewPhase.value) return null;
   const p = reviewPair.value;
   // Pair hasn't loaded or doesn't exist yet — but the job IS in the
   // review phase, so still nudge the user to leave a review. The
-  // MutualReviewCard inside InvoiceTab falls back to a plain prompt in
-  // that case and our CTA below routes them there.
+  // MutualReviewCard mounted below falls back to a plain prompt in
+  // that case and our CTA routes them there.
   if (!p) return "needsReview";
-  if (p.revealedAt) return "revealed";
+  // Once revealed, the MutualReviewCard rendered alongside this banner
+  // surfaces the actual review content inline — no separate "Reviews
+  // are live" banner needed (it would be a second click to reach the
+  // same content the card already shows).
+  if (p.revealedAt) return null;
   if (!mySubmittedAt.value && !p.locked) return "needsReview";
   // I submitted, the other side hasn't, deadline hasn't passed —
   // surface a passive "waiting" indicator (no CTA). Avoids the
@@ -466,6 +469,14 @@ const reviewBannerVariant = computed<
   if (mySubmittedAt.value && !p.locked) return "waiting";
   return null;
 });
+
+// Drives the always-mounted MutualReviewCard above the tabs. Once the
+// job hits complete/reviewed the card is on the page (it owns its own
+// "is there anything to show" gate: revealed reviews + locked-out
+// fallback + the invisible dialog host). Keeping the mount above the
+// tab bar means the user lands on the actual reviews the moment they
+// open the job — no clicking through to the Invoice tab.
+const shouldMountReviewCard = computed(() => isJobInReviewPhase.value);
 
 const reviewDaysLeft = computed(() => {
   const p = reviewPair.value;
@@ -487,22 +498,6 @@ function openReviewFromBanner() {
   }
 }
 
-// Banner "See reviews" CTA (revealed state) → switch to Invoice tab,
-// then smooth-scroll the post-reveal MutualReviewCard into view. If
-// the user was already on Invoice the tab-switch is a no-op and we
-// just scroll. The anchor id lives on MutualReviewCard's outer wrapper
-// so the scroll targets the actual reviews block, not the top of the
-// tab. Two nextTicks: one for the tab change to apply, one for layout
-// to settle so scrollIntoView measures correctly.
-async function scrollToReviews() {
-  if (route.query.tab !== "invoice") {
-    await router.replace({ query: { ...route.query, tab: "invoice" } });
-  }
-  await nextTick();
-  await nextTick();
-  const el = document.getElementById("mutual-reviews-anchor");
-  if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-}
 
 async function saveSchedule() {
   if (!job.value || !scheduledStart.value || !scheduledEnd.value) return;
@@ -802,39 +797,23 @@ function onReturnToApplicants() {
         </div>
       </div>
 
-      <div
-        v-else-if="reviewBannerVariant === 'revealed'"
-        class="bs-card p-4 mb-4 border-l-4 border-l-emerald-500"
-      >
-        <div class="flex items-start gap-3">
-          <Avatar
-            v-if="counterpartyPhotoUrl"
-            :image="counterpartyPhotoUrl"
-            shape="circle"
-            size="large"
-          />
-          <Avatar
-            v-else
-            :label="counterpartyInitials"
-            shape="circle"
-            size="large"
-            class="!bg-emerald-100 !text-emerald-700 font-semibold"
-          />
-          <div class="flex-1 min-w-0">
-            <div class="font-semibold">Reviews are live</div>
-            <p class="text-sm text-[color:var(--bs-muted)] mt-1">
-              You and {{ counterpartyName }} have both reviewed.
-            </p>
-            <Button
-              label="See reviews"
-              icon="pi pi-arrow-right"
-              outlined
-              class="mt-3"
-              @click="scrollToReviews"
-            />
-          </div>
-        </div>
-      </div>
+      <!-- Mutual review card sits in the banner area so revealed reviews
+           land right at the top of every tab. Pre-reveal it renders
+           nothing visible (the action banners above handle that state)
+           but still hosts the ReviewPrompt dialog so the "Leave a
+           review" CTA can pop the modal. Post-reveal it shows both
+           reviews stacked. -->
+      <MutualReviewCard
+        v-if="shouldMountReviewCard"
+        :job="job"
+        :is-client="isClient"
+        :is-tradie="isTradie"
+        :counterparty-name="counterpartyName"
+        :counterparty-photo-url="counterpartyPhotoUrl"
+        :auto-open-signal="reviewAutoOpenSignal"
+        class="mb-4"
+        @reviewed="load"
+      />
 
       <!-- Global banners — always above the tabs so the user can't miss them
            while browsing tab content. -->
@@ -973,12 +952,8 @@ function onReturnToApplicants() {
           :marking-paid="markingPaid"
           :resolved-tradesperson-name="resolvedTradespersonName"
           :resolved-client-name="resolvedClientName"
-          :counterparty-name="counterpartyName"
-          :counterparty-photo-url="counterpartyPhotoUrl"
-          :review-auto-open-signal="reviewAutoOpenSignal"
           @mark-paid="onMarkPaid"
           @revise-quote="showQuoteSheet = true"
-          @reviewed="load"
           @paid="load"
         />
       </div>

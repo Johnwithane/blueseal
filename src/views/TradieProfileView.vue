@@ -108,6 +108,17 @@ function vouchInitial(name: string): string {
   return (name || "?").trim().slice(0, 1).toUpperCase();
 }
 
+// Display helpers for the reviews list. Legacy reviews written before
+// clientName/clientPhotoURL were denormalized fall back to a generic
+// "Client" label + "C" initial — keeps the row from rendering an empty
+// circle while staying honest that we don't know who wrote it.
+function reviewerName(r: WithId<ReviewDoc>): string {
+  return r.clientName?.trim() || "Client";
+}
+function reviewerInitial(r: WithId<ReviewDoc>): string {
+  return reviewerName(r).slice(0, 1).toUpperCase();
+}
+
 onMounted(async () => {
   const uid = route.params.uid as string;
   // Parallel — vouches reads are independent of the tradesperson + reviews
@@ -380,14 +391,67 @@ onMounted(async () => {
       <section class="bs-card p-5 mt-4">
         <h2 class="font-semibold mb-2">Reviews</h2>
         <div v-if="!reviews.length" class="text-sm text-[color:var(--bs-muted)]">No reviews yet.</div>
-        <article v-for="r in reviews" :key="r.id" class="border-t py-3 first:border-t-0 first:pt-0">
-          <div class="flex items-center justify-between">
-            <Rating :model-value="r.rating" readonly :cancel="false" />
-            <span class="text-xs text-[color:var(--bs-muted)]">{{ relativeTime(r.createdAt) }}</span>
-          </div>
-          <p class="text-sm mt-1">{{ r.text }}</p>
+        <article
+          v-for="r in reviews"
+          :key="r.id"
+          class="border-t py-3 first:border-t-0 first:pt-0"
+        >
+          <!-- Reviewer header: avatar + name on the left, relative
+               timestamp on the right. Avatar falls back to the
+               reviewer's initial when no photoURL is available
+               (legacy review docs that pre-date denormalization OR
+               clients who signed up without a profile photo). -->
+          <header class="flex items-start justify-between gap-3 mb-1">
+            <div class="flex items-center gap-2 min-w-0">
+              <Avatar
+                v-if="r.clientPhotoURL"
+                :image="r.clientPhotoURL"
+                shape="circle"
+                size="small"
+              />
+              <Avatar
+                v-else
+                :label="reviewerInitial(r)"
+                shape="circle"
+                size="small"
+                class="!bg-[color:var(--bs-blue)]/10 !text-[color:var(--bs-blue)] font-semibold"
+              />
+              <div class="min-w-0">
+                <div class="text-sm font-medium truncate">{{ reviewerName(r) }}</div>
+                <Rating
+                  :model-value="r.rating"
+                  readonly
+                  :cancel="false"
+                  class="review-row__rating"
+                />
+              </div>
+            </div>
+            <span class="text-xs text-[color:var(--bs-muted)] flex-none">
+              {{ relativeTime(r.createdAt) }}
+            </span>
+          </header>
+          <p v-if="r.text" class="text-sm mt-2">{{ r.text }}</p>
         </article>
       </section>
     </template>
   </section>
 </template>
+
+<style scoped>
+/* Amber stars on the review row rating to match the modal + revealed
+   reviews — the brand green default reads as "approved" rather than
+   "rating." Smaller size since the reviewer name is the headline,
+   stars are secondary. */
+.review-row__rating :deep(.p-rating-icon),
+.review-row__rating :deep(.p-icon),
+.review-row__rating :deep(.p-rating-on-icon) {
+  color: #f59e0b !important;
+  fill: #f59e0b !important;
+}
+.review-row__rating :deep(.p-rating-icon),
+.review-row__rating :deep(.p-icon) {
+  width: 0.875rem;
+  height: 0.875rem;
+  font-size: 0.875rem;
+}
+</style>

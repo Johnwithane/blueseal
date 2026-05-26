@@ -8,6 +8,7 @@ import Message from "primevue/message";
 import Avatar from "primevue/avatar";
 import { createReview, createClientReview } from "@/firebase/services/reviews";
 import type { JobDoc, WithId } from "@/firebase/interfaces";
+import { useAuthStore } from "@/stores/auth";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 import { reviewSchema, clientReviewSchema } from "@/validation/schemas";
@@ -35,6 +36,7 @@ const emit = defineEmits<{
 }>();
 
 const toast = useToast();
+const auth = useAuthStore();
 
 const open = ref(props.open);
 watch(() => props.open, (v) => { open.value = v; });
@@ -95,9 +97,23 @@ async function submit() {
     }
     submitting.value = true;
     try {
+      // Denormalize the reviewer's display name + photo so the public
+      // tradesperson profile can render "Sam · ★★★★★" without needing
+      // read access to /users/{clientId} (which is owner+admin only).
+      // Fallback chain mirrors the rest of the app — auth store user
+      // doc first (richest source), then the Firebase Auth display
+      // name, then a generic "Client" so something always renders.
+      const reviewerName =
+        auth.user?.displayName?.trim() ||
+        auth.fbUser?.displayName?.trim() ||
+        "Client";
+      const reviewerPhoto =
+        auth.user?.photoURL ?? auth.fbUser?.photoURL ?? null;
       await createReview({
         jobId: props.job.id,
         clientId: props.job.clientId,
+        clientName: reviewerName,
+        clientPhotoURL: reviewerPhoto,
         tradespersonId: props.job.tradespersonId,
         ...parsed.data,
       });
