@@ -395,20 +395,22 @@ async function submit() {
         <p class="text-xs text-[color:var(--bs-muted)] mt-1">
           Only the chosen tradesperson sees your exact address — everyone else sees just your city and the first 3 chars of your postal code.
         </p>
+        <!-- Autocomplete input doubles as the addressLine1 source. Picking a
+             Google suggestion overrides with the cleanly-parsed street and
+             also fills city/region/postal + lat/lng; typing without picking
+             still carries the raw text through (but submit blocks on the
+             missing lat/lng since the geocoded point is required to map
+             the job). -->
         <input
           ref="addressAutocompleteEl"
+          v-model="addressLine1"
           type="text"
           class="p-inputtext p-component w-full mt-2"
           placeholder="Start typing your address…"
-          autocomplete="off"
+          maxlength="200"
+          autocomplete="address-line1"
         />
         <div class="grid sm:grid-cols-2 gap-2 mt-2">
-          <InputText
-            v-model="addressLine1"
-            placeholder="Street address"
-            maxlength="200"
-            autocomplete="address-line1"
-          />
           <InputText
             v-model="city"
             placeholder="City"

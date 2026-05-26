@@ -169,6 +169,14 @@ async function submit() {
 
   submitting.value = true;
   try {
+    // Defensive token refresh before the createJob write. The Firestore rule
+    // gates on the `roles` claim on the token; long-running sessions (or
+    // sessions opened on a device with a cached pre-roles-update token) can
+    // hold a stale claim that lists 'tradesperson' but not 'client' even
+    // though the user doc has both. applyAuthState heals divergence at page
+    // load, but this guarantees a fresh token at the moment of the write.
+    await auth.refreshClaims();
+
     // Pre-allocate the chatId so the job can be created first (with the
     // chatId on it) and the chat doc can be written with the real jobId.
     // Rules lock chat.jobId post-create — there is no patch-later path —
@@ -306,15 +314,20 @@ async function submit() {
 
       <fieldset>
         <legend class="text-sm font-medium mb-2">Address</legend>
+        <!-- Autocomplete input doubles as the addressLine1 source. Picking a
+             Google suggestion overrides with the cleanly-parsed street and
+             also fills city/region/postal; typing without picking still
+             carries the raw text through to submission. -->
         <input
           ref="addressAutocompleteEl"
+          v-model="addressLine1"
           type="text"
           class="p-inputtext p-component w-full"
           placeholder="Start typing your address…"
-          autocomplete="off"
+          maxlength="200"
+          autocomplete="address-line1"
         />
         <div class="grid sm:grid-cols-2 gap-2 mt-2">
-          <InputText v-model="addressLine1" placeholder="Street address" maxlength="200" autocomplete="address-line1" />
           <InputText v-model="city" placeholder="City" maxlength="100" autocomplete="address-level2" />
           <InputText v-model="region" placeholder="Province" maxlength="100" autocomplete="address-level1" />
           <InputText v-model="postalCode" placeholder="Postal code (A1A 1A1)" maxlength="7" autocomplete="postal-code" />

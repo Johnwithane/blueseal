@@ -115,8 +115,8 @@ export const useAuthStore = defineStore("auth", {
     async applyAuthState(fbUser: User | null) {
       this.fbUser = fbUser;
       if (fbUser) {
-        const tokenResult = await fbUser.getIdTokenResult();
-        const claimRoles = rolesFromClaims(
+        let tokenResult = await fbUser.getIdTokenResult();
+        let claimRoles = rolesFromClaims(
           tokenResult.claims as Record<string, unknown>,
         );
         // getUser() can throw permission-denied during the Firestore auth
@@ -129,6 +129,35 @@ export const useAuthStore = defineStore("auth", {
           doc = await getUser(fbUser.uid);
         } catch {
           doc = null;
+        }
+        // Doc/claim divergence recovery. Rules read the token's `roles`
+        // claim; the UI reads `doc.roles`. If the doc lists a role the
+        // cached token's claim doesn't, the session is sitting on a stale
+        // token (e.g. the user added a role via addRoleToSelf in a prior
+        // session, then this device opened with an old cached token).
+        // Force a refresh so subsequent Firestore writes go in against the
+        // up-to-date claim. If the claim STILL doesn't match the doc after
+        // the refresh, the server-side claim is genuinely missing (e.g.
+        // setRoleOnSignup failed historically) — log so we can spot it and
+        // resync server-side instead of looping forever.
+        const docRoles: Role[] = Array.isArray(doc?.roles)
+          ? (doc.roles as unknown[]).filter(
+              (r): r is Role => r === "client" || r === "tradesperson" || r === "admin",
+            )
+          : [];
+        const claimMissing = docRoles.some((r) => !claimRoles.includes(r));
+        if (claimMissing) {
+          tokenResult = await fbUser.getIdTokenResult(true);
+          claimRoles = rolesFromClaims(
+            tokenResult.claims as Record<string, unknown>,
+          );
+          const stillMissing = docRoles.some((r) => !claimRoles.includes(r));
+          if (stillMissing) {
+            console.warn(
+              "[auth] doc/claim role mismatch persists after token refresh — server-side claim resync needed",
+              { uid: fbUser.uid, docRoles, claimRoles },
+            );
+          }
         }
         // PIPEDA: refuse to seat the session for an account that's been
         // marked for deletion. Sign-out happens server-side via Firebase
