@@ -27,6 +27,13 @@ const props = defineProps<{
   // for the other side when available) and passes the strings here.
   resolvedTradespersonName: string;
   resolvedClientName: string;
+  // The OTHER party from the signed-in user's perspective. Used by
+  // MutualReviewCard to render the personalized review modal header
+  // (avatar + "Leave {name} a review"). Resolved upstream so the
+  // photo-URL fallback chain (denormalized → public tradie doc →
+  // auth profile) lives in one place.
+  counterpartyName: string;
+  counterpartyPhotoUrl: string | null;
   // Bumped each time JobDetailView sees ?review=1 in the URL — passed
   // straight through to MutualReviewCard so the deep link auto-opens
   // the review modal even on subsequent visits.
@@ -232,6 +239,8 @@ const lockedStatuses = new Set<JobDoc["status"]>([
       :job="job"
       :is-client="isClient"
       :is-tradie="isTradie"
+      :counterparty-name="counterpartyName"
+      :counterparty-photo-url="counterpartyPhotoUrl"
       :auto-open-signal="reviewAutoOpenSignal"
       @reviewed="emit('reviewed')"
     />

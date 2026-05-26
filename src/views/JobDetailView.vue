@@ -5,6 +5,7 @@ import Button from "primevue/button";
 import Tag from "primevue/tag";
 import Textarea from "primevue/textarea";
 import Dialog from "primevue/dialog";
+import Avatar from "primevue/avatar";
 import {
   CANCELLABLE_STATUSES,
   cancelJob,
@@ -156,6 +157,43 @@ const resolvedClientName = computed(() => {
     return auth.fbUser.displayName.trim();
   }
   return "Client";
+});
+
+// Resolved photo URLs — same fallback chain as the names above.
+// Tradies are public (tradieInfo carries their photoURL when loaded
+// for client viewers); clients aren't, so the client-side photo only
+// comes from the denormalized job field OR the auth profile of the
+// signed-in client. Anything missing falls back to null and the
+// downstream Avatar component renders initials instead.
+const resolvedTradespersonPhotoURL = computed<string | null>(() => {
+  const denorm = job.value?.tradespersonPhotoURL ?? null;
+  if (denorm) return denorm;
+  if (isTradie.value && auth.fbUser?.photoURL) return auth.fbUser.photoURL;
+  const fromTradieDoc = tradieInfo.value?.photoURL ?? null;
+  if (fromTradieDoc) return fromTradieDoc;
+  return null;
+});
+
+const resolvedClientPhotoURL = computed<string | null>(() => {
+  const denorm = job.value?.clientPhotoURL ?? null;
+  if (denorm) return denorm;
+  if (isClient.value && auth.fbUser?.photoURL) return auth.fbUser.photoURL;
+  return null;
+});
+
+// Counterparty (the other party from the viewer's perspective). The
+// review banner + modal both display this person.
+const counterpartyName = computed(() =>
+  isClient.value ? resolvedTradespersonName.value : resolvedClientName.value,
+);
+const counterpartyPhotoUrl = computed<string | null>(() =>
+  isClient.value ? resolvedTradespersonPhotoURL.value : resolvedClientPhotoURL.value,
+);
+const counterpartyInitials = computed(() => {
+  const parts = counterpartyName.value.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 });
 
 const canClientCancel = computed(
@@ -410,17 +448,9 @@ const mySubmittedAt = computed(() => {
   return null;
 });
 
-const counterpartyNameForBanner = computed(() => {
-  if (isClient.value) {
-    return job.value?.tradespersonName?.trim() || "your tradesperson";
-  }
-  if (isTradie.value) {
-    return job.value?.clientName?.trim() || "your client";
-  }
-  return "the other party";
-});
-
-const reviewBannerVariant = computed<"needsReview" | "revealed" | null>(() => {
+const reviewBannerVariant = computed<
+  "needsReview" | "waiting" | "revealed" | null
+>(() => {
   if (!isJobInReviewPhase.value) return null;
   const p = reviewPair.value;
   // Pair hasn't loaded or doesn't exist yet — but the job IS in the
@@ -430,6 +460,10 @@ const reviewBannerVariant = computed<"needsReview" | "revealed" | null>(() => {
   if (!p) return "needsReview";
   if (p.revealedAt) return "revealed";
   if (!mySubmittedAt.value && !p.locked) return "needsReview";
+  // I submitted, the other side hasn't, deadline hasn't passed —
+  // surface a passive "waiting" indicator (no CTA). Avoids the
+  // user assuming nothing happened after they hit Submit.
+  if (mySubmittedAt.value && !p.locked) return "waiting";
   return null;
 });
 
@@ -679,30 +713,40 @@ function onReturnToApplicants() {
         />
       </header>
 
-      <!-- Mutual-review banner: prominent CTA right under the title so
-           the user doesn't have to dig into the Invoice tab (or wait
-           on a notification) to find the prompt. Two variants:
-             - needsReview: amber-tinted, primary CTA "Leave a review"
-             - revealed: emerald-tinted, secondary CTA "See reviews"
-           Clicking either switches to the Invoice tab and signals
-           MutualReviewCard to open the modal. -->
+      <!-- Mutual-review banner: top-of-page surface for the review loop.
+           Three variants:
+             needsReview — amber, primary "Leave [name] a review" CTA
+             waiting     — slate, passive "Waiting on [name]" indicator
+             revealed    — emerald, secondary "See reviews" → Invoice tab
+           All three show the counterparty's avatar + name so the user
+           recognises who they're being asked about at a glance. -->
       <div
         v-if="reviewBannerVariant === 'needsReview'"
         class="bs-card p-4 mb-4 border-l-4 border-l-amber-500"
       >
         <div class="flex items-start gap-3">
-          <i class="pi pi-star-fill text-amber-500 text-lg mt-0.5"></i>
+          <Avatar
+            v-if="counterpartyPhotoUrl"
+            :image="counterpartyPhotoUrl"
+            shape="circle"
+            size="large"
+          />
+          <Avatar
+            v-else
+            :label="counterpartyInitials"
+            shape="circle"
+            size="large"
+            class="!bg-amber-100 !text-amber-700 font-semibold"
+          />
           <div class="flex-1 min-w-0">
-            <div class="font-semibold">Leave a review for {{ counterpartyNameForBanner }}</div>
+            <div class="font-semibold">Leave {{ counterpartyName }} a review</div>
             <p class="text-sm text-[color:var(--bs-muted)] mt-1">
-              Reviews stay hidden until both of you submit — same as AirBnB.
-              <template v-if="reviewDaysLeft !== null && reviewDaysLeft > 0">
-                {{ reviewDaysLeft }} day{{ reviewDaysLeft === 1 ? "" : "s" }} left
-                in the window.
+              Hidden until they review you back.<template v-if="reviewDaysLeft !== null && reviewDaysLeft > 0">
+                {{ " " }}{{ reviewDaysLeft }} day{{ reviewDaysLeft === 1 ? "" : "s" }} left.
               </template>
             </p>
             <Button
-              label="Leave a review"
+              :label="`Leave ${counterpartyName} a review`"
               icon="pi pi-star"
               class="mt-3"
               @click="openReviewFromBanner"
@@ -712,16 +756,56 @@ function onReturnToApplicants() {
       </div>
 
       <div
+        v-else-if="reviewBannerVariant === 'waiting'"
+        class="bs-card p-4 mb-4 border-l-4 border-l-slate-400"
+      >
+        <div class="flex items-start gap-3">
+          <Avatar
+            v-if="counterpartyPhotoUrl"
+            :image="counterpartyPhotoUrl"
+            shape="circle"
+            size="large"
+          />
+          <Avatar
+            v-else
+            :label="counterpartyInitials"
+            shape="circle"
+            size="large"
+            class="!bg-slate-100 !text-slate-600 font-semibold"
+          />
+          <div class="flex-1 min-w-0">
+            <div class="font-semibold">Waiting on {{ counterpartyName }}</div>
+            <p class="text-sm text-[color:var(--bs-muted)] mt-1">
+              Your review is in. Once they submit theirs, both go live.<template v-if="reviewDaysLeft !== null && reviewDaysLeft > 0">
+                {{ " " }}{{ reviewDaysLeft }} day{{ reviewDaysLeft === 1 ? "" : "s" }} left.
+              </template>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div
         v-else-if="reviewBannerVariant === 'revealed'"
         class="bs-card p-4 mb-4 border-l-4 border-l-emerald-500"
       >
         <div class="flex items-start gap-3">
-          <i class="pi pi-eye text-emerald-600 text-lg mt-0.5"></i>
+          <Avatar
+            v-if="counterpartyPhotoUrl"
+            :image="counterpartyPhotoUrl"
+            shape="circle"
+            size="large"
+          />
+          <Avatar
+            v-else
+            :label="counterpartyInitials"
+            shape="circle"
+            size="large"
+            class="!bg-emerald-100 !text-emerald-700 font-semibold"
+          />
           <div class="flex-1 min-w-0">
             <div class="font-semibold">Reviews are live</div>
             <p class="text-sm text-[color:var(--bs-muted)] mt-1">
-              You and {{ counterpartyNameForBanner }} have both reviewed —
-              their feedback is now visible.
+              You and {{ counterpartyName }} have both reviewed.
             </p>
             <Button
               label="See reviews"
@@ -871,6 +955,8 @@ function onReturnToApplicants() {
           :marking-paid="markingPaid"
           :resolved-tradesperson-name="resolvedTradespersonName"
           :resolved-client-name="resolvedClientName"
+          :counterparty-name="counterpartyName"
+          :counterparty-photo-url="counterpartyPhotoUrl"
           :review-auto-open-signal="reviewAutoOpenSignal"
           @mark-paid="onMarkPaid"
           @revise-quote="showQuoteSheet = true"

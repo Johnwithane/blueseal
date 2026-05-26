@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
-import Button from "primevue/button";
 import Rating from "primevue/rating";
 import ReviewPrompt from "@/components/ReviewPrompt.vue";
 import {
@@ -16,28 +15,30 @@ import type {
   WithId,
 } from "@/firebase/interfaces";
 
-// AirBnB-style mutual-review surface for the Invoice tab.
+// Mutual-review surface for the Invoice tab.
 //
-// Five visible states, driven by the reviewPairs/{jobId} doc:
-//   1. No pair yet — fall back to the plain "Leave a review" trigger so
-//      legacy / edge-case jobs still work.
-//   2. I haven't submitted, pair unlocked — CTA + countdown.
-//   3. I submitted, waiting on counterparty — "Holding your review until
-//      they submit. Reveal date: …"
-//   4. Both revealed — show my review + the counterparty's side-by-side.
-//   5. Locked at deadline with one side missing — show whichever side
-//      submitted; explain the other side never reviewed.
+// The top-of-page banner (in JobDetailView) owns the action-oriented
+// states — "leave a review", "waiting on counterparty", "reviews are
+// live, view them". This card is the *consumable content* surface:
+// it renders once the reviews are revealed so the user can read what
+// the other party wrote, alongside their own.
 //
-// Deep-link auto-open: parent passes `autoOpenSignal` (incremented from
-// JobDetailView whenever ?review=1 lands). We open the dialog once per
-// signal change so re-arriving on the URL re-opens it.
+// The ReviewPrompt dialog still mounts here when the user could still
+// submit, so banner clicks (which set the auto-open signal) can pop
+// the modal even when no visible card content is shown. The dialog is
+// a no-render-when-closed element; mounting it doesn't add visual UI.
 
 const props = defineProps<{
   job: WithId<JobDoc>;
   isClient: boolean;
   isTradie: boolean;
-  // Bumped by parent each time ?review=1 hits the URL — lets a
-  // notification deep-link pop the modal even after the first mount.
+  // Resolved by the parent — display name + photo of the OTHER party
+  // (the one being reviewed). Used inside the dialog header.
+  counterpartyName: string;
+  counterpartyPhotoUrl?: string | null;
+  // Bumped by JobDetailView each time a notification or banner click
+  // wants to open the modal. The watcher inside this component opens
+  // the dialog exactly once per signal value.
   autoOpenSignal?: number;
 }>();
 
@@ -52,9 +53,6 @@ const theirReview = ref<WithId<ReviewDoc> | WithId<ClientReviewDoc> | null>(null
 
 const dialogOpen = ref(false);
 
-// Identity: which side am I, what doc holds my review, what doc holds
-// theirs. Locked once based on props — never flips during the lifetime
-// of this component (the parent re-mounts on role change).
 const role = computed<"client" | "tradesperson" | null>(() => {
   if (props.isClient) return "client";
   if (props.isTradie) return "tradesperson";
@@ -66,21 +64,9 @@ const mySubmittedAt = computed(() =>
     ? pair.value?.clientSubmittedAt ?? null
     : pair.value?.tradieSubmittedAt ?? null,
 );
-const theirSubmittedAt = computed(() =>
-  role.value === "client"
-    ? pair.value?.tradieSubmittedAt ?? null
-    : pair.value?.clientSubmittedAt ?? null,
-);
 
 const isRevealed = computed(() => pair.value?.revealedAt != null);
 const isLocked = computed(() => pair.value?.locked === true);
-
-const daysLeft = computed(() => {
-  if (!pair.value) return null;
-  const ms = pair.value.deadlineAt.toDate().getTime() - Date.now();
-  if (ms <= 0) return 0;
-  return Math.ceil(ms / (24 * 60 * 60 * 1000));
-});
 
 const myReviewId = computed(() =>
   role.value === "client"
@@ -93,22 +79,8 @@ const theirReviewId = computed(() =>
     : pair.value?.clientReviewId ?? null,
 );
 
-// Counterparty display name — best-effort from the denormalized fields
-// the job carries. Falls back to a role-neutral noun so the UI never
-// renders "undefined".
-const counterpartyName = computed(() => {
-  if (role.value === "client") {
-    return (
-      props.job.tradespersonName?.trim() || "your tradesperson"
-    );
-  }
-  if (role.value === "tradesperson") {
-    return props.job.clientName?.trim() || "your client";
-  }
-  return "the other party";
-});
 const myCounterpartyHeading = computed(() =>
-  role.value === "client" ? "Their review of you" : "Their review of you",
+  `${props.counterpartyName}'s review`,
 );
 
 onMounted(() => {
@@ -124,10 +96,6 @@ onUnmounted(() => {
   unsubscribePair = null;
 });
 
-// Re-fetch the underlying review docs whenever the pair changes — the
-// ids on the pair are the source of truth, the docs themselves can
-// arrive a tick later. Both fetches are gated by rules, so getting back
-// null pre-reveal is expected for the counterparty side.
 async function refreshReviews() {
   await Promise.all([
     (async () => {
@@ -159,17 +127,9 @@ const canStillSubmit = computed(
   () => role.value != null && !mySubmittedAt.value && !isLocked.value,
 );
 
-// Deep-link / banner-click auto-open. Three paths land here:
-//   1. Notification click → JobDetailView watcher bumps the signal
-//      BEFORE InvoiceTab is mounted (if the user was on a different
-//      tab). MutualReviewCard then mounts with a non-zero signal.
-//   2. Banner click while already on the Invoice tab → signal goes
-//      0→1 with the card already mounted.
-//   3. Same banner clicked again → signal goes 1→2.
-// All three must open the dialog exactly once per signal value, and
-// only if the user actually has a review to submit. `lastHandledSignal`
-// tracks which signal value we've already acted on so re-renders /
-// pair-load completions don't re-trigger the same value.
+// Banner-click / notification deep-link auto-open. Signal value
+// represents a "user requested the modal" event; we open exactly once
+// per value, gated on pair load + actually being able to submit.
 const lastHandledSignal = ref<number | undefined>(undefined);
 watch(
   [() => props.autoOpenSignal, pairLoaded, canStillSubmit],
@@ -177,12 +137,8 @@ watch(
     const sig = props.autoOpenSignal;
     if (sig === undefined || sig === 0) return;
     if (sig === lastHandledSignal.value) return;
-    // Wait until the pair has loaded so canStillSubmit is meaningful.
-    // The watcher fires again when pairLoaded flips, picking it back up.
     if (!pairLoaded.value) return;
     if (!canStillSubmit.value) {
-      // Mark handled so we don't keep re-evaluating once the user has
-      // already submitted (or the pair is locked).
       lastHandledSignal.value = sig;
       return;
     }
@@ -192,24 +148,21 @@ watch(
   { immediate: true },
 );
 
-function openDialog() {
-  dialogOpen.value = true;
-}
-
 function onReviewed() {
-  // Snapshot listener picks up the pair change; the local emit lets the
-  // parent (InvoiceTab → JobDetailView) also re-fetch any job-level state.
   emit("reviewed");
 }
 
-// Render guards — only show the card once the job has actually reached
-// the review stage (complete or reviewed). For other statuses the
-// parent should not be mounting us, but we belt-and-brace.
+// Only render visible content for the post-action states. The banner
+// at the top of the page handles "needs review" + "waiting" — keeping
+// them here too was the redundancy the user flagged.
+const showRevealedContent = computed(() => isRevealed.value);
+const showLockedOutMessage = computed(
+  () => isLocked.value && !mySubmittedAt.value,
+);
 const isShowable = computed(
   () => props.job.status === "complete" || props.job.status === "reviewed",
 );
 
-// Display helpers for the revealed-review block.
 function formatDate(ts: { toDate(): Date } | null | undefined): string {
   if (!ts) return "";
   return new Intl.DateTimeFormat("en-CA", {
@@ -228,163 +181,115 @@ function textOf(r: WithId<ReviewDoc> | WithId<ClientReviewDoc> | null): string {
 </script>
 
 <template>
-  <div v-if="isShowable" class="bs-card p-4 space-y-3">
-    <h3 class="font-semibold text-sm flex items-center gap-2">
-      <i class="pi pi-star text-amber-500"></i>
-      Mutual review
-    </h3>
+  <template v-if="isShowable">
+    <!-- Revealed: show both reviews stacked, counterparty first. This
+         is the entire visible job of this component now — the action
+         states live in the top banner. -->
+    <div v-if="showRevealedContent" class="bs-card p-4 space-y-3">
+      <h3 class="font-semibold text-sm flex items-center gap-2">
+        <i class="pi pi-eye text-emerald-600"></i>
+        Reviews
+      </h3>
 
-    <!-- Fallback when the pair hasn't loaded yet OR doesn't exist (pre-
-         feature jobs that completed before the seeder existed). Show the
-         original plain trigger so the user still has a path. -->
-    <template v-if="!pairLoaded">
-      <p class="text-xs text-[color:var(--bs-muted)]">Loading…</p>
-    </template>
-
-    <template v-else-if="!pair">
-      <p class="text-xs text-[color:var(--bs-muted)] mb-2">
-        Leave a review for {{ counterpartyName }}. It stays hidden until they
-        submit theirs too.
-      </p>
-      <ReviewPrompt
-        v-if="role"
-        :job="job"
-        :as-role="role"
-        @reviewed="onReviewed"
-      />
-    </template>
-
-    <!-- State A: I haven't submitted yet, window still open. -->
-    <template v-else-if="canStillSubmit && !isRevealed">
-      <p class="text-xs text-[color:var(--bs-muted)]">
-        Reviews stay hidden until both you and {{ counterpartyName }} submit.
-        <span v-if="theirSubmittedAt" class="text-emerald-700 font-medium">
-          They've already left theirs — submit yours to unlock it.
-        </span>
-        <template v-else>
-          <span v-if="daysLeft !== null && daysLeft > 0">
-            {{ daysLeft }} day{{ daysLeft === 1 ? "" : "s" }} left in the
-            review window.
-          </span>
-        </template>
-      </p>
-      <Button
-        label="Leave a review"
-        icon="pi pi-star"
-        @click="openDialog"
-      />
-      <ReviewPrompt
-        v-if="role"
-        :job="job"
-        :as-role="role"
-        :open="dialogOpen"
-        hide-trigger
-        @update:open="dialogOpen = $event"
-        @reviewed="onReviewed"
-      />
-    </template>
-
-    <!-- State B: I submitted, waiting on counterparty (and not yet locked). -->
-    <template v-else-if="mySubmittedAt && !isRevealed && !isLocked">
       <div
-        class="rounded-lg border border-[color:var(--bs-border)] bg-[color:var(--bs-surface-alt)] p-3"
+        v-if="theirReview"
+        class="rounded-lg border border-[color:var(--bs-border)] p-3"
       >
-        <div class="flex items-start gap-2">
-          <i class="pi pi-check-circle text-emerald-600 text-lg mt-0.5"></i>
-          <div class="flex-1">
-            <p class="text-sm font-medium">Thanks — your review is in.</p>
-            <p class="text-xs text-[color:var(--bs-muted)] mt-1">
-              We're holding it (and {{ counterpartyName }}'s, once they
-              submit) until both sides are in. Same as AirBnB — neither of
-              you sees the other's review until both have left one, so
-              nobody can react to the other's score.
-              <span v-if="daysLeft !== null && daysLeft > 0">
-                Reveal date: latest in
-                {{ daysLeft }} day{{ daysLeft === 1 ? "" : "s" }}.
-              </span>
-            </p>
-          </div>
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-xs font-semibold uppercase tracking-wide text-[color:var(--bs-muted)]">
+            {{ myCounterpartyHeading }}
+          </span>
+          <span class="text-[10px] text-[color:var(--bs-muted)]">
+            {{ formatDate(pair?.revealedAt) }}
+          </span>
         </div>
+        <div class="flex items-center gap-2 mb-1">
+          <Rating
+            :model-value="ratingOf(theirReview)"
+            readonly
+            :cancel="false"
+            class="review-readonly"
+          />
+          <span class="text-sm font-medium">{{ ratingOf(theirReview) }} / 5</span>
+        </div>
+        <p
+          v-if="textOf(theirReview)"
+          class="text-sm text-[color:var(--bs-text)] whitespace-pre-wrap"
+        >
+          {{ textOf(theirReview) }}
+        </p>
+        <p v-else class="text-xs italic text-[color:var(--bs-muted)]">
+          No written comment.
+        </p>
       </div>
-    </template>
-
-    <!-- State C: revealed — show counterparty review (and mine, as a
-         reminder of what I submitted). -->
-    <template v-else-if="isRevealed">
-      <div class="space-y-3">
-        <div
-          v-if="theirReview"
-          class="rounded-lg border border-[color:var(--bs-border)] p-3"
-        >
-          <div class="flex items-center justify-between mb-1">
-            <span class="text-xs font-semibold uppercase tracking-wide text-[color:var(--bs-muted)]">
-              {{ myCounterpartyHeading }}
-            </span>
-            <span class="text-[10px] text-[color:var(--bs-muted)]">
-              {{ formatDate(pair.revealedAt) }}
-            </span>
-          </div>
-          <div class="flex items-center gap-2 mb-1">
-            <Rating
-              :model-value="ratingOf(theirReview)"
-              readonly
-              :cancel="false"
-            />
-            <span class="text-sm font-medium">{{ ratingOf(theirReview) }} / 5</span>
-          </div>
-          <p
-            v-if="textOf(theirReview)"
-            class="text-sm text-[color:var(--bs-text)] whitespace-pre-wrap"
-          >
-            {{ textOf(theirReview) }}
-          </p>
-          <p v-else class="text-xs italic text-[color:var(--bs-muted)]">
-            No written comment.
-          </p>
-        </div>
-        <div
-          v-else-if="isLocked"
-          class="rounded-lg border border-dashed border-[color:var(--bs-border)] p-3 text-xs text-[color:var(--bs-muted)]"
-        >
-          {{ counterpartyName }} didn't leave a review before the window
-          closed. No score from them is recorded on this job.
-        </div>
-
-        <div
-          v-if="myReview"
-          class="rounded-lg border border-[color:var(--bs-border)] p-3"
-        >
-          <div class="flex items-center justify-between mb-1">
-            <span class="text-xs font-semibold uppercase tracking-wide text-[color:var(--bs-muted)]">
-              Your review
-            </span>
-          </div>
-          <div class="flex items-center gap-2 mb-1">
-            <Rating
-              :model-value="ratingOf(myReview)"
-              readonly
-              :cancel="false"
-            />
-            <span class="text-sm font-medium">{{ ratingOf(myReview) }} / 5</span>
-          </div>
-          <p
-            v-if="textOf(myReview)"
-            class="text-sm text-[color:var(--bs-text)] whitespace-pre-wrap"
-          >
-            {{ textOf(myReview) }}
-          </p>
-        </div>
+      <div
+        v-else-if="isLocked"
+        class="rounded-lg border border-dashed border-[color:var(--bs-border)] p-3 text-xs text-[color:var(--bs-muted)]"
+      >
+        {{ counterpartyName }} didn't leave a review before the window closed.
       </div>
-    </template>
 
-    <!-- State D: locked + I never submitted. Late path — no longer
-         eligible to leave one. Show the counterparty's review if it
-         exists, but don't offer a CTA. -->
-    <template v-else-if="isLocked && !mySubmittedAt">
-      <p class="text-xs text-[color:var(--bs-muted)]">
-        The 14-day review window closed without your review. You can no
-        longer leave one for this job.
-      </p>
-    </template>
-  </div>
+      <div
+        v-if="myReview"
+        class="rounded-lg border border-[color:var(--bs-border)] p-3"
+      >
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-xs font-semibold uppercase tracking-wide text-[color:var(--bs-muted)]">
+            Your review
+          </span>
+        </div>
+        <div class="flex items-center gap-2 mb-1">
+          <Rating
+            :model-value="ratingOf(myReview)"
+            readonly
+            :cancel="false"
+            class="review-readonly"
+          />
+          <span class="text-sm font-medium">{{ ratingOf(myReview) }} / 5</span>
+        </div>
+        <p
+          v-if="textOf(myReview)"
+          class="text-sm text-[color:var(--bs-text)] whitespace-pre-wrap"
+        >
+          {{ textOf(myReview) }}
+        </p>
+      </div>
+    </div>
+
+    <!-- Locked out + I never submitted: tiny apology line so the user
+         understands why the action surface vanished. -->
+    <div
+      v-else-if="showLockedOutMessage"
+      class="bs-card p-3 text-xs text-[color:var(--bs-muted)]"
+    >
+      The 14-day review window closed without your review. You can no longer
+      leave one for this job.
+    </div>
+
+    <!-- Dialog host. Mounted invisibly when the user can still submit
+         so the banner's auto-open signal has something to drive. The
+         dialog itself takes no layout space when closed. -->
+    <ReviewPrompt
+      v-if="role && canStillSubmit"
+      :job="job"
+      :as-role="role"
+      :counterparty-name="counterpartyName"
+      :counterparty-photo-url="counterpartyPhotoUrl"
+      :open="dialogOpen"
+      hide-trigger
+      @update:open="dialogOpen = $event"
+      @reviewed="onReviewed"
+    />
+  </template>
 </template>
+
+<style scoped>
+/* Mirror the amber-star treatment in the read-only display so the
+   modal and the post-reveal view look consistent. */
+.review-readonly :deep(.p-rating-icon),
+.review-readonly :deep(.p-icon),
+.review-readonly :deep(.p-rating-on-icon) {
+  color: #f59e0b !important;
+  fill: #f59e0b !important;
+}
+</style>
