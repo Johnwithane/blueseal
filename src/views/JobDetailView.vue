@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter, RouterLink } from "vue-router";
 import Button from "primevue/button";
 import Tag from "primevue/tag";
@@ -475,15 +475,33 @@ const reviewDaysLeft = computed(() => {
   return Math.ceil(ms / (24 * 60 * 60 * 1000));
 });
 
-// One CTA → switch to Invoice tab AND bump the auto-open signal so
-// MutualReviewCard pops the dialog as soon as it mounts (the watcher
-// inside MutualReviewCard fires immediately so the timing works even
-// when InvoiceTab wasn't previously mounted).
+// Banner "Leave a review" CTA → switch to Invoice tab AND bump the
+// auto-open signal so MutualReviewCard pops the dialog as soon as it
+// mounts. Only meaningful when the user can still submit; revealed
+// state uses scrollToReviews instead because the signal-driven open is
+// guarded by canStillSubmit and would silently no-op.
 function openReviewFromBanner() {
   reviewAutoOpenSignal.value += 1;
   if (route.query.tab !== "invoice") {
     router.replace({ query: { ...route.query, tab: "invoice" } });
   }
+}
+
+// Banner "See reviews" CTA (revealed state) → switch to Invoice tab,
+// then smooth-scroll the post-reveal MutualReviewCard into view. If
+// the user was already on Invoice the tab-switch is a no-op and we
+// just scroll. The anchor id lives on MutualReviewCard's outer wrapper
+// so the scroll targets the actual reviews block, not the top of the
+// tab. Two nextTicks: one for the tab change to apply, one for layout
+// to settle so scrollIntoView measures correctly.
+async function scrollToReviews() {
+  if (route.query.tab !== "invoice") {
+    await router.replace({ query: { ...route.query, tab: "invoice" } });
+  }
+  await nextTick();
+  await nextTick();
+  const el = document.getElementById("mutual-reviews-anchor");
+  if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 async function saveSchedule() {
@@ -812,7 +830,7 @@ function onReturnToApplicants() {
               icon="pi pi-arrow-right"
               outlined
               class="mt-3"
-              @click="openReviewFromBanner"
+              @click="scrollToReviews"
             />
           </div>
         </div>

@@ -184,8 +184,15 @@ function textOf(r: WithId<ReviewDoc> | WithId<ClientReviewDoc> | null): string {
   <template v-if="isShowable">
     <!-- Revealed: show both reviews stacked, counterparty first. This
          is the entire visible job of this component now — the action
-         states live in the top banner. -->
-    <div v-if="showRevealedContent" class="bs-card p-4 space-y-3">
+         states live in the top banner. The anchor id is the scroll
+         target for the banner's "See reviews" CTA — JobDetailView
+         queries this exact id after switching to the Invoice tab so
+         the user lands on the actual review content, not the tab top. -->
+    <div
+      v-if="showRevealedContent"
+      id="mutual-reviews-anchor"
+      class="bs-card p-4 space-y-3 scroll-mt-4"
+    >
       <h3 class="font-semibold text-sm flex items-center gap-2">
         <i class="pi pi-eye text-emerald-600"></i>
         Reviews
