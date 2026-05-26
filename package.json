@@ -25,6 +25,8 @@
     "@stripe/stripe-js": "^9.6.0",
     "firebase": "^11.1.0",
     "geofire-common": "^6.0.0",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "marked": "^18.0.4",
     "pinia": "^2.3.0",
     "primeicons": "^7.0.0",

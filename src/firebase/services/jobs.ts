@@ -248,6 +248,13 @@ export async function markJobPaid(jobId: string): Promise<{ ok: true }> {
   return res.data;
 }
 
+/** Client-initiated mark-as-paid (manual/offline payment path, no Stripe). */
+export async function clientMarkPaid(jobId: string): Promise<{ ok: true }> {
+  const fn = httpsCallable<{ jobId: string }, { ok: true }>(functions, "clientMarkPaid");
+  const res = await fn({ jobId });
+  return res.data;
+}
+
 /**
  * Resolve the real jobId for a chat. Used to repair legacy notification
  * deep-links that point at `/jobs/pending` — those came from a fixed bug

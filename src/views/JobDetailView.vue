@@ -670,6 +670,7 @@ function onReturnToApplicants() {
           @mark-paid="onMarkPaid"
           @revise-quote="showQuoteSheet = true"
           @reviewed="load"
+          @paid="load"
         />
       </div>
 

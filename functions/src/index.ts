@@ -41,6 +41,7 @@ export { submitJobForApproval } from "./jobs/submitJobForApproval";
 export { clientApproveJob } from "./jobs/clientApproveJob";
 export { clientRequestChanges } from "./jobs/clientRequestChanges";
 export { markJobPaid } from "./jobs/markJobPaid";
+export { clientMarkPaid } from "./jobs/clientMarkPaid";
 export { submitQuote } from "./jobs/submitQuote";
 export { clientAcceptQuote } from "./jobs/clientAcceptQuote";
 export { clientDeclineQuote } from "./jobs/clientDeclineQuote";

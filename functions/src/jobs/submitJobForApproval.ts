@@ -182,6 +182,12 @@ export const submitJobForApproval = onCall({ enforceAppCheck: false }, async (re
   const existingIds = new Set(
     existingLines.filter((li) => li.id).map((li) => li.id as string),
   );
+  // On re-submit (client requested changes → tradie revises), only preserve
+  // id-bearing rows (already-billed time entries / expenses). Freeform
+  // rows (quote rows + extras) have no id and the wrap-up sheet re-supplies
+  // them in `extraLineItems` — keeping them here too would stack the
+  // freeform lines on every revision.
+  const preservedLines = existingLines.filter((li) => li.id);
 
   // ---------- roll up time entries by rate ----------
   const rollup = new Map<number, { hours: number; ids: string[] }>();
@@ -237,7 +243,7 @@ export const submitJobForApproval = onCall({ enforceAppCheck: false }, async (re
     expenseStamps.push(d.id);
   }
 
-  const mergedLines: LineItem[] = [...existingLines, ...pulledLines, ...extraLineItems];
+  const mergedLines: LineItem[] = [...preservedLines, ...pulledLines, ...extraLineItems];
   const totals = computeTotals(mergedLines, discount);
 
   if (mergedLines.length === 0 || totals.total <= 0) {

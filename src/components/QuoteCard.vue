@@ -5,13 +5,38 @@ import Tag from "primevue/tag";
 import { subscribeQuote, getQuoteByJobId, markQuoteViewed } from "@/firebase/services/quotes";
 import type { LineItemKind, QuoteDoc, QuoteStatus, WithId } from "@/firebase/interfaces";
 import { useFormatters } from "@/composables/useFormatters";
+import { useToast } from "@/composables/useToast";
+import { humanizeError } from "@/utils/errors";
 
 const props = defineProps<{
   jobId: string;
   canEdit: boolean;
   /** When true, mark the quote as viewed on first load (client-side read-receipt). */
   stampViewedOnLoad?: boolean;
+  /** Names denormalized on the job — used for the PDF "From"/"To" header. */
+  tradespersonName?: string | null;
+  clientName?: string | null;
 }>();
+
+const toast = useToast();
+const downloadingPdf = ref(false);
+
+async function downloadPdf() {
+  if (!quote.value || downloadingPdf.value) return;
+  downloadingPdf.value = true;
+  try {
+    const { downloadQuotePdf } = await import("@/utils/pdfRender");
+    await downloadQuotePdf(
+      quote.value,
+      { name: props.tradespersonName?.trim() || "Tradesperson" },
+      { name: props.clientName?.trim() || "Client" },
+    );
+  } catch (e) {
+    toast.error("Couldn't render PDF", humanizeError(e));
+  } finally {
+    downloadingPdf.value = false;
+  }
+}
 
 const emit = defineEmits<{
   revise: [];
@@ -214,9 +239,9 @@ const KIND_ICON: Record<LineItemKind, string> = {
       <p class="text-xs text-amber-900 whitespace-pre-wrap">{{ quote.declinedReason }}</p>
     </div>
 
-    <div v-if="props.canEdit" class="flex items-center gap-2 mt-4">
+    <div class="flex items-center gap-2 mt-4 flex-wrap">
       <Button
-        v-if="quote.status !== 'accepted'"
+        v-if="props.canEdit && quote.status !== 'accepted'"
         :label="quote.status === 'declined' ? 'Revise & re-send' : 'Edit & re-send'"
         icon="pi pi-pencil"
         outlined
@@ -231,6 +256,16 @@ const KIND_ICON: Record<LineItemKind, string> = {
       >
         <Button label="Download PDF" icon="pi pi-download" outlined size="small" />
       </a>
+      <Button
+        v-else
+        label="Download PDF"
+        icon="pi pi-download"
+        outlined
+        size="small"
+        :loading="downloadingPdf"
+        :disabled="downloadingPdf"
+        @click="downloadPdf"
+      />
     </div>
   </div>
 </template>

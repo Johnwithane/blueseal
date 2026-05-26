@@ -1,21 +1,23 @@
 <script setup lang="ts">
+import { ref } from "vue";
 import Button from "primevue/button";
 import { RouterLink } from "vue-router";
 import QuoteCard from "@/components/QuoteCard.vue";
 import InvoiceEditor from "@/components/InvoiceEditor.vue";
 import ExpensesCard from "@/components/ExpensesCard.vue";
 import ReviewPrompt from "@/components/ReviewPrompt.vue";
+import PayInvoiceDialog from "@/components/PayInvoiceDialog.vue";
 import type { JobDoc, WithId } from "@/firebase/interfaces";
 
-defineProps<{
+const props = defineProps<{
   job: WithId<JobDoc>;
   isClient: boolean;
   isTradie: boolean;
   invoiceId: string | null;
   // True only when the invoice was sent through the Stripe Connect
-  // pipeline (clientSecret available). Legacy "mark paid" / manual
-  // invoices have no in-app pay or receipt page, so the CTAs below
-  // gate on this in addition to invoiceId.
+  // pipeline (clientSecret available). Drives the link to the in-app
+  // /invoices/:id/pay flow (card payment). When false the client gets
+  // the offline-pay dialog instead so the loop still closes.
   invoicePayable: boolean;
   markingPaid: boolean;
 }>();
@@ -24,7 +26,14 @@ const emit = defineEmits<{
   "mark-paid": [];
   "revise-quote": [];
   reviewed: [];
+  paid: [];
 }>();
+
+const showPayDialog = ref(false);
+
+function openPayDialog() {
+  showPayDialog.value = true;
+}
 </script>
 
 <template>
@@ -53,13 +62,14 @@ const emit = defineEmits<{
       />
     </div>
 
-    <!-- Client: the invoice is sent, payment is due. The InvoiceEditor
-         below renders the breakdown read-only; this card surfaces the
-         primary action (pay now → Stripe checkout). Without it the
-         client has no in-app payment affordance and ends up hunting
-         for an email link. -->
+    <!-- Client: invoice is approved + sent, payment is due. Two paths:
+         Stripe Connect (invoicePayable === true) takes them to the in-app
+         card-payment view; otherwise we open the offline-pay dialog so
+         the client can mark it paid after sending the funds directly
+         (e-transfer / cash / etc.). Either way they aren't stranded
+         without an action. -->
     <div
-      v-if="isClient && job.status === 'awaiting_payment' && invoiceId && invoicePayable"
+      v-if="isClient && job.status === 'awaiting_payment' && invoiceId"
       class="bs-card p-3 border-l-4 border-l-emerald-500"
     >
       <h3 class="font-semibold text-sm mb-1 flex items-center gap-2">
@@ -67,9 +77,19 @@ const emit = defineEmits<{
         Invoice ready to pay
       </h3>
       <p class="text-xs text-[color:var(--bs-muted)] mb-3">
-        Pay by card to close out the job — you'll get a receipt right after.
+        <template v-if="invoicePayable">
+          Pay by card to close out the job — you'll get a receipt right after.
+        </template>
+        <template v-else>
+          Pay the tradesperson directly (e-transfer, cash, etc.), then
+          confirm here to close out the job.
+        </template>
       </p>
-      <RouterLink :to="`/invoices/${invoiceId}/pay`" class="block">
+      <RouterLink
+        v-if="invoicePayable"
+        :to="`/invoices/${invoiceId}/pay`"
+        class="block"
+      >
         <Button
           label="Pay invoice"
           icon="pi pi-credit-card"
@@ -77,7 +97,23 @@ const emit = defineEmits<{
           class="w-full"
         />
       </RouterLink>
+      <Button
+        v-else
+        label="Pay invoice"
+        icon="pi pi-wallet"
+        severity="success"
+        class="w-full"
+        @click="openPayDialog"
+      />
     </div>
+
+    <PayInvoiceDialog
+      v-if="isClient && invoiceId"
+      v-model:visible="showPayDialog"
+      :job-id="props.job.id"
+      :invoice-id="invoiceId"
+      @paid="emit('paid')"
+    />
 
     <!-- Client: post-payment receipt link. The InvoiceEditor below
          shows the line items, but the receipt view is the cleaner
@@ -117,11 +153,19 @@ const emit = defineEmits<{
       :job-id="job.id"
       :can-edit="isTradie"
       :stamp-viewed-on-load="isClient"
+      :tradesperson-name="job.tradespersonName ?? null"
+      :client-name="job.clientName ?? null"
       @revise="emit('revise-quote')"
     />
 
     <!-- Invoice (renders only when one exists). -->
-    <InvoiceEditor v-if="invoiceId" :invoice-id="invoiceId" :can-edit="isTradie" />
+    <InvoiceEditor
+      v-if="invoiceId"
+      :invoice-id="invoiceId"
+      :can-edit="isTradie"
+      :tradesperson-name="job.tradespersonName ?? null"
+      :client-name="job.clientName ?? null"
+    />
 
     <!-- No-invoice empty state, only when there's also no quote drafted. -->
     <div

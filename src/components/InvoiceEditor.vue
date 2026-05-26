@@ -33,7 +33,29 @@ import { z } from "zod";
 const props = defineProps<{
   invoiceId: string;
   canEdit: boolean;
+  /** Names denormalized on the job — used for the PDF "From"/"To" header. */
+  tradespersonName?: string | null;
+  clientName?: string | null;
 }>();
+
+const downloadingPdf = ref(false);
+
+async function downloadPdf() {
+  if (!invoice.value || downloadingPdf.value) return;
+  downloadingPdf.value = true;
+  try {
+    const { downloadInvoicePdf } = await import("@/utils/pdfRender");
+    await downloadInvoicePdf(
+      invoice.value,
+      { name: props.tradespersonName?.trim() || "Tradesperson" },
+      { name: props.clientName?.trim() || "Client" },
+    );
+  } catch (e) {
+    toast.error("Couldn't render PDF", humanizeError(e));
+  } finally {
+    downloadingPdf.value = false;
+  }
+}
 
 const invoice = ref<WithId<InvoiceDoc> | null>(null);
 // UI rows: same shape as LineItem but `unitPrice` is in DOLLARS for InputNumber
@@ -458,9 +480,25 @@ async function markPaid() {
           :disabled="saving"
           @click="markPaid"
         />
+      </div>
+
+      <!-- Download row: visible to both tradesperson and client. Prefers the
+           server-rendered pdfUrl (written by sendInvoice when Stripe Connect
+           is live) and falls back to the lazy-loaded client-side renderer. -->
+      <div class="flex items-center mt-3">
         <a v-if="invoice.pdfUrl" :href="invoice.pdfUrl" target="_blank" rel="noopener noreferrer">
           <Button label="Download PDF" icon="pi pi-download" outlined size="small" />
         </a>
+        <Button
+          v-else
+          label="Download PDF"
+          icon="pi pi-download"
+          outlined
+          size="small"
+          :loading="downloadingPdf"
+          :disabled="downloadingPdf"
+          @click="downloadPdf"
+        />
       </div>
     </template>
   </div>
