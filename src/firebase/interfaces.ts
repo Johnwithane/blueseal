@@ -183,7 +183,25 @@ export interface TradespersonDoc {
   // by submitQuote (defaults to 1) so pre-existing tradesperson docs that
   // predate the quote flow keep working.
   nextQuoteNumber?: number;
+  // Customisable prefixes on the generated invoice/quote number stamp. The
+  // stamp shape stays `${prefix}-${year}-${0001}` — e.g. setting
+  // invoicePrefix to "ACME" gives "ACME-2026-0001". Server-managed via the
+  // setInvoiceNumbering callable: prefixes can change anytime (old docs
+  // keep their stamped number), but the starting sequence can only be set
+  // before the tradesperson issues their first invoice/quote so the
+  // counter stays monotonic. Optional only for backwards-compat with
+  // pre-cutover tradesperson docs; readers default to "INV"/"Q".
+  invoicePrefix?: string;
+  quotePrefix?: string;
   paymentInstructions: string;
+  // Company logo shown at the top of generated quotes and invoices in
+  // place of the Blue Seal wordmark when set. Stored as the public download
+  // URL of an upload at `tradespeople/{uid}/logo/...` in Storage. Pulled
+  // fresh by the PDF renderer + invoice card UI on every render — changes
+  // here propagate to historical invoices too (deliberate: tradies who
+  // rebrand want their old invoices to look current if a client
+  // re-downloads). Optional/null when the tradesperson hasn't uploaded one.
+  companyLogoUrl?: string | null;
   submittedAt: Timestamp | null;
   approvedAt: Timestamp | null;
   // Stripe Connect Express state — mirrored from Stripe via the
