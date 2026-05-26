@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter, RouterLink } from "vue-router";
 import Button from "primevue/button";
 import Tag from "primevue/tag";
@@ -20,8 +20,15 @@ import { getTradesperson } from "@/firebase/services/tradespeople";
 import { findCollisions, type Collision } from "@/firebase/services/bookings";
 import { useConfirm } from "primevue/useconfirm";
 import { getInvoiceByJobId } from "@/firebase/services/invoices";
+import { subscribeReviewPair } from "@/firebase/services/reviews";
 import { useAuthStore } from "@/stores/auth";
-import type { JobDoc, JobStatus, TradespersonDoc, WithId } from "@/firebase/interfaces";
+import type {
+  JobDoc,
+  JobStatus,
+  ReviewPairDoc,
+  TradespersonDoc,
+  WithId,
+} from "@/firebase/interfaces";
 import { useFormatters } from "@/composables/useFormatters";
 import FinishJobSheet from "@/components/FinishJobSheet.vue";
 import ClientApprovalBanner from "@/components/ClientApprovalBanner.vue";
@@ -74,6 +81,13 @@ function formatScheduled(
 
 const job = ref<WithId<JobDoc> | null>(null);
 const tradieInfo = ref<WithId<TradespersonDoc> | null>(null);
+const reviewPair = ref<WithId<ReviewPairDoc> | null>(null);
+// Live subscription handle for the mutual-review pair. Owned at the
+// JobDetailView level (not inside InvoiceTab) so the top-of-page banner
+// can render the right CTA even when the Brief or Schedule tab is
+// active — without that, the user has to hunt through tabs to find
+// the review prompt after a job is paid.
+let unsubscribeReviewPair: (() => void) | null = null;
 const intakeFields = ref<IntakeField[]>([]);
 const invoiceId = ref<string | null>(null);
 // True only for invoices sent through the Stripe Connect pipeline (i.e.
@@ -354,6 +368,90 @@ async function load() {
 
 onMounted(load);
 
+// Subscribe to the mutual-review pair as soon as we know the jobId.
+// JobDetailView owns this (not InvoiceTab) so the top-of-page banner
+// can react to pair state even when the user is on a different tab.
+// The watch starts immediately on first load and re-binds if the
+// route changes to a different job (rare but possible via in-app
+// navigation).
+watch(
+  () => route.params.id,
+  (id) => {
+    unsubscribeReviewPair?.();
+    unsubscribeReviewPair = null;
+    reviewPair.value = null;
+    if (typeof id !== "string" || !id) return;
+    unsubscribeReviewPair = subscribeReviewPair(id, (p) => {
+      reviewPair.value = p;
+    });
+  },
+  { immediate: true },
+);
+
+onUnmounted(() => {
+  unsubscribeReviewPair?.();
+  unsubscribeReviewPair = null;
+});
+
+// Banner state — only derived once both job + pair are loaded. We
+// surface the banner only when the user actually has work to do
+// (needs to leave a review) OR when both reviews just became visible
+// (so they don't miss it). "Waiting on the other side" is a passive
+// state — no banner, the InvoiceTab card handles it.
+const isJobInReviewPhase = computed(
+  () => job.value?.status === "complete" || job.value?.status === "reviewed",
+);
+
+const mySubmittedAt = computed(() => {
+  const p = reviewPair.value;
+  if (!p) return null;
+  if (isClient.value) return p.clientSubmittedAt;
+  if (isTradie.value) return p.tradieSubmittedAt;
+  return null;
+});
+
+const counterpartyNameForBanner = computed(() => {
+  if (isClient.value) {
+    return job.value?.tradespersonName?.trim() || "your tradesperson";
+  }
+  if (isTradie.value) {
+    return job.value?.clientName?.trim() || "your client";
+  }
+  return "the other party";
+});
+
+const reviewBannerVariant = computed<"needsReview" | "revealed" | null>(() => {
+  if (!isJobInReviewPhase.value) return null;
+  const p = reviewPair.value;
+  // Pair hasn't loaded or doesn't exist yet — but the job IS in the
+  // review phase, so still nudge the user to leave a review. The
+  // MutualReviewCard inside InvoiceTab falls back to a plain prompt in
+  // that case and our CTA below routes them there.
+  if (!p) return "needsReview";
+  if (p.revealedAt) return "revealed";
+  if (!mySubmittedAt.value && !p.locked) return "needsReview";
+  return null;
+});
+
+const reviewDaysLeft = computed(() => {
+  const p = reviewPair.value;
+  if (!p) return null;
+  const ms = p.deadlineAt.toDate().getTime() - Date.now();
+  if (ms <= 0) return 0;
+  return Math.ceil(ms / (24 * 60 * 60 * 1000));
+});
+
+// One CTA → switch to Invoice tab AND bump the auto-open signal so
+// MutualReviewCard pops the dialog as soon as it mounts (the watcher
+// inside MutualReviewCard fires immediately so the timing works even
+// when InvoiceTab wasn't previously mounted).
+function openReviewFromBanner() {
+  reviewAutoOpenSignal.value += 1;
+  if (route.query.tab !== "invoice") {
+    router.replace({ query: { ...route.query, tab: "invoice" } });
+  }
+}
+
 async function saveSchedule() {
   if (!job.value || !scheduledStart.value || !scheduledEnd.value) return;
   if (scheduledEnd.value <= scheduledStart.value) {
@@ -580,6 +678,61 @@ function onReturnToApplicants() {
           class="shrink-0"
         />
       </header>
+
+      <!-- Mutual-review banner: prominent CTA right under the title so
+           the user doesn't have to dig into the Invoice tab (or wait
+           on a notification) to find the prompt. Two variants:
+             - needsReview: amber-tinted, primary CTA "Leave a review"
+             - revealed: emerald-tinted, secondary CTA "See reviews"
+           Clicking either switches to the Invoice tab and signals
+           MutualReviewCard to open the modal. -->
+      <div
+        v-if="reviewBannerVariant === 'needsReview'"
+        class="bs-card p-4 mb-4 border-l-4 border-l-amber-500"
+      >
+        <div class="flex items-start gap-3">
+          <i class="pi pi-star-fill text-amber-500 text-lg mt-0.5"></i>
+          <div class="flex-1 min-w-0">
+            <div class="font-semibold">Leave a review for {{ counterpartyNameForBanner }}</div>
+            <p class="text-sm text-[color:var(--bs-muted)] mt-1">
+              Reviews stay hidden until both of you submit — same as AirBnB.
+              <template v-if="reviewDaysLeft !== null && reviewDaysLeft > 0">
+                {{ reviewDaysLeft }} day{{ reviewDaysLeft === 1 ? "" : "s" }} left
+                in the window.
+              </template>
+            </p>
+            <Button
+              label="Leave a review"
+              icon="pi pi-star"
+              class="mt-3"
+              @click="openReviewFromBanner"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div
+        v-else-if="reviewBannerVariant === 'revealed'"
+        class="bs-card p-4 mb-4 border-l-4 border-l-emerald-500"
+      >
+        <div class="flex items-start gap-3">
+          <i class="pi pi-eye text-emerald-600 text-lg mt-0.5"></i>
+          <div class="flex-1 min-w-0">
+            <div class="font-semibold">Reviews are live</div>
+            <p class="text-sm text-[color:var(--bs-muted)] mt-1">
+              You and {{ counterpartyNameForBanner }} have both reviewed —
+              their feedback is now visible.
+            </p>
+            <Button
+              label="See reviews"
+              icon="pi pi-arrow-right"
+              outlined
+              class="mt-3"
+              @click="openReviewFromBanner"
+            />
+          </div>
+        </div>
+      </div>
 
       <!-- Global banners — always above the tabs so the user can't miss them
            while browsing tab content. -->

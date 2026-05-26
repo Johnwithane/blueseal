@@ -135,40 +135,144 @@ async function submit() {
     v-model:visible="open"
     modal
     :header="props.asRole === 'client' ? 'Review the tradesperson' : 'Review the client (private)'"
-    :style="{ width: '32rem' }"
+    :style="{ width: '34rem', maxWidth: '94vw' }"
+    :pt="{ content: { class: 'review-dialog-content' } }"
   >
     <Message v-if="error" severity="error" :closable="false" class="mb-3">{{ error }}</Message>
-    <div class="space-y-3">
-      <div>
-        <label class="text-sm font-medium block mb-1">Overall</label>
-        <Rating v-model="overall" :cancel="false" />
-      </div>
 
+    <!-- Intro: explain the mutual-blind contract up-front so the user
+         doesn't worry their review goes live the moment they click
+         Submit. Different copy for the private (tradie → client) side
+         to clarify visibility. -->
+    <p class="text-xs text-[color:var(--bs-muted)] mb-5 leading-relaxed">
       <template v-if="props.asRole === 'client'">
-        <div class="grid grid-cols-2 gap-2">
-          <div><label class="text-xs">Quality</label><Rating v-model="quality" :cancel="false" /></div>
-          <div><label class="text-xs">Punctuality</label><Rating v-model="punctuality" :cancel="false" /></div>
-          <div><label class="text-xs">Communication</label><Rating v-model="communication" :cancel="false" /></div>
-          <div><label class="text-xs">Value</label><Rating v-model="value" :cancel="false" /></div>
-        </div>
+        Your review stays hidden until the tradesperson submits theirs
+        (or the 14-day window closes). Then both go live at once — same
+        as AirBnB. They can't read yours before writing theirs, and you
+        can't read theirs before writing yours.
       </template>
       <template v-else>
-        <div class="grid grid-cols-2 gap-2">
-          <div><label class="text-xs">Punctuality</label><Rating v-model="punctuality" :cancel="false" /></div>
-          <div><label class="text-xs">Communication</label><Rating v-model="communication" :cancel="false" /></div>
-          <div><label class="text-xs">Clarity</label><Rating v-model="clarity" :cancel="false" /></div>
-          <div><label class="text-xs">Payment</label><Rating v-model="payment" :cancel="false" /></div>
-        </div>
+        This private review is only visible to other tradespeople, never
+        to the client. It stays hidden until they submit their public
+        review of you (or the 14-day window closes), then it's added to
+        their reputation.
       </template>
+    </p>
+
+    <div class="space-y-5">
+      <!-- Overall rating: centered, larger so it reads as the primary
+           input of the form. The dimension breakdown below is supporting. -->
+      <div class="text-center">
+        <label class="text-sm font-semibold block mb-2">Overall rating</label>
+        <Rating v-model="overall" :cancel="false" class="review-overall justify-center" />
+        <p class="text-[11px] text-[color:var(--bs-muted)] mt-1">
+          Tap a star — 1 (worst) to 5 (best)
+        </p>
+      </div>
+
+      <!-- Dimension breakdown: label stacked ABOVE stars with breathing
+           room. Two-up grid on tablet+; single column on phone so the
+           star row never wraps mid-label. -->
+      <div>
+        <label class="text-sm font-semibold block mb-3">Break it down</label>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+          <template v-if="props.asRole === 'client'">
+            <div class="review-dim">
+              <label>Quality</label>
+              <Rating v-model="quality" :cancel="false" />
+            </div>
+            <div class="review-dim">
+              <label>Punctuality</label>
+              <Rating v-model="punctuality" :cancel="false" />
+            </div>
+            <div class="review-dim">
+              <label>Communication</label>
+              <Rating v-model="communication" :cancel="false" />
+            </div>
+            <div class="review-dim">
+              <label>Value</label>
+              <Rating v-model="value" :cancel="false" />
+            </div>
+          </template>
+          <template v-else>
+            <div class="review-dim">
+              <label>Punctuality</label>
+              <Rating v-model="punctuality" :cancel="false" />
+            </div>
+            <div class="review-dim">
+              <label>Communication</label>
+              <Rating v-model="communication" :cancel="false" />
+            </div>
+            <div class="review-dim">
+              <label>Clarity</label>
+              <Rating v-model="clarity" :cancel="false" />
+            </div>
+            <div class="review-dim">
+              <label>Payment</label>
+              <Rating v-model="payment" :cancel="false" />
+            </div>
+          </template>
+        </div>
+      </div>
 
       <div>
-        <label class="text-xs font-medium">Comments</label>
-        <Textarea v-model="text" rows="4" maxlength="2000" class="w-full mt-1" />
+        <label class="text-sm font-semibold block mb-2">
+          Comments
+          <span class="text-xs font-normal text-[color:var(--bs-muted)]">
+            (optional)
+          </span>
+        </label>
+        <Textarea
+          v-model="text"
+          rows="4"
+          maxlength="2000"
+          class="w-full"
+          :placeholder="
+            props.asRole === 'client'
+              ? 'What stood out about the work or the service?'
+              : 'What stood out about working with this client?'
+          "
+        />
+        <div class="text-[11px] text-[color:var(--bs-muted)] text-right mt-1">
+          {{ text.length }} / 2000
+        </div>
       </div>
     </div>
     <template #footer>
       <Button label="Cancel" text @click="open = false" />
-      <Button label="Submit" icon="pi pi-send" :loading="submitting" :disabled="submitting" @click="submit" />
+      <Button
+        label="Submit review"
+        icon="pi pi-send"
+        :loading="submitting"
+        :disabled="submitting"
+        @click="submit"
+      />
     </template>
   </Dialog>
 </template>
+
+<style scoped>
+/* Dimension cell: label stacked above the star row with a consistent
+   gap. The class lets the PrimeVue Rating retain its default
+   spacing without us reaching into its internals. */
+.review-dim label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--bs-text);
+  margin-bottom: 0.375rem;
+}
+
+/* Overall rating: nudge the star size up so it feels like the
+   headline input. PrimeVue's Rating uses inline SVGs; scaling
+   the font-size pulls the star icons with it via :deep. */
+.review-overall :deep(.p-rating-icon) {
+  font-size: 1.5rem;
+}
+
+/* Tighten Dialog content padding a touch so the intro line + form
+   don't feel airy on phone. */
+:global(.review-dialog-content) {
+  padding-top: 0.5rem !important;
+}
+</style>

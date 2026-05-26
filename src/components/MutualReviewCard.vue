@@ -155,19 +155,41 @@ async function refreshReviews() {
   ]);
 }
 
-// Deep-link auto-open. Open the dialog when the signal changes — but
-// only if there's something for the user to submit. Re-opening on the
-// reveal state would be jarring.
-watch(
-  () => props.autoOpenSignal,
-  (sig, prev) => {
-    if (sig === undefined || sig === prev) return;
-    if (canStillSubmit.value) dialogOpen.value = true;
-  },
-);
-
 const canStillSubmit = computed(
   () => role.value != null && !mySubmittedAt.value && !isLocked.value,
+);
+
+// Deep-link / banner-click auto-open. Three paths land here:
+//   1. Notification click → JobDetailView watcher bumps the signal
+//      BEFORE InvoiceTab is mounted (if the user was on a different
+//      tab). MutualReviewCard then mounts with a non-zero signal.
+//   2. Banner click while already on the Invoice tab → signal goes
+//      0→1 with the card already mounted.
+//   3. Same banner clicked again → signal goes 1→2.
+// All three must open the dialog exactly once per signal value, and
+// only if the user actually has a review to submit. `lastHandledSignal`
+// tracks which signal value we've already acted on so re-renders /
+// pair-load completions don't re-trigger the same value.
+const lastHandledSignal = ref<number | undefined>(undefined);
+watch(
+  [() => props.autoOpenSignal, pairLoaded, canStillSubmit],
+  () => {
+    const sig = props.autoOpenSignal;
+    if (sig === undefined || sig === 0) return;
+    if (sig === lastHandledSignal.value) return;
+    // Wait until the pair has loaded so canStillSubmit is meaningful.
+    // The watcher fires again when pairLoaded flips, picking it back up.
+    if (!pairLoaded.value) return;
+    if (!canStillSubmit.value) {
+      // Mark handled so we don't keep re-evaluating once the user has
+      // already submitted (or the pair is locked).
+      lastHandledSignal.value = sig;
+      return;
+    }
+    lastHandledSignal.value = sig;
+    dialogOpen.value = true;
+  },
+  { immediate: true },
 );
 
 function openDialog() {
