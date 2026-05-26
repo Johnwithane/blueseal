@@ -53,6 +53,7 @@ export { clientDeclineQuote } from "./jobs/clientDeclineQuote";
 
 // Invoicing
 export { onJobCompleted } from "./invoicing/onJobCompleted";
+export { setInvoiceNumbering } from "./billing/setInvoiceNumbering";
 // TODO(stripe-setup): re-enable once STRIPE_SECRET_KEY is set via
 // `firebase functions:secrets:set` (HUMANTASKS.md → "Set Stripe secrets
 // on Cloud Functions"). sendInvoice binds STRIPE_SECRET_KEY and blocks

@@ -29,6 +29,7 @@ interface UserData {
 interface TradespersonData {
   displayName?: string | null;
   companyName?: string | null;
+  companyLogoUrl?: string | null;
   primaryAddressText?: string | null;
   businessAddress?: string | null;
   businessPhone?: string | null;
@@ -39,6 +40,7 @@ interface PartyInfoResult {
   tradesperson: {
     name: string;
     companyName: string | null;
+    companyLogoUrl: string | null;
     address: string | null;
     phone: string | null;
     email: string | null;
@@ -123,6 +125,7 @@ export const getInvoicePartyInfo = onCall(
       tradesperson: {
         name: tradespersonName,
         companyName: tradieDoc.companyName?.trim() || null,
+        companyLogoUrl: tradieDoc.companyLogoUrl?.trim() || null,
         address: tradieAddress,
         phone: tradieDoc.businessPhone?.trim() || tradieUser.phone?.trim() || null,
         email: tradieUser.email?.trim() || null,

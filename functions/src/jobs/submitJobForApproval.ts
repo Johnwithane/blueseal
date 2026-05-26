@@ -159,6 +159,7 @@ export const submitJobForApproval = onCall({ enforceAppCheck: false }, async (re
   const tradie = tradieSnap.data() as {
     displayName?: string;
     nextInvoiceNumber?: number;
+    invoicePrefix?: string;
     paymentInstructions?: string;
   };
 
@@ -276,11 +277,12 @@ export const submitJobForApproval = onCall({ enforceAppCheck: false }, async (re
   // Create or update the invoice.
   if (!invoiceSnap.exists) {
     const seq = tradie.nextInvoiceNumber ?? 1;
+    const prefix = (tradie.invoicePrefix ?? "INV").trim() || "INV";
     const year = new Intl.DateTimeFormat("en-CA", {
       timeZone: "America/Toronto",
       year: "numeric",
     }).format(new Date());
-    const invoiceNumber = `INV-${year}-${String(seq).padStart(4, "0")}`;
+    const invoiceNumber = `${prefix}-${year}-${String(seq).padStart(4, "0")}`;
     batch.set(invoiceRef, {
       tradespersonId: uid,
       clientId: job.clientId,

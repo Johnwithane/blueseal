@@ -135,6 +135,7 @@ export const submitQuote = onCall({ enforceAppCheck: false }, async (req) => {
   const tradie = tradieSnap.data() as {
     displayName?: string;
     nextQuoteNumber?: number;
+    quotePrefix?: string;
   };
 
   const totals = computeTotals(lineItems, discount);
@@ -150,11 +151,12 @@ export const submitQuote = onCall({ enforceAppCheck: false }, async (req) => {
 
   if (!quoteSnap.exists) {
     const seq = tradie.nextQuoteNumber ?? 1;
+    const prefix = (tradie.quotePrefix ?? "Q").trim() || "Q";
     const year = new Intl.DateTimeFormat("en-CA", {
       timeZone: "America/Toronto",
       year: "numeric",
     }).format(new Date());
-    quoteNumber = `Q-${year}-${String(seq).padStart(4, "0")}`;
+    quoteNumber = `${prefix}-${year}-${String(seq).padStart(4, "0")}`;
     batch.set(quoteRef, {
       tradespersonId: uid,
       clientId: job.clientId,

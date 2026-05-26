@@ -136,4 +136,44 @@ describe("tradespeople — server-managed field locks", () => {
       }),
     );
   });
+
+  // Invoice/quote numbering customisation is server-managed via the
+  // setInvoiceNumbering callable — the owner can't change the prefix or
+  // skip the sequence from the client. companyLogoUrl is owner-editable
+  // so they can swap their logo without round-tripping through a
+  // callable.
+  it("owner cannot self-set invoicePrefix", async () => {
+    await seedTradie();
+    const fs = env.authenticatedContext(TRADIE_UID, TRADIE_CLAIMS).firestore();
+    await assertFails(
+      updateDoc(doc(fs, "tradespeople", TRADIE_UID), { invoicePrefix: "ACME" }),
+    );
+  });
+
+  it("owner cannot self-set quotePrefix", async () => {
+    await seedTradie();
+    const fs = env.authenticatedContext(TRADIE_UID, TRADIE_CLAIMS).firestore();
+    await assertFails(
+      updateDoc(doc(fs, "tradespeople", TRADIE_UID), { quotePrefix: "EST" }),
+    );
+  });
+
+  it("owner cannot self-set nextQuoteNumber", async () => {
+    await seedTradie();
+    const fs = env.authenticatedContext(TRADIE_UID, TRADIE_CLAIMS).firestore();
+    await assertFails(
+      updateDoc(doc(fs, "tradespeople", TRADIE_UID), { nextQuoteNumber: 9000 }),
+    );
+  });
+
+  it("owner can set companyLogoUrl", async () => {
+    await seedTradie();
+    const fs = env.authenticatedContext(TRADIE_UID, TRADIE_CLAIMS).firestore();
+    await assertSucceeds(
+      updateDoc(doc(fs, "tradespeople", TRADIE_UID), {
+        companyLogoUrl:
+          "https://firebasestorage.googleapis.com/v0/b/test.appspot.com/o/logo.webp",
+      }),
+    );
+  });
 });

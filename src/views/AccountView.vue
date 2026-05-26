@@ -4,6 +4,7 @@ import { RouterLink, useRoute, useRouter } from "vue-router";
 import { updateProfile } from "firebase/auth";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
+import InputNumber from "primevue/inputnumber";
 import Message from "primevue/message";
 import Avatar from "primevue/avatar";
 import Dialog from "primevue/dialog";
@@ -28,6 +29,7 @@ import {
   createOrUpdateDraft,
   getTradesperson,
 } from "@/firebase/services/tradespeople";
+import { setInvoiceNumbering } from "@/firebase/services/billing";
 import type { TradespersonDoc, WithId } from "@/firebase/interfaces";
 import { uploadFile, makeStoragePath } from "@/firebase/services/storage";
 import { compressToWebp } from "@/utils/image";
@@ -78,6 +80,55 @@ const businessAddress = ref("");
 const businessPhone = ref("");
 const gstNumber = ref("");
 const savingTradieProfile = ref(false);
+
+// Company logo — shown at the top of generated invoice + quote PDFs in
+// place of the Blue Seal wordmark. Writes the public download URL to
+// /tradespeople/{uid}.companyLogoUrl; null when the tradesperson hasn't
+// uploaded one (defaults back to the Blue Seal mark on the PDF).
+const companyLogoUrl = ref<string | null>(null);
+const uploadingLogo = ref(false);
+const logoFileInput = ref<HTMLInputElement | null>(null);
+const removingLogo = ref(false);
+
+// Invoice / quote numbering customisation. Stamp shape is always
+// `${prefix}-${year}-${0001}`; tradies migrating from QuickBooks /
+// FreshBooks / etc set the prefix + starting number once. Server-side
+// guards reject sequence changes after the first invoice/quote issues.
+const invoicePrefix = ref("INV");
+const quotePrefix = ref("Q");
+const nextInvoiceNumber = ref<number>(1);
+const nextQuoteNumber = ref<number>(1);
+const initialNextInvoiceNumber = ref<number>(1);
+const initialNextQuoteNumber = ref<number>(1);
+const savingNumbering = ref(false);
+
+const invoicePrefixError = computed(() => prefixError(invoicePrefix.value));
+const quotePrefixError = computed(() => prefixError(quotePrefix.value));
+function prefixError(p: string): string | null {
+  const v = (p ?? "").trim();
+  if (!v) return "Prefix is required.";
+  if (v.length > 10) return "Max 10 characters.";
+  if (!/^[A-Z0-9](?:[A-Z0-9-]{0,8}[A-Z0-9])?$/.test(v)) {
+    return "Use uppercase letters, digits, and dashes only (no leading/trailing dash).";
+  }
+  return null;
+}
+// Sequence inputs are read-only once the tradesperson has issued anything
+// through Blue Seal — the server-side guard would reject the change anyway
+// and we'd rather signal that up front than catch it at submit.
+const invoiceSequenceLocked = computed(() => initialNextInvoiceNumber.value > 1);
+const quoteSequenceLocked = computed(() => initialNextQuoteNumber.value > 1);
+
+const invoiceSamplePreview = computed(() => {
+  const year = new Date().getFullYear();
+  const prefix = (invoicePrefix.value ?? "INV").trim() || "INV";
+  return `${prefix}-${year}-${String(nextInvoiceNumber.value).padStart(4, "0")}`;
+});
+const quoteSamplePreview = computed(() => {
+  const year = new Date().getFullYear();
+  const prefix = (quotePrefix.value ?? "Q").trim() || "Q";
+  return `${prefix}-${year}-${String(nextQuoteNumber.value).padStart(4, "0")}`;
+});
 
 // Privacy section state (PIPEDA — export + delete)
 const showDeleteDialog = ref(false);
@@ -180,6 +231,13 @@ onMounted(async () => {
       businessAddress.value = t.businessAddress ?? "";
       businessPhone.value = t.businessPhone ?? "";
       gstNumber.value = t.gstNumber ?? "";
+      companyLogoUrl.value = t.companyLogoUrl ?? null;
+      invoicePrefix.value = t.invoicePrefix ?? "INV";
+      quotePrefix.value = t.quotePrefix ?? "Q";
+      nextInvoiceNumber.value = t.nextInvoiceNumber ?? 1;
+      nextQuoteNumber.value = t.nextQuoteNumber ?? 1;
+      initialNextInvoiceNumber.value = t.nextInvoiceNumber ?? 1;
+      initialNextQuoteNumber.value = t.nextQuoteNumber ?? 1;
     }
   }
   // About me: canonical home is users.bio. Pre-existing tradies have their
@@ -293,6 +351,111 @@ async function shareProfile() {
     toast.success("Link copied to clipboard");
   } catch {
     toast.error("Couldn't copy link");
+  }
+}
+
+async function onLogoChange(e: Event) {
+  if (!auth.fbUser) return;
+  const target = e.target as HTMLInputElement;
+  const file = target.files?.[0];
+  if (!file) return;
+  uploadingLogo.value = true;
+  error.value = null;
+  try {
+    // Bigger max dimension than the profile avatar — invoice headers
+    // render the logo at ~38pt on letter-size paper so we want enough
+    // resolution to stay crisp on high-DPI screens / printing.
+    const compressed = await compressToWebp(file, { maxDimension: 1024, quality: 0.92 });
+    const path = makeStoragePath({
+      scope: "tradespeople",
+      id: auth.fbUser.uid,
+      bucket: "logo",
+      filename: compressed.name,
+    });
+    const url = await uploadFile(path, compressed);
+    await createOrUpdateDraft(auth.fbUser.uid, { companyLogoUrl: url });
+    companyLogoUrl.value = url;
+    if (tradie.value) tradie.value.companyLogoUrl = url;
+    toast.success("Company logo updated");
+  } catch (e) {
+    error.value = humanizeError(e);
+  } finally {
+    uploadingLogo.value = false;
+    target.value = "";
+  }
+}
+
+async function removeLogo() {
+  if (!auth.fbUser) return;
+  removingLogo.value = true;
+  error.value = null;
+  try {
+    await createOrUpdateDraft(auth.fbUser.uid, { companyLogoUrl: null });
+    companyLogoUrl.value = null;
+    if (tradie.value) tradie.value.companyLogoUrl = null;
+    toast.success("Company logo removed");
+  } catch (e) {
+    error.value = humanizeError(e);
+  } finally {
+    removingLogo.value = false;
+  }
+}
+
+async function saveNumbering() {
+  if (!auth.fbUser) return;
+  if (invoicePrefixError.value || quotePrefixError.value) {
+    toast.warn("Fix the prefix errors before saving.");
+    return;
+  }
+  // Build a partial input — only send fields the user actually changed,
+  // and skip the locked starting-number fields so we don't 412 on the
+  // server-side guard for tradies who've already issued an invoice.
+  const input: {
+    invoicePrefix?: string;
+    quotePrefix?: string;
+    nextInvoiceNumber?: number;
+    nextQuoteNumber?: number;
+  } = {};
+  const trimmedInv = invoicePrefix.value.trim();
+  const trimmedQ = quotePrefix.value.trim();
+  const currentInv = (tradie.value?.invoicePrefix ?? "INV").trim();
+  const currentQ = (tradie.value?.quotePrefix ?? "Q").trim();
+  if (trimmedInv && trimmedInv !== currentInv) input.invoicePrefix = trimmedInv;
+  if (trimmedQ && trimmedQ !== currentQ) input.quotePrefix = trimmedQ;
+  if (
+    !invoiceSequenceLocked.value &&
+    nextInvoiceNumber.value !== initialNextInvoiceNumber.value
+  ) {
+    input.nextInvoiceNumber = Math.floor(nextInvoiceNumber.value);
+  }
+  if (
+    !quoteSequenceLocked.value &&
+    nextQuoteNumber.value !== initialNextQuoteNumber.value
+  ) {
+    input.nextQuoteNumber = Math.floor(nextQuoteNumber.value);
+  }
+  if (Object.keys(input).length === 0) {
+    toast.info("Nothing to save", "No numbering changes detected.");
+    return;
+  }
+  savingNumbering.value = true;
+  try {
+    await setInvoiceNumbering(input);
+    if (input.invoicePrefix != null && tradie.value) tradie.value.invoicePrefix = input.invoicePrefix;
+    if (input.quotePrefix != null && tradie.value) tradie.value.quotePrefix = input.quotePrefix;
+    if (input.nextInvoiceNumber != null) {
+      initialNextInvoiceNumber.value = input.nextInvoiceNumber;
+      if (tradie.value) tradie.value.nextInvoiceNumber = input.nextInvoiceNumber;
+    }
+    if (input.nextQuoteNumber != null) {
+      initialNextQuoteNumber.value = input.nextQuoteNumber;
+      if (tradie.value) tradie.value.nextQuoteNumber = input.nextQuoteNumber;
+    }
+    toast.success("Invoice numbering saved");
+  } catch (e) {
+    error.value = humanizeError(e);
+  } finally {
+    savingNumbering.value = false;
   }
 }
 
@@ -750,6 +913,180 @@ async function grantAdminAllRoles() {
                 />
               </div>
             </form>
+
+            <!-- Company logo. Lives outside the form because it auto-saves
+                 on file pick (matches the profile photo pattern). -->
+            <div class="mt-4 rounded-lg border border-[color:var(--bs-border)] bg-[color:var(--bs-surface-alt,#f9fafb)] p-3 space-y-3">
+              <div class="flex items-center gap-2">
+                <i class="pi pi-image text-[color:var(--bs-blue)]"></i>
+                <h4 class="text-sm font-semibold m-0">Company logo on invoices</h4>
+              </div>
+              <p class="text-xs text-[color:var(--bs-muted)] -mt-2">
+                Replaces the Blue Seal mark at the top of your invoices and
+                quotes. Square images work best — we'll compress to WebP
+                under 1024px.
+              </p>
+              <div class="flex items-center gap-3">
+                <img
+                  v-if="companyLogoUrl"
+                  :src="companyLogoUrl"
+                  alt="Company logo"
+                  class="h-16 w-16 rounded border border-[color:var(--bs-border)] bg-white object-contain"
+                />
+                <div
+                  v-else
+                  class="h-16 w-16 rounded border border-dashed border-[color:var(--bs-border)] flex items-center justify-center text-[color:var(--bs-muted)] bg-white"
+                >
+                  <i class="pi pi-image text-xl" aria-hidden="true"></i>
+                </div>
+                <div class="flex flex-col gap-2">
+                  <Button
+                    :label="companyLogoUrl ? 'Replace logo' : 'Upload logo'"
+                    icon="pi pi-upload"
+                    outlined
+                    size="small"
+                    :loading="uploadingLogo"
+                    @click="logoFileInput?.click()"
+                  />
+                  <Button
+                    v-if="companyLogoUrl"
+                    label="Remove"
+                    icon="pi pi-times"
+                    severity="danger"
+                    text
+                    size="small"
+                    :loading="removingLogo"
+                    @click="removeLogo"
+                  />
+                  <input
+                    ref="logoFileInput"
+                    type="file"
+                    accept="image/*"
+                    class="hidden"
+                    @change="onLogoChange"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <!-- Invoice / quote numbering. Separate save button since
+                 it routes through a Cloud Function callable (validates +
+                 guards starting-number on server). -->
+            <div class="mt-4 rounded-lg border border-[color:var(--bs-border)] bg-[color:var(--bs-surface-alt,#f9fafb)] p-3 space-y-3">
+              <div class="flex items-center gap-2">
+                <i class="pi pi-hashtag text-[color:var(--bs-blue)]"></i>
+                <h4 class="text-sm font-semibold m-0">Invoice &amp; quote numbering</h4>
+              </div>
+              <p class="text-xs text-[color:var(--bs-muted)] -mt-2">
+                Customise the prefix on generated numbers. Migrating from
+                another tracker? Set your starting number once before you
+                issue your first invoice or quote through Blue Seal.
+              </p>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label class="text-sm font-medium">Invoice prefix</label>
+                  <InputText
+                    v-model="invoicePrefix"
+                    class="mt-1 w-full uppercase"
+                    maxlength="10"
+                    placeholder="INV"
+                  />
+                  <p
+                    v-if="invoicePrefixError"
+                    class="mt-1 text-xs text-red-600"
+                  >
+                    {{ invoicePrefixError }}
+                  </p>
+                  <p v-else class="mt-1 text-xs text-[color:var(--bs-muted)]">
+                    Sample: <code>{{ invoiceSamplePreview }}</code>
+                  </p>
+                </div>
+                <div>
+                  <label class="text-sm font-medium">
+                    Next invoice number
+                    <span
+                      v-if="invoiceSequenceLocked"
+                      class="text-xs text-[color:var(--bs-muted)] font-normal ml-1"
+                    >Locked</span>
+                  </label>
+                  <InputNumber
+                    v-model="nextInvoiceNumber"
+                    :min="1"
+                    :max="999999"
+                    :use-grouping="false"
+                    class="mt-1 w-full"
+                    :input-class="'w-full'"
+                    :disabled="invoiceSequenceLocked"
+                  />
+                  <p class="mt-1 text-xs text-[color:var(--bs-muted)]">
+                    <template v-if="invoiceSequenceLocked">
+                      You've already issued an invoice — contact support to
+                      renumber.
+                    </template>
+                    <template v-else>
+                      First invoice gets this number; it increments from there.
+                    </template>
+                  </p>
+                </div>
+
+                <div>
+                  <label class="text-sm font-medium">Quote prefix</label>
+                  <InputText
+                    v-model="quotePrefix"
+                    class="mt-1 w-full uppercase"
+                    maxlength="10"
+                    placeholder="Q"
+                  />
+                  <p
+                    v-if="quotePrefixError"
+                    class="mt-1 text-xs text-red-600"
+                  >
+                    {{ quotePrefixError }}
+                  </p>
+                  <p v-else class="mt-1 text-xs text-[color:var(--bs-muted)]">
+                    Sample: <code>{{ quoteSamplePreview }}</code>
+                  </p>
+                </div>
+                <div>
+                  <label class="text-sm font-medium">
+                    Next quote number
+                    <span
+                      v-if="quoteSequenceLocked"
+                      class="text-xs text-[color:var(--bs-muted)] font-normal ml-1"
+                    >Locked</span>
+                  </label>
+                  <InputNumber
+                    v-model="nextQuoteNumber"
+                    :min="1"
+                    :max="999999"
+                    :use-grouping="false"
+                    class="mt-1 w-full"
+                    :input-class="'w-full'"
+                    :disabled="quoteSequenceLocked"
+                  />
+                  <p class="mt-1 text-xs text-[color:var(--bs-muted)]">
+                    <template v-if="quoteSequenceLocked">
+                      You've already issued a quote — contact support to
+                      renumber.
+                    </template>
+                    <template v-else>
+                      First quote gets this number; it increments from there.
+                    </template>
+                  </p>
+                </div>
+              </div>
+
+              <div class="flex justify-end">
+                <Button
+                  label="Save numbering"
+                  icon="pi pi-save"
+                  :loading="savingNumbering"
+                  :disabled="!!invoicePrefixError || !!quotePrefixError"
+                  @click="saveNumbering"
+                />
+              </div>
+            </div>
           </AccordionContent>
         </AccordionPanel>
 

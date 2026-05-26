@@ -42,15 +42,17 @@ export const onJobCompleted = onDocumentUpdated("jobs/{jobId}", async (event) =>
     }
     const data = tradieSnap.data() as {
       nextInvoiceNumber?: number;
+      invoicePrefix?: string;
       paymentInstructions?: string;
     };
     const seq = data.nextInvoiceNumber ?? 1;
+    const prefix = (data.invoicePrefix ?? "INV").trim() || "INV";
     // Year derived from Toronto local time, not us-central1 local time.
     const year = new Intl.DateTimeFormat("en-CA", {
       timeZone: "America/Toronto",
       year: "numeric",
     }).format(new Date());
-    const invoiceNumber = `INV-${year}-${String(seq).padStart(4, "0")}`;
+    const invoiceNumber = `${prefix}-${year}-${String(seq).padStart(4, "0")}`;
     tx.set(invoiceRef, {
       tradespersonId: after.tradespersonId,
       clientId: after.clientId,

@@ -281,6 +281,7 @@ export interface InvoicePartyInfo {
   tradesperson: {
     name: string;
     companyName: string | null;
+    companyLogoUrl: string | null;
     address: string | null;
     phone: string | null;
     email: string | null;

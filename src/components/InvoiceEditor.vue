@@ -14,6 +14,7 @@ import {
   recomputeTotals,
 } from "@/firebase/services/invoices";
 import { getInvoicePartyInfo } from "@/firebase/services/jobs";
+import { getTradesperson } from "@/firebase/services/tradespeople";
 import { subscribePayoutsState } from "@/firebase/services/payoutsService";
 import PdfPreviewDialog from "@/components/PdfPreviewDialog.vue";
 import { httpsCallable } from "firebase/functions";
@@ -77,6 +78,12 @@ async function openPdfPreview() {
 }
 
 const invoice = ref<WithId<InvoiceDoc> | null>(null);
+// Tradesperson's company logo + name, surfaced at the top of the editor
+// card so the in-app invoice view matches what the client will see on the
+// PDF. Pulled fresh from /tradespeople/{uid} each load so logo updates
+// propagate immediately. Null when the tradesperson hasn't uploaded one.
+const tradieLogoUrl = ref<string | null>(null);
+const tradieCompanyName = ref<string | null>(null);
 // UI rows: same shape as LineItem but `unitPrice` is in DOLLARS for InputNumber
 // currency mode to render correctly. Converted to cents on save. `id` is
 // preserved end-to-end so pulled-in entries/expenses don't get re-pulled
@@ -141,6 +148,20 @@ const totals = computed(() =>
 async function load() {
   loading.value = true;
   invoice.value = await getInvoice(props.invoiceId);
+  // Lookup the tradesperson's branding (logo + company name) for the
+  // header row. Best-effort — the editor still works for a viewer who
+  // can't read the tradie doc (the public tradesperson collection is
+  // readable when the doc is visible, otherwise the call no-ops).
+  if (invoice.value) {
+    try {
+      const t = await getTradesperson(invoice.value.tradespersonId);
+      tradieLogoUrl.value = t?.companyLogoUrl ?? null;
+      tradieCompanyName.value = t?.companyName ?? null;
+    } catch {
+      tradieLogoUrl.value = null;
+      tradieCompanyName.value = null;
+    }
+  }
   items.value = (invoice.value?.lineItems ?? []).map((li) => ({
     id: li.id,
     description: li.description,
@@ -354,6 +375,24 @@ async function markPaid() {
     <template v-if="!collapsed">
     <div v-if="loading" class="bs-empty">Loading…</div>
     <template v-else-if="invoice">
+      <!-- Company branding row — mirrors what the client sees on the
+           generated PDF. Only renders when the tradesperson has a logo
+           or company name set; otherwise we skip the row so the editor
+           looks identical to its pre-branding shape. -->
+      <div
+        v-if="tradieLogoUrl || tradieCompanyName"
+        class="flex items-center gap-3 pb-3 mb-2 border-b"
+      >
+        <img
+          v-if="tradieLogoUrl"
+          :src="tradieLogoUrl"
+          alt="Company logo"
+          class="h-10 w-10 rounded object-contain bg-white"
+        />
+        <div v-if="tradieCompanyName" class="text-sm font-semibold">
+          {{ tradieCompanyName }}
+        </div>
+      </div>
       <table class="w-full text-sm border-t">
         <thead>
           <tr class="text-left text-[color:var(--bs-muted)]">
