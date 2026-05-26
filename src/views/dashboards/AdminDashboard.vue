@@ -8,6 +8,10 @@ import {
   backfillPayoutsField,
   type BackfillPayoutsResult,
 } from "@/firebase/services/payoutsService";
+import {
+  backfillReviewReviewers,
+  type BackfillReviewReviewersResult,
+} from "@/firebase/services/reviews";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 import type { TradespersonDoc, WithId } from "@/firebase/interfaces";
@@ -39,6 +43,33 @@ async function runPayoutsBackfill() {
     toast.error("Backfill failed", humanizeError(err));
   } finally {
     backfilling.value = false;
+  }
+}
+
+// Mutual-review reviewer backfill — fills clientName + clientPhotoURL on
+// /reviews docs that pre-date the denormalization in ReviewPrompt. New
+// reviews already carry those fields; this is a one-shot to retroactively
+// fix the public tradesperson profile so legacy rows stop rendering the
+// "Client" + "C" initial fallback.
+const backfillingReviewers = ref(false);
+const reviewerBackfillResult = ref<BackfillReviewReviewersResult | null>(null);
+
+async function runReviewerBackfill() {
+  backfillingReviewers.value = true;
+  try {
+    reviewerBackfillResult.value = await backfillReviewReviewers();
+    const r = reviewerBackfillResult.value;
+    toast.success(
+      "Reviewer backfill complete",
+      `Scanned ${r.scanned}, updated ${r.updated}, already present ${r.alreadyPresent}` +
+        (r.fallbackUsed > 0
+          ? ` · ${r.fallbackUsed} reviewer doc${r.fallbackUsed === 1 ? "" : "s"} missing, fell back to "Client".`
+          : "."),
+    );
+  } catch (err) {
+    toast.error("Reviewer backfill failed", humanizeError(err));
+  } finally {
+    backfillingReviewers.value = false;
   }
 }
 
@@ -124,6 +155,33 @@ onMounted(async () => {
           updated <strong>{{ backfillResult.updated }}</strong>,
           already present <strong>{{ backfillResult.alreadyPresent }}</strong>
           ({{ backfillResult.pages }} page{{ backfillResult.pages === 1 ? "" : "s" }}).
+        </p>
+      </div>
+
+      <!-- Mutual-review reviewer backfill: fills clientName +
+           clientPhotoURL on legacy /reviews docs so the public
+           tradesperson profile renders real names + photos instead of
+           the "Client" + "C" fallback. New reviews already carry these
+           fields; this is the one-shot to fix history. Idempotent. -->
+      <div class="mt-3 flex flex-wrap items-center gap-3">
+        <Button
+          label="Backfill review reviewers"
+          icon="pi pi-star"
+          :loading="backfillingReviewers"
+          @click="runReviewerBackfill"
+        />
+        <p
+          v-if="reviewerBackfillResult"
+          class="text-sm text-[color:var(--bs-muted)] flex-1 min-w-[10rem]"
+        >
+          Last run: scanned <strong>{{ reviewerBackfillResult.scanned }}</strong>,
+          updated <strong>{{ reviewerBackfillResult.updated }}</strong>,
+          already present <strong>{{ reviewerBackfillResult.alreadyPresent }}</strong>
+          <template v-if="reviewerBackfillResult.fallbackUsed > 0">
+            · <strong>{{ reviewerBackfillResult.fallbackUsed }}</strong>
+            fell back to "Client"
+          </template>
+          ({{ reviewerBackfillResult.pages }} page{{ reviewerBackfillResult.pages === 1 ? "" : "s" }}).
         </p>
       </div>
     </div>
