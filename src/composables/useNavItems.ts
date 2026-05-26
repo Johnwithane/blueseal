@@ -117,9 +117,9 @@ export function useNavItems(): {
           key: "vouches",
           label: "Recommendations",
           icon: "pi-verified",
-          to: "/account/vouches",
+          to: "/account/recommendations",
           mobile: false,
-          matches: exact("/account/vouches"),
+          matches: exact("/account/recommendations"),
         },
         // Account + Payouts moved into ProfileMenu (avatar at bottom of side
         // panel / Profile tab on mobile). The standalone /account and

@@ -91,10 +91,10 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, role: "any", layout: "app", title: "Account" },
   },
   {
-    // URL stays /account/vouches (vouch invite emails, shared links rely on
+    // URL stays /account/recommendations (vouch invite emails, shared links rely on
     // the old path). Route NAME is renamed to match the user-facing label
     // — TradieProfileView already references `AccountRecommendations`.
-    path: "/account/vouches",
+    path: "/account/recommendations",
     name: "AccountRecommendations",
     component: () => import("@/views/AccountVouchesView.vue"),
     meta: {

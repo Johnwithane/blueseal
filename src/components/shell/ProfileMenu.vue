@@ -25,7 +25,7 @@ const avatarInitial = computed(() => {
 });
 
 // Highlight when the user is on /account (any tab) but NOT on
-// /account/vouches — that's the Recommendations item in the side panel
+// /account/recommendations — that's the Recommendations item in the side panel
 // and shouldn't double-highlight here.
 const isActive = computed(() => route.path === "/account");
 </script>
