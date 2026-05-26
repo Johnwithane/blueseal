@@ -50,17 +50,25 @@ interface DocSummary {
   terms?: string | null;
 }
 
-// Brand palette. Pulled into the PDF (not via CSS) so the rendered file
-// is self-contained.
+// Brand palette — pulled into the PDF as RGB tuples so the rendered
+// file is self-contained. Mirrors the CSS custom properties in
+// src/assets/main.css so on-screen and on-paper Blue Seal feel like
+// the same brand.
+//   --bs-blue-dark   #1d406a → header band, table head, accents
+//   --bs-blue        #49a1d3 → secondary band, links
+//   --bs-blue-light  #a0d6f1 → ultra-soft panels
+//   --bs-amber       #f59e0b → total highlight
+//   --bs-bg          #f5f7fb → paper-alt panels
 const BRAND = {
-  blueDark: [10, 47, 87] as const, // #0a2f57
-  blue: [18, 86, 156] as const, // #12569c
-  blueLight: [225, 235, 247] as const, // #e1ebf7
-  ink: [22, 30, 46] as const, // body text
-  muted: [110, 122, 138] as const,
-  border: [220, 226, 234] as const,
-  paperAlt: [248, 250, 252] as const, // table zebra stripe
-  accent: [217, 119, 6] as const, // amber — total-row underline
+  blueDark: [29, 64, 106] as const, // #1d406a
+  blue: [73, 161, 211] as const, // #49a1d3
+  blueLight: [160, 214, 241] as const, // #a0d6f1
+  bluePanel: [231, 242, 250] as const, // computed ~10% mix of blue on white
+  amber: [245, 158, 11] as const, // #f59e0b
+  ink: [17, 24, 39] as const, // #111827
+  muted: [107, 114, 128] as const, // #6b7280
+  border: [229, 231, 235] as const, // #e5e7eb
+  paperAlt: [245, 247, 251] as const, // #f5f7fb
 };
 
 function fmtMoney(cents: number, currency = "CAD"): string {
@@ -79,72 +87,122 @@ function fmtDate(t: Timestamp | null | undefined): string {
   }).format(t.toDate());
 }
 
+// Module-level cache so the logo PNG is only fetched + base64-encoded
+// once per page session. The data URL stays in memory for the rest of
+// the tab's lifetime.
+let logoDataUrlCache: string | null = null;
+async function loadLogoDataUrl(): Promise<string | null> {
+  if (logoDataUrlCache) return logoDataUrlCache;
+  try {
+    const res = await fetch("/icons/blueseal_logo.png");
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    const reader = new FileReader();
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+    logoDataUrlCache = dataUrl;
+    return dataUrl;
+  } catch {
+    return null;
+  }
+}
+
 async function renderPdf(
   summary: DocSummary,
   party: PartyInfo,
   lineItems: LineItem[],
   totals: RenderTotals,
 ): Promise<Blob> {
-  // Lazy-import keeps the main bundle slim. jspdf-autotable mutates the
-  // jsPDF instance, so import it after jsPDF.
-  const { jsPDF } = await import("jspdf");
-  const autoTableMod = await import("jspdf-autotable");
+  // Lazy-imports keep the main bundle slim. jspdf-autotable mutates the
+  // jsPDF instance, so it has to be imported after jsPDF.
+  const [{ jsPDF }, autoTableMod, logoDataUrl] = await Promise.all([
+    import("jspdf"),
+    import("jspdf-autotable"),
+    loadLogoDataUrl(),
+  ]);
   const autoTable = autoTableMod.default;
 
   const doc = new jsPDF({ unit: "pt", format: "letter" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 48;
 
-  // ---------- brand band: gradient simulated with two stacked rects ----
-  // jsPDF doesn't ship gradient primitives — we fake a soft gradient with
-  // a deep band on top and a lighter band underneath so the brand
-  // colour leads the eye in without a screaming flat block.
+  // ============== HEADER BAND ==============
+  // Brand band uses --bs-blue-dark as the primary surface with a thin
+  // --bs-blue accent strip underneath for depth — softer than a pure
+  // flat fill. Total band height 88pt so the logo + wordmark have room
+  // without crowding the doc-number on the right.
+  const bandHeight = 88;
+  const accentY = bandHeight - 6;
   doc.setFillColor(...BRAND.blueDark);
-  doc.rect(0, 0, pageWidth, 76, "F");
+  doc.rect(0, 0, pageWidth, bandHeight, "F");
   doc.setFillColor(...BRAND.blue);
-  doc.rect(0, 60, pageWidth, 16, "F");
+  doc.rect(0, accentY, pageWidth, 6, "F");
 
-  // Brand wordmark
+  // Logo on the left. jsPDF expects width/height in the doc's units
+  // (pt). The source asset is square — render at 38pt so the band has
+  // breathing room above and below.
+  const logoSize = 38;
+  const logoX = margin;
+  const logoY = 24;
+  let textXAfterLogo = margin;
+  if (logoDataUrl) {
+    try {
+      doc.addImage(logoDataUrl, "PNG", logoX, logoY, logoSize, logoSize);
+      textXAfterLogo = logoX + logoSize + 14;
+    } catch {
+      /* image add can fail on malformed data URL — fall back to text-only */
+    }
+  }
+
+  // "Blue Seal" wordmark — bold Helvetica is a reasonable stand-in for
+  // the brand's Concert One until we ship embedded fonts.
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(22);
+  doc.setFontSize(20);
   doc.setTextColor(255, 255, 255);
-  doc.text("Blue Seal", margin, 42);
-  // Brand subline
+  doc.text("Blue Seal", textXAfterLogo, 44);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.5);
-  doc.setTextColor(225, 235, 247);
-  doc.text("Verified Trades", margin, 58);
+  doc.setTextColor(...BRAND.blueLight);
+  doc.text("Verified Trades", textXAfterLogo, 58);
 
-  // Doc-type label (top right, inside band)
+  // Doc kind + number on the right
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  doc.setTextColor(225, 235, 247);
-  doc.text(summary.kind.toUpperCase(), pageWidth - margin, 30, {
+  doc.setFontSize(9.5);
+  doc.setTextColor(...BRAND.blueLight);
+  doc.text(summary.kind.toUpperCase(), pageWidth - margin, 32, {
     align: "right",
   });
-
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
   doc.setTextColor(255, 255, 255);
-  doc.text(summary.number, pageWidth - margin, 50, { align: "right" });
-
+  doc.text(summary.number, pageWidth - margin, 52, { align: "right" });
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.5);
-  doc.setTextColor(225, 235, 247);
-  doc.text(`${summary.issuedLabel}: ${summary.issuedDate}`, pageWidth - margin, 66, {
+  doc.setTextColor(...BRAND.blueLight);
+  doc.text(`${summary.issuedLabel}: ${summary.issuedDate}`, pageWidth - margin, 68, {
     align: "right",
   });
 
-  // ---------- From / To / Bill-to panel ----------
-  let cursorY = 110;
-  const colWidth = (pageWidth - margin * 2 - 16) / 2;
+  // ============== FROM / BILL TO PANEL ==============
+  // Two columns sitting just below the header band. Soft panels with
+  // a subtle border so the contact info reads as its own block without
+  // shouting against the brand colour.
+  const panelY = bandHeight + 24;
+  const panelGap = 16;
+  const colWidth = (pageWidth - margin * 2 - panelGap) / 2;
   const leftX = margin;
-  const rightX = margin + colWidth + 16;
+  const rightX = margin + colWidth + panelGap;
+  const panelPadX = 14;
+  const panelPadY = 14;
+  const panelHeight = 96;
 
-  // Soft tinted background per column for a polished invoice look.
+  doc.setDrawColor(...BRAND.border);
   doc.setFillColor(...BRAND.paperAlt);
-  doc.roundedRect(leftX - 8, cursorY - 14, colWidth + 16, 100, 4, 4, "F");
-  doc.roundedRect(rightX - 8, cursorY - 14, colWidth + 16, 100, 4, 4, "F");
+  doc.roundedRect(leftX, panelY, colWidth, panelHeight, 6, 6, "FD");
+  doc.roundedRect(rightX, panelY, colWidth, panelHeight, 6, 6, "FD");
 
   const writePartyBlock = (
     x: number,
@@ -153,30 +211,34 @@ async function renderPdf(
     companyName: string | null,
     lines: Array<string | null>,
   ) => {
+    let y = panelY + panelPadY + 4;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
-    doc.setTextColor(...BRAND.muted);
-    doc.text(heading, x, cursorY);
+    doc.setTextColor(...BRAND.blue);
+    doc.text(heading, x + panelPadX, y);
 
+    y += 14;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11.5);
     doc.setTextColor(...BRAND.ink);
-    doc.text(name, x, cursorY + 16);
+    doc.text(name, x + panelPadX, y);
 
-    let y = cursorY + 16;
+    if (companyName) {
+      y += 13;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9.5);
+      doc.setTextColor(...BRAND.ink);
+      doc.text(companyName, x + panelPadX, y);
+    }
+
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     doc.setTextColor(...BRAND.muted);
-    if (companyName) {
-      y += 13;
-      doc.text(companyName, x, y);
-    }
     for (const line of lines) {
       if (!line) continue;
-      y += 13;
-      // Wrap long lines (addresses) to the column width.
-      const wrapped = doc.splitTextToSize(line, colWidth);
-      doc.text(wrapped, x, y);
+      y += 12;
+      const wrapped = doc.splitTextToSize(line, colWidth - panelPadX * 2);
+      doc.text(wrapped, x + panelPadX, y);
       if (Array.isArray(wrapped) && wrapped.length > 1) {
         y += (wrapped.length - 1) * 11;
       }
@@ -194,7 +256,6 @@ async function renderPdf(
       party.tradesperson.email,
     ],
   );
-
   writePartyBlock(
     rightX,
     summary.kind === "Invoice" ? "BILL TO" : "PREPARED FOR",
@@ -207,12 +268,10 @@ async function renderPdf(
     ],
   );
 
-  cursorY += 110;
+  let cursorY = panelY + panelHeight + 24;
 
-  // Optional client note
+  // Optional client note — italic pull-quote.
   if (summary.noteToClient) {
-    doc.setDrawColor(...BRAND.border);
-    doc.setFillColor(255, 255, 255);
     doc.setFont("helvetica", "italic");
     doc.setFontSize(10);
     doc.setTextColor(...BRAND.ink);
@@ -221,10 +280,10 @@ async function renderPdf(
       pageWidth - margin * 2,
     );
     doc.text(noteLines, margin, cursorY);
-    cursorY += noteLines.length * 13 + 12;
+    cursorY += noteLines.length * 13 + 14;
   }
 
-  // ---------- Line-items table ----------
+  // ============== LINE ITEMS TABLE ==============
   const tableBody = lineItems.map((li) => [
     li.description,
     li.quantity.toString(),
@@ -243,12 +302,12 @@ async function renderPdf(
       textColor: 255,
       fontSize: 10,
       fontStyle: "bold",
-      cellPadding: 8,
+      cellPadding: 10,
     },
     bodyStyles: {
       fontSize: 10,
       textColor: [...BRAND.ink],
-      cellPadding: 8,
+      cellPadding: 10,
     },
     alternateRowStyles: { fillColor: [...BRAND.paperAlt] },
     columnStyles: {
@@ -264,54 +323,59 @@ async function renderPdf(
   // @ts-expect-error autoTable attaches lastAutoTable to the doc at runtime
   const tableEndY: number = (doc.lastAutoTable?.finalY ?? cursorY) + 18;
 
-  // ---------- Totals card (right-aligned) ----------
-  const totalsBoxWidth = 220;
+  // ============== TOTALS CARD ==============
+  const totalsBoxWidth = 230;
   const totalsX = pageWidth - margin - totalsBoxWidth;
-  const labelX = totalsX + 14;
-  const valueX = totalsX + totalsBoxWidth - 14;
-
-  // Card backing — subtle blue tint for the section.
+  const labelX = totalsX + 16;
+  const valueX = totalsX + totalsBoxWidth - 16;
   const rowHeight = 18;
-  let totalsRowCount = 2; // subtotal + tax always present
-  if (totals.discountAmount > 0) totalsRowCount += 1;
-  const totalsBoxHeight = rowHeight * totalsRowCount + 36; // + total row + padding
-  doc.setFillColor(...BRAND.paperAlt);
-  doc.roundedRect(totalsX, tableEndY, totalsBoxWidth, totalsBoxHeight, 6, 6, "F");
+  const hasDiscount = totals.discountAmount > 0;
+  const innerRows = 2 + (hasDiscount ? 1 : 0); // subtotal + tax (+ discount)
+  const totalsBoxHeight = innerRows * rowHeight + 42;
 
-  let totalsY = tableEndY + 18;
+  doc.setDrawColor(...BRAND.border);
+  doc.setFillColor(...BRAND.bluePanel);
+  doc.roundedRect(totalsX, tableEndY, totalsBoxWidth, totalsBoxHeight, 8, 8, "FD");
+
+  let totalsY = tableEndY + 22;
   const totalsRow = (
     label: string,
     value: string,
     opts: { bold?: boolean; accent?: boolean } = {},
   ) => {
     doc.setFont("helvetica", opts.bold ? "bold" : "normal");
-    doc.setFontSize(opts.bold ? 12 : 10);
+    doc.setFontSize(opts.bold ? 12.5 : 10);
     if (opts.accent) doc.setTextColor(...BRAND.blueDark);
     else if (opts.bold) doc.setTextColor(...BRAND.ink);
     else doc.setTextColor(...BRAND.muted);
     doc.text(label, labelX, totalsY);
     doc.text(value, valueX, totalsY, { align: "right" });
-    totalsY += opts.bold ? 20 : rowHeight;
+    totalsY += opts.bold ? 22 : rowHeight;
   };
 
   totalsRow("Subtotal", fmtMoney(totals.subtotal, totals.currency));
-  if (totals.discountAmount > 0) {
+  if (hasDiscount) {
     const discountLabel = totals.discount?.label
       ? `Discount (${totals.discount.label})`
       : "Discount";
-    // ASCII hyphen — jsPDF's default Helvetica doesn't ship the Unicode
-    // minus glyph and renders it as garbled spaced-out text.
+    // ASCII hyphen — jsPDF's default Helvetica doesn't include the
+    // Unicode minus glyph and renders it as spaced-out garbled text.
     totalsRow(discountLabel, `-${fmtMoney(totals.discountAmount, totals.currency)}`);
   }
   totalsRow("Tax", fmtMoney(totals.taxTotal, totals.currency));
 
-  // Divider between tax and total
-  doc.setDrawColor(...BRAND.border);
-  doc.line(labelX, totalsY - 8, valueX, totalsY - 8);
-  totalsRow("Total", fmtMoney(totals.total, totals.currency), { bold: true, accent: true });
+  // Divider line above the bolded Total row
+  doc.setDrawColor(...BRAND.blue);
+  doc.setLineWidth(0.8);
+  doc.line(labelX, totalsY - 9, valueX, totalsY - 9);
+  doc.setLineWidth(0.5);
+  totalsRow("Total", fmtMoney(totals.total, totals.currency), {
+    bold: true,
+    accent: true,
+  });
 
-  // ---------- Footer blocks (payment instructions / terms / validity) ----
-  let footerY = tableEndY + totalsBoxHeight + 28;
+  // ============== FOOTER BLOCKS ==============
+  let footerY = tableEndY + totalsBoxHeight + 30;
   const writeBlock = (heading: string, body: string) => {
     if (!body.trim()) return;
     if (footerY > 700) {
@@ -319,16 +383,16 @@ async function renderPdf(
       footerY = margin;
     }
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
+    doc.setFontSize(9.5);
     doc.setTextColor(...BRAND.blueDark);
-    doc.text(heading, margin, footerY);
+    doc.text(heading.toUpperCase(), margin, footerY);
     footerY += 14;
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     doc.setTextColor(...BRAND.ink);
     const lines = doc.splitTextToSize(body, pageWidth - margin * 2);
     doc.text(lines, margin, footerY);
-    footerY += lines.length * 13 + 14;
+    footerY += lines.length * 13 + 16;
   };
 
   if (summary.validUntil) {
@@ -338,27 +402,25 @@ async function renderPdf(
     writeBlock("Payment instructions", summary.paymentInstructions);
   if (summary.terms) writeBlock("Terms / exclusions", summary.terms);
 
-  // ---------- Footer: brand mark on every page ----------
+  // ============== FOOTER ==============
   const pageCount = doc.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
     doc.setDrawColor(...BRAND.border);
-    doc.line(margin, 760, pageWidth - margin, 760);
+    doc.line(margin, 758, pageWidth - margin, 758);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(...BRAND.muted);
     doc.text(
       "Generated by Blue Seal — blueseal.app",
       margin,
-      774,
+      772,
     );
-    doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, 774, {
+    doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, 772, {
       align: "right",
     });
   }
 
-  // Output as a Blob so the caller controls the surface (preview modal,
-  // new tab, forced download).
   return doc.output("blob");
 }
 
