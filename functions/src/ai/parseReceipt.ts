@@ -6,6 +6,7 @@ import { z } from "zod";
 import { VertexAI, type Part } from "@google-cloud/vertexai";
 import { db } from "../lib/admin";
 import { requireRole } from "../lib/auth";
+import { enforceRateLimit, AI_DAILY_CAP } from "../lib/rateLimit";
 
 /**
  * Receipt OCR via Vertex AI Gemini. Reuses the same project / location /
@@ -88,6 +89,7 @@ export const parseReceipt = onCall({ enforceAppCheck: false }, async (req) => {
   const parsed = Input.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);
 
+  await enforceRateLimit(uid, "ai", AI_DAILY_CAP);
   const { jobId, expenseId } = parsed.data;
   const expenseRef = db.doc(`jobs/${jobId}/expenses/${expenseId}`);
   const expenseSnap = await expenseRef.get();

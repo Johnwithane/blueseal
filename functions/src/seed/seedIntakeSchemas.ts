@@ -114,8 +114,3 @@ export const seedIntakeSchemas = onCall({ enforceAppCheck: false }, async (req) 
   await Promise.all(writes);
   return { ok: true, seeded: Object.keys(SCHEMAS) };
 });
-
-/** Tiny health endpoint useful for verifying deploy + cold start. */
-export const ping = onCall({ enforceAppCheck: false }, async () => {
-  return { ok: true, ts: Date.now() };
-});
