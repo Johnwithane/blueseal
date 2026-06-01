@@ -32,6 +32,7 @@ export { nudgeReviewPairs } from "./reviews/nudgeReviewPairs";
 // Admin one-shot ops
 export { backfillReviewReviewers } from "./admin/backfillReviewReviewers";
 export { backfillJobPostClient } from "./admin/backfillJobPostClient";
+export { backfillJobPrivateNotes } from "./admin/backfillJobPrivateNotes";
 
 // Chat
 export { onMessageCreated } from "./chat/onMessageCreated";

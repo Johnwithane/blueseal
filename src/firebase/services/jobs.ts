@@ -168,6 +168,26 @@ export async function updatePrivateNotes(id: string, notes: string): Promise<voi
   await setDoc(jobPrivateNotesRef(id), { notes }, { merge: true });
 }
 
+// Admin one-shot: migrate legacy `privateNotes` off the client-readable job
+// doc into the tradie-only private/notes subdoc (and strip the old field).
+// Required after the F2 deploy — see backfillJobPrivateNotes Cloud Function.
+export interface BackfillJobPrivateNotesResult {
+  scanned: number;
+  copied: number;
+  strippedOnly: number;
+  skipped: number;
+  pages: number;
+}
+
+export async function backfillJobPrivateNotes(): Promise<BackfillJobPrivateNotesResult> {
+  const callable = httpsCallable<undefined, BackfillJobPrivateNotesResult>(
+    functions,
+    "backfillJobPrivateNotes",
+  );
+  const { data } = await callable();
+  return data;
+}
+
 // Per-party archive: each party hides the job from their own dashboard
 // default list. The rules layer enforces that the field name matches the
 // caller's role — passing the wrong field is a permission-denied at the

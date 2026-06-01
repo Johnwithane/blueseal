@@ -16,6 +16,10 @@ import {
   backfillJobPostClient,
   type BackfillJobPostClientResult,
 } from "@/firebase/services/jobPosts";
+import {
+  backfillJobPrivateNotes,
+  type BackfillJobPrivateNotesResult,
+} from "@/firebase/services/jobs";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 import type { TradespersonDoc, WithId } from "@/firebase/interfaces";
@@ -101,6 +105,30 @@ async function runJobPostClientBackfill() {
     toast.error("Job-post client backfill failed", humanizeError(err));
   } finally {
     backfillingJobPostClient.value = false;
+  }
+}
+
+// Private-notes migration — moves legacy job `privateNotes` into the
+// tradie-only jobs/{id}/private/notes subdoc and strips the old field off the
+// client-readable job doc (closes the F2 leak for pre-existing jobs). Run once
+// after the F2 deploy; idempotent. Scanned counts every job, so on a large DB
+// this can take a few clicks (it pages and the cursor resumes).
+const backfillingPrivateNotes = ref(false);
+const privateNotesBackfillResult = ref<BackfillJobPrivateNotesResult | null>(null);
+
+async function runPrivateNotesBackfill() {
+  backfillingPrivateNotes.value = true;
+  try {
+    privateNotesBackfillResult.value = await backfillJobPrivateNotes();
+    const r = privateNotesBackfillResult.value;
+    toast.success(
+      "Private-notes backfill complete",
+      `Scanned ${r.scanned}, moved ${r.copied}, stripped-only ${r.strippedOnly}, skipped ${r.skipped}.`,
+    );
+  } catch (err) {
+    toast.error("Private-notes backfill failed", humanizeError(err));
+  } finally {
+    backfillingPrivateNotes.value = false;
   }
 }
 
@@ -239,6 +267,29 @@ onMounted(async () => {
             fell back to "Client"
           </template>
           ({{ jobPostClientBackfillResult.pages }} page{{ jobPostClientBackfillResult.pages === 1 ? "" : "s" }}).
+        </p>
+      </div>
+
+      <!-- Private-notes migration: moves legacy job `privateNotes` into the
+           tradie-only private/notes subdoc and strips the old field off the
+           client-readable job doc. Run once after the F2 deploy. Idempotent;
+           on a large DB re-click until skipped == scanned. -->
+      <div class="mt-3 flex flex-wrap items-center gap-3">
+        <Button
+          label="Migrate private job notes"
+          icon="pi pi-lock"
+          :loading="backfillingPrivateNotes"
+          @click="runPrivateNotesBackfill"
+        />
+        <p
+          v-if="privateNotesBackfillResult"
+          class="text-sm text-[color:var(--bs-muted)] flex-1 min-w-[10rem]"
+        >
+          Last run: scanned <strong>{{ privateNotesBackfillResult.scanned }}</strong>,
+          moved <strong>{{ privateNotesBackfillResult.copied }}</strong>,
+          stripped-only <strong>{{ privateNotesBackfillResult.strippedOnly }}</strong>,
+          skipped <strong>{{ privateNotesBackfillResult.skipped }}</strong>
+          ({{ privateNotesBackfillResult.pages }} page{{ privateNotesBackfillResult.pages === 1 ? "" : "s" }}).
         </p>
       </div>
     </div>
