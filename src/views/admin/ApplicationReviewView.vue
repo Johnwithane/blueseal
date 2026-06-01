@@ -506,7 +506,7 @@ const approveBlockerHint = computed(() => {
       </footer>
     </template>
 
-    <Dialog v-model:visible="showRequestInfo" modal header="Request more information" :style="{ width: '32rem' }">
+    <Dialog v-model:visible="showRequestInfo" modal header="Request more information" :style="{ width: '32rem', maxWidth: '92vw' }">
       <Textarea v-model="notesInput" rows="5" class="w-full" placeholder="What do they need to fix?" />
       <template #footer>
         <Button label="Cancel" text @click="showRequestInfo = false" />
@@ -514,7 +514,7 @@ const approveBlockerHint = computed(() => {
       </template>
     </Dialog>
 
-    <Dialog v-model:visible="showReject" modal header="Reject application" :style="{ width: '32rem' }">
+    <Dialog v-model:visible="showReject" modal header="Reject application" :style="{ width: '32rem', maxWidth: '92vw' }">
       <Textarea v-model="notesInput" rows="5" class="w-full" placeholder="Reason (sent to applicant)" maxlength="2000" />
       <template #footer>
         <Button label="Cancel" text @click="showReject = false" />
@@ -522,7 +522,7 @@ const approveBlockerHint = computed(() => {
       </template>
     </Dialog>
 
-    <Dialog v-model:visible="showRejectCert" modal header="Reject certification" :style="{ width: '32rem' }">
+    <Dialog v-model:visible="showRejectCert" modal header="Reject certification" :style="{ width: '32rem', maxWidth: '92vw' }">
       <Textarea v-model="rejectReason" rows="4" class="w-full" placeholder="Reason for rejection" maxlength="2000" />
       <template #footer>
         <Button label="Cancel" text @click="showRejectCert = false" />
@@ -530,7 +530,7 @@ const approveBlockerHint = computed(() => {
       </template>
     </Dialog>
 
-    <Dialog v-model:visible="showRejectId" modal header="Reject ID" :style="{ width: '32rem' }">
+    <Dialog v-model:visible="showRejectId" modal header="Reject ID" :style="{ width: '32rem', maxWidth: '92vw' }">
       <Textarea v-model="rejectReason" rows="4" class="w-full" placeholder="Reason for rejection" maxlength="2000" />
       <template #footer>
         <Button label="Cancel" text @click="showRejectId = false" />
@@ -538,7 +538,7 @@ const approveBlockerHint = computed(() => {
       </template>
     </Dialog>
 
-    <Dialog v-model:visible="showRejectInsurance" modal header="Reject insurance" :style="{ width: '32rem' }">
+    <Dialog v-model:visible="showRejectInsurance" modal header="Reject insurance" :style="{ width: '32rem', maxWidth: '92vw' }">
       <Textarea v-model="rejectReason" rows="4" class="w-full" placeholder="Reason for rejection" maxlength="2000" />
       <template #footer>
         <Button label="Cancel" text @click="showRejectInsurance = false" />
@@ -581,7 +581,7 @@ const approveBlockerHint = computed(() => {
       </template>
     </Dialog>
 
-    <Dialog v-model:visible="showRejectWsib" modal header="Reject WSIB" :style="{ width: '32rem' }">
+    <Dialog v-model:visible="showRejectWsib" modal header="Reject WSIB" :style="{ width: '32rem', maxWidth: '92vw' }">
       <Textarea v-model="rejectReason" rows="4" class="w-full" placeholder="Reason for rejection" maxlength="2000" />
       <template #footer>
         <Button label="Cancel" text @click="showRejectWsib = false" />

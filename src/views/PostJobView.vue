@@ -459,7 +459,7 @@ async function submit() {
 
       <div>
         <label class="text-sm font-medium">Photos (1–8 required)</label>
-        <div class="grid grid-cols-4 gap-2 mt-2">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
           <div
             v-for="(p, idx) in photos"
             :key="p.previewUrl"
