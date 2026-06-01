@@ -884,6 +884,45 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    // ---------- prospects (seeded, unclaimed tradesperson listings) ----------
+    // Seeded from public registries + reviewed research. NOT members: separate
+    // collection from tradespeople/ so they can never satisfy the
+    // isVisible==true (vetted) invariant. Public read ONLY when isListed (so
+    // search can surface them with a "Pending verification" badge); a suppressed
+    // (isListed=false) prospect is admin-only. Writes flow through admin
+    // callables (bulkImportProspects / suppressProspect) on the Admin SDK, which
+    // bypasses rules; client-side writes are limited to admins. The harvested
+    // email/phone are NOT on this doc — only emailHash + the private subdoc.
+    match /prospects/{prospectId} {
+      allow read: if (resource != null && resource.data.isListed == true) || isAdmin();
+      allow create, update, delete: if isAdmin();
+
+      // prospects/{id}/private/contact — plaintext harvested email/phone.
+      // Never world-readable (that's why it's split off). Admin only; the
+      // import + outreach callables read/write it via the Admin SDK.
+      match /private/{docId} {
+        allow read, write: if isAdmin();
+      }
+    }
+
+    // ---------- prospectLeads (a real client request held against a prospect) ----------
+    // Created by requestProspectOutreach, drained into a real job by
+    // linkProspectOnSignup. The owning client can read their own lead to see
+    // status; nobody else (the prospect has no account yet). All writes flow
+    // through callables/triggers on the Admin SDK.
+    match /prospectLeads/{leadId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.clientId == uid());
+      allow create, update, delete: if false;
+    }
+
+    // ---------- prospectSuppression (permanent opt-out / takedown tombstones) ----------
+    // Must never leak who opted out, so it's admin-read only and written solely
+    // server-side (suppressProspect endpoint + admin takedown, both Admin SDK).
+    match /prospectSuppression/{suppressionKey} {
+      allow read: if isAdmin();
+      allow create, update, delete: if false;
+    }
+
     // ---------- siteContent (admin-editable public site copy) ----------
     // World-readable so the home page can render testimonials etc. without
     // requiring auth. Admin-only write — adding new editable content blocks

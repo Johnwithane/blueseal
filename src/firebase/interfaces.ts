@@ -233,6 +233,173 @@ export interface TradespersonContact {
 }
 
 // ---------------------------------------------------------------------------
+// prospects/{prospectId} — seeded, unclaimed tradesperson listings
+// ---------------------------------------------------------------------------
+// Seeded from public registries + human-reviewed research (see
+// tools/seed-research). These are NOT members: no account, no uid, and they
+// live in a separate collection from tradespeople/{uid} on purpose, so they can
+// never satisfy the `isVisible == true` (= vetted + approved) invariant that
+// search, the public read rule, and the marketplace all depend on. They surface
+// in client search via their own `isListed` flag with a "Pending verification"
+// badge, and deliberately carry NO trust fields (idVerified / verifiedTrades /
+// insurance / wsib / ratings) — there is nothing to render a verified badge
+// from.
+//
+// Lifecycle:
+//   listed        — imported, discoverable, no outreach yet.
+//   outreach_sent — a real client requested them; the claim invite email went
+//                   out (requestProspectOutreach). Still discoverable.
+//   claimed       — the person signed up with the matching email;
+//                   linkProspectOnSignup migrated the profile into
+//                   tradespeople/{uid} and DELETES this doc. `claimed` is a
+//                   transient marker only ever seen mid-trigger.
+//   suppressed    — unsubscribed / takedown. isListed=false, never re-imported
+//                   (a permanent prospectSuppression tombstone is also written).
+//
+// PRIVACY: the harvested business email/phone are NOT on this world-readable
+// doc — they live in prospects/{id}/private/contact (admin-only). For the
+// claim match we keep only `emailHash` (a SHA-256 of the lowercased email) on
+// the public doc: enough for linkProspectOnSignup's equality query, useless for
+// harvesting. (Firestore reads are all-or-nothing per doc, so a plaintext email
+// on a publicly readable doc would leak — hence the hash.)
+export type ProspectStatus =
+  | "listed"
+  | "outreach_sent"
+  | "claimed"
+  | "suppressed";
+
+// How we obtained the prospect's data — drives provenance/audit and the CASL
+// consent posture. Mirrors the `dataBasis` enum the import file carries.
+export type ProspectDataBasis =
+  | "open_data"
+  | "public_registry"
+  | "industry_association"
+  | "manual_public_lookup";
+
+export interface ProspectDoc {
+  // Discovery subset — mirrors the TradespersonDoc fields that search + the
+  // card render, so a prospect card looks like a (badged) tradie card.
+  displayName: string;
+  companyName: string | null;
+  bio: string;
+  trades: string[]; // canonical keys (src/data/trades.ts), primary at [0]
+  yearsExperience: Record<string, number>;
+  pricingModel: PricingModel;
+  hourlyRate: number | null; // cents
+  languages: string[];
+  // PUBLIC coarse location only (same split as TradespersonDoc). The exact
+  // point is never stored for a seeded listing; harvested email/phone live in
+  // the private subdoc.
+  locationApprox: GeoPoint;
+  geohashPublic: string; // length-6 geohash, same derivation as tradespeople
+  serviceRadiusKm: number;
+
+  // Listing state. `isListed` is the prospect analogue of isVisible, but means
+  // "unvetted seeded listing", never "trusted". searchProspects filters on it.
+  status: ProspectStatus;
+  isListed: boolean;
+
+  // Claim match key — SHA-256 hex of the lowercased prospect email.
+  // linkProspectOnSignup hashes the new user's email and matches on this
+  // (the email-claim mechanism, mirroring vouches' toEmail match, but hashed
+  // so the address never sits on a world-readable doc).
+  emailHash: string;
+
+  // Provenance / CASL. `dataConsentBasis` + `sourceUrl` are the audit trail for
+  // the implied-consent (conspicuous-publication) outreach basis;
+  // `emailConspicuouslyPublished` gates whether we may ever email this row.
+  source: string; // human label, e.g. "City of Kelowna Business Licences"
+  sourceUrl: string | null;
+  dataConsentBasis: ProspectDataBasis;
+  emailConspicuouslyPublished: boolean;
+  licenceNumber: string | null;
+  importedBy: string; // admin uid
+  importedAt: Timestamp;
+  // Unguessable token for the unsubscribe link, so the suppress endpoint can't
+  // be used to enumerate prospect ids.
+  unsubToken: string;
+
+  // Outreach bookkeeping — drives the per-prospect cooldown in
+  // requestProspectOutreach so a popular prospect isn't emailed repeatedly.
+  lastOutreachAt: Timestamp | null;
+  outreachCount: number;
+  firstRequestedAt: Timestamp | null;
+
+  // Claim linkage — set transiently by linkProspectOnSignup just before the doc
+  // is deleted; only meaningful if a delete ever fails mid-trigger.
+  claimedByUid: string | null;
+  claimedAt: Timestamp | null;
+}
+
+// Private prospect contact — prospects/{prospectId}/private/contact. The
+// harvested public business email/phone we must NOT expose on the world-
+// readable prospect doc. Admin-only (firestore.rules). No exact coordinate is
+// stored: a seeded listing only ever has the coarse locationApprox.
+export interface ProspectContact {
+  prospectEmail: string; // plaintext, lowercased
+  prospectPhone: string | null;
+  website: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// prospectLeads/{leadId}
+// A real client request held against an unclaimed prospect until they sign up.
+// Created by requestProspectOutreach; drained into a real job by
+// linkProspectOnSignup when the prospect claims. NOT world-readable — only the
+// owning client + admin (firestore.rules).
+// ---------------------------------------------------------------------------
+export type ProspectLeadStatus =
+  | "pending_signup"
+  | "claimed"
+  | "expired"
+  | "cancelled";
+
+export interface ProspectLeadDoc {
+  clientId: string;
+  clientName: string | null;
+  clientPhotoURL: string | null;
+  prospectId: string;
+  // SHA-256 hex of the lowercased prospect email — the claim trigger drains
+  // leads by matching the new user's email hash, so the harvested address never
+  // lands on the lead either.
+  emailHash: string;
+  // Trimmed JobDoc shape so the client's request survives until claim and can
+  // be replayed into a real job verbatim.
+  trade: string;
+  title: string;
+  description: string;
+  urgency: Urgency;
+  address: JobAddress;
+  intakeFormData: Record<string, unknown>;
+  intakePhotos: string[];
+  status: ProspectLeadStatus;
+  createdAt: Timestamp;
+  // +30d. scheduledProspectExpiry flips still-pending leads to `expired`.
+  expiresAt: Timestamp;
+  claimedJobId: string | null; // set when the lead becomes a real job
+  respondedAt: Timestamp | null;
+}
+
+// ---------------------------------------------------------------------------
+// prospectSuppression/{suppressionKey}
+// Permanent opt-out / takedown tombstone. One doc per known identifier (the
+// suppressionKey is a hash of email / licence# / externalKey). bulkImport
+// checks this BEFORE every write so a removed prospect is never re-imported by
+// a later research run. Admin-read / server-write only — it must never leak who
+// opted out. NEVER deleted.
+// ---------------------------------------------------------------------------
+export type ProspectSuppressionReason = "unsubscribe" | "takedown" | "complaint";
+
+export interface ProspectSuppressionDoc {
+  reason: ProspectSuppressionReason;
+  // The hashed identifier this tombstone matches (e.g. emailHash). Stored for
+  // audit; the doc id IS the suppressionKey so lookups are a single get().
+  identifier: string;
+  createdAt: Timestamp;
+  createdBy: string | null; // admin uid, or null for self-serve unsubscribe
+}
+
+// ---------------------------------------------------------------------------
 // certifications/{certId}
 // ---------------------------------------------------------------------------
 export type DocStatus = "pending" | "approved" | "rejected";
@@ -1228,7 +1395,10 @@ export type NotificationType =
   | "vouch_accepted"
   | "recommendation_received"
   | "recommendation_accepted"
-  | "new_job_posting";
+  | "new_job_posting"
+  // Fires to the requesting client when a seeded prospect they asked for signs
+  // up and their held lead converts into a real job. Links to /jobs/{id}.
+  | "prospect_claimed";
 
 export interface NotificationDoc {
   userId: string;

@@ -49,6 +49,7 @@ const ICON: Record<NotificationType, string> = {
   recommendation_received: "pi pi-user-plus",
   recommendation_accepted: "pi pi-thumbs-up",
   new_job_posting: "pi pi-briefcase",
+  prospect_claimed: "pi pi-user-plus",
 };
 
 function iconFor(type: NotificationType): string {

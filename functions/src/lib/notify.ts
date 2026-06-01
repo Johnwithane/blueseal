@@ -47,7 +47,10 @@ export type NotificationType =
   | "vouch_accepted"
   | "recommendation_received"
   | "recommendation_accepted"
-  | "new_job_posting";
+  | "new_job_posting"
+  // Fires to the requesting client when a seeded prospect they asked for signs
+  // up and their held lead converts into a real job.
+  | "prospect_claimed";
 
 /**
  * Channel routing per notification.

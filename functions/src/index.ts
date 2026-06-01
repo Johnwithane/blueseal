@@ -95,6 +95,7 @@ export { backfillPayoutsField } from "./payments/backfillPayoutsField";
 // invocation surface for cost/DoS probing. Deploy success is verified via the
 // Firebase console / CLI output instead. Keep it out of prod.
 export { seedIntakeSchemas } from "./seed/seedIntakeSchemas";
+export { bulkImportProspects } from "./seed/bulkImportProspects";
 
 // Messaging (WhatsApp Cloud API queue processor)
 export { processWhatsAppMessage } from "./messaging/processWhatsAppMessage";

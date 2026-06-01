@@ -234,6 +234,14 @@
         { "fieldPath": "toEmail", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "prospects",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "isListed", "order": "ASCENDING" },
+        { "fieldPath": "geohashPublic", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
