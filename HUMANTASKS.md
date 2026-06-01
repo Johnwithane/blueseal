@@ -190,3 +190,37 @@ Phase 6 added a self-serve "Delete my account" + "Export my data" flow that sati
 - **Why:** Some users won't have WhatsApp (or won't want it for business use). SMS via Twilio still works — the code in [functions/src/lib/sms.ts](functions/src/lib/sms.ts) is intact; you just need to install the extension and wire `notify()` to pick SMS based on a user preference. That preference UI doesn't exist yet (it's a future phase).
 - **What (when you're ready):** See the Twilio setup steps that used to live here — sign up at twilio.com, buy a Canadian number (~$1.15 CAD/mo + $0.0079/SMS to Canada), install the **Send SMS with Twilio** Firebase extension pointed at the `sms` collection (NOT the default `messages`, which collides with chat).
 - **Cost watch:** SMS is metered per message — much more expensive than WhatsApp's per-conversation pricing for high-frequency users.
+
+---
+
+## Security hardening pass (branch: claude/app-security-mvp-readiness-cRet7)
+
+These ship in code but require a human to deploy + run migrations. **Do them in
+this order** — the rules/index changes and the data migrations are coupled.
+
+### [ ] Deploy the AI cost/abuse hardening (functions only)
+
+- **Why:** Adds a per-user 100/day cap across all Vertex AI callables, fences prompt-injection, and removes the unauthenticated `ping`. App Check is still off, so this rate limit is currently the main guard against a single account running up the Vertex bill.
+- **What:** `firebase deploy --only functions`.
+- **Verify:** Call an AI tool 100+ times as one user → the 101st returns `resource-exhausted`. Confirm `ping` is gone from the Functions list.
+
+### [ ] Deploy F2 (private job notes) + run the migration
+
+- **Why:** The tradesperson's private notes (incl. AI behavioural notes about the client) were on the client-readable job doc. Moved to a tradie-only subdoc. **Until the migration runs, existing jobs keep the old field on the client-readable doc — the leak stays open for them, and the tradie's existing notes won't display.**
+- **What:** `firebase deploy --only firestore:rules,functions`, then in the Admin dashboard click **"Migrate private job notes"** (re-click until `skipped == scanned`).
+- **Verify:** As a client, open an old job → you can't read its `private/notes` subdoc. As the tradie → your notes are intact.
+
+### [ ] Deploy F1 (tradesperson location/address) + run the migration
+
+- **Why:** Every visible tradesperson's **exact home coordinates + street address** were world-readable, unauthenticated. Moved to a private subdoc; the public doc now carries only a coarse (~1 km) location for search.
+- **What — ORDER MATTERS:**
+  1. `firebase deploy --only firestore:indexes` and **wait for the new `tradespeople` indexes to finish building** (Firestore console → Indexes).
+  2. `firebase deploy --only firestore:rules,functions`.
+  3. Admin dashboard → **"Migrate tradesperson location"** (re-click until `skipped == scanned`).
+- **CRITICAL:** Until step 3 completes, **discovery returns ZERO results** for un-migrated tradies (they have the old `geohash` field; search now queries `geohashPublic`). Strongly recommend running the whole sequence in a **staging project first** and confirming search + the profile/onboarding editors still work before doing prod.
+- **Verify:** Search returns nearby tradies; open a public tradie profile while logged out → no street address shown; as the tradie, the profile + onboarding editors still show your saved address/pin.
+
+### [ ] (Still open — not in this branch) Turn on App Check
+
+- **Why:** Every callable is `enforceAppCheck: false`. The AI rate limit added above is a stopgap; App Check is the real bot/replay/abuse guard. Flagged by the audit as "the single biggest pre-launch fix."
+- **What:** Provision a reCAPTCHA Enterprise key, init App Check client-side, THEN flip `enforceAppCheck: true` on the callables. Order matters — enabling enforcement before the client init ships breaks every callable.
