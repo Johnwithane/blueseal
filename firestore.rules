@@ -181,6 +181,17 @@ service cloud.firestore {
             : request.resource.data.vettingStatus in ['draft','pending','info_requested']);
       allow update: if isAdmin();
       allow delete: if isAdmin();
+
+      // ---------- tradespeople/{uid}/private/{docId} ----------
+      // Exact service-area location + (often home) address + billing contact
+      // details. NEVER world-readable — that's the whole reason they're split
+      // off the public tradesperson doc. Owner + admin only. The owner writes
+      // these via setLocation / setContactInfo; admin can read for vetting +
+      // support and correct if needed.
+      match /private/{docId} {
+        allow read: if isOwner(tradieId) || isAdmin();
+        allow write: if isOwner(tradieId) || isAdmin();
+      }
     }
 
     // ---------- certifications ----------

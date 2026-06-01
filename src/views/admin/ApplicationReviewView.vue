@@ -5,7 +5,7 @@ import Button from "primevue/button";
 import Tag from "primevue/tag";
 import Textarea from "primevue/textarea";
 import Dialog from "primevue/dialog";
-import { getTradesperson } from "@/firebase/services/tradespeople";
+import { getTradesperson, getTradespersonContact } from "@/firebase/services/tradespeople";
 import { listCertsFor, approveCertification, rejectCertification } from "@/firebase/services/certifications";
 import { getIdVerification, approveId, rejectId } from "@/firebase/services/idVerifications";
 import { resolveFileUrl } from "@/firebase/services/storage";
@@ -46,6 +46,9 @@ const { date } = useFormatters();
 
 const uid = route.params.uid as string;
 const tradie = ref<WithId<TradespersonDoc> | null>(null);
+// Service-area address is private (tradespeople/{uid}/private/contact); admin
+// fetches it separately for the review screen.
+const tradieAddress = ref<string>("");
 const certs = ref<WithId<CertificationDoc>[]>([]);
 const idDoc = ref<WithId<IdVerificationDoc> | null>(null);
 // The tradesperson's client stores ID as a Storage path (admin-only-read
@@ -82,6 +85,7 @@ function openViewer(url: string | null | undefined, title: string, watermark = f
 async function load() {
   loading.value = true;
   tradie.value = await getTradesperson(uid);
+  tradieAddress.value = (await getTradespersonContact(uid))?.primaryAddressText ?? "";
   const [certList, idData, insuranceData, wsibData] = await Promise.all([
     listCertsFor(uid),
     getIdVerification(uid),
@@ -272,7 +276,7 @@ const approveBlockerHint = computed(() => {
           <dl class="text-sm space-y-2">
             <div><dt class="font-medium">Trades</dt><dd>{{ tradie.trades.map(tradeLabel).join(", ") }}</dd></div>
             <div><dt class="font-medium">Bio</dt><dd class="whitespace-pre-wrap">{{ tradie.bio }}</dd></div>
-            <div><dt class="font-medium">Service area</dt><dd>{{ tradie.primaryAddressText }} ({{ tradie.serviceRadiusKm }} km)</dd></div>
+            <div><dt class="font-medium">Service area</dt><dd>{{ tradieAddress }} ({{ tradie.serviceRadiusKm }} km)</dd></div>
             <div><dt class="font-medium">Pricing</dt><dd>{{ tradie.pricingModel }}{{ tradie.hourlyRate ? ` @ $${(tradie.hourlyRate/100).toFixed(2)}/hr` : "" }}</dd></div>
           </dl>
         </section>

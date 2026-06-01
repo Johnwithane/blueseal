@@ -17,7 +17,9 @@ interface MetaLike {
 }
 
 interface TradieLike {
-  location?: { latitude: number; longitude: number };
+  // Coarse public location (~1km); exact location is private now. Good enough
+  // for an "in your area" notification radius check.
+  locationApprox?: { latitude: number; longitude: number };
   serviceRadiusKm?: number;
 }
 
@@ -70,8 +72,8 @@ export const onJobPostCreated = onDocumentCreated(
           .collection("tradespeople")
           .where("trades", "array-contains", post.trade)
           .where("isVisible", "==", true)
-          .where("geohash", ">=", start)
-          .where("geohash", "<=", end)
+          .where("geohashPublic", ">=", start)
+          .where("geohashPublic", "<=", end)
           .limit(500)
           .get();
         for (const d of snap.docs) {
@@ -83,7 +85,7 @@ export const onJobPostCreated = onDocumentCreated(
     const eligibleUids: string[] = [];
     for (const [uid, t] of candidates) {
       if (uid === post.clientId) continue;
-      const loc = t.location;
+      const loc = t.locationApprox;
       const radius = t.serviceRadiusKm;
       if (!loc || typeof radius !== "number") continue;
       const distKm = distanceBetween(

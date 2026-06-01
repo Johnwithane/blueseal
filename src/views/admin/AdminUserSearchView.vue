@@ -13,7 +13,7 @@ import type {
   WithId,
 } from "@/firebase/interfaces";
 import { searchUsers } from "@/firebase/services/users";
-import { getTradesperson } from "@/firebase/services/tradespeople";
+import { getTradesperson, getTradespersonContact } from "@/firebase/services/tradespeople";
 import { listJobsForClient, listJobsForTradie } from "@/firebase/services/jobs";
 import { useFormatters } from "@/composables/useFormatters";
 import { humanizeError } from "@/utils/errors";
@@ -36,6 +36,8 @@ interface ExpandedState {
   loaded: boolean;
   error: string | null;
   tradie: WithId<TradespersonDoc> | null;
+  // Service-area address is private (tradespeople/{uid}/private/contact).
+  tradieAddress: string | null;
   clientJobs: WithId<JobDoc>[];
   tradieJobs: WithId<JobDoc>[];
 }
@@ -84,6 +86,7 @@ async function toggleExpand(user: WithId<UserDoc>) {
     loaded: false,
     error: null,
     tradie: null,
+    tradieAddress: null,
     clientJobs: [],
     tradieJobs: [],
   };
@@ -92,12 +95,14 @@ async function toggleExpand(user: WithId<UserDoc>) {
   const isTradie = (user.roles ?? []).includes("tradesperson");
   const isClient = (user.roles ?? []).includes("client");
   try {
-    const [tradie, clientJobs, tradieJobs] = await Promise.all([
+    const [tradie, contact, clientJobs, tradieJobs] = await Promise.all([
       isTradie ? getTradesperson(user.id) : Promise.resolve(null),
+      isTradie ? getTradespersonContact(user.id) : Promise.resolve(null),
       isClient ? listJobsForClient(user.id, RECENT_JOBS_LIMIT) : Promise.resolve([]),
       isTradie ? listJobsForTradie(user.id, RECENT_JOBS_LIMIT) : Promise.resolve([]),
     ]);
     state.tradie = tradie;
+    state.tradieAddress = contact?.primaryAddressText ?? null;
     state.clientJobs = clientJobs;
     state.tradieJobs = tradieJobs;
     state.loaded = true;
@@ -389,9 +394,9 @@ function vettingSeverity(s: string): "info" | "success" | "warn" | "danger" {
                   <dt class="inline font-medium">Company:</dt>
                   {{ expanded[u.id].tradie!.companyName }}
                 </div>
-                <div v-if="expanded[u.id].tradie!.primaryAddressText" class="sm:col-span-2">
+                <div v-if="expanded[u.id].tradieAddress" class="sm:col-span-2">
                   <dt class="inline font-medium">Address:</dt>
-                  {{ expanded[u.id].tradie!.primaryAddressText }}
+                  {{ expanded[u.id].tradieAddress }}
                 </div>
                 <div v-if="expanded[u.id].tradie!.insuranceExpiresAt">
                   <dt class="inline font-medium">Insurance expires:</dt>

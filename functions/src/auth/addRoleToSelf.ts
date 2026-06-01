@@ -68,10 +68,12 @@ export const addRoleToSelf = onCall({ enforceAppCheck: false }, async (req) => {
         pricingModel: "quote",
         hourlyRate: null,
         providesFreeQuotes: true,
-        location: null,
-        geohash: "",
+        // Exact location + address are private (contact subdoc), created
+        // lazily when the tradie sets their service area. Public doc carries
+        // only the coarse search fields, unset until then.
+        locationApprox: null,
+        geohashPublic: "",
         serviceRadiusKm: 25,
-        primaryAddressText: "",
         portfolioPhotos: [],
         ratingAvg: 0,
         ratingCount: 0,

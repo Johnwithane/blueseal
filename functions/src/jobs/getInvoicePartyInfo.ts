@@ -30,6 +30,10 @@ interface TradespersonData {
   displayName?: string | null;
   companyName?: string | null;
   companyLogoUrl?: string | null;
+}
+
+// Address + billing contact moved to tradespeople/{uid}/private/contact.
+interface TradespersonContactData {
   primaryAddressText?: string | null;
   businessAddress?: string | null;
   businessPhone?: string | null;
@@ -94,15 +98,19 @@ export const getInvoicePartyInfo = onCall(
       throw new HttpsError("permission-denied", "Not a party to this job.");
     }
 
-    const [tradieUserSnap, tradieDocSnap, clientUserSnap] = await Promise.all([
-      db.doc(`users/${job.tradespersonId}`).get(),
-      db.doc(`tradespeople/${job.tradespersonId}`).get(),
-      db.doc(`users/${job.clientId}`).get(),
-    ]);
+    const [tradieUserSnap, tradieDocSnap, tradieContactSnap, clientUserSnap] =
+      await Promise.all([
+        db.doc(`users/${job.tradespersonId}`).get(),
+        db.doc(`tradespeople/${job.tradespersonId}`).get(),
+        db.doc(`tradespeople/${job.tradespersonId}/private/contact`).get(),
+        db.doc(`users/${job.clientId}`).get(),
+      ]);
 
     const tradieUser = (tradieUserSnap.data() as UserData | undefined) ?? {};
     const tradieDoc =
       (tradieDocSnap.data() as TradespersonData | undefined) ?? {};
+    const tradieContact =
+      (tradieContactSnap.data() as TradespersonContactData | undefined) ?? {};
     const clientUser = (clientUserSnap.data() as UserData | undefined) ?? {};
 
     const tradespersonName =
@@ -117,8 +125,8 @@ export const getInvoicePartyInfo = onCall(
       "Client";
 
     const tradieAddress =
-      tradieDoc.businessAddress?.trim() ||
-      tradieDoc.primaryAddressText?.trim() ||
+      tradieContact.businessAddress?.trim() ||
+      tradieContact.primaryAddressText?.trim() ||
       null;
 
     return {
@@ -127,9 +135,9 @@ export const getInvoicePartyInfo = onCall(
         companyName: tradieDoc.companyName?.trim() || null,
         companyLogoUrl: tradieDoc.companyLogoUrl?.trim() || null,
         address: tradieAddress,
-        phone: tradieDoc.businessPhone?.trim() || tradieUser.phone?.trim() || null,
+        phone: tradieContact.businessPhone?.trim() || tradieUser.phone?.trim() || null,
         email: tradieUser.email?.trim() || null,
-        gstNumber: tradieDoc.gstNumber?.trim() || null,
+        gstNumber: tradieContact.gstNumber?.trim() || null,
       },
       client: {
         name: clientName,

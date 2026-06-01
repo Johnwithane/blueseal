@@ -11,15 +11,30 @@ import {
   setDoc,
   updateDoc,
   where,
+  writeBatch,
   GeoPoint,
 } from "firebase/firestore";
 import { geohashForLocation, geohashQueryBounds, distanceBetween } from "geofire-common";
-import { db } from "@/firebase/config";
-import type { TradespersonDoc, WithId, WeeklyAvailability } from "@/firebase/interfaces";
+import { httpsCallable } from "firebase/functions";
+import { db, functions } from "@/firebase/config";
+import type {
+  TradespersonContact,
+  TradespersonDoc,
+  WithId,
+  WeeklyAvailability,
+} from "@/firebase/interfaces";
 import { typedConverter } from "@/firebase/converters";
 
 const tradieRef = (uid: string) =>
   doc(db, "tradespeople", uid).withConverter(typedConverter<TradespersonDoc>());
+
+// Private contact subdoc — exact location + (home) address + billing details.
+// Owner + admin only (firestore.rules). See TradespersonContact.
+const contactRef = (uid: string) => doc(db, "tradespeople", uid, "private", "contact");
+
+// Coarsen an exact coordinate to ~2 decimals (~1.1 km) for the public doc.
+// Enough for "tradies within N km" discovery; not enough to find a home.
+const toApprox = (n: number): number => Math.round(n * 100) / 100;
 
 const tradiesCol = () =>
   collection(db, "tradespeople").withConverter(typedConverter<TradespersonDoc>());
@@ -125,10 +140,9 @@ export async function createOrUpdateDraft(
     pricingModel: "both",
     hourlyRate: null,
     providesFreeQuotes: true,
-    location: new GeoPoint(0, 0),
-    geohash: "",
+    locationApprox: new GeoPoint(0, 0),
+    geohashPublic: "",
     serviceRadiusKm: 25,
-    primaryAddressText: "",
     portfolioPhotos: [],
     ratingAvg: 0,
     ratingCount: 0,
@@ -160,12 +174,51 @@ export async function createOrUpdateDraft(
   });
 }
 
-export async function setLocation(uid: string, lat: number, lng: number): Promise<void> {
-  const geohash = geohashForLocation([lat, lng]);
-  await updateDoc(doc(db, "tradespeople", uid), {
-    location: new GeoPoint(lat, lng),
-    geohash,
-  });
+// Save the service-area point. The EXACT coordinate (+ optional address label)
+// goes to the private contact subdoc; only a coarse approximation + a length-6
+// geohash land on the public doc for proximity search. Written together in a
+// batch so the two never drift. `label` is the human-readable address for the
+// pin (stored only in the private subdoc).
+export async function setLocation(
+  uid: string,
+  lat: number,
+  lng: number,
+  label?: string,
+): Promise<void> {
+  const geohashPublic = geohashForLocation([lat, lng]).slice(0, 6);
+  const batch = writeBatch(db);
+  batch.set(
+    contactRef(uid),
+    {
+      location: new GeoPoint(lat, lng),
+      ...(label !== undefined ? { primaryAddressText: label } : {}),
+    },
+    { merge: true },
+  );
+  batch.set(
+    doc(db, "tradespeople", uid),
+    { locationApprox: new GeoPoint(toApprox(lat), toApprox(lng)), geohashPublic },
+    { merge: true },
+  );
+  await batch.commit();
+}
+
+// Read the private contact subdoc (owner/admin). Returns null when it hasn't
+// been created yet (tradie hasn't set a location/address).
+export async function getTradespersonContact(
+  uid: string,
+): Promise<TradespersonContact | null> {
+  const snap = await getDoc(contactRef(uid));
+  return snap.exists() ? (snap.data() as TradespersonContact) : null;
+}
+
+// Save the billing-side contact fields (address override, phone, GST) to the
+// private subdoc. primaryAddressText is set via setLocation alongside the pin.
+export async function setContactInfo(
+  uid: string,
+  info: Partial<Pick<TradespersonContact, "businessAddress" | "businessPhone" | "gstNumber">>,
+): Promise<void> {
+  await setDoc(contactRef(uid), info, { merge: true });
 }
 
 export async function submitForReview(uid: string): Promise<void> {
@@ -248,9 +301,9 @@ export async function searchTradespeople(
     query(
       tradiesCol(),
       where("isVisible", "==", true),
-      orderBy("geohash"),
-      where("geohash", ">=", b[0]),
-      where("geohash", "<=", b[1]),
+      orderBy("geohashPublic"),
+      where("geohashPublic", ">=", b[0]),
+      where("geohashPublic", "<=", b[1]),
     ),
   );
 
@@ -263,7 +316,10 @@ export async function searchTradespeople(
       if (seen.has(d.id)) continue;
       seen.add(d.id);
       const data = d.data();
-      const distKm = distanceBetween(center, [data.location.latitude, data.location.longitude]);
+      const distKm = distanceBetween(center, [
+        data.locationApprox.latitude,
+        data.locationApprox.longitude,
+      ]);
       if (distKm > opts.radiusKm) continue;
       if (opts.minRating && data.ratingAvg < opts.minRating) continue;
       if (opts.trade && !data.trades.includes(opts.trade)) continue;
@@ -275,6 +331,26 @@ export async function searchTradespeople(
 
   out.sort((a, b) => a.distanceKm - b.distanceKm);
   return opts.limit ? out.slice(0, opts.limit) : out;
+}
+
+// Admin one-shot: migrate every tradesperson to the F1 public/private split —
+// exact location + address out of the world-readable doc and into
+// private/contact, coarse search fields onto the public doc. Required after
+// the F1 deploy (search returns nothing for un-migrated tradies). Idempotent.
+export interface BackfillTradieContactResult {
+  scanned: number;
+  migrated: number;
+  skipped: number;
+  pages: number;
+}
+
+export async function backfillTradieContact(): Promise<BackfillTradieContactResult> {
+  const callable = httpsCallable<undefined, BackfillTradieContactResult>(
+    functions,
+    "backfillTradieContact",
+  );
+  const { data } = await callable();
+  return data;
 }
 
 export async function listPendingApplications(): Promise<WithId<TradespersonDoc>[]> {

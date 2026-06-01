@@ -5,7 +5,16 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "isVisible", "order": "ASCENDING" },
-        { "fieldPath": "geohash", "order": "ASCENDING" }
+        { "fieldPath": "geohashPublic", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "tradespeople",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "trades", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "isVisible", "order": "ASCENDING" },
+        { "fieldPath": "geohashPublic", "order": "ASCENDING" }
       ]
     },
     {

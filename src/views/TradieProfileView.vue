@@ -186,7 +186,10 @@ onMounted(async () => {
             </div>
             <div class="mt-1 text-sm text-[color:var(--bs-muted)]">
               {{ tradesWithYears.map((t) => t.label).join(" · ") }}
-              <span v-if="tradie.primaryAddressText"> • {{ tradie.primaryAddressText }}</span>
+              <!-- Home/street address removed from the public profile — it's
+                   private now (tradespeople/{uid}/private/contact). The service
+                   radius still conveys coverage without exposing where they
+                   live. -->
               <span v-if="tradie.serviceRadiusKm"> • {{ tradie.serviceRadiusKm }} km radius</span>
             </div>
             <div class="mt-2 flex flex-wrap items-center gap-1">

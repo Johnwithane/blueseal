@@ -136,26 +136,17 @@ export interface TradespersonDoc {
   pricingModel: PricingModel;
   hourlyRate: number | null; // cents
   providesFreeQuotes: boolean;
-  location: GeoPoint;
-  geohash: string;
+  // PUBLIC, coarse location for discovery. The exact GeoPoint + the home
+  // address live in the private subdoc tradespeople/{uid}/private/contact
+  // (see TradespersonContact) — they must NOT be on this world-readable doc,
+  // or any unauthenticated reader could harvest every vetted tradie's home
+  // coordinates. `locationApprox` is the exact point rounded to ~2 decimals
+  // (~1.1 km); `geohashPublic` is a length-6 geohash (~1.2 km cell) used for
+  // the bounding-box proximity query. Mirrors the public/private split used
+  // by jobPosts.addressPublic.
+  locationApprox: GeoPoint;
+  geohashPublic: string;
   serviceRadiusKm: number;
-  primaryAddressText: string;
-  // Billing-side contact info shown on quotes + invoices the tradesperson
-  // issues. businessAddress optionally overrides primaryAddressText for
-  // sole proprietors who'd rather not show their home address on
-  // paperwork; falls back to primaryAddressText when blank. businessPhone
-  // is a separate line so the client can reach the trade's billing
-  // contact directly. gstNumber is the tradesperson's CRA GST/HST
-  // registration (format like "123456789RT0001") — optional because
-  // small suppliers under the $30k threshold aren't required to register,
-  // but tradies who are registered must show it on invoices per CRA's
-  // documentary requirements for clients claiming input tax credits.
-  // All three optional only because pre-existing tradesperson docs
-  // predate the fields; new docs default to null + the UI nudges the
-  // owner to fill them.
-  businessAddress?: string | null;
-  businessPhone?: string | null;
-  gstNumber?: string | null;
   portfolioPhotos: string[];
   ratingAvg: number;
   ratingCount: number;
@@ -217,6 +208,28 @@ export interface TradespersonDoc {
   // pre-cutover docs don't have it; readers should treat undefined as 0.
   paidJobsCount?: number;
   paidLifetimeCents?: number;
+}
+
+// Private tradesperson contact details, stored at
+// tradespeople/{uid}/private/contact. Read/write restricted to the owner +
+// admin in firestore.rules. Holds the data that must NOT be world-readable:
+// the exact service-area point and the (often home) address used on
+// paperwork. The public tradespeople doc carries only locationApprox +
+// geohashPublic for discovery.
+//
+// `location` is the exact GeoPoint the tradie dropped on the map (used to
+// restore the editor pin). `primaryAddressText` is the human-readable label
+// for that point (often a home address for sole proprietors). businessAddress
+// optionally overrides primaryAddressText on quotes/invoices for tradies who'd
+// rather not show their home address; businessPhone is the billing contact
+// line; gstNumber is the CRA GST/HST registration shown on invoices. The last
+// three are optional/null because not every tradie fills them in.
+export interface TradespersonContact {
+  location: GeoPoint;
+  primaryAddressText: string;
+  businessAddress?: string | null;
+  businessPhone?: string | null;
+  gstNumber?: string | null;
 }
 
 // ---------------------------------------------------------------------------

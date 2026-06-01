@@ -33,6 +33,7 @@ export { nudgeReviewPairs } from "./reviews/nudgeReviewPairs";
 export { backfillReviewReviewers } from "./admin/backfillReviewReviewers";
 export { backfillJobPostClient } from "./admin/backfillJobPostClient";
 export { backfillJobPrivateNotes } from "./admin/backfillJobPrivateNotes";
+export { backfillTradieContact } from "./admin/backfillTradieContact";
 
 // Chat
 export { onMessageCreated } from "./chat/onMessageCreated";
