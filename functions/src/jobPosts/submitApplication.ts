@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { CALLABLE_OPTS } from "../lib/callable";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { z } from "zod";
@@ -24,7 +25,7 @@ const Input = z.object({
 
 const DAILY_APPLICATION_CAP = 10;
 
-export const submitApplication = onCall({ enforceAppCheck: false }, async (req) => {
+export const submitApplication = onCall(CALLABLE_OPTS, async (req) => {
   const uid = requireRoleOrAdmin(req, "tradesperson");
   // Admins still need a tradesperson doc with isVisible:true to apply —
   // they don't get a free pass on the verified-tradie contract.

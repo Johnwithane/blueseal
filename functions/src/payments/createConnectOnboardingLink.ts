@@ -13,6 +13,7 @@
 // notify.ts) so dev / staging / prod each route to the right host.
 
 import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { CALLABLE_OPTS } from "../lib/callable";
 import { logger } from "firebase-functions/v2";
 
 import { db } from "../lib/admin";
@@ -25,7 +26,7 @@ function appBaseUrl(): string {
 }
 
 export const createConnectOnboardingLink = onCall(
-  { secrets: [STRIPE_SECRET_KEY], enforceAppCheck: false },
+  { ...CALLABLE_OPTS, secrets: [STRIPE_SECRET_KEY] },
   async (req) => {
     const uid = requireRole(req, "tradesperson");
 

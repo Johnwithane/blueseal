@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { CALLABLE_OPTS } from "../lib/callable";
 import { logger } from "firebase-functions/v2";
 import { db, storage } from "../lib/admin";
 import { requireAuth } from "../lib/auth";
@@ -18,7 +19,7 @@ import { enqueueMail } from "../lib/mail";
  * phone) are NOT included in the caller's export — only their own copy
  * lives here. PII-leakage by export is the most common PIPEDA misstep.
  */
-export const exportMyData = onCall({ enforceAppCheck: false, timeoutSeconds: 120 }, async (req) => {
+export const exportMyData = onCall({ ...CALLABLE_OPTS, timeoutSeconds: 120 }, async (req) => {
   const uid = requireAuth(req);
   const ctx = { fn: "exportMyData", uid };
 

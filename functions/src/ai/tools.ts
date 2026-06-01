@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { CALLABLE_OPTS } from "../lib/callable";
 import { FieldValue } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { z } from "zod";
@@ -171,7 +172,7 @@ async function logUsage(
 }
 
 function makeTool(tool: "diagnose" | "quote" | "summary") {
-  return onCall({ enforceAppCheck: false }, async (req) => {
+  return onCall(CALLABLE_OPTS, async (req) => {
     const uid = requireAuth(req);
     const parsed = Input.safeParse(req.data);
     if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);

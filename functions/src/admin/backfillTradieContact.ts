@@ -19,6 +19,7 @@
 // skipped, so re-running after a partial run is safe. Resumable cursor.
 
 import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { CALLABLE_OPTS } from "../lib/callable";
 import { FieldValue, GeoPoint } from "firebase-admin/firestore";
 import { geohashForLocation } from "geofire-common";
 import { logger } from "firebase-functions/v2";
@@ -40,7 +41,7 @@ interface BackfillResult {
 }
 
 export const backfillTradieContact = onCall(
-  { enforceAppCheck: false },
+  CALLABLE_OPTS,
   async (req): Promise<BackfillResult> => {
     const actor = requireAdmin(req);
 

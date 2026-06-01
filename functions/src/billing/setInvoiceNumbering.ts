@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { CALLABLE_OPTS } from "../lib/callable";
 import { logger } from "firebase-functions/v2";
 import { z } from "zod";
 import { db } from "../lib/admin";
@@ -38,7 +39,7 @@ const Input = z
  * could collide with a previously-issued number. Once they've started
  * issuing through Blue Seal, mid-stream renumbering is admin-only.
  */
-export const setInvoiceNumbering = onCall({ enforceAppCheck: false }, async (req) => {
+export const setInvoiceNumbering = onCall(CALLABLE_OPTS, async (req) => {
   const uid = requireRole(req, "tradesperson");
   const parsed = Input.safeParse(req.data);
   if (!parsed.success) {

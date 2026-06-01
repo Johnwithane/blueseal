@@ -23,6 +23,7 @@
 // label visible forever, which is the exact bug we're fixing.
 
 import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { CALLABLE_OPTS } from "../lib/callable";
 import { logger } from "firebase-functions/v2";
 
 import { db } from "../lib/admin";
@@ -78,7 +79,7 @@ async function readClientSnapshot(
 }
 
 export const backfillReviewReviewers = onCall(
-  { enforceAppCheck: false },
+  CALLABLE_OPTS,
   async (req): Promise<BackfillResult> => {
     const actor = requireAdmin(req);
 

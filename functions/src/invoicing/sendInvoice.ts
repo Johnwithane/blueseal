@@ -22,6 +22,7 @@
 // invoices stay auditable when PLATFORM_FEE_BPS changes.
 
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { CALLABLE_OPTS } from "../lib/callable";
 import { FieldValue } from "firebase-admin/firestore";
 import { z } from "zod";
 import PDFDocument from "pdfkit";
@@ -142,7 +143,7 @@ async function renderPdf(
 }
 
 export const sendInvoice = onCall(
-  { secrets: [STRIPE_SECRET_KEY], enforceAppCheck: false },
+  { ...CALLABLE_OPTS, secrets: [STRIPE_SECRET_KEY] },
   async (req) => {
     const uid = requireAuth(req);
     const parsed = Input.safeParse(req.data);

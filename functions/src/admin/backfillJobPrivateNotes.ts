@@ -17,6 +17,7 @@
 // be re-invoked and pick up where it left off.
 
 import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { CALLABLE_OPTS } from "../lib/callable";
 import { FieldValue } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 
@@ -35,7 +36,7 @@ interface BackfillResult {
 }
 
 export const backfillJobPrivateNotes = onCall(
-  { enforceAppCheck: false },
+  CALLABLE_OPTS,
   async (req): Promise<BackfillResult> => {
     const actor = requireAdmin(req);
 

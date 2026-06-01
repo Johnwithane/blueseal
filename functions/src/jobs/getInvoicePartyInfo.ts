@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { CALLABLE_OPTS } from "../lib/callable";
 import { z } from "zod";
 import { db } from "../lib/admin";
 import { requireAuth } from "../lib/auth";
@@ -77,7 +78,7 @@ function joinAddress(addr: JobData["address"]): string | null {
  * read rules.
  */
 export const getInvoicePartyInfo = onCall(
-  { enforceAppCheck: false },
+  CALLABLE_OPTS,
   async (req): Promise<PartyInfoResult> => {
     const uid = requireAuth(req);
     const parsed = Input.safeParse(req.data);

@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { CALLABLE_OPTS } from "../lib/callable";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { z } from "zod";
@@ -55,7 +56,7 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
  * The whole pull commits as a single Firestore batch so a partial write
  * can't leave entries marked invoiced but missing from the line items.
  */
-export const pullBillablesFromJob = onCall({ enforceAppCheck: false }, async (req) => {
+export const pullBillablesFromJob = onCall(CALLABLE_OPTS, async (req) => {
   const uid = requireRole(req, "tradesperson");
   const parsed = Input.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);

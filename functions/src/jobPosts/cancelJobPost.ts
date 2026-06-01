@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { CALLABLE_OPTS } from "../lib/callable";
 import { FieldValue } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { z } from "zod";
@@ -11,7 +12,7 @@ const Input = z.object({
   reason: z.string().trim().max(500).optional(),
 });
 
-export const cancelJobPost = onCall({ enforceAppCheck: false }, async (req) => {
+export const cancelJobPost = onCall(CALLABLE_OPTS, async (req) => {
   const uid = requireRoleOrAdmin(req, "client");
   const parsed = Input.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);

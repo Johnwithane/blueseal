@@ -1,9 +1,10 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { CALLABLE_OPTS } from "../lib/callable";
 import { FieldValue } from "firebase-admin/firestore";
 import { db } from "../lib/admin";
 import { requireRole } from "../lib/auth";
 
-export const submitForVetting = onCall({ enforceAppCheck: false }, async (req) => {
+export const submitForVetting = onCall(CALLABLE_OPTS, async (req) => {
   const uid = requireRole(req, "tradesperson");
   const tradieRef = db.doc(`tradespeople/${uid}`);
   const idRef = db.doc(`idVerifications/${uid}`);

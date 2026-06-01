@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { CALLABLE_OPTS } from "../lib/callable";
 import { FieldValue } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { z } from "zod";
@@ -34,7 +35,7 @@ interface InvoiceData {
  * onJobUpdated suppresses its generic line on the awaiting_payment →
  * complete transition because we post a friendlier one here.
  */
-export const markJobPaid = onCall({ enforceAppCheck: false }, async (req) => {
+export const markJobPaid = onCall(CALLABLE_OPTS, async (req) => {
   const uid = requireRole(req, "tradesperson");
   const parsed = Input.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);

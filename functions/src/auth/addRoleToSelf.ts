@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { CALLABLE_OPTS } from "../lib/callable";
 import { logger } from "firebase-functions/v2";
 import { z } from "zod";
 import { FieldValue } from "firebase-admin/firestore";
@@ -19,7 +20,7 @@ const Input = z.object({ role: z.enum(["client", "tradesperson"]) });
  *
  * "admin" cannot be self-added. That stays behind `setAdminRole`.
  */
-export const addRoleToSelf = onCall({ enforceAppCheck: false }, async (req) => {
+export const addRoleToSelf = onCall(CALLABLE_OPTS, async (req) => {
   const uid = requireAuth(req);
   const parsed = Input.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", "Invalid input");

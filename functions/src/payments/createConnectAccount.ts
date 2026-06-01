@@ -13,6 +13,7 @@
 // onto without a query.
 
 import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { CALLABLE_OPTS } from "../lib/callable";
 import { FieldValue } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 
@@ -30,7 +31,7 @@ interface ExistingPayouts {
 }
 
 export const createConnectAccount = onCall(
-  { secrets: [STRIPE_SECRET_KEY], enforceAppCheck: false },
+  { ...CALLABLE_OPTS, secrets: [STRIPE_SECRET_KEY] },
   async (req) => {
     const uid = requireRole(req, "tradesperson");
 

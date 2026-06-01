@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { CALLABLE_OPTS } from "../lib/callable";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { z } from "zod";
@@ -22,7 +23,7 @@ const Input = z.object({
  * snapshot is 0 — the entry still records the time, and the tradie can
  * manually price the resulting invoice line.
  */
-export const clockIn = onCall({ enforceAppCheck: false }, async (req) => {
+export const clockIn = onCall(CALLABLE_OPTS, async (req) => {
   const uid = requireRole(req, "tradesperson");
   const parsed = Input.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);

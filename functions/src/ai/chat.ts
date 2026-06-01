@@ -1,4 +1,5 @@
 import { onCall, HttpsError, type CallableRequest } from "firebase-functions/v2/https";
+import { CALLABLE_OPTS } from "../lib/callable";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { z } from "zod";
@@ -211,7 +212,7 @@ async function loadJobContext(
   return { job, chatTranscript: transcript };
 }
 
-export const aiChat = onCall({ enforceAppCheck: false }, async (req) => {
+export const aiChat = onCall(CALLABLE_OPTS, async (req) => {
   const uid = requireAuth(req);
   const parsed = Input.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);

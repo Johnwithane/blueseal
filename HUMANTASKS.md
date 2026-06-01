@@ -220,7 +220,13 @@ this order** — the rules/index changes and the data migrations are coupled.
 - **CRITICAL:** Until step 3 completes, **discovery returns ZERO results** for un-migrated tradies (they have the old `geohash` field; search now queries `geohashPublic`). Strongly recommend running the whole sequence in a **staging project first** and confirming search + the profile/onboarding editors still work before doing prod.
 - **Verify:** Search returns nearby tradies; open a public tradie profile while logged out → no street address shown; as the tradie, the profile + onboarding editors still show your saved address/pin.
 
-### [ ] (Still open — not in this branch) Turn on App Check
+### [ ] Turn on App Check (wiring is DONE — only the key + flip remain)
 
-- **Why:** Every callable is `enforceAppCheck: false`. The AI rate limit added above is a stopgap; App Check is the real bot/replay/abuse guard. Flagged by the audit as "the single biggest pre-launch fix."
-- **What:** Provision a reCAPTCHA Enterprise key, init App Check client-side, THEN flip `enforceAppCheck: true` on the callables. Order matters — enabling enforcement before the client init ships breaks every callable.
+- **Why:** Every callable was `enforceAppCheck: false`. The AI rate limit is a stopgap; App Check is the real bot/replay/abuse guard. Flagged by the audit as "the single biggest pre-launch fix."
+- **Already done in this branch:** client-side init (`src/firebase/config.ts`, gated on `VITE_RECAPTCHA_SITE_KEY`), and all 49 callables now read a single env-driven flag (`functions/src/lib/callable.ts`, `ENFORCE_APP_CHECK`). Nothing breaks while the key is unset.
+- **What's left (do in THIS order — enforcing before the client init is live rejects every call):**
+  1. Provision a **reCAPTCHA Enterprise** site key in Google Cloud and register the web app under Firebase Console → App Check. (If you provision a reCAPTCHA **v3** key instead, swap `ReCaptchaEnterpriseProvider` → `ReCaptchaV3Provider` in `config.ts`.)
+  2. Set `VITE_RECAPTCHA_SITE_KEY` in the frontend env and deploy hosting. Confirm in the App Check console that requests show as verified.
+  3. Only then set `ENFORCE_APP_CHECK=true` on the Cloud Functions runtime and `firebase deploy --only functions`.
+  4. For local testing, set `VITE_APPCHECK_DEBUG_TOKEN` and register the printed debug token in the console.
+- **Verify:** With enforcement on, a call from a non-attested client (curl/Postman, no App Check token) returns `unauthenticated`; the real web app keeps working.

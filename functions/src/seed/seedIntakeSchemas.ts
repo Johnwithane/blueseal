@@ -1,4 +1,5 @@
 import { onCall } from "firebase-functions/v2/https";
+import { CALLABLE_OPTS } from "../lib/callable";
 import { FieldValue } from "firebase-admin/firestore";
 import { db } from "../lib/admin";
 import { requireAdmin } from "../lib/auth";
@@ -98,7 +99,7 @@ const SCHEMAS: Record<
   ],
 };
 
-export const seedIntakeSchemas = onCall({ enforceAppCheck: false }, async (req) => {
+export const seedIntakeSchemas = onCall(CALLABLE_OPTS, async (req) => {
   requireAdmin(req);
   const writes: Promise<unknown>[] = [];
   for (const [trade, fields] of Object.entries(SCHEMAS)) {

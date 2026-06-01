@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { CALLABLE_OPTS } from "../lib/callable";
 import { FieldValue } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { z } from "zod";
@@ -46,7 +47,7 @@ interface QuoteData {
  * AND the quoted → awaiting_upfront_payment transitions (richer messages
  * are posted here).
  */
-export const clientAcceptQuote = onCall({ enforceAppCheck: false }, async (req) => {
+export const clientAcceptQuote = onCall(CALLABLE_OPTS, async (req) => {
   const uid = requireRole(req, "client");
   const parsed = Input.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);
