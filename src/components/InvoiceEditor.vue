@@ -402,7 +402,10 @@ async function markPaid() {
           {{ tradieCompanyName }}
         </div>
       </div>
-      <table class="w-full text-sm border-t">
+      <!-- Line-item columns don't fit 375px; scroll horizontally with a sane
+           min-width rather than squishing every column unreadably. -->
+      <div class="overflow-x-auto">
+      <table class="w-full text-sm border-t min-w-[32rem]">
         <thead>
           <tr class="text-left text-[color:var(--bs-muted)]">
             <th class="py-1 font-medium">Description</th>
@@ -480,6 +483,7 @@ async function markPaid() {
           </tr>
         </tfoot>
       </table>
+      </div>
 
       <div v-if="props.canEdit" class="mt-3 rounded-lg border border-[color:var(--bs-border)] p-3">
         <div class="flex items-center gap-2 mb-2">

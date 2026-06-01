@@ -360,7 +360,7 @@ async function submit() {
         <div v-if="budgetHint" class="text-xs text-[color:var(--bs-muted)] mt-1">
           <i class="pi pi-info-circle mr-1"></i>{{ budgetHint }}
         </div>
-        <div class="grid grid-cols-2 gap-2 mt-2">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
           <div>
             <label class="text-xs">Min</label>
             <InputNumber
@@ -445,7 +445,7 @@ async function submit() {
 
       <fieldset>
         <legend class="text-sm font-medium">Preferred date window (optional)</legend>
-        <div class="grid grid-cols-2 gap-2 mt-2">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
           <div>
             <label class="text-xs">Start</label>
             <DatePicker v-model="startDate" date-format="yy-mm-dd" class="w-full" />
