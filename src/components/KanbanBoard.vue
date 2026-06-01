@@ -39,48 +39,77 @@ const byColumn = computed(() => {
   }
   return m;
 });
+
+function openJob(id: string) {
+  router.push({ name: "JobDetail", params: { id } });
+}
 </script>
 
 <template>
-  <div class="overflow-x-auto -mx-4 px-4 pb-2">
-    <div class="grid grid-cols-[repeat(8,minmax(240px,1fr))] gap-3 min-w-[1920px]">
-      <section
-        v-for="col in columns"
-        :key="col.key"
-        class="bg-[#f9fafb] rounded-xl p-3 min-h-[60vh]"
-      >
-        <header class="flex items-center justify-between mb-2">
-          <div class="flex items-center gap-2">
-            <span class="h-2.5 w-2.5 rounded-full" :style="{ background: col.color }"></span>
-            <span class="font-semibold text-sm">{{ col.label }}</span>
-          </div>
-          <span class="text-xs text-[color:var(--bs-muted)]">{{ byColumn[col.key].length }}</span>
-        </header>
+  <!--
+    Mobile-first pipeline. 8 status columns don't fit any phone, so we scroll
+    horizontally either way — the trick is making the scroll pleasant:
+    - Phones: each column is ~85vw and snaps into view, so it's a one-column-
+      at-a-time swipe (Trello-style) rather than a fiddly drag across narrow
+      columns. snap-mandatory + scroll-smooth.
+    - md+: fixed 15rem columns, snap off, normal multi-column scroll.
+    `-mx-4 px-4` lets the strip bleed to the screen edges inside a padded
+    parent; overscroll-x-contain stops the horizontal swipe from triggering
+    browser back-navigation.
+  -->
+  <div
+    class="flex gap-3 overflow-x-auto overscroll-x-contain -mx-4 px-4 pb-2 snap-x snap-mandatory scroll-smooth md:snap-none"
+  >
+    <section
+      v-for="col in columns"
+      :key="col.key"
+      class="snap-start shrink-0 w-[85vw] sm:w-72 md:w-60 bg-[#f9fafb] rounded-xl p-3 min-h-[60vh]"
+    >
+      <header class="flex items-center justify-between mb-2">
+        <div class="flex items-center gap-2 min-w-0">
+          <span class="h-2.5 w-2.5 rounded-full shrink-0" :style="{ background: col.color }"></span>
+          <span class="font-semibold text-sm truncate">{{ col.label }}</span>
+        </div>
+        <span class="text-xs text-[color:var(--bs-muted)] shrink-0 ml-2">{{
+          byColumn[col.key].length
+        }}</span>
+      </header>
 
-        <article
-          v-for="job in byColumn[col.key]"
-          :key="job.id"
-          class="bs-card p-3 mb-2 cursor-pointer"
-          @click="router.push({ name: 'JobDetail', params: { id: job.id } })"
-        >
-          <div class="font-medium text-sm line-clamp-1">{{ job.title }}</div>
-          <div class="text-xs text-[color:var(--bs-muted)] mt-1">
-            {{ job.trade }} • {{ relativeTime(job.createdAt) }}
-          </div>
-          <div v-if="job.scheduledStart" class="text-xs mt-1 text-[color:var(--bs-blue)]">
-            <i class="pi pi-calendar text-[10px]"></i>
-            Scheduled
-          </div>
-          <div class="mt-2 pt-2 border-t border-[color:var(--bs-border)]">
-            <JobCounterparty
-              role="client"
-              size="small"
-              :name="job.clientName"
-              :photo-url="job.clientPhotoURL"
-            />
-          </div>
-        </article>
-      </section>
-    </div>
+      <article
+        v-for="job in byColumn[col.key]"
+        :key="job.id"
+        class="bs-card p-3 mb-2 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--bs-blue)]"
+        role="button"
+        tabindex="0"
+        :aria-label="`Open job: ${job.title}`"
+        @click="openJob(job.id)"
+        @keydown.enter="openJob(job.id)"
+        @keydown.space.prevent="openJob(job.id)"
+      >
+        <div class="font-medium text-sm line-clamp-1">{{ job.title }}</div>
+        <div class="text-xs text-[color:var(--bs-muted)] mt-1">
+          {{ job.trade }} • {{ relativeTime(job.createdAt) }}
+        </div>
+        <div v-if="job.scheduledStart" class="text-xs mt-1 text-[color:var(--bs-blue)]">
+          <i class="pi pi-calendar text-[10px]"></i>
+          Scheduled
+        </div>
+        <div class="mt-2 pt-2 border-t border-[color:var(--bs-border)]">
+          <JobCounterparty
+            role="client"
+            size="small"
+            :name="job.clientName"
+            :photo-url="job.clientPhotoURL"
+          />
+        </div>
+      </article>
+
+      <p
+        v-if="byColumn[col.key].length === 0"
+        class="text-xs text-[color:var(--bs-muted)] px-1 py-6 text-center"
+      >
+        Nothing here yet.
+      </p>
+    </section>
   </div>
 </template>
