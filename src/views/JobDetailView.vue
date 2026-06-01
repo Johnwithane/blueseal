@@ -10,6 +10,7 @@ import {
   CANCELLABLE_STATUSES,
   cancelJob,
   getJob,
+  getJobPrivateNotes,
   markJobPaid,
   markUpfrontFeePaid,
   scheduleJob,
@@ -378,7 +379,9 @@ async function load() {
 
     scheduledStart.value = job.value.scheduledStart?.toDate() ?? null;
     scheduledEnd.value = job.value.scheduledEnd?.toDate() ?? null;
-    privateNotes.value = job.value.privateNotes ?? "";
+    // Private notes live in a tradie-only subdoc; the client can't read it
+    // (rules deny it), so only fetch when the viewer is the tradesperson.
+    privateNotes.value = isTradie.value ? await getJobPrivateNotes(job.value.id) : "";
     intakeDraft.value = { ...(job.value.intakeFormData ?? {}) };
 
     // Clients see a "Your tradesperson" panel — fetch the tradesperson doc
@@ -558,11 +561,7 @@ async function updateLogManually() {
   try {
     const res = await updateJobLog(job.value.id, { force: true });
     if (res.appended) {
-      const fresh = await getJob(job.value.id);
-      if (fresh) {
-        job.value = fresh;
-        privateNotes.value = fresh.privateNotes ?? "";
-      }
+      privateNotes.value = await getJobPrivateNotes(job.value.id);
       toast.success("Log updated", "Added a new entry from recent client activity.");
     } else {
       toast.info("Nothing new to log", "No action-relevant client messages since the last update.");
@@ -579,11 +578,7 @@ async function maybeAutoUpdateLog() {
   try {
     const res = await updateJobLog(job.value.id);
     if (res.appended) {
-      const fresh = await getJob(job.value.id);
-      if (fresh) {
-        job.value = fresh;
-        privateNotes.value = fresh.privateNotes ?? "";
-      }
+      privateNotes.value = await getJobPrivateNotes(job.value.id);
     }
   } catch (e) {
     console.warn("auto-log failed", e);

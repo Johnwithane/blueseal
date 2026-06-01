@@ -304,7 +304,7 @@ const visibleApplications = computed(() =>
 
         <p class="text-sm whitespace-pre-line">{{ post.description }}</p>
 
-        <div class="grid grid-cols-2 gap-3 text-sm">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
           <div>
             <div class="text-xs text-[color:var(--bs-muted)]">Budget</div>
             <div class="font-medium">{{ formatBudget(post.budget.min, post.budget.max) }} CAD</div>
@@ -321,7 +321,7 @@ const visibleApplications = computed(() =>
           </div>
         </div>
 
-        <div v-if="post.photos.length" class="grid grid-cols-4 gap-2">
+        <div v-if="post.photos.length" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
           <div
             v-for="path in post.photos"
             :key="path"

@@ -117,7 +117,6 @@ interface JobShape {
   clientId: string;
   status: string;
   title?: string;
-  privateNotes?: string;
   scheduledStart?: Timestamp | null;
   scheduledEnd?: Timestamp | null;
 }
@@ -140,13 +139,17 @@ async function toolGetJobStatus(ctx: ToolContext): Promise<ToolResult> {
     return { ok: false, error: "Not your job." };
   }
   const timer = await toolGetCurrentTimer(ctx);
+  // Private notes moved to the jobs/{id}/private/notes subdoc (out of the
+  // client-readable job doc). Admin SDK reads bypass rules.
+  const notesSnap = await db.doc(`jobs/${ctx.jobId}/private/notes`).get();
+  const privateNotes = (notesSnap.data() as { notes?: string } | undefined)?.notes ?? "";
   return {
     ok: true,
     title: job.title ?? null,
     status: job.status,
     scheduledStart: job.scheduledStart?.toDate().toISOString() ?? null,
     scheduledEnd: job.scheduledEnd?.toDate().toISOString() ?? null,
-    privateNotes: job.privateNotes ?? "",
+    privateNotes,
     runningTimer: timer,
   };
 }
@@ -187,17 +190,20 @@ async function toolAppendPrivateNote(
   if (note.length > 2000) return { ok: false, error: "Note too long (max 2000 chars)." };
 
   const jobRef = db.doc(`jobs/${ctx.jobId}`);
+  const notesRef = jobRef.collection("private").doc("notes");
   const updated = await db.runTransaction(async (tx) => {
-    const snap = await tx.get(jobRef);
-    if (!snap.exists) throw new Error("Job not found.");
-    const job = snap.data() as JobShape;
+    // All reads before writes. Verify ownership off the job doc; read the
+    // existing notes off the private subdoc.
+    const [jobSnap, notesSnap] = await Promise.all([tx.get(jobRef), tx.get(notesRef)]);
+    if (!jobSnap.exists) throw new Error("Job not found.");
+    const job = jobSnap.data() as JobShape;
     if (job.tradespersonId !== ctx.uid) {
       throw new Error("Only the assigned tradesperson can update private notes.");
     }
-    const existing = (job.privateNotes ?? "").trim();
+    const existing = ((notesSnap.data() as { notes?: string } | undefined)?.notes ?? "").trim();
     const line = `[${dateLabel()}] ${note}`;
     const next = existing ? `${existing}\n${line}` : line;
-    tx.update(jobRef, { privateNotes: next });
+    tx.set(notesRef, { notes: next }, { merge: true });
     return next;
   });
   return { ok: true, privateNotes: updated };

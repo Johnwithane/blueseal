@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { CALLABLE_OPTS } from "../lib/callable";
 import { FieldValue, GeoPoint, Timestamp } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { z } from "zod";
@@ -55,7 +56,7 @@ function toTimestamp(dateStr: string | null): Timestamp | null {
   return Timestamp.fromDate(new Date(`${dateStr}T00:00:00Z`));
 }
 
-export const createJobPost = onCall({ enforceAppCheck: false }, async (req) => {
+export const createJobPost = onCall(CALLABLE_OPTS, async (req) => {
   const uid = requireRoleOrAdmin(req, "client");
   const parsed = Input.safeParse(req.data);
   if (!parsed.success) {

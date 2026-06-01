@@ -9,9 +9,16 @@ import {
   assertSucceeds,
   type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
-import { GeoPoint, doc, setDoc, updateDoc } from "firebase/firestore";
+import { GeoPoint, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 
-import { TRADIE_CLAIMS, TRADIE_UID, setupTestEnv } from "./setup";
+import {
+  ADMIN_CLAIMS,
+  ADMIN_UID,
+  OTHER_TRADIE_UID,
+  TRADIE_CLAIMS,
+  TRADIE_UID,
+  setupTestEnv,
+} from "./setup";
 
 let env: RulesTestEnvironment;
 
@@ -43,10 +50,11 @@ const baselineTradie = {
   pricingModel: "hourly",
   hourlyRate: 10_000,
   providesFreeQuotes: true,
-  location: new GeoPoint(49.2827, -123.1207),
-  geohash: "c2b2",
+  // Public doc carries only the coarse search fields; the exact location +
+  // address moved to the private/contact subdoc (see the describe block below).
+  locationApprox: new GeoPoint(49.28, -123.12),
+  geohashPublic: "c2b2bc",
   serviceRadiusKm: 25,
-  primaryAddressText: "Vancouver, BC",
   portfolioPhotos: [],
   ratingAvg: 0,
   ratingCount: 0,
@@ -175,5 +183,59 @@ describe("tradespeople — server-managed field locks", () => {
           "https://firebasestorage.googleapis.com/v0/b/test.appspot.com/o/logo.webp",
       }),
     );
+  });
+});
+
+// tradespeople/{uid}/private/contact — the exact location + (home) address.
+// These were world-readable on the public doc (the F1 leak); the whole point
+// of the subdoc is that NO ONE but the owner + admin can read them. The
+// unauthenticated case is the mass-harvest scenario we're closing.
+const CONTACT_PATH = ["tradespeople", TRADIE_UID, "private", "contact"] as const;
+
+async function seedContact() {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const fs = ctx.firestore();
+    await setDoc(doc(fs, "tradespeople", TRADIE_UID), baselineTradie);
+    await setDoc(doc(fs, ...CONTACT_PATH), {
+      location: new GeoPoint(49.2827, -123.1207),
+      primaryAddressText: "123 Real St, Vancouver, BC",
+      businessAddress: null,
+      businessPhone: null,
+      gstNumber: null,
+    });
+  });
+}
+
+describe("tradespeople/{uid}/private/contact — owner+admin only", () => {
+  it("owner can read their own contact subdoc", async () => {
+    await seedContact();
+    const fs = env.authenticatedContext(TRADIE_UID, TRADIE_CLAIMS).firestore();
+    await assertSucceeds(getDoc(doc(fs, ...CONTACT_PATH)));
+  });
+
+  it("owner can write their own contact subdoc", async () => {
+    await seedContact();
+    const fs = env.authenticatedContext(TRADIE_UID, TRADIE_CLAIMS).firestore();
+    await assertSucceeds(
+      setDoc(doc(fs, ...CONTACT_PATH), { primaryAddressText: "new" }, { merge: true }),
+    );
+  });
+
+  it("an UNAUTHENTICATED reader cannot read the contact subdoc (the leak we closed)", async () => {
+    await seedContact();
+    const fs = env.unauthenticatedContext().firestore();
+    await assertFails(getDoc(doc(fs, ...CONTACT_PATH)));
+  });
+
+  it("a different tradesperson cannot read the contact subdoc", async () => {
+    await seedContact();
+    const fs = env.authenticatedContext(OTHER_TRADIE_UID, TRADIE_CLAIMS).firestore();
+    await assertFails(getDoc(doc(fs, ...CONTACT_PATH)));
+  });
+
+  it("admin can read the contact subdoc", async () => {
+    await seedContact();
+    const fs = env.authenticatedContext(ADMIN_UID, ADMIN_CLAIMS).firestore();
+    await assertSucceeds(getDoc(doc(fs, ...CONTACT_PATH)));
   });
 });

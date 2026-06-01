@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { CALLABLE_OPTS } from "../lib/callable";
 import { FieldValue } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { z } from "zod";
@@ -7,7 +8,7 @@ import { requireRoleOrAdmin } from "../lib/auth";
 
 const Input = z.object({ postId: z.string().min(1).max(128) });
 
-export const withdrawApplication = onCall({ enforceAppCheck: false }, async (req) => {
+export const withdrawApplication = onCall(CALLABLE_OPTS, async (req) => {
   const uid = requireRoleOrAdmin(req, "tradesperson");
   const parsed = Input.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);

@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { CALLABLE_OPTS } from "../lib/callable";
 import { logger } from "firebase-functions/v2";
 import { z } from "zod";
 import { db } from "../lib/admin";
@@ -14,7 +15,7 @@ const Input = z.object({ vouchId: z.string().min(1).max(128) });
  * Hard delete (not a status flip) so a future re-vouch from the same
  * voucher passes the dedupe check without admin intervention.
  */
-export const revokeVouch = onCall({ enforceAppCheck: false }, async (req) => {
+export const revokeVouch = onCall(CALLABLE_OPTS, async (req) => {
   const uid = requireAuth(req);
   const parsed = Input.safeParse(req.data);
   if (!parsed.success) {

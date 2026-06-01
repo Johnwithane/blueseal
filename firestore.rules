@@ -181,6 +181,17 @@ service cloud.firestore {
             : request.resource.data.vettingStatus in ['draft','pending','info_requested']);
       allow update: if isAdmin();
       allow delete: if isAdmin();
+
+      // ---------- tradespeople/{uid}/private/{docId} ----------
+      // Exact service-area location + (often home) address + billing contact
+      // details. NEVER world-readable — that's the whole reason they're split
+      // off the public tradesperson doc. Owner + admin only. The owner writes
+      // these via setLocation / setContactInfo; admin can read for vetting +
+      // support and correct if needed.
+      match /private/{docId} {
+        allow read: if isOwner(tradieId) || isAdmin();
+        allow write: if isOwner(tradieId) || isAdmin();
+      }
     }
 
     // ---------- certifications ----------
@@ -281,8 +292,7 @@ service cloud.firestore {
       allow create: if isClient()
         && request.resource.data.clientId == uid()
         && request.resource.data.status == 'requested'
-        && request.resource.data.tradespersonId is string
-        && request.resource.data.privateNotes == '';
+        && request.resource.data.tradespersonId is string;
       // Updates: identity + creation fields immutable. Status transitions are
       // permitted but the doc cannot be reassigned to a different client/tradie/chat.
       // Counterparty display fields (denormalized at create) are also immutable
@@ -304,12 +314,9 @@ service cloud.firestore {
             == resource.data.get('tradespersonName', null)
         && request.resource.data.get('tradespersonPhotoURL', null)
             == resource.data.get('tradespersonPhotoURL', null)
-        && (
-          // Tradie can edit privateNotes; client must not touch them.
-          resource.data.tradespersonId == uid()
-          || isAdmin()
-          || request.resource.data.privateNotes == resource.data.privateNotes
-        )
+        // privateNotes moved to the jobs/{jobId}/private/notes subdoc (client
+        // can read the job doc, so the notes can't live on it). See the
+        // `private` match block below.
         // Per-party archive: each party may set/clear only their own
         // archive timestamp. Admin can touch either. `.get(field, null)`
         // is required because the fields are optional and pre-existing
@@ -372,6 +379,21 @@ service cloud.firestore {
         allow delete: if (isOwner(resource.data.tradespersonId)
                          && resource.data.invoicedAt == null)
                       || isAdmin();
+      }
+
+      // ---------- jobs/{jobId}/private/{docId} (tradie-only notes) ----------
+      // Holds the tradesperson's private job log (free-text notes + the
+      // AI auto-log). The parent job doc is client-readable, so these can't
+      // live on it. Gated to the assigned tradie + admin via a parent-job
+      // lookup. The client can read the job but NOT this subdoc.
+      match /private/{docId} {
+        allow read: if isSignedIn()
+          && (jobDoc(jobId).data.tradespersonId == uid() || isAdmin());
+        allow create, update: if isSignedIn()
+          && (jobDoc(jobId).data.tradespersonId == uid() || isAdmin())
+          && request.resource.data.notes is string
+          && request.resource.data.notes.size() <= 20000;
+        allow delete: if isAdmin();
       }
 
       // ---------- jobs/{jobId}/expenses (tradie-only; client never reads) ----------

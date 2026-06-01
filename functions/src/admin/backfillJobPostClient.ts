@@ -21,6 +21,7 @@
 // to "Client" + null photo so the row still renders something sensible.
 
 import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { CALLABLE_OPTS } from "../lib/callable";
 import { logger } from "firebase-functions/v2";
 
 import { db } from "../lib/admin";
@@ -73,7 +74,7 @@ async function readClientSnapshot(
 }
 
 export const backfillJobPostClient = onCall(
-  { enforceAppCheck: false },
+  CALLABLE_OPTS,
   async (req): Promise<BackfillResult> => {
     const actor = requireAdmin(req);
 

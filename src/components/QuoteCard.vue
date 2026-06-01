@@ -178,7 +178,9 @@ const KIND_ICON: Record<LineItemKind, string> = {
       "{{ quote.noteToClient }}"
     </div>
 
-    <table class="w-full text-sm border-t">
+    <!-- Scroll the line-item table on narrow screens instead of squishing. -->
+    <div class="overflow-x-auto">
+    <table class="w-full text-sm border-t min-w-[28rem]">
       <thead>
         <tr class="text-left text-[color:var(--bs-muted)]">
           <th class="py-1 font-medium">Item</th>
@@ -265,6 +267,7 @@ const KIND_ICON: Record<LineItemKind, string> = {
         </tr>
       </tfoot>
     </table>
+    </div>
 
     <div v-if="quote.estimatedHours" class="text-xs text-[color:var(--bs-muted)] mt-2">
       Estimated time: {{ quote.estimatedHours }} hours

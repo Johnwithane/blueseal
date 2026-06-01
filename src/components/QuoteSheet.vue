@@ -553,7 +553,7 @@ function close() {
                  on opt-in). The "X hrs × $Y/hr = $Z" preview below uses
                  whichever rate is in effect so the math is obvious. -->
             <div v-if="l.kind === 'hourly'" class="mt-2">
-              <div class="grid grid-cols-2 gap-2">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">Hours</label>
                   <InputNumber
@@ -638,7 +638,7 @@ function close() {
             <!-- Tax per line. Entered as a percent (e.g. 13 for HST) so the
                  number on screen matches what a tradesperson would say out
                  loud. Stored as a 0–1 decimal on the line item. -->
-            <div class="grid grid-cols-2 gap-2 mt-2">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
               <div>
                 <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">
                   Tax rate
@@ -701,7 +701,7 @@ function close() {
           :allow-empty="false"
           class="text-xs"
         />
-        <div v-if="discountMode !== 'off'" class="mt-3 grid grid-cols-2 gap-2">
+        <div v-if="discountMode !== 'off'" class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
           <div>
             <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">
               {{ discountMode === "percent" ? "Percent off" : "Amount off" }}
@@ -752,7 +752,7 @@ function close() {
           :allow-empty="false"
           class="text-xs"
         />
-        <div v-if="upfrontMode !== 'off'" class="mt-3 grid grid-cols-2 gap-2">
+        <div v-if="upfrontMode !== 'off'" class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
           <div>
             <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">
               {{ upfrontMode === "percent" ? `Percent (max ${UPFRONT_PERCENT_CAP}%)` : "Amount" }}

@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { CALLABLE_OPTS } from "../lib/callable";
 import { FieldValue, GeoPoint, Timestamp } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { z } from "zod";
@@ -88,11 +89,10 @@ interface JobPayload {
   cancelledReason: null;
   cancelledBy: null;
   chatId: string;
-  privateNotes: string;
   sourcePostId: string;
 }
 
-export const acceptApplication = onCall({ enforceAppCheck: false }, async (req) => {
+export const acceptApplication = onCall(CALLABLE_OPTS, async (req) => {
   const uid = requireRoleOrAdmin(req, "client");
   const parsed = Input.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);
@@ -203,7 +203,6 @@ export const acceptApplication = onCall({ enforceAppCheck: false }, async (req) 
         cancelledReason: null,
         cancelledBy: null,
         chatId: chatRef.id,
-        privateNotes: "",
         sourcePostId: postId,
       };
       tx.set(jobRef, jobPayload);

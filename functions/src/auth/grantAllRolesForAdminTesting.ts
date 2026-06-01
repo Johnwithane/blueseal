@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { CALLABLE_OPTS } from "../lib/callable";
 import { logger } from "firebase-functions/v2";
 import { FieldValue } from "firebase-admin/firestore";
 import { adminAuth, db } from "../lib/admin";
@@ -15,7 +16,7 @@ import { requireAdmin } from "../lib/auth";
  * here because admins are already trusted.
  */
 export const grantAllRolesForAdminTesting = onCall(
-  { enforceAppCheck: false },
+  CALLABLE_OPTS,
   async (req) => {
     const uid = requireAdmin(req);
 
@@ -64,10 +65,11 @@ export const grantAllRolesForAdminTesting = onCall(
         pricingModel: "quote",
         hourlyRate: null,
         providesFreeQuotes: true,
-        location: null,
-        geohash: "",
+        // Exact location + address are private (contact subdoc), created
+        // lazily on setLocation. Public doc carries only coarse search fields.
+        locationApprox: null,
+        geohashPublic: "",
         serviceRadiusKm: 25,
-        primaryAddressText: "",
         portfolioPhotos: [],
         ratingAvg: 0,
         ratingCount: 0,

@@ -2,7 +2,6 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import { updateProfile } from "firebase/auth";
-import { GeoPoint } from "firebase/firestore";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import InputNumber from "primevue/inputnumber";
@@ -29,6 +28,8 @@ import {
 import {
   createOrUpdateDraft,
   getTradesperson,
+  getTradespersonContact,
+  setContactInfo,
   setLocation,
 } from "@/firebase/services/tradespeople";
 import { setInvoiceNumbering } from "@/firebase/services/billing";
@@ -250,9 +251,6 @@ onMounted(async () => {
     if (t) {
       companyName.value = t.companyName ?? "";
       languages.value = Array.isArray(t.languages) ? [...t.languages] : [];
-      businessAddress.value = t.businessAddress ?? "";
-      businessPhone.value = t.businessPhone ?? "";
-      gstNumber.value = t.gstNumber ?? "";
       companyLogoUrl.value = t.companyLogoUrl ?? null;
       invoicePrefix.value = t.invoicePrefix ?? "INV";
       quotePrefix.value = t.quotePrefix ?? "Q";
@@ -260,15 +258,22 @@ onMounted(async () => {
       nextQuoteNumber.value = t.nextQuoteNumber ?? 1;
       initialNextInvoiceNumber.value = t.nextInvoiceNumber ?? 1;
       initialNextQuoteNumber.value = t.nextQuoteNumber ?? 1;
-      // Onboarding writes (0,0) into `location` for new drafts; treat
-      // that the same as "unset" so the picker opens on the country
-      // centroid instead of dropping a pin in the Gulf of Guinea.
-      const hasGeo = !!t.location && t.location.latitude !== 0;
+      // Exact location + (home) address + billing contact live in the
+      // private contact subdoc, not the public tradesperson doc.
+      const contact = await getTradespersonContact(auth.fbUser.uid);
+      businessAddress.value = contact?.businessAddress ?? "";
+      businessPhone.value = contact?.businessPhone ?? "";
+      gstNumber.value = contact?.gstNumber ?? "";
+      // Onboarding writes (0,0) into the pin for new drafts; treat that the
+      // same as "unset" so the picker opens on the country centroid instead
+      // of dropping a pin in the Gulf of Guinea.
+      const loc = contact?.location;
+      const hasGeo = !!loc && loc.latitude !== 0;
       serviceLocation.value = {
-        lat: hasGeo ? t.location.latitude : null,
-        lng: hasGeo ? t.location.longitude : null,
+        lat: hasGeo ? loc.latitude : null,
+        lng: hasGeo ? loc.longitude : null,
         radiusKm: t.serviceRadiusKm || 25,
-        label: t.primaryAddressText ?? "",
+        label: contact?.primaryAddressText ?? "",
       };
     }
   }
@@ -349,6 +354,9 @@ async function saveTradieProfile() {
     await createOrUpdateDraft(auth.fbUser.uid, {
       companyName: companyName.value.trim() || null,
       languages: languages.value,
+    });
+    // Billing contact (address override / phone / GST) is private — subdoc.
+    await setContactInfo(auth.fbUser.uid, {
       businessAddress: businessAddress.value.trim() || null,
       businessPhone: businessPhone.value.trim() || null,
       gstNumber: gstNumber.value.trim() || null,
@@ -356,9 +364,6 @@ async function saveTradieProfile() {
     if (tradie.value) {
       tradie.value.companyName = companyName.value.trim() || null;
       tradie.value.languages = [...languages.value];
-      tradie.value.businessAddress = businessAddress.value.trim() || null;
-      tradie.value.businessPhone = businessPhone.value.trim() || null;
-      tradie.value.gstNumber = gstNumber.value.trim() || null;
     }
     toast.success("Tradesperson profile saved");
   } catch (e) {
@@ -385,15 +390,13 @@ async function saveServiceArea() {
   savingServiceArea.value = true;
   try {
     await createOrUpdateDraft(auth.fbUser.uid, {
-      primaryAddressText: label ?? "",
       serviceRadiusKm: radiusKm,
-      location: new GeoPoint(lat, lng),
     });
-    await setLocation(auth.fbUser.uid, lat, lng);
+    // Exact pin + address label go to the private subdoc; setLocation also
+    // writes the coarse locationApprox + geohashPublic to the public doc.
+    await setLocation(auth.fbUser.uid, lat, lng, label ?? "");
     if (tradie.value) {
-      tradie.value.primaryAddressText = label ?? "";
       tradie.value.serviceRadiusKm = radiusKm;
-      tradie.value.location = new GeoPoint(lat, lng);
     }
     toast.success("Service area saved");
   } catch (e) {

@@ -1,4 +1,5 @@
 import { initializeApp } from "firebase/app";
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 import { getAuth, connectAuthEmulator } from "firebase/auth";
 import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 import { getStorage, connectStorageEmulator } from "firebase/storage";
@@ -16,6 +17,34 @@ const firebaseConfig = {
 };
 
 export const app = initializeApp(firebaseConfig);
+
+// App Check (anti-abuse / bot protection for callables + Firestore + Storage).
+// Gated on VITE_RECAPTCHA_SITE_KEY so environments without a key configured
+// (local dev, preview builds) don't crash — App Check simply stays off there.
+// Turning ENFORCEMENT on is a separate, coordinated step: provision the key,
+// ship this init, THEN set ENFORCE_APP_CHECK=true on the Cloud Functions
+// runtime (see functions/src/lib/callable.ts). Enforcing before this init is
+// live would reject every call.
+//
+// NOTE: the key must be a reCAPTCHA *Enterprise* site key. If you provision a
+// reCAPTCHA v3 key instead, swap ReCaptchaEnterpriseProvider →
+// ReCaptchaV3Provider (same import path).
+const recaptchaSiteKey: string = import.meta.env.VITE_RECAPTCHA_SITE_KEY ?? "";
+if (recaptchaSiteKey) {
+  // In dev, let Firebase mint a debug token so App Check works against a
+  // local/test build without a real attestation. Register the printed token
+  // in the Firebase console under App Check → Apps → Manage debug tokens.
+  if (import.meta.env.DEV) {
+    (
+      self as unknown as { FIREBASE_APPCHECK_DEBUG_TOKEN?: boolean | string }
+    ).FIREBASE_APPCHECK_DEBUG_TOKEN = import.meta.env.VITE_APPCHECK_DEBUG_TOKEN ?? true;
+  }
+  initializeAppCheck(app, {
+    provider: new ReCaptchaEnterpriseProvider(recaptchaSiteKey),
+    isTokenAutoRefreshEnabled: true,
+  });
+}
+
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);

@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { CALLABLE_OPTS } from "../lib/callable";
 import { logger } from "firebase-functions/v2";
 import { z } from "zod";
 import { adminAuth, db } from "../lib/admin";
@@ -7,7 +8,7 @@ import { logAdminAction } from "../lib/audit";
 
 const Input = z.object({ targetUid: z.string().min(1).max(128) });
 
-export const setAdminRole = onCall({ enforceAppCheck: false }, async (req) => {
+export const setAdminRole = onCall(CALLABLE_OPTS, async (req) => {
   const actor = requireAdmin(req);
   const parsed = Input.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", "Invalid input");

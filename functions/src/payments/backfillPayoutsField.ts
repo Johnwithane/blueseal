@@ -16,6 +16,7 @@
 // reasonable follow-up but not in this commit's scope).
 
 import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { CALLABLE_OPTS } from "../lib/callable";
 import { logger } from "firebase-functions/v2";
 
 import { db } from "../lib/admin";
@@ -33,7 +34,7 @@ interface BackfillResult {
 }
 
 export const backfillPayoutsField = onCall(
-  { enforceAppCheck: false },
+  CALLABLE_OPTS,
   async (req): Promise<BackfillResult> => {
     const actor = requireAdmin(req);
 

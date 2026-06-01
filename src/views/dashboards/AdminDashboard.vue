@@ -3,7 +3,11 @@ import { onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import Button from "primevue/button";
 import Avatar from "primevue/avatar";
-import { listPendingApplications } from "@/firebase/services/tradespeople";
+import {
+  listPendingApplications,
+  backfillTradieContact,
+  type BackfillTradieContactResult,
+} from "@/firebase/services/tradespeople";
 import {
   backfillPayoutsField,
   type BackfillPayoutsResult,
@@ -16,6 +20,10 @@ import {
   backfillJobPostClient,
   type BackfillJobPostClientResult,
 } from "@/firebase/services/jobPosts";
+import {
+  backfillJobPrivateNotes,
+  type BackfillJobPrivateNotesResult,
+} from "@/firebase/services/jobs";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 import type { TradespersonDoc, WithId } from "@/firebase/interfaces";
@@ -101,6 +109,55 @@ async function runJobPostClientBackfill() {
     toast.error("Job-post client backfill failed", humanizeError(err));
   } finally {
     backfillingJobPostClient.value = false;
+  }
+}
+
+// Private-notes migration — moves legacy job `privateNotes` into the
+// tradie-only jobs/{id}/private/notes subdoc and strips the old field off the
+// client-readable job doc (closes the F2 leak for pre-existing jobs). Run once
+// after the F2 deploy; idempotent. Scanned counts every job, so on a large DB
+// this can take a few clicks (it pages and the cursor resumes).
+const backfillingPrivateNotes = ref(false);
+const privateNotesBackfillResult = ref<BackfillJobPrivateNotesResult | null>(null);
+
+async function runPrivateNotesBackfill() {
+  backfillingPrivateNotes.value = true;
+  try {
+    privateNotesBackfillResult.value = await backfillJobPrivateNotes();
+    const r = privateNotesBackfillResult.value;
+    toast.success(
+      "Private-notes backfill complete",
+      `Scanned ${r.scanned}, moved ${r.copied}, stripped-only ${r.strippedOnly}, skipped ${r.skipped}.`,
+    );
+  } catch (err) {
+    toast.error("Private-notes backfill failed", humanizeError(err));
+  } finally {
+    backfillingPrivateNotes.value = false;
+  }
+}
+
+// Tradesperson contact migration (F1) — moves exact location + (home) address
+// off the world-readable tradesperson doc into the private/contact subdoc and
+// derives the coarse public search fields. MUST be run once after the F1
+// deploy: until then, discovery returns nothing for un-migrated tradies (they
+// have `geohash`, the query now uses `geohashPublic`). Idempotent; re-click on
+// a large DB until skipped == scanned.
+const backfillingTradieContact = ref(false);
+const tradieContactBackfillResult = ref<BackfillTradieContactResult | null>(null);
+
+async function runTradieContactBackfill() {
+  backfillingTradieContact.value = true;
+  try {
+    tradieContactBackfillResult.value = await backfillTradieContact();
+    const r = tradieContactBackfillResult.value;
+    toast.success(
+      "Tradesperson contact migration complete",
+      `Scanned ${r.scanned}, migrated ${r.migrated}, skipped ${r.skipped}.`,
+    );
+  } catch (err) {
+    toast.error("Tradesperson contact migration failed", humanizeError(err));
+  } finally {
+    backfillingTradieContact.value = false;
   }
 }
 
@@ -239,6 +296,51 @@ onMounted(async () => {
             fell back to "Client"
           </template>
           ({{ jobPostClientBackfillResult.pages }} page{{ jobPostClientBackfillResult.pages === 1 ? "" : "s" }}).
+        </p>
+      </div>
+
+      <!-- Private-notes migration: moves legacy job `privateNotes` into the
+           tradie-only private/notes subdoc and strips the old field off the
+           client-readable job doc. Run once after the F2 deploy. Idempotent;
+           on a large DB re-click until skipped == scanned. -->
+      <div class="mt-3 flex flex-wrap items-center gap-3">
+        <Button
+          label="Migrate private job notes"
+          icon="pi pi-lock"
+          :loading="backfillingPrivateNotes"
+          @click="runPrivateNotesBackfill"
+        />
+        <p
+          v-if="privateNotesBackfillResult"
+          class="text-sm text-[color:var(--bs-muted)] flex-1 min-w-[10rem]"
+        >
+          Last run: scanned <strong>{{ privateNotesBackfillResult.scanned }}</strong>,
+          moved <strong>{{ privateNotesBackfillResult.copied }}</strong>,
+          stripped-only <strong>{{ privateNotesBackfillResult.strippedOnly }}</strong>,
+          skipped <strong>{{ privateNotesBackfillResult.skipped }}</strong>
+          ({{ privateNotesBackfillResult.pages }} page{{ privateNotesBackfillResult.pages === 1 ? "" : "s" }}).
+        </p>
+      </div>
+
+      <!-- Tradesperson contact migration (F1): exact location + address out of
+           the world-readable doc into private/contact + derive coarse search
+           fields. Run once after the F1 deploy. Idempotent; re-click until
+           skipped == scanned. -->
+      <div class="mt-3 flex flex-wrap items-center gap-3">
+        <Button
+          label="Migrate tradesperson location"
+          icon="pi pi-map-marker"
+          :loading="backfillingTradieContact"
+          @click="runTradieContactBackfill"
+        />
+        <p
+          v-if="tradieContactBackfillResult"
+          class="text-sm text-[color:var(--bs-muted)] flex-1 min-w-[10rem]"
+        >
+          Last run: scanned <strong>{{ tradieContactBackfillResult.scanned }}</strong>,
+          migrated <strong>{{ tradieContactBackfillResult.migrated }}</strong>,
+          skipped <strong>{{ tradieContactBackfillResult.skipped }}</strong>
+          ({{ tradieContactBackfillResult.pages }} page{{ tradieContactBackfillResult.pages === 1 ? "" : "s" }}).
         </p>
       </div>
     </div>

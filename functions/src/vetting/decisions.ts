@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { CALLABLE_OPTS } from "../lib/callable";
 import { z } from "zod";
 import { FieldValue } from "firebase-admin/firestore";
 import { db } from "../lib/admin";
@@ -28,7 +29,7 @@ async function tradieEmail(uid: string): Promise<string | null> {
   return (u.data() as { email?: string } | undefined)?.email ?? null;
 }
 
-export const approveApplication = onCall({ enforceAppCheck: false }, async (req) => {
+export const approveApplication = onCall(CALLABLE_OPTS, async (req) => {
   const actor = requireAdmin(req);
   const parsed = ApproveInput.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);
@@ -138,7 +139,7 @@ export const approveApplication = onCall({ enforceAppCheck: false }, async (req)
   return { ok: true };
 });
 
-export const requestApplicationInfo = onCall({ enforceAppCheck: false }, async (req) => {
+export const requestApplicationInfo = onCall(CALLABLE_OPTS, async (req) => {
   const actor = requireAdmin(req);
   const parsed = InfoInput.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);
@@ -175,7 +176,7 @@ export const requestApplicationInfo = onCall({ enforceAppCheck: false }, async (
   return { ok: true };
 });
 
-export const rejectApplication = onCall({ enforceAppCheck: false }, async (req) => {
+export const rejectApplication = onCall(CALLABLE_OPTS, async (req) => {
   const actor = requireAdmin(req);
   const parsed = RejectInput.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);

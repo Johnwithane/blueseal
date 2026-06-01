@@ -27,6 +27,13 @@ const loadingTradie = ref(true);
 const posts = ref<WithId<JobPostDoc>[]>([]);
 const appliedPostIds = ref<Set<string>>(new Set());
 
+// The exact service-area point is now private; the public tradesperson doc
+// carries only locationApprox (~1 km). (0,0) is the "not set yet" sentinel
+// written by onboarding, so treat it as unset.
+const hasServiceArea = computed(
+  () => !!tradie.value?.locationApprox && tradie.value.locationApprox.latitude !== 0,
+);
+
 const tradeFilter = ref<string | "any">("any");
 const radiusKm = ref(25);
 
@@ -43,7 +50,7 @@ onMounted(async () => {
   tradie.value = await getTradesperson(auth.fbUser.uid);
   loadingTradie.value = false;
 
-  if (!tradie.value || !tradie.value.isVisible || !tradie.value.location) return;
+  if (!tradie.value || !tradie.value.isVisible || !hasServiceArea.value) return;
 
   // Default trade filter to primary trade.
   tradeFilter.value = tradie.value.trades[0] ?? "any";
@@ -57,15 +64,15 @@ onMounted(async () => {
 });
 
 watch([tradeFilter, radiusKm], () => {
-  if (tradie.value?.isVisible && tradie.value.location) startFeed();
+  if (tradie.value?.isVisible && hasServiceArea.value) startFeed();
 });
 
 function startFeed() {
   unsubFeed?.();
-  if (!tradie.value || !tradie.value.location) return;
+  if (!tradie.value || !hasServiceArea.value) return;
   const center = {
-    lat: tradie.value.location.latitude,
-    lng: tradie.value.location.longitude,
+    lat: tradie.value.locationApprox.latitude,
+    lng: tradie.value.locationApprox.longitude,
   };
   unsubFeed = subscribeJobPostFeed(
     {
@@ -135,7 +142,7 @@ function urgencyLabel(u: string): string {
       You'll be able to browse and apply to open jobs once your application is approved (typically 1–2 business days).
     </Message>
 
-    <Message v-else-if="!tradie?.location" severity="warn" :closable="false" class="mt-6">
+    <Message v-else-if="!hasServiceArea" severity="warn" :closable="false" class="mt-6">
       <strong>Service area not set.</strong>
       We need your address and service radius to show jobs near you.
       <RouterLink :to="{ name: 'Account' }" class="underline ml-1">Update your profile</RouterLink>

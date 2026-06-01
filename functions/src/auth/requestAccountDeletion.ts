@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { CALLABLE_OPTS } from "../lib/callable";
 import { FieldValue } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { z } from "zod";
@@ -21,7 +22,7 @@ const Input = z.object({
  *
  * Returns success even when the user doc is already deleted (idempotent).
  */
-export const requestAccountDeletion = onCall({ enforceAppCheck: false }, async (req) => {
+export const requestAccountDeletion = onCall(CALLABLE_OPTS, async (req) => {
   const uid = requireAuth(req);
   const parsed = Input.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);

@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { CALLABLE_OPTS } from "../lib/callable";
 import { FieldValue } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { z } from "zod";
@@ -15,7 +16,7 @@ const Input = z.object({ vouchId: z.string().min(1).max(128) });
  * since the voucher hit Send) so the public chip matches the live profile.
  */
 export const acceptVouchRequest = onCall(
-  { enforceAppCheck: false },
+  CALLABLE_OPTS,
   async (req) => {
     const uid = requireAuth(req);
     const parsed = Input.safeParse(req.data);

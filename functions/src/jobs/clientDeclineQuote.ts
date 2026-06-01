@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { CALLABLE_OPTS } from "../lib/callable";
 import { FieldValue } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { z } from "zod";
@@ -38,7 +39,7 @@ interface QuoteData {
  *
  * onJobUpdated never fires for this path because status doesn't change.
  */
-export const clientDeclineQuote = onCall({ enforceAppCheck: false }, async (req) => {
+export const clientDeclineQuote = onCall(CALLABLE_OPTS, async (req) => {
   const uid = requireRole(req, "client");
   const parsed = Input.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);

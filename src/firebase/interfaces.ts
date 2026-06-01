@@ -136,26 +136,17 @@ export interface TradespersonDoc {
   pricingModel: PricingModel;
   hourlyRate: number | null; // cents
   providesFreeQuotes: boolean;
-  location: GeoPoint;
-  geohash: string;
+  // PUBLIC, coarse location for discovery. The exact GeoPoint + the home
+  // address live in the private subdoc tradespeople/{uid}/private/contact
+  // (see TradespersonContact) — they must NOT be on this world-readable doc,
+  // or any unauthenticated reader could harvest every vetted tradie's home
+  // coordinates. `locationApprox` is the exact point rounded to ~2 decimals
+  // (~1.1 km); `geohashPublic` is a length-6 geohash (~1.2 km cell) used for
+  // the bounding-box proximity query. Mirrors the public/private split used
+  // by jobPosts.addressPublic.
+  locationApprox: GeoPoint;
+  geohashPublic: string;
   serviceRadiusKm: number;
-  primaryAddressText: string;
-  // Billing-side contact info shown on quotes + invoices the tradesperson
-  // issues. businessAddress optionally overrides primaryAddressText for
-  // sole proprietors who'd rather not show their home address on
-  // paperwork; falls back to primaryAddressText when blank. businessPhone
-  // is a separate line so the client can reach the trade's billing
-  // contact directly. gstNumber is the tradesperson's CRA GST/HST
-  // registration (format like "123456789RT0001") — optional because
-  // small suppliers under the $30k threshold aren't required to register,
-  // but tradies who are registered must show it on invoices per CRA's
-  // documentary requirements for clients claiming input tax credits.
-  // All three optional only because pre-existing tradesperson docs
-  // predate the fields; new docs default to null + the UI nudges the
-  // owner to fill them.
-  businessAddress?: string | null;
-  businessPhone?: string | null;
-  gstNumber?: string | null;
   portfolioPhotos: string[];
   ratingAvg: number;
   ratingCount: number;
@@ -217,6 +208,28 @@ export interface TradespersonDoc {
   // pre-cutover docs don't have it; readers should treat undefined as 0.
   paidJobsCount?: number;
   paidLifetimeCents?: number;
+}
+
+// Private tradesperson contact details, stored at
+// tradespeople/{uid}/private/contact. Read/write restricted to the owner +
+// admin in firestore.rules. Holds the data that must NOT be world-readable:
+// the exact service-area point and the (often home) address used on
+// paperwork. The public tradespeople doc carries only locationApprox +
+// geohashPublic for discovery.
+//
+// `location` is the exact GeoPoint the tradie dropped on the map (used to
+// restore the editor pin). `primaryAddressText` is the human-readable label
+// for that point (often a home address for sole proprietors). businessAddress
+// optionally overrides primaryAddressText on quotes/invoices for tradies who'd
+// rather not show their home address; businessPhone is the billing contact
+// line; gstNumber is the CRA GST/HST registration shown on invoices. The last
+// three are optional/null because not every tradie fills them in.
+export interface TradespersonContact {
+  location: GeoPoint;
+  primaryAddressText: string;
+  businessAddress?: string | null;
+  businessPhone?: string | null;
+  gstNumber?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -424,15 +437,8 @@ export interface JobDoc {
   // the tradesperson status dropdown before this field existed.
   cancelledBy: string | null;
   chatId: string;
-  privateNotes: string;
   // Set when this job was created via the job-board marketplace conversion.
   sourcePostId: string | null;
-  // Watermark for the auto-log feature (aiUpdateJobLog). Updated each time
-  // the AI scans new client chat activity and either appends a note or
-  // confirms there was nothing log-worthy. The auto-trigger on
-  // JobDetailView short-circuits server-side when this is within a 1-hour
-  // cooldown.
-  privateNotesLastAutoUpdateAt: Timestamp | null;
   // Per-party user-initiated archive. Each party can hide a job from their
   // own dashboard's default list without affecting the other side's view —
   // the underlying job doc and its chat/invoice/etc remain intact. Rules
@@ -451,6 +457,20 @@ export interface JobDoc {
   // is back-linked by onJobCompleted when the auto-drafted invoice consumes
   // the credit, so a second invoice can never double-apply it.
   upfrontFee?: UpfrontFeeState | null;
+}
+
+// Tradesperson-private job log, stored at jobs/{jobId}/private/notes so it is
+// physically unreadable by the client (the parent job doc is client-readable,
+// and Firestore can't filter reads by field). Holds the tradie's free-text
+// notes plus the auto-log written by aiUpdateJobLog. Read/write is restricted
+// to the assigned tradie + admin in firestore.rules.
+export interface JobPrivateNotes {
+  notes: string;
+  // Watermark for the auto-log feature (aiUpdateJobLog). Updated each time the
+  // AI scans new client chat activity and either appends a note or confirms
+  // there was nothing log-worthy. The auto-trigger on JobDetailView
+  // short-circuits server-side when this is within a 1-hour cooldown.
+  lastAutoUpdateAt: Timestamp | null;
 }
 
 export interface UpfrontFeeState {

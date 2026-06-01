@@ -8,6 +8,7 @@
 // flips true after onboarding); Stripe returns 400 before then.
 
 import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { CALLABLE_OPTS } from "../lib/callable";
 import { logger } from "firebase-functions/v2";
 
 import { db } from "../lib/admin";
@@ -15,7 +16,7 @@ import { requireRole } from "../lib/auth";
 import { STRIPE_SECRET_KEY, getStripe } from "./stripeClient";
 
 export const createConnectLoginLink = onCall(
-  { secrets: [STRIPE_SECRET_KEY], enforceAppCheck: false },
+  { ...CALLABLE_OPTS, secrets: [STRIPE_SECRET_KEY] },
   async (req) => {
     const uid = requireRole(req, "tradesperson");
 

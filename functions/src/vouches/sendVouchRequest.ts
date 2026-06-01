@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { CALLABLE_OPTS } from "../lib/callable";
 import { FieldValue } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { z } from "zod";
@@ -46,7 +47,7 @@ const MAX_OUTGOING_PENDING = 50;
  * Dedupe: at most one open or accepted vouch per (fromUserId, target). The
  * target is the resolved uid in (1)/(2), or the email in (3).
  */
-export const sendVouchRequest = onCall({ enforceAppCheck: false }, async (req) => {
+export const sendVouchRequest = onCall(CALLABLE_OPTS, async (req) => {
   const uid = requireRole(req, "tradesperson");
   const parsed = Input.safeParse(req.data);
   if (!parsed.success) {

@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { CALLABLE_OPTS } from "../lib/callable";
 import { FieldValue } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { z } from "zod";
@@ -13,7 +14,7 @@ const Input = z.object({ postId: z.string().min(1).max(128) });
 // the intake form (i.e. job status is still 'accepted'). Cancels the job,
 // flips the post back to open, returns the previously-selected applicant
 // to pending. Rejected applicants stay rejected to avoid re-spamming them.
-export const returnToApplicants = onCall({ enforceAppCheck: false }, async (req) => {
+export const returnToApplicants = onCall(CALLABLE_OPTS, async (req) => {
   const uid = requireRoleOrAdmin(req, "client");
   const parsed = Input.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);

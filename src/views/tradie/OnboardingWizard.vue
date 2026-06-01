@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref, computed, watch } from "vue";
 import { useRouter, onBeforeRouteLeave } from "vue-router";
-import { GeoPoint } from "firebase/firestore";
 import Button from "primevue/button";
 import Stepper from "primevue/stepper";
 import StepList from "primevue/steplist";
@@ -24,6 +23,7 @@ import { useAuthStore } from "@/stores/auth";
 import {
   createOrUpdateDraft,
   getTradesperson,
+  getTradespersonContact,
   setLocation,
   emptyAvailability,
   withdrawFromReview,
@@ -313,12 +313,15 @@ onMounted(async () => {
     pricingModel.value = t.pricingModel;
     hourlyRateDollars.value = t.hourlyRate ? t.hourlyRate / 100 : null;
     providesFreeQuotes.value = t.providesFreeQuotes;
-    const hasGeo = !!t.location && t.location.latitude !== 0;
+    // Exact pin + address label are private now (contact subdoc).
+    const contact = await getTradespersonContact(auth.fbUser.uid);
+    const loc = contact?.location;
+    const hasGeo = !!loc && loc.latitude !== 0;
     location.value = {
-      lat: hasGeo ? t.location.latitude : null,
-      lng: hasGeo ? t.location.longitude : null,
+      lat: hasGeo ? loc.latitude : null,
+      lng: hasGeo ? loc.longitude : null,
       radiusKm: t.serviceRadiusKm || 25,
-      label: t.primaryAddressText ?? "",
+      label: contact?.primaryAddressText ?? "",
     };
     availability.value = t.weeklyAvailability ?? emptyAvailability();
     paymentInstructions.value = t.paymentInstructions ?? "";
@@ -402,7 +405,6 @@ async function saveDraft(opts: { silent?: boolean } = {}): Promise<void> {
       hourlyRate:
         hourlyRateDollars.value != null ? Math.round(hourlyRateDollars.value * 100) : null,
       providesFreeQuotes: providesFreeQuotes.value,
-      primaryAddressText: location.value.label ?? "",
       serviceRadiusKm: location.value.radiusKm,
       weeklyAvailability: availability.value,
       paymentInstructions: paymentInstructions.value,
@@ -420,12 +422,11 @@ async function saveDraft(opts: { silent?: boolean } = {}): Promise<void> {
       photoURL: photoURL.value ?? auth.user?.photoURL ?? null,
     };
     const { lat: locLat, lng: locLng } = location.value;
-    if (locLat != null && locLng != null) {
-      patch.location = new GeoPoint(locLat, locLng);
-    }
     await createOrUpdateDraft(auth.fbUser.uid, patch);
     if (locLat != null && locLng != null) {
-      await setLocation(auth.fbUser.uid, locLat, locLng);
+      // Exact pin + address label go to the private contact subdoc; setLocation
+      // also derives the coarse locationApprox + geohashPublic on the public doc.
+      await setLocation(auth.fbUser.uid, locLat, locLng, location.value.label ?? "");
     }
     lastSavedAt.value = new Date();
     dirty.value = false;

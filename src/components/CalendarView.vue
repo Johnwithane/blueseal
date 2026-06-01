@@ -227,11 +227,13 @@ function confirmBlock() {
     </header>
 
     <!-- WEEK VIEW -->
-    <div v-if="view === 'week'" class="grid grid-cols-2 gap-2 sm:grid-cols-7">
+    <!-- Mobile: full-width vertical agenda (1 col, compact height) so each day
+         is readable; sm+: the 7-across week grid. -->
+    <div v-if="view === 'week'" class="grid grid-cols-1 gap-2 sm:grid-cols-7">
       <div
         v-for="(d, i) in weekDays"
         :key="d.toISOString()"
-        class="bs-card min-h-[16rem] p-3"
+        class="bs-card min-h-[7rem] sm:min-h-[16rem] p-3"
         :class="{ 'ring-2 ring-[color:var(--bs-blue)]': isSameDay(d, today) }"
       >
         <header class="mb-2 flex items-center justify-between">

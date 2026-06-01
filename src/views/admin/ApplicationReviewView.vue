@@ -5,7 +5,7 @@ import Button from "primevue/button";
 import Tag from "primevue/tag";
 import Textarea from "primevue/textarea";
 import Dialog from "primevue/dialog";
-import { getTradesperson } from "@/firebase/services/tradespeople";
+import { getTradesperson, getTradespersonContact } from "@/firebase/services/tradespeople";
 import { listCertsFor, approveCertification, rejectCertification } from "@/firebase/services/certifications";
 import { getIdVerification, approveId, rejectId } from "@/firebase/services/idVerifications";
 import { resolveFileUrl } from "@/firebase/services/storage";
@@ -46,6 +46,9 @@ const { date } = useFormatters();
 
 const uid = route.params.uid as string;
 const tradie = ref<WithId<TradespersonDoc> | null>(null);
+// Service-area address is private (tradespeople/{uid}/private/contact); admin
+// fetches it separately for the review screen.
+const tradieAddress = ref<string>("");
 const certs = ref<WithId<CertificationDoc>[]>([]);
 const idDoc = ref<WithId<IdVerificationDoc> | null>(null);
 // The tradesperson's client stores ID as a Storage path (admin-only-read
@@ -82,6 +85,7 @@ function openViewer(url: string | null | undefined, title: string, watermark = f
 async function load() {
   loading.value = true;
   tradie.value = await getTradesperson(uid);
+  tradieAddress.value = (await getTradespersonContact(uid))?.primaryAddressText ?? "";
   const [certList, idData, insuranceData, wsibData] = await Promise.all([
     listCertsFor(uid),
     getIdVerification(uid),
@@ -272,7 +276,7 @@ const approveBlockerHint = computed(() => {
           <dl class="text-sm space-y-2">
             <div><dt class="font-medium">Trades</dt><dd>{{ tradie.trades.map(tradeLabel).join(", ") }}</dd></div>
             <div><dt class="font-medium">Bio</dt><dd class="whitespace-pre-wrap">{{ tradie.bio }}</dd></div>
-            <div><dt class="font-medium">Service area</dt><dd>{{ tradie.primaryAddressText }} ({{ tradie.serviceRadiusKm }} km)</dd></div>
+            <div><dt class="font-medium">Service area</dt><dd>{{ tradieAddress }} ({{ tradie.serviceRadiusKm }} km)</dd></div>
             <div><dt class="font-medium">Pricing</dt><dd>{{ tradie.pricingModel }}{{ tradie.hourlyRate ? ` @ $${(tradie.hourlyRate/100).toFixed(2)}/hr` : "" }}</dd></div>
           </dl>
         </section>
@@ -502,7 +506,7 @@ const approveBlockerHint = computed(() => {
       </footer>
     </template>
 
-    <Dialog v-model:visible="showRequestInfo" modal header="Request more information" :style="{ width: '32rem' }">
+    <Dialog v-model:visible="showRequestInfo" modal header="Request more information" :style="{ width: '32rem', maxWidth: '92vw' }">
       <Textarea v-model="notesInput" rows="5" class="w-full" placeholder="What do they need to fix?" />
       <template #footer>
         <Button label="Cancel" text @click="showRequestInfo = false" />
@@ -510,7 +514,7 @@ const approveBlockerHint = computed(() => {
       </template>
     </Dialog>
 
-    <Dialog v-model:visible="showReject" modal header="Reject application" :style="{ width: '32rem' }">
+    <Dialog v-model:visible="showReject" modal header="Reject application" :style="{ width: '32rem', maxWidth: '92vw' }">
       <Textarea v-model="notesInput" rows="5" class="w-full" placeholder="Reason (sent to applicant)" maxlength="2000" />
       <template #footer>
         <Button label="Cancel" text @click="showReject = false" />
@@ -518,7 +522,7 @@ const approveBlockerHint = computed(() => {
       </template>
     </Dialog>
 
-    <Dialog v-model:visible="showRejectCert" modal header="Reject certification" :style="{ width: '32rem' }">
+    <Dialog v-model:visible="showRejectCert" modal header="Reject certification" :style="{ width: '32rem', maxWidth: '92vw' }">
       <Textarea v-model="rejectReason" rows="4" class="w-full" placeholder="Reason for rejection" maxlength="2000" />
       <template #footer>
         <Button label="Cancel" text @click="showRejectCert = false" />
@@ -526,7 +530,7 @@ const approveBlockerHint = computed(() => {
       </template>
     </Dialog>
 
-    <Dialog v-model:visible="showRejectId" modal header="Reject ID" :style="{ width: '32rem' }">
+    <Dialog v-model:visible="showRejectId" modal header="Reject ID" :style="{ width: '32rem', maxWidth: '92vw' }">
       <Textarea v-model="rejectReason" rows="4" class="w-full" placeholder="Reason for rejection" maxlength="2000" />
       <template #footer>
         <Button label="Cancel" text @click="showRejectId = false" />
@@ -534,7 +538,7 @@ const approveBlockerHint = computed(() => {
       </template>
     </Dialog>
 
-    <Dialog v-model:visible="showRejectInsurance" modal header="Reject insurance" :style="{ width: '32rem' }">
+    <Dialog v-model:visible="showRejectInsurance" modal header="Reject insurance" :style="{ width: '32rem', maxWidth: '92vw' }">
       <Textarea v-model="rejectReason" rows="4" class="w-full" placeholder="Reason for rejection" maxlength="2000" />
       <template #footer>
         <Button label="Cancel" text @click="showRejectInsurance = false" />
@@ -577,7 +581,7 @@ const approveBlockerHint = computed(() => {
       </template>
     </Dialog>
 
-    <Dialog v-model:visible="showRejectWsib" modal header="Reject WSIB" :style="{ width: '32rem' }">
+    <Dialog v-model:visible="showRejectWsib" modal header="Reject WSIB" :style="{ width: '32rem', maxWidth: '92vw' }">
       <Textarea v-model="rejectReason" rows="4" class="w-full" placeholder="Reason for rejection" maxlength="2000" />
       <template #footer>
         <Button label="Cancel" text @click="showRejectWsib = false" />
