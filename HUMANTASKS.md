@@ -195,29 +195,27 @@ Phase 6 added a self-serve "Delete my account" + "Export my data" flow that sati
 
 ## Security hardening pass (branch: claude/app-security-mvp-readiness-cRet7)
 
-These ship in code but require a human to deploy + run migrations. **Do them in
-this order** — the rules/index changes and the data migrations are coupled.
+**Status: DEPLOYED to prod 2026-06-01** — functions, firestore rules, and
+indexes deployed; both data migrations run successfully (private notes: 6
+jobs; tradesperson location: 4 tradies). The items below are kept for the
+record; only App Check enforcement (and the optional `ping` cleanup) remain.
 
-### [ ] Deploy the AI cost/abuse hardening (functions only)
+### [x] Deploy the AI cost/abuse hardening (functions only) — DONE 2026-06-01
 
 - **Why:** Adds a per-user 100/day cap across all Vertex AI callables, fences prompt-injection, and removes the unauthenticated `ping`. App Check is still off, so this rate limit is currently the main guard against a single account running up the Vertex bill.
-- **What:** `firebase deploy --only functions`.
-- **Verify:** Call an AI tool 100+ times as one user → the 101st returns `resource-exhausted`. Confirm `ping` is gone from the Functions list.
+- **What:** `firebase deploy --only functions`. ✅ deployed.
+- **Verify:** Call an AI tool 100+ times as one user → the 101st returns `resource-exhausted`. (`ping` removal: if you answered "No" on the delete prompt during deploy, run `firebase functions:delete ping --region us-central1 --force` to finish it.)
 
-### [ ] Deploy F2 (private job notes) + run the migration
+### [x] Deploy F2 (private job notes) + run the migration — DONE 2026-06-01
 
-- **Why:** The tradesperson's private notes (incl. AI behavioural notes about the client) were on the client-readable job doc. Moved to a tradie-only subdoc. **Until the migration runs, existing jobs keep the old field on the client-readable doc — the leak stays open for them, and the tradie's existing notes won't display.**
-- **What:** `firebase deploy --only firestore:rules,functions`, then in the Admin dashboard click **"Migrate private job notes"** (re-click until `skipped == scanned`).
+- **Why:** The tradesperson's private notes (incl. AI behavioural notes about the client) were on the client-readable job doc. Moved to a tradie-only subdoc.
+- **What:** `firebase deploy --only firestore:rules,functions` → Admin dashboard → **"Migrate private job notes"**. ✅ deployed + migrated (scanned 6, moved 2, stripped-only 3, skipped 1).
 - **Verify:** As a client, open an old job → you can't read its `private/notes` subdoc. As the tradie → your notes are intact.
 
-### [ ] Deploy F1 (tradesperson location/address) + run the migration
+### [x] Deploy F1 (tradesperson location/address) + run the migration — DONE 2026-06-01
 
 - **Why:** Every visible tradesperson's **exact home coordinates + street address** were world-readable, unauthenticated. Moved to a private subdoc; the public doc now carries only a coarse (~1 km) location for search.
-- **What — ORDER MATTERS:**
-  1. `firebase deploy --only firestore:indexes` and **wait for the new `tradespeople` indexes to finish building** (Firestore console → Indexes).
-  2. `firebase deploy --only firestore:rules,functions`.
-  3. Admin dashboard → **"Migrate tradesperson location"** (re-click until `skipped == scanned`).
-- **CRITICAL:** Until step 3 completes, **discovery returns ZERO results** for un-migrated tradies (they have the old `geohash` field; search now queries `geohashPublic`). Strongly recommend running the whole sequence in a **staging project first** and confirming search + the profile/onboarding editors still work before doing prod.
+- **What:** indexes → rules+functions → Admin dashboard **"Migrate tradesperson location"**. ✅ deployed + migrated (scanned 4, migrated 4, skipped 0). The new `geohashPublic` indexes were deployed (the legacy `geohash` index was intentionally left in place, not deleted).
 - **Verify:** Search returns nearby tradies; open a public tradie profile while logged out → no street address shown; as the tradie, the profile + onboarding editors still show your saved address/pin.
 
 ### [ ] Turn on App Check (wiring is DONE — only the key + flip remain)
