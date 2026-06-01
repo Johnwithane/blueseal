@@ -48,7 +48,6 @@ async function seedJob(extras: Record<string, unknown> = {}) {
       chatId: "chat_1",
       status: "complete",
       trade: "plumbing",
-      privateNotes: "",
       createdAt: Timestamp.now(),
       ...extras,
     });

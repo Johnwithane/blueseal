@@ -424,15 +424,8 @@ export interface JobDoc {
   // the tradesperson status dropdown before this field existed.
   cancelledBy: string | null;
   chatId: string;
-  privateNotes: string;
   // Set when this job was created via the job-board marketplace conversion.
   sourcePostId: string | null;
-  // Watermark for the auto-log feature (aiUpdateJobLog). Updated each time
-  // the AI scans new client chat activity and either appends a note or
-  // confirms there was nothing log-worthy. The auto-trigger on
-  // JobDetailView short-circuits server-side when this is within a 1-hour
-  // cooldown.
-  privateNotesLastAutoUpdateAt: Timestamp | null;
   // Per-party user-initiated archive. Each party can hide a job from their
   // own dashboard's default list without affecting the other side's view —
   // the underlying job doc and its chat/invoice/etc remain intact. Rules
@@ -451,6 +444,20 @@ export interface JobDoc {
   // is back-linked by onJobCompleted when the auto-drafted invoice consumes
   // the credit, so a second invoice can never double-apply it.
   upfrontFee?: UpfrontFeeState | null;
+}
+
+// Tradesperson-private job log, stored at jobs/{jobId}/private/notes so it is
+// physically unreadable by the client (the parent job doc is client-readable,
+// and Firestore can't filter reads by field). Holds the tradie's free-text
+// notes plus the auto-log written by aiUpdateJobLog. Read/write is restricted
+// to the assigned tradie + admin in firestore.rules.
+export interface JobPrivateNotes {
+  notes: string;
+  // Watermark for the auto-log feature (aiUpdateJobLog). Updated each time the
+  // AI scans new client chat activity and either appends a note or confirms
+  // there was nothing log-worthy. The auto-trigger on JobDetailView
+  // short-circuits server-side when this is within a 1-hour cooldown.
+  lastAutoUpdateAt: Timestamp | null;
 }
 
 export interface UpfrontFeeState {

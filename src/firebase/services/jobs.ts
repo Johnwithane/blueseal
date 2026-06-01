@@ -9,6 +9,7 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  setDoc,
   updateDoc,
   where,
   GeoPoint,
@@ -19,6 +20,7 @@ import type {
   InvoiceDiscount,
   JobAddress,
   JobDoc,
+  JobPrivateNotes,
   JobStatus,
   LineItem,
   WithId,
@@ -89,9 +91,7 @@ export async function createJob(input: NewJobInput, chatId: string): Promise<str
     cancelledReason: null,
     cancelledBy: null,
     chatId,
-    privateNotes: "",
     sourcePostId: null,
-    privateNotesLastAutoUpdateAt: null,
   });
   return docRef.id;
 }
@@ -152,8 +152,20 @@ export async function scheduleJob(id: string, start: Date, end: Date): Promise<v
   });
 }
 
+// Private notes live in a subdoc (jobs/{id}/private/notes) so the client —
+// who can read the parent job doc — can't read the tradie's notes. Read/write
+// is restricted to the assigned tradie + admin in firestore.rules.
+const jobPrivateNotesRef = (jobId: string) => doc(db, "jobs", jobId, "private", "notes");
+
+export async function getJobPrivateNotes(jobId: string): Promise<string> {
+  const snap = await getDoc(jobPrivateNotesRef(jobId));
+  return snap.exists() ? ((snap.data() as Partial<JobPrivateNotes>).notes ?? "") : "";
+}
+
 export async function updatePrivateNotes(id: string, notes: string): Promise<void> {
-  await updateDoc(doc(db, "jobs", id), { privateNotes: notes });
+  // merge so the server-managed lastAutoUpdateAt watermark isn't clobbered by
+  // a manual save, and so the first-ever save creates the subdoc.
+  await setDoc(jobPrivateNotesRef(id), { notes }, { merge: true });
 }
 
 // Per-party archive: each party hides the job from their own dashboard

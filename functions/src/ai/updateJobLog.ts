@@ -20,7 +20,7 @@ import { enforceRateLimit, AI_DAILY_CAP } from "../lib/rateLimit";
  *
  * The model is instructed to respond with "SKIP" when the new messages
  * contain nothing action-relevant (e.g. just acknowledgements like "ok"
- * or "thanks"). We update privateNotesLastAutoUpdateAt regardless so we
+ * or "thanks"). We update the lastAutoUpdateAt watermark regardless so we
  * don't keep re-processing the same low-value tail.
  */
 
@@ -51,8 +51,13 @@ interface JobDoc {
   trade: string;
   title: string;
   description: string;
-  privateNotes?: string;
-  privateNotesLastAutoUpdateAt?: Timestamp | null;
+}
+
+// Private notes + auto-log watermark now live in jobs/{jobId}/private/notes
+// (out of the client-readable job doc). See firestore.rules + interfaces.ts.
+interface PrivateNotesDoc {
+  notes?: string;
+  lastAutoUpdateAt?: Timestamp | null;
 }
 
 interface MessageDoc {
@@ -86,7 +91,11 @@ export const aiUpdateJobLog = onCall({ enforceAppCheck: false }, async (req) => 
     throw new HttpsError("permission-denied", "Only the assigned tradesperson can update the log.");
   }
 
-  const lastUpdateMs = job.privateNotesLastAutoUpdateAt?.toMillis() ?? 0;
+  const notesRef = jobRef.collection("private").doc("notes");
+  const notesSnap = await notesRef.get();
+  const notesData = (notesSnap.data() as PrivateNotesDoc | undefined) ?? {};
+
+  const lastUpdateMs = notesData.lastAutoUpdateAt?.toMillis() ?? 0;
   const now = Date.now();
   if (!force && now - lastUpdateMs < COOLDOWN_MS) {
     return { ok: true, skipped: true, reason: "cooldown" };
@@ -118,16 +127,14 @@ export const aiUpdateJobLog = onCall({ enforceAppCheck: false }, async (req) => 
   if (newClientMsgs.length === 0) {
     // No new client signal — bump the watermark anyway so the auto-call
     // on the next page-load doesn't re-scan the same window.
-    await jobRef.update({
-      privateNotesLastAutoUpdateAt: FieldValue.serverTimestamp(),
-    });
+    await notesRef.set({ lastAutoUpdateAt: FieldValue.serverTimestamp() }, { merge: true });
     return { ok: true, skipped: true, reason: "no-new-client-activity" };
   }
 
   const transcript = newClientMsgs
     .map((m) => `Client: ${m.text}`)
     .join("\n");
-  const existing = (job.privateNotes ?? "").trim();
+  const existing = (notesData.notes ?? "").trim();
 
   const prompt =
     "You maintain a Canadian tradesperson's private job log. Below are NEW client messages " +
@@ -177,14 +184,14 @@ export const aiUpdateJobLog = onCall({ enforceAppCheck: false }, async (req) => 
   // the model returned actual content.
   const isSkip = !entryText || /^SKIP\b/i.test(entryText);
   const update: { [key: string]: unknown } = {
-    privateNotesLastAutoUpdateAt: FieldValue.serverTimestamp(),
+    lastAutoUpdateAt: FieldValue.serverTimestamp(),
   };
   let appended: string | null = null;
   if (!isSkip) {
     appended = `[${dateLabel()}] (auto) ${entryText}`;
-    update.privateNotes = existing ? `${existing}\n${appended}` : appended;
+    update.notes = existing ? `${existing}\n${appended}` : appended;
   }
-  await jobRef.update(update);
+  await notesRef.set(update, { merge: true });
 
   await db.collection("aiUsage").add({
     userId: uid,
