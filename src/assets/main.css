@@ -78,6 +78,30 @@ body {
   background: var(--bs-bg);
   color: var(--bs-text);
   -webkit-font-smoothing: antialiased;
+  /* Belt-and-braces guard against a stray over-wide element making the whole
+     page scroll sideways (which makes the fixed bottom nav look broken on
+     mobile). `clip` — not `hidden` — so it doesn't become a scroll container
+     and break position: sticky bars inside. Intentional horizontal scrollers
+     (kanban, line-item tables) have their own overflow-x:auto and are
+     unaffected. */
+  overflow-x: clip;
+}
+
+/* iOS Safari auto-zooms the viewport whenever a focused form field has a
+   font-size below 16px. Force 16px on form controls at mobile widths so
+   tapping an input (e.g. the Search filters) never triggers that zoom — which
+   was also shoving the fixed bottom nav out of view. */
+@media (max-width: 639px) {
+  input,
+  textarea,
+  select,
+  .p-inputtext,
+  .p-textarea,
+  .p-inputnumber-input,
+  .p-select-label,
+  .p-autocomplete-input {
+    font-size: 16px;
+  }
 }
 
 h1, h2, h3, h4, h5, h6 {

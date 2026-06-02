@@ -745,7 +745,7 @@ async function grantAdminAllRoles() {
 </script>
 
 <template>
-  <section class="bs-container max-w-2xl py-6">
+  <section class="bs-container max-w-2xl pb-6 pt-3">
     <!-- Tradesperson quick-actions. Lives above the tab bar so the public
          profile is always one tap away regardless of which tab is open —
          View + Share are the two things tradies most often need from this

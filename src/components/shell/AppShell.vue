@@ -96,12 +96,21 @@ const mobileCompact = computed(() => route.meta.mobileCompact === true);
 }
 
 .app-shell__title {
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   font-weight: 700;
   letter-spacing: -0.01em;
-  padding-top: 1rem;
-  padding-bottom: 0.5rem;
+  /* Tight on mobile to reclaim top real estate — the view's own top padding
+     supplies the gap to the first card. Roomier on desktop. */
+  padding-top: 0.75rem;
+  padding-bottom: 0;
   color: var(--bs-text);
+}
+@media (min-width: 768px) {
+  .app-shell__title {
+    font-size: 1.5rem;
+    padding-top: 1rem;
+    padding-bottom: 0.5rem;
+  }
 }
 
 .app-shell__bottom {
