@@ -348,6 +348,7 @@ onMounted(async () => {
       <LocationPicker
         v-model="draftLocation"
         :markers="mapMarkers"
+        gesture="greedy"
         @marker-click="onMarkerClick"
       />
       <template #footer>
@@ -375,7 +376,7 @@ onMounted(async () => {
         <p>No results yet. Set a location and search.</p>
       </div>
       <template v-else>
-        <div v-if="results.length" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div v-if="results.length" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <TradieCard v-for="t in results" :key="t.id" :tradie="t" />
         </div>
 
@@ -387,7 +388,7 @@ onMounted(async () => {
           <p class="mb-3 text-sm text-[color:var(--bs-muted)]">
             These tradespeople haven't been verified by Blue Seal yet.
           </p>
-          <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <ProspectCard v-for="p in prospectResults" :key="p.id" :prospect="p" />
           </div>
         </section>

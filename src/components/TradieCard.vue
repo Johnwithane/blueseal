@@ -56,7 +56,7 @@ const wsibLive = computed(() => {
       />
       <div class="min-w-0 flex-1">
         <div class="flex items-center gap-1.5 flex-wrap">
-          <span class="font-semibold truncate">
+          <span class="font-semibold truncate min-w-0 max-w-full">
             {{ props.tradie.displayName?.trim() || tradeLabel(props.tradie.trades[0]) }}
           </span>
           <Tag v-if="props.tradie.idVerified" value="ID verified" severity="success" />
@@ -71,7 +71,7 @@ const wsibLive = computed(() => {
             :expires-at="props.tradie.wsibExpiresAt"
           />
         </div>
-        <div class="text-xs text-[color:var(--bs-muted)] mt-0.5">
+        <div class="text-xs text-[color:var(--bs-muted)] mt-0.5 break-words">
           {{ props.tradie.trades.map(tradeLabel).join(" • ") }}
         </div>
       </div>

@@ -49,12 +49,12 @@ const avatarInitial = computed(() => {
       />
       <div class="min-w-0 flex-1">
         <div class="flex items-center gap-1.5 flex-wrap">
-          <span class="font-semibold truncate">
+          <span class="font-semibold truncate min-w-0 max-w-full">
             {{ props.prospect.displayName?.trim() || tradeLabel(props.prospect.trades[0]) }}
           </span>
           <Tag value="Unverified" severity="warn" />
         </div>
-        <div class="text-xs text-[color:var(--bs-muted)] mt-0.5">
+        <div class="text-xs text-[color:var(--bs-muted)] mt-0.5 break-words">
           {{ props.prospect.trades.map(tradeLabel).join(" • ") }}
         </div>
         <div
