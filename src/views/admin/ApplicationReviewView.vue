@@ -39,6 +39,7 @@ import { useFormatters } from "@/composables/useFormatters";
 import { registryForIssuingBody } from "@/utils/certRegistries";
 import { VERIFICATION_SEVERITY, VERIFICATION_LABEL } from "@/utils/verificationStatus";
 import LoadingState from "@/components/LoadingState.vue";
+import RejectReasonDialog from "@/components/RejectReasonDialog.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -519,29 +520,26 @@ const approveBlockerHint = computed(() => {
       </template>
     </Dialog>
 
-    <Dialog v-model:visible="showRejectCert" modal header="Reject certification" :style="{ width: '32rem', maxWidth: '92vw' }">
-      <Textarea v-model="rejectReason" rows="4" class="w-full" placeholder="Reason for rejection" maxlength="2000" />
-      <template #footer>
-        <Button label="Cancel" text @click="showRejectCert = false" />
-        <Button label="Reject" icon="pi pi-ban" severity="danger" :disabled="!rejectReason.trim()" @click="confirmRejectCert" />
-      </template>
-    </Dialog>
+    <RejectReasonDialog
+      v-model:visible="showRejectCert"
+      v-model:reason="rejectReason"
+      header="Reject certification"
+      @confirm="confirmRejectCert"
+    />
 
-    <Dialog v-model:visible="showRejectId" modal header="Reject ID" :style="{ width: '32rem', maxWidth: '92vw' }">
-      <Textarea v-model="rejectReason" rows="4" class="w-full" placeholder="Reason for rejection" maxlength="2000" />
-      <template #footer>
-        <Button label="Cancel" text @click="showRejectId = false" />
-        <Button label="Reject" icon="pi pi-ban" severity="danger" :disabled="!rejectReason.trim()" @click="confirmRejectId" />
-      </template>
-    </Dialog>
+    <RejectReasonDialog
+      v-model:visible="showRejectId"
+      v-model:reason="rejectReason"
+      header="Reject ID"
+      @confirm="confirmRejectId"
+    />
 
-    <Dialog v-model:visible="showRejectInsurance" modal header="Reject insurance" :style="{ width: '32rem', maxWidth: '92vw' }">
-      <Textarea v-model="rejectReason" rows="4" class="w-full" placeholder="Reason for rejection" maxlength="2000" />
-      <template #footer>
-        <Button label="Cancel" text @click="showRejectInsurance = false" />
-        <Button label="Reject" icon="pi pi-ban" severity="danger" :disabled="!rejectReason.trim()" @click="confirmRejectInsurance" />
-      </template>
-    </Dialog>
+    <RejectReasonDialog
+      v-model:visible="showRejectInsurance"
+      v-model:reason="rejectReason"
+      header="Reject insurance"
+      @confirm="confirmRejectInsurance"
+    />
 
     <Dialog
       :visible="viewer !== null"
@@ -578,12 +576,11 @@ const approveBlockerHint = computed(() => {
       </template>
     </Dialog>
 
-    <Dialog v-model:visible="showRejectWsib" modal header="Reject WSIB" :style="{ width: '32rem', maxWidth: '92vw' }">
-      <Textarea v-model="rejectReason" rows="4" class="w-full" placeholder="Reason for rejection" maxlength="2000" />
-      <template #footer>
-        <Button label="Cancel" text @click="showRejectWsib = false" />
-        <Button label="Reject" icon="pi pi-ban" severity="danger" :disabled="!rejectReason.trim()" @click="confirmRejectWsib" />
-      </template>
-    </Dialog>
+    <RejectReasonDialog
+      v-model:visible="showRejectWsib"
+      v-model:reason="rejectReason"
+      header="Reject WSIB"
+      @confirm="confirmRejectWsib"
+    />
   </section>
 </template>
