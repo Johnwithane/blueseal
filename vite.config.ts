@@ -9,7 +9,12 @@ export default defineConfig({
     vue(),
     tailwindcss(),
     VitePWA({
-      registerType: "autoUpdate",
+      // "prompt" (not "autoUpdate") so a freshly-deployed service worker WAITS
+      // instead of force-reloading the tab. useAppUpdate() (src/composables)
+      // owns the decision of *when* to apply it — only at a safe, non-disruptive
+      // moment — which is what fixes "I don't see updates until I hard-refresh"
+      // on mobile without yanking the page out from under someone mid-form.
+      registerType: "prompt",
       includeAssets: [
         "favicon.ico",
         "favicon-16x16.png",

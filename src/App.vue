@@ -12,12 +12,18 @@ import RoleSwitchOverlay from "@/components/RoleSwitchOverlay.vue";
 import AppShell from "@/components/shell/AppShell.vue";
 import { useNotificationsStore } from "@/stores/notifications";
 import { useAuthStore } from "@/stores/auth";
+import { useAppUpdate } from "@/composables";
 
 const route = useRoute();
 const router = useRouter();
 const notifs = useNotificationsStore();
 const auth = useAuthStore();
 const primeToast = primeUseToast();
+
+// Keep installed/mobile PWAs on the latest deploy without a manual hard-refresh:
+// re-checks for a new build on resume + hourly, and applies it only when it
+// won't interrupt the user (app backgrounded, or idle). See useAppUpdate.
+useAppUpdate();
 // `meta.layout` decides which shell wraps the route. Unset → "public" (the
 // marketing AppHeader/Footer chrome). "app" mounts the Instagram-style
 // AppShell; "chromeless" renders the view alone (onboarding wizard).
