@@ -19,15 +19,18 @@ interface Column {
 // flow (send-quote → client-accepts → active → finish-job → approve →
 // pay), so this board purely visualises where each job sits. Cards are
 // clickable to open the job page.
+// Column accents reference the shared --bs-status-* tokens (main.css) so the
+// board and the JobList section colours stay in lock-step. `complete` is now
+// green (was grey here, green in JobList — the token reconciles them).
 const columns: Column[] = [
-  { key: "accepted", label: "Accepted (awaiting brief)", color: "#a0d6f1" },
-  { key: "requested", label: "Inbox", color: "#0ea5e9" },
-  { key: "quoted", label: "Quoted", color: "#f59e0b" },
-  { key: "awaiting_upfront_payment", label: "Awaiting upfront", color: "#d97706" },
-  { key: "in_progress", label: "In progress", color: "#0d47a1" },
-  { key: "awaiting_client_approval", label: "Awaiting approval", color: "#f97316" },
-  { key: "awaiting_payment", label: "Awaiting payment", color: "#7c3aed" },
-  { key: "complete", label: "Complete", color: "#6b7280" },
+  { key: "accepted", label: "Accepted (awaiting brief)", color: "var(--bs-status-accepted)" },
+  { key: "requested", label: "Inbox", color: "var(--bs-status-requested)" },
+  { key: "quoted", label: "Quoted", color: "var(--bs-status-quoted)" },
+  { key: "awaiting_upfront_payment", label: "Awaiting upfront", color: "var(--bs-status-awaiting_upfront_payment)" },
+  { key: "in_progress", label: "In progress", color: "var(--bs-status-in_progress)" },
+  { key: "awaiting_client_approval", label: "Awaiting approval", color: "var(--bs-status-awaiting_client_approval)" },
+  { key: "awaiting_payment", label: "Awaiting payment", color: "var(--bs-status-awaiting_payment)" },
+  { key: "complete", label: "Complete", color: "var(--bs-status-complete)" },
 ];
 
 const byColumn = computed(() => {
@@ -63,7 +66,7 @@ function openJob(id: string) {
     <section
       v-for="col in columns"
       :key="col.key"
-      class="snap-start shrink-0 w-[85vw] sm:w-72 md:w-60 bg-[#f9fafb] rounded-xl p-3 min-h-[60vh]"
+      class="snap-start shrink-0 w-[85vw] sm:w-72 md:w-60 bg-[color:var(--bs-surface-alt)] rounded-xl p-3 min-h-[60vh]"
     >
       <header class="flex items-center justify-between mb-2">
         <div class="flex items-center gap-2 min-w-0">

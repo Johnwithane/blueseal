@@ -78,17 +78,19 @@ const SECTION_LABEL: Record<JobStatus, { client: string; tradesperson: string }>
   cancelled: { client: "Cancelled", tradesperson: "Cancelled" },
 };
 
+// Per-status accent. Values live in main.css (--bs-status-*) so the kanban
+// dots and these list section colours share one source of truth.
 const SECTION_COLOR: Record<JobStatus, string> = {
-  requested: "#0ea5e9",
-  accepted: "#a0d6f1",
-  quoted: "#f59e0b",
-  awaiting_upfront_payment: "#d97706",
-  in_progress: "#0d47a1",
-  awaiting_client_approval: "#f97316",
-  awaiting_payment: "#7c3aed",
-  complete: "#10b981",
-  reviewed: "#6b7280",
-  cancelled: "#ef4444",
+  requested: "var(--bs-status-requested)",
+  accepted: "var(--bs-status-accepted)",
+  quoted: "var(--bs-status-quoted)",
+  awaiting_upfront_payment: "var(--bs-status-awaiting_upfront_payment)",
+  in_progress: "var(--bs-status-in_progress)",
+  awaiting_client_approval: "var(--bs-status-awaiting_client_approval)",
+  awaiting_payment: "var(--bs-status-awaiting_payment)",
+  complete: "var(--bs-status-complete)",
+  reviewed: "var(--bs-status-reviewed)",
+  cancelled: "var(--bs-status-cancelled)",
 };
 
 const filter = ref<"all" | JobStatus>("all");
