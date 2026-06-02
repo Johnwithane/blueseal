@@ -1444,7 +1444,7 @@ async function grantAdminAllRoles() {
         </p>
 
         <div class="mt-4 rounded-lg border border-[color:var(--bs-border)] p-4">
-          <div class="flex items-start justify-between gap-3">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h3 class="font-semibold">Download your data</h3>
               <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
@@ -1474,7 +1474,7 @@ async function grantAdminAllRoles() {
         </div>
 
         <div class="mt-4 rounded-lg border border-red-200 bg-red-50/30 p-4">
-          <div class="flex items-start justify-between gap-3">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h3 class="font-semibold text-red-700">Delete my account</h3>
               <p class="mt-1 text-sm text-[color:var(--bs-muted)]">

@@ -481,7 +481,7 @@ const approveBlockerHint = computed(() => {
       </div>
 
       <!-- Decision bar -->
-      <footer class="bs-card p-4 mt-6 flex flex-wrap gap-2 items-center justify-between">
+      <footer class="bs-card p-4 mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div class="text-sm text-[color:var(--bs-muted)]">
           <template v-if="canApproveApplication">
             One click approves every pending cert + ID and sets their profile <strong>live</strong>.
@@ -490,14 +490,15 @@ const approveBlockerHint = computed(() => {
             {{ approveBlockerHint }}
           </template>
         </div>
-        <div class="flex gap-2">
-          <Button label="Request info" icon="pi pi-question-circle" outlined @click="showRequestInfo = true; notesInput = ''" />
-          <Button label="Reject" icon="pi pi-ban" severity="danger" outlined @click="showReject = true; notesInput = ''" />
+        <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+          <Button label="Request info" icon="pi pi-question-circle" outlined class="w-full sm:w-auto" @click="showRequestInfo = true; notesInput = ''" />
+          <Button label="Reject" icon="pi pi-ban" severity="danger" outlined class="w-full sm:w-auto" @click="showReject = true; notesInput = ''" />
           <Button
             label="Approve everything"
             icon="pi pi-check"
             severity="success"
             :disabled="!canApproveApplication"
+            class="col-span-2 w-full sm:col-span-1 sm:w-auto"
             @click="approveAll"
           />
         </div>

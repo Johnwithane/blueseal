@@ -275,8 +275,8 @@ const visibleApplications = computed(() =>
     <template v-else-if="post">
       <!-- HEADER -->
       <div class="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h1 class="text-2xl font-bold">{{ post.title }}</h1>
+        <div class="min-w-0">
+          <h1 class="text-2xl font-bold break-words">{{ post.title }}</h1>
           <div class="text-xs text-[color:var(--bs-muted)] mt-1">
             {{ tradeLabel(post.trade) }} • {{ relativeTime(post.createdAt) }}
           </div>

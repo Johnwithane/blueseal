@@ -98,7 +98,7 @@ function openInNewTab() {
     </div>
 
     <template #footer>
-      <div class="flex items-center gap-2 w-full">
+      <div class="flex flex-wrap items-center gap-2 w-full">
         <Button label="Close" text @click="close" />
         <span class="flex-1"></span>
         <Button

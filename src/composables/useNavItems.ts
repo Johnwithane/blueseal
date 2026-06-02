@@ -164,7 +164,9 @@ export function useNavItems(): {
           label: "Disputes",
           icon: "pi-flag",
           to: "/admin/disputes",
-          mobile: true,
+          // Desktop-only in the side panel; on mobile it's reached from the
+          // dashboard, keeping the bottom bar to Dashboard + Vetting + Alerts.
+          mobile: false,
           matches: prefix("/admin/disputes"),
         },
         {
@@ -225,7 +227,9 @@ export function useNavItems(): {
         mobileLabel: "Post",
         icon: "pi-megaphone",
         to: "/jobs/post",
-        mobile: true,
+        // Desktop-only in the side panel; on mobile it's reached from inside
+        // Jobs, keeping the bottom bar to Jobs + Search + Alerts.
+        mobile: false,
         matches: exact("/jobs/post"),
       },
       // Account moved into ProfileMenu — see the tradesperson and admin

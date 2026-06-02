@@ -10,10 +10,10 @@ const { sideItems, isActive } = useNavItems();
 
 <template>
   <aside class="side-panel">
-    <!-- Logo + brand. The shell only renders for signed-in users, so the
-         brand routes to their dashboard (not the marketing "/") — tapping it
-         keeps them inside the app instead of ejecting them to the splash. -->
-    <RouterLink to="/dashboard" class="side-panel__brand">
+    <!-- Logo + brand → the homepage (root), per product convention that the
+         logo always goes home. The role "Jobs"/"Dashboard" nav item covers
+         the in-app home. -->
+    <RouterLink to="/" class="side-panel__brand">
       <img src="/icons/blueseal_logo.png" alt="" class="h-8 w-auto" />
       <span class="side-panel__brand-text">Blue Seal</span>
     </RouterLink>

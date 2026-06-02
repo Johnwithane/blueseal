@@ -662,18 +662,19 @@ function close() {
     </div>
 
     <template #footer>
-      <div class="flex items-center gap-2 w-full">
-        <Button label="Cancel" text :disabled="submitting" @click="close" />
-        <span class="flex-1"></span>
+      <div class="flex flex-col-reverse gap-2 w-full sm:flex-row sm:items-center">
+        <Button label="Cancel" text :disabled="submitting" class="w-full sm:w-auto" @click="close" />
+        <span class="hidden flex-1 sm:block"></span>
         <Button
           :label="
             totals.total > 0
-              ? `Send to client for approval — ${money(totals.total)}`
+              ? `Send for approval — ${money(totals.total)}`
               : 'Add something to bill first'
           "
           icon="pi pi-send"
           :loading="submitting"
           :disabled="!canSubmit"
+          class="w-full sm:w-auto"
           @click="onSubmit"
         />
       </div>

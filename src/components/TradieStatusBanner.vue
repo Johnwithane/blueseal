@@ -154,15 +154,17 @@ const content = computed<BannerContent | null>(() => {
     ]"
     role="status"
   >
-    <div class="bs-container flex items-start gap-3 py-3">
-      <i :class="['pi', content.icon, 'bs-tradie-status-banner__icon']" aria-hidden="true"></i>
-      <div class="flex-1 min-w-0">
-        <div class="text-sm font-semibold leading-tight">{{ content.label }}</div>
-        <div class="mt-0.5 text-sm leading-snug text-[color:var(--bs-text)]/85">
-          {{ content.message }}
+    <div class="bs-container flex flex-col gap-2 py-3 sm:flex-row sm:items-start sm:gap-3">
+      <div class="flex flex-1 items-start gap-3 min-w-0">
+        <i :class="['pi', content.icon, 'bs-tradie-status-banner__icon']" aria-hidden="true"></i>
+        <div class="min-w-0">
+          <div class="text-sm font-semibold leading-tight">{{ content.label }}</div>
+          <div class="mt-0.5 text-sm leading-snug text-[color:var(--bs-text)]/85">
+            {{ content.message }}
+          </div>
         </div>
       </div>
-      <RouterLink v-if="content.cta" :to="content.cta.to" class="shrink-0">
+      <RouterLink v-if="content.cta" :to="content.cta.to" class="shrink-0 self-start">
         <Button :label="content.cta.label" size="small" icon="pi pi-arrow-right" icon-pos="right" />
       </RouterLink>
     </div>

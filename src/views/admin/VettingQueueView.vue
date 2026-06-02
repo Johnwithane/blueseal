@@ -37,12 +37,12 @@ onMounted(refresh);
 
 <template>
   <section class="bs-container py-6">
-    <div class="flex items-center justify-between mb-4">
+    <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
       <div>
         <RouterLink to="/dashboard" class="text-xs text-[color:var(--bs-muted)]">← Back</RouterLink>
         <p class="text-[color:var(--bs-muted)] text-sm mt-1">Sorted by oldest pending first.</p>
       </div>
-      <Button label="Refresh" icon="pi pi-refresh" outlined :loading="loading" @click="refresh" />
+      <Button label="Refresh" icon="pi pi-refresh" outlined :loading="loading" class="self-start sm:self-auto" @click="refresh" />
     </div>
 
     <LoadingState v-if="loading" />

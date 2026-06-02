@@ -179,29 +179,30 @@ onMounted(async () => {
 
 <template>
   <section class="bs-container py-8">
-    <div class="flex items-center justify-between mb-6">
-      <div>
-        <p class="text-[color:var(--bs-muted)]">
-          {{ pending.length }} application{{ pending.length === 1 ? "" : "s" }} awaiting review.
-        </p>
-      </div>
-      <div class="flex flex-wrap gap-2">
-        <RouterLink to="/admin/users">
-          <Button label="User search" icon="pi pi-user-edit" outlined />
+    <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <p class="text-[color:var(--bs-muted)]">
+        {{ pending.length }} application{{ pending.length === 1 ? "" : "s" }} awaiting review.
+      </p>
+      <!-- Full-width tappable grid on mobile; inline wrap on desktop. The
+           primary "Open vetting queue" spans the row on mobile. -->
+      <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+        <RouterLink to="/admin/users" class="block w-full sm:w-auto">
+          <Button label="User search" icon="pi pi-user-edit" outlined class="w-full sm:w-auto" />
         </RouterLink>
-        <RouterLink to="/admin/site-content">
-          <Button label="Site content" icon="pi pi-pencil" outlined />
+        <RouterLink to="/admin/site-content" class="block w-full sm:w-auto">
+          <Button label="Site content" icon="pi pi-pencil" outlined class="w-full sm:w-auto" />
         </RouterLink>
-        <RouterLink to="/admin/disputes">
+        <RouterLink to="/admin/disputes" class="block w-full sm:w-auto">
           <Button
             label="Disputes"
             icon="pi pi-exclamation-triangle"
             outlined
             severity="warn"
+            class="w-full sm:w-auto"
           />
         </RouterLink>
-        <RouterLink to="/admin/vetting">
-          <Button label="Open vetting queue" icon="pi pi-arrow-right" />
+        <RouterLink to="/admin/vetting" class="col-span-2 block w-full sm:col-span-1 sm:w-auto">
+          <Button label="Open vetting queue" icon="pi pi-arrow-right" class="w-full sm:w-auto" />
         </RouterLink>
       </div>
     </div>

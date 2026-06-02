@@ -65,7 +65,7 @@ const openCount = computed(() => open.value.length);
 
 <template>
   <section class="bs-container py-6">
-    <div class="flex items-center justify-between mb-4">
+    <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
       <div>
         <RouterLink to="/dashboard" class="text-xs text-[color:var(--bs-muted)]"
           >← Back</RouterLink
@@ -81,6 +81,7 @@ const openCount = computed(() => open.value.length);
         icon="pi pi-refresh"
         outlined
         :loading="loading"
+        class="self-start sm:self-auto"
         @click="refresh"
       />
     </div>
