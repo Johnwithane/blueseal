@@ -41,6 +41,15 @@ const routes: RouteRecordRaw[] = [
     meta: { layout: "public" },
   },
   {
+    // Public profile for a seeded, unclaimed prospect (Phase 2). Distinct from
+    // /tradies/:uid — prospects live in a separate collection and never render
+    // as verified.
+    path: "/prospects/:id",
+    name: "ProspectProfile",
+    component: () => import("@/views/ProspectProfileView.vue"),
+    meta: { layout: "public" },
+  },
+  {
     path: "/request/:uid",
     name: "RequestQuote",
     component: () => import("@/views/RequestQuoteView.vue"),

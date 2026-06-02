@@ -6,12 +6,14 @@ import Select from "primevue/select";
 import Rating from "primevue/rating";
 import Message from "primevue/message";
 import { searchTradespeople, type AvailabilityFilter } from "@/firebase/services/tradespeople";
+import { searchProspects } from "@/firebase/services/prospects";
 import { TRADES } from "@/data/trades";
 import TradieCard from "@/components/TradieCard.vue";
+import ProspectCard from "@/components/ProspectCard.vue";
 import LocationPicker, {
   type LocationValue,
 } from "@/components/LocationPicker.vue";
-import type { TradespersonDoc, WithId } from "@/firebase/interfaces";
+import type { ProspectDoc, TradespersonDoc, WithId } from "@/firebase/interfaces";
 
 const route = useRoute();
 
@@ -29,6 +31,8 @@ const location = ref<LocationValue>({
   radiusKm: 50,
 });
 const results = ref<Array<WithId<TradespersonDoc> & { distanceKm: number }>>([]);
+// Seeded, unclaimed listings shown below the verified results (Phase 2).
+const prospectResults = ref<Array<WithId<ProspectDoc> & { distanceKm: number }>>([]);
 const loading = ref(false);
 const error = ref<string | null>(null);
 
@@ -46,15 +50,32 @@ async function search() {
   error.value = null;
   loading.value = true;
   try {
-    results.value = await searchTradespeople({
-      trade: trade.value ?? undefined,
-      centerLat: location.value.lat,
-      centerLng: location.value.lng,
-      radiusKm: location.value.radiusKm,
-      minRating: minRating.value || undefined,
-      availability: availability.value === "any" ? undefined : availability.value,
-      limit: 50,
-    });
+    // Verified tradespeople + seeded prospects in parallel. Prospect search is
+    // non-fatal — if it fails (e.g. index still building), the verified results
+    // still render; prospects are supplementary.
+    const [tradies, prospects] = await Promise.all([
+      searchTradespeople({
+        trade: trade.value ?? undefined,
+        centerLat: location.value.lat,
+        centerLng: location.value.lng,
+        radiusKm: location.value.radiusKm,
+        minRating: minRating.value || undefined,
+        availability: availability.value === "any" ? undefined : availability.value,
+        limit: 50,
+      }),
+      searchProspects({
+        trade: trade.value ?? undefined,
+        centerLat: location.value.lat,
+        centerLng: location.value.lng,
+        radiusKm: location.value.radiusKm,
+        limit: 50,
+      }).catch((e) => {
+        console.warn("[search] prospect search failed", e);
+        return [];
+      }),
+    ]);
+    results.value = tradies;
+    prospectResults.value = prospects;
   } catch (e) {
     error.value = (e as Error).message;
   } finally {
@@ -135,12 +156,30 @@ watch(
     </Message>
 
     <div v-if="loading" class="bs-empty">Searching…</div>
-    <div v-else-if="!results.length" class="bs-empty">
-      <i class="pi pi-search mb-2 block text-3xl"></i>
-      <p>No results yet. Set a location and search.</p>
-    </div>
-    <div v-else class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      <TradieCard v-for="t in results" :key="t.id" :tradie="t" />
-    </div>
+    <template v-else>
+      <div v-if="!results.length && !prospectResults.length" class="bs-empty">
+        <i class="pi pi-search mb-2 block text-3xl"></i>
+        <p>No results yet. Set a location and search.</p>
+      </div>
+      <template v-else>
+        <div v-if="results.length" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <TradieCard v-for="t in results" :key="t.id" :tradie="t" />
+        </div>
+
+        <!-- Seeded, unclaimed listings — clearly separated below the verified
+             results so they never outrank a vetted tradesperson, and labelled
+             "pending verification" so clients aren't misled. -->
+        <section v-if="prospectResults.length" class="mt-6">
+          <h2 class="text-lg font-semibold">Not yet on Blue Seal</h2>
+          <p class="mb-3 text-sm text-[color:var(--bs-muted)]">
+            Found in public records — pending verification. They haven't verified
+            their identity or credentials yet.
+          </p>
+          <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <ProspectCard v-for="p in prospectResults" :key="p.id" :prospect="p" />
+          </div>
+        </section>
+      </template>
+    </template>
   </section>
 </template>
