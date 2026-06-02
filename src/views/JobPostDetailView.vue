@@ -38,6 +38,7 @@ import { useFormatters } from "@/composables";
 import { humanizeError } from "@/utils/errors";
 import VerifiedBadge from "@/components/VerifiedBadge.vue";
 import JobCounterparty from "@/components/JobCounterparty.vue";
+import LoadingState from "@/components/LoadingState.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -267,9 +268,7 @@ const visibleApplications = computed(() =>
 
 <template>
   <section class="bs-container py-6 max-w-3xl">
-    <div v-if="loading" class="bs-card p-6 text-center text-[color:var(--bs-muted)]">
-      <i class="pi pi-spin pi-spinner mr-2"></i>Loading post…
-    </div>
+    <LoadingState v-if="loading" label="Loading post…" />
 
     <Message v-else-if="error" severity="error" :closable="false">{{ error }}</Message>
 

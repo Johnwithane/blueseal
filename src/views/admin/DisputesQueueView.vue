@@ -9,6 +9,7 @@ import {
 } from "@/firebase/services/disputes";
 import { useFormatters } from "@/composables/useFormatters";
 import type { DisputeDoc, WithId } from "@/firebase/interfaces";
+import LoadingState from "@/components/LoadingState.vue";
 
 const open = ref<WithId<DisputeDoc>[]>([]);
 const closed = ref<WithId<DisputeDoc>[]>([]);
@@ -84,7 +85,7 @@ const openCount = computed(() => open.value.length);
       />
     </div>
 
-    <div v-if="loading" class="bs-empty">Loading…</div>
+    <LoadingState v-if="loading" />
     <div v-else-if="open.length === 0" class="bs-empty">
       <i class="pi pi-check-circle text-green-600 mr-2" />No open disputes.
     </div>

@@ -29,6 +29,7 @@ import { humanizeError } from "@/utils/errors";
 import type { TradespersonDoc, WithId } from "@/firebase/interfaces";
 import { useFormatters } from "@/composables";
 import { tradeLabel } from "@/data/trades";
+import LoadingState from "@/components/LoadingState.vue";
 
 const pending = ref<WithId<TradespersonDoc>[]>([]);
 const loading = ref(true);
@@ -345,7 +346,7 @@ onMounted(async () => {
       </div>
     </div>
 
-    <div v-if="loading" class="bs-empty">Loading…</div>
+    <LoadingState v-if="loading" />
     <div v-else-if="pending.length === 0" class="bs-empty">
       <i class="pi pi-check-circle text-3xl mb-2 block text-green-600"></i>
       <p>Queue clear. Nice work.</p>

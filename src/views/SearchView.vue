@@ -20,6 +20,7 @@ import LocationPicker, {
   type LocationValue,
 } from "@/components/LocationPicker.vue";
 import type { ProspectDoc, TradespersonDoc, WithId } from "@/firebase/interfaces";
+import LoadingState from "@/components/LoadingState.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -308,7 +309,7 @@ onMounted(async () => {
       {{ error }}
     </Message>
 
-    <div v-if="loading" class="bs-empty">Searching…</div>
+    <LoadingState v-if="loading" label="Searching…" />
     <template v-else>
       <div
         v-if="!results.length && !prospectResults.length"

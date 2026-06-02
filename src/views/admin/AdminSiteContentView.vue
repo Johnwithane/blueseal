@@ -10,6 +10,7 @@ import { getHomeContent, saveHomeTestimonials } from "@/firebase/services/siteCo
 import { useToast } from "@/composables/useToast";
 import { useFormatters } from "@/composables/useFormatters";
 import { humanizeError } from "@/utils/errors";
+import LoadingState from "@/components/LoadingState.vue";
 
 const toast = useToast();
 const { relativeTime } = useFormatters();
@@ -94,7 +95,7 @@ async function save() {
       to start.
     </Message>
 
-    <div v-if="loading" class="bs-empty">Loading…</div>
+    <LoadingState v-if="loading" />
 
     <div v-else class="space-y-4">
       <article

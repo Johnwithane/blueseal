@@ -185,6 +185,23 @@ a { color: var(--bs-blue); }
   color: var(--bs-muted);
 }
 
+/* Shared loading indicator (see LoadingState.vue). */
+.bs-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 2rem;
+  color: var(--bs-muted);
+  font-size: 0.875rem;
+}
+.bs-loading--inline {
+  flex-direction: row;
+  gap: 0.5rem;
+  padding: 0;
+}
+
 /* Make PrimeVue inputs full-width by default in forms */
 .bs-form .p-inputtext,
 .bs-form .p-password,

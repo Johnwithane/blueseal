@@ -38,6 +38,7 @@ import { tradeLabel } from "@/data/trades";
 import { useFormatters } from "@/composables/useFormatters";
 import { registryForIssuingBody } from "@/utils/certRegistries";
 import { VERIFICATION_SEVERITY, VERIFICATION_LABEL } from "@/utils/verificationStatus";
+import LoadingState from "@/components/LoadingState.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -257,7 +258,7 @@ const approveBlockerHint = computed(() => {
   <section class="bs-container py-6">
     <RouterLink to="/admin/vetting" class="text-xs text-[color:var(--bs-muted)]">← Queue</RouterLink>
 
-    <div v-if="loading" class="bs-empty mt-4">Loading…</div>
+    <LoadingState v-if="loading" class="mt-4" />
     <template v-else-if="tradie">
       <header class="mt-2 mb-4">
         <div class="text-sm text-[color:var(--bs-muted)]">

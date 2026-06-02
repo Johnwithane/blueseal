@@ -26,6 +26,7 @@ import { useToast } from "@/composables/useToast";
 import CalendarView from "@/components/CalendarView.vue";
 import VerifiedBadge from "@/components/VerifiedBadge.vue";
 import ProspectProfile from "@/components/ProspectProfile.vue";
+import LoadingState from "@/components/LoadingState.vue";
 
 const route = useRoute();
 const tradie = ref<WithId<TradespersonDoc> | null>(null);
@@ -163,7 +164,7 @@ onMounted(async () => {
        body instead of the tradesperson layout when the id resolves to one. -->
   <ProspectProfile v-if="!loading && prospect" :prospect="prospect" />
   <section v-else class="bs-container py-6">
-    <div v-if="loading" class="bs-empty">Loading…</div>
+    <LoadingState v-if="loading" />
     <div v-else-if="!tradie" class="bs-empty">
       <i class="pi pi-times-circle text-3xl mb-2 block"></i>
       <p>Profile not found.</p>

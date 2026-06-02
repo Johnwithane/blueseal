@@ -9,6 +9,7 @@ import {
 import type { TradespersonDoc, WithId } from "@/firebase/interfaces";
 import { useFormatters } from "@/composables/useFormatters";
 import { tradeLabel } from "@/data/trades";
+import LoadingState from "@/components/LoadingState.vue";
 
 function tradesLabel(t: WithId<TradespersonDoc>): string {
   return t.trades.map((k) => tradeLabel(k)).join(", ") || "—";
@@ -44,7 +45,7 @@ onMounted(refresh);
       <Button label="Refresh" icon="pi pi-refresh" outlined :loading="loading" @click="refresh" />
     </div>
 
-    <div v-if="loading" class="bs-empty">Loading…</div>
+    <LoadingState v-if="loading" />
     <div v-else-if="pending.length === 0" class="bs-empty">
       <i class="pi pi-check-circle text-green-600 mr-2" />Queue clear.
     </div>

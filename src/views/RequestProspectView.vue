@@ -15,6 +15,7 @@ import type { ProspectDoc, WithId, Urgency } from "@/firebase/interfaces";
 import { tradeLabel } from "@/data/trades";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
+import LoadingState from "@/components/LoadingState.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -108,7 +109,7 @@ async function submit() {
     </p>
 
     <Message v-if="error" severity="error" :closable="false" class="mt-4">{{ error }}</Message>
-    <div v-if="loading" class="bs-empty mt-4">Loading…</div>
+    <LoadingState v-if="loading" class="mt-4" />
 
     <form v-else class="bs-form bs-card p-5 mt-4 space-y-4" @submit.prevent="submit">
       <div v-if="prospect" class="text-sm text-[color:var(--bs-muted)]">

@@ -18,6 +18,7 @@ import type {
 import { TRADES, tradeLabel } from "@/data/trades";
 import { useFormatters } from "@/composables";
 import JobCounterparty from "@/components/JobCounterparty.vue";
+import LoadingState from "@/components/LoadingState.vue";
 
 const auth = useAuthStore();
 const { relativeTime } = useFormatters();
@@ -117,9 +118,7 @@ function urgencyLabel(u: string): string {
       Jobs posted by clients in your area. Apply with a message and your proposed price.
     </p>
 
-    <div v-if="loadingTradie" class="bs-card mt-6 p-6 text-center text-[color:var(--bs-muted)]">
-      <i class="pi pi-spin pi-spinner mr-2"></i>Loading your profile…
-    </div>
+    <LoadingState v-if="loadingTradie" class="mt-6" label="Loading your profile…" />
 
     <Message
       v-else-if="!tradie?.isVisible && tradie?.vettingStatus === 'approved'"

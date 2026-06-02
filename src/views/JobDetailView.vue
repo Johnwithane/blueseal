@@ -53,6 +53,7 @@ import ScheduleTab from "@/features/jobDetail/ScheduleTab.vue";
 import InvoiceTab from "@/features/jobDetail/InvoiceTab.vue";
 import JobChatButton from "@/features/jobDetail/JobChatButton.vue";
 import JobChatOverlay from "@/features/jobDetail/JobChatOverlay.vue";
+import LoadingState from "@/components/LoadingState.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -751,7 +752,7 @@ function onReturnToApplicants() {
   >
     <RouterLink to="/dashboard" class="text-xs text-[color:var(--bs-muted)]">← Dashboard</RouterLink>
 
-    <div v-if="loading" class="bs-empty mt-4">Loading…</div>
+    <LoadingState v-if="loading" class="mt-4" />
     <div v-else-if="loadError" class="bs-empty mt-4">
       <i class="pi pi-exclamation-circle text-3xl mb-2 block text-amber-600"></i>
       <p class="font-medium">We couldn't open this job.</p>
