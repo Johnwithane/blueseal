@@ -250,7 +250,7 @@ export interface TradespersonContact {
 //   outreach_sent — a real client requested them; the claim invite email went
 //                   out (requestProspectOutreach). Still discoverable.
 //   claimed       — the person signed up with the matching email;
-//                   linkProspectOnSignup migrated the profile into
+//                   claimProspect migrated the profile into
 //                   tradespeople/{uid} and DELETES this doc. `claimed` is a
 //                   transient marker only ever seen mid-trigger.
 //   suppressed    — unsubscribed / takedown. isListed=false, never re-imported
@@ -259,7 +259,7 @@ export interface TradespersonContact {
 // PRIVACY: the harvested business email/phone are NOT on this world-readable
 // doc — they live in prospects/{id}/private/contact (admin-only). For the
 // claim match we keep only `emailHash` (a SHA-256 of the lowercased email) on
-// the public doc: enough for linkProspectOnSignup's equality query, useless for
+// the public doc: enough for claimProspect's equality query, useless for
 // harvesting. (Firestore reads are all-or-nothing per doc, so a plaintext email
 // on a publicly readable doc would leak — hence the hash.)
 export type ProspectStatus =
@@ -302,6 +302,9 @@ export interface ProspectDoc {
   // website. Populated for research-sourced listings; optional on older docs.
   locationLabel?: string | null;
   website?: string | null;
+  // Re-hosted "our work" / gallery photos pulled from the business's own site
+  // (best-effort — many won't have any). Storage URLs (CSP-allowed).
+  portfolioPhotos?: string[];
 
   // Listing state. `isListed` is the prospect analogue of isVisible, but means
   // "unvetted seeded listing", never "trusted". searchProspects filters on it.
@@ -309,7 +312,7 @@ export interface ProspectDoc {
   isListed: boolean;
 
   // Claim match key — SHA-256 hex of the lowercased prospect email.
-  // linkProspectOnSignup hashes the new user's email and matches on this
+  // claimProspect hashes the new user's email and matches on this
   // (the email-claim mechanism, mirroring vouches' toEmail match, but hashed
   // so the address never sits on a world-readable doc).
   emailHash: string;
@@ -324,9 +327,8 @@ export interface ProspectDoc {
   licenceNumber: string | null;
   importedBy: string; // admin uid
   importedAt: Timestamp;
-  // Unguessable token for the unsubscribe link, so the suppress endpoint can't
-  // be used to enumerate prospect ids.
-  unsubToken: string;
+  // (Unsubscribe token is NOT stored — it's an HMAC(secret, prospectId)
+  // recomputed on demand, so it can never leak via this world-readable doc.)
 
   // Outreach bookkeeping — drives the per-prospect cooldown in
   // requestProspectOutreach so a popular prospect isn't emailed repeatedly.
@@ -334,7 +336,7 @@ export interface ProspectDoc {
   outreachCount: number;
   firstRequestedAt: Timestamp | null;
 
-  // Claim linkage — set transiently by linkProspectOnSignup just before the doc
+  // Claim linkage — set transiently by claimProspect just before the doc
   // is deleted; only meaningful if a delete ever fails mid-trigger.
   claimedByUid: string | null;
   claimedAt: Timestamp | null;
@@ -354,7 +356,7 @@ export interface ProspectContact {
 // prospectLeads/{leadId}
 // A real client request held against an unclaimed prospect until they sign up.
 // Created by requestProspectOutreach; drained into a real job by
-// linkProspectOnSignup when the prospect claims. NOT world-readable — only the
+// claimProspect when the prospect claims. NOT world-readable — only the
 // owning client + admin (firestore.rules).
 // ---------------------------------------------------------------------------
 export type ProspectLeadStatus =

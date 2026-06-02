@@ -912,7 +912,7 @@ service cloud.firestore {
 
     // ---------- prospectLeads (a real client request held against a prospect) ----------
     // Created by requestProspectOutreach, drained into a real job by
-    // linkProspectOnSignup. The owning client can read their own lead to see
+    // claimProspect. The owning client can read their own lead to see
     // status; nobody else (the prospect has no account yet). All writes flow
     // through callables/triggers on the Admin SDK.
     match /prospectLeads/{leadId} {

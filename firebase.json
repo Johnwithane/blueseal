@@ -18,7 +18,13 @@
   "hosting": {
     "public": "dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
-    "rewrites": [{ "source": "**", "destination": "/index.html" }],
+    "rewrites": [
+      {
+        "source": "/p/unsubscribe",
+        "function": { "functionId": "suppressProspect", "region": "us-central1" }
+      },
+      { "source": "**", "destination": "/index.html" }
+    ],
     "headers": [
       {
         "source": "**",

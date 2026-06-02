@@ -63,7 +63,6 @@ function prospectPayload(overrides: Record<string, unknown>): Record<string, unk
     licenceNumber: null,
     importedBy: ADMIN_UID,
     importedAt: new Date(),
-    unsubToken: "tok",
     lastOutreachAt: null,
     outreachCount: 0,
     firstRequestedAt: null,

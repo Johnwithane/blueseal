@@ -97,6 +97,14 @@ export { backfillPayoutsField } from "./payments/backfillPayoutsField";
 export { seedIntakeSchemas } from "./seed/seedIntakeSchemas";
 export { bulkImportProspects } from "./seed/bulkImportProspects";
 
+// Prospects — seeded-listing outreach (on a real client request) + claim flow.
+// Claim is an authenticated callable gated on a VERIFIED email (magic-link
+// sign-in), not a trigger trusting an attacker-writable email field.
+export { requestProspectOutreach } from "./prospects/requestProspectOutreach";
+export { suppressProspect } from "./prospects/suppressProspect";
+export { claimProspect } from "./prospects/claimProspect";
+export { scheduledProspectExpiry } from "./prospects/scheduledProspectExpiry";
+
 // Messaging (WhatsApp Cloud API queue processor)
 export { processWhatsAppMessage } from "./messaging/processWhatsAppMessage";
 

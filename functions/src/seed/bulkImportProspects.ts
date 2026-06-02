@@ -16,7 +16,7 @@
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { FieldValue, GeoPoint } from "firebase-admin/firestore";
 import { geohashForLocation } from "geofire-common";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash } from "node:crypto";
 import { logger } from "firebase-functions/v2";
 
 import { CALLABLE_OPTS } from "../lib/callable";
@@ -177,6 +177,8 @@ export const bulkImportProspects = onCall(
           ),
           geohashPublic,
           serviceRadiusKm: row.serviceRadiusKm,
+          locationLabel: row.locationLabel,
+          website: row.website,
           status: "listed",
           isListed: true,
           emailHash: p.emailHash,
@@ -187,7 +189,6 @@ export const bulkImportProspects = onCall(
           licenceNumber: row.licenceNumber,
           importedBy: actor,
           importedAt: FieldValue.serverTimestamp(),
-          unsubToken: randomBytes(24).toString("hex"),
           lastOutreachAt: null,
           outreachCount: 0,
           firstRequestedAt: null,

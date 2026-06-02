@@ -3,8 +3,12 @@ import { mount } from "@vue/test-utils";
 import ProspectProfile from "./ProspectProfile.vue";
 import type { ProspectDoc, WithId } from "@/firebase/interfaces";
 
+vi.mock("vue-router", () => ({ RouterLink: { template: "<a><slot/></a>" } }));
 vi.mock("@/composables/useFormatters", () => ({
   useFormatters: () => ({ money: (cents: number) => `$${(cents / 100).toFixed(0)}` }),
+}));
+vi.mock("@/stores/auth", () => ({
+  useAuthStore: () => ({ isAuthenticated: true, hasClientRole: true }),
 }));
 
 function prospect(partial: Partial<WithId<ProspectDoc>> = {}): WithId<ProspectDoc> {
@@ -57,11 +61,11 @@ describe("ProspectProfile", () => {
     expect(text).not.toContain("/ 5");
   });
 
-  it("renders the CTA disabled (outreach is wired in Phase 3)", () => {
+  it("renders the 'Request this pro' CTA for a signed-in client", () => {
     const cta = mountProfile()
       .findAll("button")
       .find((b) => b.text().includes("Request this pro"));
     expect(cta).toBeDefined();
-    expect(cta!.attributes("disabled")).toBeDefined();
+    expect(cta!.attributes("disabled")).toBeUndefined();
   });
 });

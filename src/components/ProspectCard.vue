@@ -31,12 +31,15 @@ const avatarInitial = computed(() => {
     class="bs-card p-4 hover:shadow-md transition-shadow no-underline text-inherit block"
   >
     <div class="flex items-start gap-3">
-      <Avatar
+      <!-- Logo fit-to-circle: `contain` so non-square company logos aren't
+           stretched; a white background fills the letterboxed area. -->
+      <div
         v-if="props.prospect.photoURL"
-        :image="props.prospect.photoURL"
-        size="large"
-        shape="circle"
-      />
+        class="prospect-logo prospect-logo--lg"
+        role="img"
+        :aria-label="props.prospect.displayName"
+        :style="{ backgroundImage: `url('${props.prospect.photoURL}')` }"
+      ></div>
       <Avatar
         v-else
         :label="avatarInitial"
@@ -77,3 +80,19 @@ const avatarInitial = computed(() => {
     </div>
   </RouterLink>
 </template>
+
+<style scoped>
+.prospect-logo {
+  flex: none;
+  border-radius: 9999px;
+  background-color: #fff;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  border: 1px solid var(--bs-border);
+}
+.prospect-logo--lg {
+  width: 3rem;
+  height: 3rem;
+}
+</style>

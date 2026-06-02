@@ -6,6 +6,34 @@ Tasks are grouped by the phase that introduced them so you can see why each one 
 
 ---
 
+## Seeded prospects — outreach + magic-link claim (added 2026-06-01)
+
+The seeded-prospect directory + claim flow ships safe-by-default: leads are
+created, but **no outreach email is sent and no magic-link claim works** until
+the items below are set. Nothing breaks while they're unset.
+
+### [ ] Enable email-link (passwordless) sign-in + authorize the claim domain
+
+- **Why:** The claim flow uses a Firebase magic sign-in link — clicking it proves the prospect controls their inbox and signs them in with a verified email (`claimProspect` gates on `email_verified`). Without this, `generateSignInWithEmailLink` throws and outreach silently skips the email.
+- **What:** Firebase Console → Authentication → Sign-in method → enable **Email link (passwordless sign-in)**. Then Authentication → Settings → Authorized domains → ensure your app domain (and `localhost` for testing) is listed so the `/claim` continue URL is allowed.
+- **Verify:** Request a seeded prospect as a client (with the env below set) → the outreach email arrives with a "See the request" magic link → clicking it lands on `/claim`, signs you in, and converts the request into a job.
+
+### [ ] Set the CASL outreach env vars on Cloud Functions
+
+- **Why:** CASL requires every outreach email to carry the sender's physical mailing address + a working unsubscribe. These are gated: until set, `sendOutreachEmail` returns without sending.
+- **What:** set on the functions runtime:
+  - `BLUE_SEAL_MAILING_ADDRESS` — a valid physical mailing address (registered office or PO box), current ≥60 days. **Required for any send.**
+  - `BLUE_SEAL_LEGAL_NAME` — optional; legal entity name in the footer (defaults to "Blue Seal").
+  - `PROSPECT_UNSUB_SECRET` — a long random secret. The unsubscribe token is `HMAC(secret, prospectId)` (never stored), so this must be set for unsubscribe links to validate. **Required for any send.**
+- **Verify:** With all set, the outreach footer shows the mailing address + a working "Unsubscribe" link; clicking it drops the prospect from search and tombstones them (never re-imported).
+
+### [ ] Legal sign-off on the CASL consent basis
+
+- **Why:** Outreach relies on the "conspicuous publication" implied-consent basis (only rows with `emailConspicuouslyPublished: true` are emailed) + the "only on a real client request" relevance argument.
+- **What:** Have counsel confirm the basis before the first real send. The footer wording is row-accurate (varies by `dataConsentBasis`), and provenance (`sourceUrl`, `dataConsentBasis`) is retained on every prospect for the audit trail.
+
+---
+
 ## Monetization pivot — Stripe Connect Express (added 2026-05-24)
 
 Replacing the AI subscription with a 12% commission via Stripe Connect Express. Phase A wires the connection: callable to create Connect Express accounts, hosted onboarding link, login link, and an `account.updated` webhook that mirrors Stripe state onto `tradespeople/{uid}.payouts`. Payment / payout / refund / dispute webhook events land in Phase B alongside the `sendInvoice` rewrite.

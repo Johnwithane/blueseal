@@ -50,6 +50,13 @@ const routes: RouteRecordRaw[] = [
     component: () => import("@/views/RequestQuoteView.vue"),
     meta: { requiresAuth: true, role: "client", layout: "app", title: "Request quote" },
   },
+  {
+    // Request a seeded (unverified) prospect → outreach + claim flow.
+    path: "/request-prospect/:id",
+    name: "RequestProspect",
+    component: () => import("@/views/RequestProspectView.vue"),
+    meta: { requiresAuth: true, role: "client", layout: "app", title: "Request" },
+  },
 
   // Legal
   {
@@ -62,6 +69,14 @@ const routes: RouteRecordRaw[] = [
     path: "/terms",
     name: "Terms",
     component: () => import("@/views/TermsView.vue"),
+    meta: { layout: "public" },
+  },
+
+  // Prospect magic-link claim handler (lands here from the outreach email).
+  {
+    path: "/claim",
+    name: "ProspectClaim",
+    component: () => import("@/views/ClaimView.vue"),
     meta: { layout: "public" },
   },
 

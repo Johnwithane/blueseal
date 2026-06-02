@@ -6,15 +6,18 @@
 // portfolio, availability, or verified badges — a seeded listing has none of
 // that, and showing anything verified-looking would misrepresent them).
 import { computed } from "vue";
+import { RouterLink } from "vue-router";
 import Button from "primevue/button";
 import Tag from "primevue/tag";
 import Avatar from "primevue/avatar";
 import type { ProspectDoc, WithId } from "@/firebase/interfaces";
 import { tradeLabel } from "@/data/trades";
 import { useFormatters } from "@/composables/useFormatters";
+import { useAuthStore } from "@/stores/auth";
 
 const props = defineProps<{ prospect: WithId<ProspectDoc> }>();
 const { money } = useFormatters();
+const auth = useAuthStore();
 
 const displayName = computed(() => props.prospect.displayName?.trim() || "");
 const avatarInitial = computed(() => {
@@ -47,12 +50,14 @@ const tradesWithYears = computed(() =>
 
     <header class="bs-card p-5">
       <div class="flex flex-col gap-4 sm:flex-row sm:items-start">
-        <Avatar
+        <!-- Logo fit-to-circle: `contain` so non-square logos aren't stretched. -->
+        <div
           v-if="prospect.photoURL"
-          :image="prospect.photoURL"
-          size="xlarge"
-          shape="circle"
-        />
+          class="prospect-logo prospect-logo--xl"
+          role="img"
+          :aria-label="prospect.displayName"
+          :style="{ backgroundImage: `url('${prospect.photoURL}')` }"
+        ></div>
         <Avatar
           v-else
           :label="avatarInitial"
@@ -95,16 +100,23 @@ const tradesWithYears = computed(() =>
           </div>
         </div>
         <div class="flex flex-col items-stretch gap-1">
-          <!-- CTA wired up in Phase 3 (request -> outreach). Disabled for now. -->
-          <Button label="Request this pro" icon="pi pi-send" disabled />
-          <span class="text-center text-xs text-[color:var(--bs-muted)]">
-            Available soon
-          </span>
+          <RouterLink
+            v-if="auth.isAuthenticated && auth.hasClientRole"
+            :to="{ name: 'RequestProspect', params: { id: prospect.id } }"
+          >
+            <Button label="Request this pro" icon="pi pi-send" class="w-full" />
+          </RouterLink>
+          <RouterLink v-else-if="!auth.isAuthenticated" :to="{ name: 'SignUp' }">
+            <Button label="Sign up to contact" icon="pi pi-user-plus" class="w-full" />
+          </RouterLink>
         </div>
       </div>
     </header>
 
-    <section v-if="prospect.bio || prospect.hourlyRate != null" class="bs-card p-5 mt-4 space-y-3">
+    <section
+      v-if="prospect.bio || prospect.hourlyRate != null || prospect.website"
+      class="bs-card p-5 mt-4 space-y-3"
+    >
       <h2 class="font-semibold">About</h2>
       <p v-if="prospect.bio" class="text-sm whitespace-pre-wrap">{{ prospect.bio }}</p>
       <div class="text-sm text-[color:var(--bs-muted)]">
@@ -113,6 +125,49 @@ const tradesWithYears = computed(() =>
           {{ prospect.hourlyRate ? money(prospect.hourlyRate) + "/hr" : "Quote on request" }}
         </strong>
       </div>
+      <div v-if="prospect.website" class="text-sm">
+        <a
+          :href="prospect.website"
+          target="_blank"
+          rel="noopener noreferrer nofollow"
+          class="text-[color:var(--bs-blue)] hover:underline"
+        >
+          <i class="pi pi-external-link mr-1"></i>Visit website
+        </a>
+      </div>
+    </section>
+
+    <section
+      v-if="prospect.portfolioPhotos && prospect.portfolioPhotos.length"
+      class="bs-card p-5 mt-4"
+    >
+      <h2 class="font-semibold mb-3">Recent work</h2>
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+        <img
+          v-for="(url, i) in prospect.portfolioPhotos"
+          :key="i"
+          :src="url"
+          :alt="`Work photo ${i + 1}`"
+          class="aspect-square w-full rounded-md object-cover"
+          loading="lazy"
+        />
+      </div>
     </section>
   </section>
 </template>
+
+<style scoped>
+.prospect-logo {
+  flex: none;
+  border-radius: 9999px;
+  background-color: #fff;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  border: 1px solid var(--bs-border);
+}
+.prospect-logo--xl {
+  width: 5rem;
+  height: 5rem;
+}
+</style>

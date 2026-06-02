@@ -242,6 +242,47 @@
         { "fieldPath": "isListed", "order": "ASCENDING" },
         { "fieldPath": "geohashPublic", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "prospectLeads",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "expiresAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "prospectLeads",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clientId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "prospectLeads",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clientId", "order": "ASCENDING" },
+        { "fieldPath": "prospectId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "prospectLeads",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "emailHash", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "prospects",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "emailHash", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

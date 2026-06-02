@@ -85,6 +85,51 @@ export async function getProspect(id: string): Promise<WithId<ProspectDoc> | nul
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
 
+export interface ProspectRequestInput {
+  prospectId: string;
+  title: string;
+  description: string;
+  urgency: "flexible" | "this_week" | "urgent";
+  address: { line1: string; city: string; region: string; postalCode: string };
+}
+
+export type ProspectRequestResult =
+  | { status: "claimed"; tradespersonId: string }
+  | { status: "pending_signup"; leadId: string; emailed?: boolean; alreadyRequested?: boolean };
+
+/**
+ * Client requests a seeded (unverified) prospect. Creates a held lead and — on
+ * a real client request — triggers the (CASL-gated) outreach email. If the
+ * prospect has already signed up, returns { status:"claimed", tradespersonId }
+ * so the caller can redirect to the real profile.
+ */
+export async function requestProspectOutreach(
+  input: ProspectRequestInput,
+): Promise<ProspectRequestResult> {
+  const callable = httpsCallable<ProspectRequestInput, ProspectRequestResult>(
+    functions,
+    "requestProspectOutreach",
+  );
+  const { data } = await callable(input);
+  return data;
+}
+
+export type ClaimProspectResult =
+  | { status: "claimed"; jobsCreated: number; prospectsClaimed: number }
+  | { status: "needs_verification" }
+  | { status: "none" };
+
+/**
+ * Claims the seeded prospect(s) matching the signed-in user's VERIFIED email
+ * (set by magic-link sign-in). Migrates the seeded profile into their
+ * tradesperson draft and converts any waiting client requests into real jobs.
+ */
+export async function claimProspect(): Promise<ClaimProspectResult> {
+  const callable = httpsCallable<undefined, ClaimProspectResult>(functions, "claimProspect");
+  const { data } = await callable();
+  return data;
+}
+
 export interface BulkImportProspectsResult {
   received: number;
   imported: number; // for dryRun: the count that WOULD import

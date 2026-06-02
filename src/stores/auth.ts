@@ -2,10 +2,12 @@ import { defineStore } from "pinia";
 import {
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
+  isSignInWithEmailLink,
   onAuthStateChanged,
   sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
+  signInWithEmailLink,
   signInWithPopup,
   signOut,
   updateProfile,
@@ -253,6 +255,50 @@ export const useAuthStore = defineStore("auth", {
           this.roles = [intendedRole];
           this.activeRole = intendedRole;
         }
+      } catch (e) {
+        this.error = (e as Error).message;
+        throw e;
+      } finally {
+        this.pending = false;
+      }
+    },
+
+    /**
+     * Completes a Firebase email-link (magic-link) sign-in from the current
+     * URL. Used by the prospect-claim flow: clicking the link in the outreach
+     * email proves the recipient controls that inbox and signs them in with a
+     * VERIFIED email. Provisions a tradesperson user doc on first sign-in.
+     */
+    async completeEmailLinkSignIn(email: string): Promise<{ isNew: boolean }> {
+      this.pending = true;
+      this.error = null;
+      try {
+        const href = window.location.href;
+        if (!isSignInWithEmailLink(auth, href)) {
+          throw new Error("This sign-in link is invalid or has expired.");
+        }
+        const cred = await signInWithEmailLink(auth, email, href);
+        const existing = await getUser(cred.user.uid);
+        let isNew = false;
+        if (!existing) {
+          isNew = true;
+          await createUser({
+            uid: cred.user.uid,
+            email: cred.user.email ?? email,
+            displayName: cred.user.displayName ?? "",
+            photoURL: cred.user.photoURL,
+            role: "tradesperson",
+            termsAcceptedVersion: LEGAL_VERSION,
+          });
+          this.roles = ["tradesperson"];
+          this.activeRole = "tradesperson";
+        }
+        // Refresh the token so the verified-email claim is visible to the
+        // claimProspect callable (which gates on email_verified). The roles
+        // claim lands on a later refresh via setRoleOnSignup + applyAuthState's
+        // claim-lag recovery; claimProspect doesn't depend on it.
+        await cred.user.getIdToken(true);
+        return { isNew };
       } catch (e) {
         this.error = (e as Error).message;
         throw e;

@@ -122,6 +122,8 @@ export const seededProspectRowSchema = z.object({
     lat: z.number().min(-90).max(90),
     lng: z.number().min(-180).max(180),
   }),
+  // Human "City, Province" label shown on the card/profile. Optional.
+  locationLabel: z.string().trim().max(80).nullable().default(null),
 
   // Contact. A usable email is REQUIRED: the whole loop (claim-by-email +
   // outreach-on-request) needs one, and CASL implied consent rests on a
