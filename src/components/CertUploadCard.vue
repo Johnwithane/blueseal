@@ -18,11 +18,13 @@ import {
 import { isSelfDeclaredNoCert, NO_CERT_SENTINEL } from "@/firebase/services/certifications";
 import { compressOrPassPdf } from "@/utils/image";
 import { useToast } from "@/composables/useToast";
+import { useConfirmAction } from "@/composables/useConfirmAction";
 import { useFormatters } from "@/composables/useFormatters";
 import { humanizeError } from "@/utils/errors";
 import { VERIFICATION_SEVERITY } from "@/utils/verificationStatus";
 
 const toast = useToast();
+const { confirmDestructive } = useConfirmAction();
 const { date } = useFormatters();
 
 const props = defineProps<{
@@ -158,15 +160,23 @@ async function submitNoCertDeclaration() {
   }
 }
 
-async function removeExisting() {
+function removeExisting() {
   if (!props.existing) return;
-  if (!window.confirm("Remove this certification? You can upload a new one after.")) return;
-  removing.value = true;
-  try {
-    emit("deleted", props.existing.id);
-  } finally {
-    removing.value = false;
-  }
+  const id = props.existing.id;
+  confirmDestructive(
+    {
+      message: "Remove this certification? You can upload a new one after.",
+      header: "Remove certification",
+    },
+    () => {
+      removing.value = true;
+      try {
+        emit("deleted", id);
+      } finally {
+        removing.value = false;
+      }
+    },
+  );
 }
 
 // Walk the form refs back to the values stored on the existing cert so the

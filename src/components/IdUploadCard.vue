@@ -8,10 +8,12 @@ import Message from "primevue/message";
 import type { IdDocType } from "@/firebase/interfaces";
 import { compressOrPassPdf } from "@/utils/image";
 import { useToast } from "@/composables/useToast";
+import { useConfirmAction } from "@/composables/useConfirmAction";
 import { humanizeError } from "@/utils/errors";
 import { VERIFICATION_SEVERITY, VERIFICATION_LABEL } from "@/utils/verificationStatus";
 
 const toast = useToast();
+const { confirmDestructive } = useConfirmAction();
 
 const props = defineProps<{
   status: "none" | "pending" | "approved" | "rejected";
@@ -61,19 +63,23 @@ async function onFile(e: Event) {
   }
 }
 
-async function removeUploaded() {
-  if (!window.confirm("Remove this ID? You'll need to upload a new one.")) return;
-  removing.value = true;
-  try {
-    if (localFileUrl.value) {
-      URL.revokeObjectURL(localFileUrl.value);
-      localFileUrl.value = null;
-      localFileName.value = null;
-    }
-    emit("removed");
-  } finally {
-    removing.value = false;
-  }
+function removeUploaded() {
+  confirmDestructive(
+    { message: "Remove this ID? You'll need to upload a new one.", header: "Remove ID" },
+    () => {
+      removing.value = true;
+      try {
+        if (localFileUrl.value) {
+          URL.revokeObjectURL(localFileUrl.value);
+          localFileUrl.value = null;
+          localFileName.value = null;
+        }
+        emit("removed");
+      } finally {
+        removing.value = false;
+      }
+    },
+  );
 }
 
 

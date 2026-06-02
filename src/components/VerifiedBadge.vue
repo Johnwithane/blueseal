@@ -6,7 +6,7 @@ import Popover from "primevue/popover";
 import type { Timestamp } from "firebase/firestore";
 import { useFormatters } from "@/composables/useFormatters";
 
-type Kind = "insurance" | "wsib";
+type Kind = "insurance" | "wsib" | "id" | "cert";
 type Variant = "tag" | "pill";
 
 withDefaults(
@@ -22,6 +22,22 @@ const { date } = useFormatters();
 const popover = ref<InstanceType<typeof Popover> | null>(null);
 
 const meta = {
+  id: {
+    label: "ID",
+    icon: "pi pi-id-card",
+    pillClass: "bg-emerald-100 text-emerald-800",
+    title: "About the ID badge",
+    body:
+      "The tradesperson's government photo ID was uploaded and checked against their profile name by Blue Seal's admin team before they were allowed to go live.",
+  },
+  cert: {
+    label: "Cert",
+    icon: "pi pi-verified",
+    pillClass: "bg-blue-100 text-blue-800",
+    title: "About the Cert badge",
+    body:
+      "A trade certification or licence was uploaded by the tradesperson and reviewed by Blue Seal's admin team. It is not a guarantee the credential is currently in force or covers your specific job.",
+  },
   insurance: {
     label: "Insured",
     icon: "pi pi-verified",

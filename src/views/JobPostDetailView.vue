@@ -415,20 +415,16 @@ const visibleApplications = computed(() =>
                   v-if="applicantTradies.get(app.tradespersonId)"
                   class="flex flex-wrap gap-1 mt-1.5"
                 >
-                  <span
+                  <VerifiedBadge
                     v-if="applicantTradies.get(app.tradespersonId)!.idVerified"
-                    class="inline-flex items-center gap-1 text-[10px] font-medium bg-emerald-100 text-emerald-800 rounded-full px-1.5 py-0.5"
-                    title="ID verified by Blue Seal"
-                  >
-                    <i class="pi pi-id-card text-[10px]" />ID
-                  </span>
-                  <span
+                    kind="id"
+                    variant="pill"
+                  />
+                  <VerifiedBadge
                     v-if="(applicantTradies.get(app.tradespersonId)!.verifiedTrades?.length ?? 0) > 0"
-                    class="inline-flex items-center gap-1 text-[10px] font-medium bg-blue-100 text-blue-800 rounded-full px-1.5 py-0.5"
-                    title="Trade certification verified"
-                  >
-                    <i class="pi pi-verified text-[10px]" />Cert
-                  </span>
+                    kind="cert"
+                    variant="pill"
+                  />
                   <VerifiedBadge
                     v-if="applicantTradies.get(app.tradespersonId)!.insuranceVerified"
                     kind="insurance"
