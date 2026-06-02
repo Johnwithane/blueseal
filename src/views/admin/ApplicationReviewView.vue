@@ -37,6 +37,7 @@ import { useToast } from "@/composables/useToast";
 import { tradeLabel } from "@/data/trades";
 import { useFormatters } from "@/composables/useFormatters";
 import { registryForIssuingBody } from "@/utils/certRegistries";
+import { VERIFICATION_SEVERITY, VERIFICATION_LABEL } from "@/utils/verificationStatus";
 
 const route = useRoute();
 const router = useRouter();
@@ -226,11 +227,6 @@ async function submitReject() {
   router.replace({ name: "AdminVetting" });
 }
 
-const certSeverity = {
-  pending: "warn" as const,
-  approved: "success" as const,
-  rejected: "danger" as const,
-};
 
 async function copyCertNumber(certNumber: string) {
   try {
@@ -288,7 +284,7 @@ const approveBlockerHint = computed(() => {
           <article v-for="c in certs" :key="c.id" class="border-t py-3 first:border-t-0 first:pt-0">
             <div class="flex items-center justify-between">
               <div class="font-medium">{{ tradeLabel(c.trade) }}</div>
-              <Tag :value="c.status" :severity="certSeverity[c.status]" />
+              <Tag :value="VERIFICATION_LABEL[c.status]" :severity="VERIFICATION_SEVERITY[c.status]" />
             </div>
             <div class="text-xs text-[color:var(--bs-muted)]">
               {{ c.issuingBody }} • #{{ c.certNumber }}
@@ -359,7 +355,7 @@ const approveBlockerHint = computed(() => {
           <template v-else>
             <div class="flex items-center justify-between mb-2">
               <div class="font-medium">{{ idDoc.documentType }}</div>
-              <Tag :value="idDoc.status" :severity="certSeverity[idDoc.status]" />
+              <Tag :value="VERIFICATION_LABEL[idDoc.status]" :severity="VERIFICATION_SEVERITY[idDoc.status]" />
             </div>
             <div v-if="!idFileUrl" class="bs-empty">Loading document…</div>
             <Button
@@ -389,8 +385,8 @@ const approveBlockerHint = computed(() => {
             <h2 class="font-semibold">Insurance verification</h2>
             <Tag
               v-if="insurance"
-              :value="insurance.status"
-              :severity="certSeverity[insurance.status]"
+              :value="VERIFICATION_LABEL[insurance.status]"
+              :severity="VERIFICATION_SEVERITY[insurance.status]"
             />
           </div>
           <div v-if="!insurance" class="bs-empty">Not submitted (optional).</div>
@@ -438,7 +434,7 @@ const approveBlockerHint = computed(() => {
         <section class="bs-card p-4">
           <div class="flex items-center justify-between mb-2">
             <h2 class="font-semibold">WSIB / workers' comp</h2>
-            <Tag v-if="wsib" :value="wsib.status" :severity="certSeverity[wsib.status]" />
+            <Tag v-if="wsib" :value="VERIFICATION_LABEL[wsib.status]" :severity="VERIFICATION_SEVERITY[wsib.status]" />
           </div>
           <div v-if="!wsib" class="bs-empty">Not submitted (optional).</div>
           <template v-else>

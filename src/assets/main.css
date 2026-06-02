@@ -299,6 +299,38 @@ a { color: var(--bs-blue); }
   animation: bs-marquee 40s linear infinite;
 }
 
+/* Collapsible verification-document card (cert / insurance / WSIB). This
+   <details>-based chevron/summary/body styling was duplicated verbatim in all
+   three upload cards (UI_UX_AUDIT.md R6); promoted here so they share it. */
+.bs-cert-card {
+  /* Replace the default `<details>` triangle with our own chevron. */
+  padding: 0;
+}
+.bs-cert-card > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.75rem;
+  user-select: none;
+}
+.bs-cert-card > summary::-webkit-details-marker {
+  display: none;
+}
+.bs-cert-card__chevron {
+  transition: transform 0.18s ease;
+  color: var(--bs-muted);
+}
+.bs-cert-card[open] > summary .bs-cert-card__chevron {
+  transform: rotate(180deg);
+}
+.bs-cert-card__body {
+  padding: 0 0.75rem 0.75rem;
+}
+
 /* Chrome (layout) crossfade — see App.vue. Global (not scoped) so the classes
    reach the AppShell component root, which carries its own style scope. */
 .bs-layout-enter-active,

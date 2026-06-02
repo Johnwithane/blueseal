@@ -6,6 +6,7 @@ import type { JobDoc, WithId } from "@/firebase/interfaces";
 import { useFormatters } from "@/composables/useFormatters";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
+import StatusBanner from "@/components/StatusBanner.vue";
 
 const props = defineProps<{
   job: WithId<JobDoc>;
@@ -50,48 +51,37 @@ async function onMarkPaid() {
 </script>
 
 <template>
-  <div class="bs-card p-4 border-l-4 border-l-amber-500">
-    <div class="flex items-start gap-3">
-      <i class="pi pi-wallet text-amber-600 text-xl mt-0.5"></i>
-      <div class="min-w-0 flex-1">
-        <template v-if="isClient">
-          <div class="font-semibold text-base">
-            {{ money(amountCents) }} upfront fee due
+  <StatusBanner severity="action" icon="pi-wallet">
+    <template #title>
+      <template v-if="isClient">{{ money(amountCents) }} upfront fee due</template>
+      <template v-else>Awaiting {{ money(amountCents) }} upfront fee</template>
+    </template>
+    <template #body>
+      <template v-if="isClient">
+        <p class="text-sm text-[color:var(--bs-muted)] mt-1">
+          Your tradesperson is holding off until this is paid. The amount is
+          credited against the final invoice — so it counts toward, not on top
+          of, the total.
+        </p>
+        <div
+          v-if="paymentInstructions"
+          class="mt-3 rounded-md border border-[color:var(--bs-border)] bg-[color:var(--bs-surface-alt)] p-3 text-sm whitespace-pre-wrap"
+        >
+          <div class="text-[11px] font-semibold uppercase text-[color:var(--bs-muted)] mb-1">
+            Payment instructions
           </div>
-          <p class="text-sm text-[color:var(--bs-muted)] mt-1">
-            Your tradesperson is holding off until this is paid. The amount is
-            credited against the final invoice — so it counts toward, not on top
-            of, the total.
-          </p>
-          <div
-            v-if="paymentInstructions"
-            class="mt-3 rounded-md border border-[color:var(--bs-border)] bg-[color:var(--bs-paper-alt,#f9fafb)] p-3 text-sm whitespace-pre-wrap"
-          >
-            <div class="text-[11px] font-semibold uppercase text-[color:var(--bs-muted)] mb-1">
-              Payment instructions
-            </div>
-            {{ paymentInstructions }}
-          </div>
-          <p
-            v-else
-            class="mt-3 text-xs text-[color:var(--bs-muted)] italic"
-          >
-            No payment instructions on file — ask in chat how they want it.
-          </p>
-        </template>
-        <template v-else>
-          <div class="font-semibold text-base">
-            Awaiting {{ money(amountCents) }} upfront fee
-          </div>
-          <p class="text-sm text-[color:var(--bs-muted)] mt-1">
-            Job won't move to in-progress until the upfront fee is in. Once
-            it lands, mark it received and you're clear to start.
-          </p>
-        </template>
-      </div>
-    </div>
-
-    <div class="mt-4">
+          {{ paymentInstructions }}
+        </div>
+        <p v-else class="mt-3 text-xs text-[color:var(--bs-muted)] italic">
+          No payment instructions on file — ask in chat how they want it.
+        </p>
+      </template>
+      <p v-else class="text-sm text-[color:var(--bs-muted)] mt-1">
+        Job won't move to in-progress until the upfront fee is in. Once
+        it lands, mark it received and you're clear to start.
+      </p>
+    </template>
+    <template #actions>
       <Button
         :label="isTradie ? `Mark received — ${money(amountCents)}` : `I've paid — mark as sent`"
         :icon="isTradie ? 'pi pi-check' : 'pi pi-send'"
@@ -101,6 +91,6 @@ async function onMarkPaid() {
         :disabled="submitting || amountCents <= 0"
         @click="onMarkPaid"
       />
-    </div>
-  </div>
+    </template>
+  </StatusBanner>
 </template>

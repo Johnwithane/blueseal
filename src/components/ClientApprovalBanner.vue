@@ -6,6 +6,7 @@ import Textarea from "primevue/textarea";
 import { clientApproveJob, clientRequestChanges } from "@/firebase/services/jobs";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
+import StatusBanner from "@/components/StatusBanner.vue";
 
 const props = defineProps<{
   jobId: string;
@@ -66,38 +67,36 @@ async function onSubmitRequest() {
 </script>
 
 <template>
-  <div class="bs-card p-4 border-l-4 border-l-amber-500">
-    <div class="flex items-start gap-3">
-      <i class="pi pi-check-circle text-amber-600 text-xl mt-0.5"></i>
-      <div class="min-w-0 flex-1">
-        <div class="font-semibold text-base">Please review the work</div>
-        <p class="text-sm text-[color:var(--bs-muted)] mt-1">
-          Your tradesperson marked the job as done. Look over the invoice below.
-          Approve to receive it and pay, or request changes if anything's off.
-        </p>
+  <StatusBanner severity="action" icon="pi-check-circle" title="Please review the work">
+    <template #body>
+      <p class="text-sm text-[color:var(--bs-muted)] mt-1">
+        Your tradesperson marked the job as done. Look over the invoice below.
+        Approve to receive it and pay, or request changes if anything's off.
+      </p>
+    </template>
+    <template #actions>
+      <div class="grid sm:grid-cols-2 gap-2">
+        <Button
+          label="Request changes"
+          icon="pi pi-undo"
+          severity="secondary"
+          outlined
+          :disabled="approving || requesting"
+          @click="openRequestDialog"
+        />
+        <Button
+          label="Approve & receive invoice"
+          icon="pi pi-check"
+          severity="success"
+          :loading="approving"
+          :disabled="approving || requesting"
+          @click="onApprove"
+        />
       </div>
-    </div>
+    </template>
+  </StatusBanner>
 
-    <div class="grid sm:grid-cols-2 gap-2 mt-4">
-      <Button
-        label="Request changes"
-        icon="pi pi-undo"
-        severity="secondary"
-        outlined
-        :disabled="approving || requesting"
-        @click="openRequestDialog"
-      />
-      <Button
-        label="Approve & receive invoice"
-        icon="pi pi-check"
-        severity="success"
-        :loading="approving"
-        :disabled="approving || requesting"
-        @click="onApprove"
-      />
-    </div>
-
-    <Dialog
+  <Dialog
       v-model:visible="showRequestDialog"
       modal
       header="Request changes"
@@ -127,5 +126,4 @@ async function onSubmitRequest() {
         />
       </template>
     </Dialog>
-  </div>
 </template>
