@@ -89,8 +89,13 @@ body {
 
 /* iOS Safari auto-zooms the viewport whenever a focused form field has a
    font-size below 16px. Force 16px on form controls at mobile widths so
-   tapping an input (e.g. the Search filters) never triggers that zoom — which
-   was also shoving the fixed bottom nav out of view. */
+   tapping an input (e.g. the Search location field, which sits above the map)
+   never triggers that zoom — which was also shoving the fixed bottom nav out
+   of view / off-centre once the page was magnified.
+   `!important` because PrimeVue injects its own `.p-inputtext` font-size at
+   runtime (CSS-in-JS) after this stylesheet, at equal specificity, so a plain
+   rule loses the cascade. .pac-target-input is Google Places' autocomplete
+   input (used by LocationPicker). */
 @media (max-width: 639px) {
   input,
   textarea,
@@ -99,8 +104,9 @@ body {
   .p-textarea,
   .p-inputnumber-input,
   .p-select-label,
-  .p-autocomplete-input {
-    font-size: 16px;
+  .p-autocomplete-input,
+  .pac-target-input {
+    font-size: 16px !important;
   }
 }
 
