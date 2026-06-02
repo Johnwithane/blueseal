@@ -122,6 +122,17 @@ const mobileCompact = computed(() => route.meta.mobileCompact === true);
   }
 }
 
+/* Reclaim mobile top real-estate across every app view: the shell already
+   renders the page title above the slot, so the view's own large top padding
+   (py-6 / py-8) is redundant on phones and pushes content down. Tighten the
+   top padding of the view's root container on mobile only — desktop keeps the
+   roomier spacing each view defines. */
+@media (max-width: 767px) {
+  .app-shell__content :deep(section.bs-container) {
+    padding-top: 0.5rem;
+  }
+}
+
 .app-shell__bottom {
   display: flex;
 }

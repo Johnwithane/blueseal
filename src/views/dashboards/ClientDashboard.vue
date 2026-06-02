@@ -64,24 +64,24 @@ function formatBudget(min: number, max: number): string {
 </script>
 
 <template>
-  <section class="bs-container py-8">
-    <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
-      <div>
-        <p class="text-[color:var(--bs-muted)]">
-          Welcome{{ auth.user?.displayName ? `, ${auth.user.displayName}` : "" }} — your jobs and posted requests.
-        </p>
-      </div>
-      <div class="flex gap-2">
+  <section class="bs-container pb-8 pt-3">
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <!-- Welcome line is desktop-only — the "Jobs" page title already orients
+           on mobile, where vertical space is scarce. -->
+      <p class="hidden text-[color:var(--bs-muted)] sm:block">
+        Welcome{{ auth.user?.displayName ? `, ${auth.user.displayName}` : "" }} — your jobs and posted requests.
+      </p>
+      <div class="flex flex-wrap gap-2">
         <RouterLink to="/jobs/post">
-          <Button label="Post a job" icon="pi pi-megaphone" />
+          <Button label="Post a job" icon="pi pi-megaphone" size="small" />
         </RouterLink>
         <RouterLink to="/search">
-          <Button label="Find a tradesperson" icon="pi pi-search" outlined />
+          <Button label="Find a tradesperson" icon="pi pi-search" outlined size="small" />
         </RouterLink>
       </div>
     </div>
 
-    <div class="mb-4">
+    <div class="mb-3">
       <SelectButton v-model="view" :options="viewOptions" option-label="label" option-value="value" />
     </div>
 

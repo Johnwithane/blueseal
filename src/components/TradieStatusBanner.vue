@@ -154,19 +154,25 @@ const content = computed<BannerContent | null>(() => {
     ]"
     role="status"
   >
-    <div class="bs-container flex flex-col gap-2 py-3 sm:flex-row sm:items-start sm:gap-3">
-      <div class="flex flex-1 items-start gap-3 min-w-0">
-        <i :class="['pi', content.icon, 'bs-tradie-status-banner__icon']" aria-hidden="true"></i>
-        <div class="min-w-0">
-          <div class="text-sm font-semibold leading-tight">{{ content.label }}</div>
-          <div class="mt-0.5 text-sm leading-snug text-[color:var(--bs-text)]/85">
-            {{ content.message }}
-          </div>
-        </div>
-      </div>
-      <RouterLink v-if="content.cta" :to="content.cta.to" class="shrink-0 self-start">
+    <!-- Compact single-line bar: a small leading CTA on the left, then the
+         status text. For action states (those WITH a cta, e.g. "Connect your
+         bank account") the longer description is desktop-only so mobile reads
+         as one tight line. Info-only states (rejected/changes-requested, no
+         cta) always show the full message since that text is the point. -->
+    <div class="bs-container flex items-center gap-2 py-2">
+      <RouterLink v-if="content.cta" :to="content.cta.to" class="shrink-0">
         <Button :label="content.cta.label" size="small" icon="pi pi-arrow-right" icon-pos="right" />
       </RouterLink>
+      <i
+        :class="['pi', content.icon, 'bs-tradie-status-banner__icon shrink-0']"
+        aria-hidden="true"
+      ></i>
+      <p class="min-w-0 flex-1 text-xs leading-snug sm:text-sm">
+        <span class="font-semibold">{{ content.label }}</span>
+        <span :class="content.cta ? 'hidden sm:inline' : ''">
+          <span class="text-[color:var(--bs-text)]/70"> — {{ content.message }}</span>
+        </span>
+      </p>
     </div>
   </div>
 </template>
