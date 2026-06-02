@@ -92,14 +92,10 @@ export function useNavItems(): {
           mobile: true,
           matches: prefix("/jobs/browse"),
         },
-        {
-          key: "profile",
-          label: "Profile",
-          icon: "pi-user",
-          to: "/account",
-          mobile: false,
-          matches: exact("/account"),
-        },
+        // Profile is reachable via the ProfileMenu avatar at the bottom of the
+        // side panel (desktop) and the Profile tab on mobile — it used to be
+        // duplicated as an explicit row here, which no other role had. Removed
+        // so the nav schema is consistent across roles.
         {
           key: "notifications",
           label: "Notifications",
@@ -136,7 +132,10 @@ export function useNavItems(): {
           label: "Dashboard",
           icon: "pi-home",
           to: "/dashboard",
-          mobile: false,
+          // Admin's home now appears in the mobile bottom bar too — previously
+          // it was desktop-only, leaving mobile admins with no tab back to
+          // their dashboard (only the brand logo, which used to eject them).
+          mobile: true,
           matches: (r) => r.path === "/dashboard" || r.path.startsWith("/dashboard/"),
         },
         {
@@ -173,7 +172,10 @@ export function useNavItems(): {
           label: "Users",
           icon: "pi-users",
           to: "/admin/users",
-          mobile: true,
+          // Desktop-only: Dashboard took its mobile slot (above) to keep the
+          // bottom bar at 4 tabs + brand + profile rather than overflowing.
+          // User search is a desktop-leaning task anyway.
+          mobile: false,
           matches: prefix("/admin/users"),
         },
         {

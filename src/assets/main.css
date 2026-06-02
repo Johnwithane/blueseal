@@ -298,3 +298,20 @@ a { color: var(--bs-blue); }
   width: max-content;
   animation: bs-marquee 40s linear infinite;
 }
+
+/* Chrome (layout) crossfade — see App.vue. Global (not scoped) so the classes
+   reach the AppShell component root, which carries its own style scope. */
+.bs-layout-enter-active,
+.bs-layout-leave-active {
+  transition: opacity 150ms ease;
+}
+.bs-layout-enter-from,
+.bs-layout-leave-to {
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bs-layout-enter-active,
+  .bs-layout-leave-active {
+    transition: none;
+  }
+}

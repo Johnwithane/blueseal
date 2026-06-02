@@ -9,13 +9,13 @@ const { mobileItems, isActive } = useNavItems();
 const route = useRoute();
 
 // Split the mobile tabs in half so the Blue Seal brand logo can sit in the
-// center of the bar. The brand tab routes to "/" — without this there's no
-// way back to the marketing homepage from inside the app on mobile (the
-// side panel's brand link only exists on desktop).
+// center of the bar. The brand tab routes to the dashboard (the shell only
+// renders for signed-in users) so tapping it is a "home" action that keeps
+// them inside the app rather than dropping them on the marketing splash.
 const splitIndex = computed(() => Math.ceil(mobileItems.value.length / 2));
 const firstHalf = computed(() => mobileItems.value.slice(0, splitIndex.value));
 const secondHalf = computed(() => mobileItems.value.slice(splitIndex.value));
-const isHomeActive = computed(() => route.path === "/");
+const isHomeActive = computed(() => route.path === "/dashboard");
 </script>
 
 <template>
@@ -38,7 +38,7 @@ const isHomeActive = computed(() => route.path === "/");
     </template>
 
     <RouterLink
-      to="/"
+      to="/dashboard"
       class="bottom-tab bottom-tab--brand"
       :class="{ 'bottom-tab--active': isHomeActive }"
       aria-label="Home"
