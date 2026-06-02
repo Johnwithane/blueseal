@@ -3,7 +3,7 @@ import { createPinia } from "pinia";
 import PrimeVue from "primevue/config";
 import ToastService from "primevue/toastservice";
 import ConfirmationService from "primevue/confirmationservice";
-import Aura from "@primevue/themes/aura";
+import { BlueSealPreset } from "./theme/preset";
 import "primeicons/primeicons.css";
 import "./assets/main.css";
 
@@ -17,7 +17,7 @@ app.use(createPinia());
 app.use(router);
 app.use(PrimeVue, {
   theme: {
-    preset: Aura,
+    preset: BlueSealPreset,
     options: { darkModeSelector: ".bs-dark" },
   },
 });
