@@ -326,7 +326,7 @@ onMounted(async () => {
              results so they never outrank a vetted tradesperson, and labelled
              "not yet verified" so clients aren't misled. -->
         <section v-if="prospectResults.length" class="mt-6">
-          <h2 class="text-lg font-semibold">Not yet verified</h2>
+          <h2 class="text-lg font-semibold">Unverified tradespeople</h2>
           <p class="mb-3 text-sm text-[color:var(--bs-muted)]">
             These tradespeople haven't been verified by Blue Seal yet.
           </p>

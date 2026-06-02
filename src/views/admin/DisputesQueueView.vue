@@ -2,8 +2,6 @@
 import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import Button from "primevue/button";
-import DataTable from "primevue/datatable";
-import Column from "primevue/column";
 import Tag from "primevue/tag";
 import {
   listClosedDisputes,
@@ -34,8 +32,8 @@ function fmtMoney(cents: number, currency: string): string {
   );
 }
 
-function reasonLabel(reason: string): string {
-  return reason.replace(/_/g, " ");
+function reasonLabel(reason: string | null): string {
+  return (reason ?? "—").replace(/_/g, " ");
 }
 
 // Days-until-evidence-due, used to colour-code urgency. Stripe gives us
@@ -55,7 +53,7 @@ function urgencySeverity(
   return "info";
 }
 
-function outcomeSeverity(outcome: string): "success" | "danger" | "secondary" {
+function outcomeSeverity(outcome: string | null): "success" | "danger" | "secondary" {
   if (outcome === "won") return "success";
   if (outcome === "lost") return "danger";
   return "secondary";
@@ -86,104 +84,70 @@ const openCount = computed(() => open.value.length);
       />
     </div>
 
-    <DataTable
-      :value="open"
-      :loading="loading"
-      data-key="id"
-      :rows="50"
-      striped-rows
-    >
-      <template #empty>
-        <div class="bs-empty">
-          <i class="pi pi-check-circle text-green-600 mr-2" />No open disputes.
-        </div>
-      </template>
-      <Column header="Amount">
-        <template #body="{ data }">
-          <span class="font-semibold tabular-nums">
-            {{ fmtMoney(data.amount, data.currency) }}
-          </span>
-        </template>
-      </Column>
-      <Column header="Reason">
-        <template #body="{ data }">
-          <span class="capitalize">{{ reasonLabel(data.reason) }}</span>
-        </template>
-      </Column>
-      <Column header="Status">
-        <template #body="{ data }">
-          <code class="text-xs">{{ data.status }}</code>
-        </template>
-      </Column>
-      <Column header="Evidence due">
-        <template #body="{ data }">
-          <template v-if="data.evidenceDueBy">
-            <Tag
-              :severity="urgencySeverity(daysUntilDue(data))"
-              :value="`${daysUntilDue(data)}d`"
-            />
-            <span class="ml-2 text-xs text-[color:var(--bs-muted)]">
-              {{ relativeTime(data.evidenceDueBy) }}
-            </span>
-          </template>
-          <span v-else class="text-xs text-[color:var(--bs-muted)]">—</span>
-        </template>
-      </Column>
-      <Column header="Created">
-        <template #body="{ data }">
-          {{ relativeTime(data.createdAt) }}
-        </template>
-      </Column>
-      <Column header="">
-        <template #body="{ data }">
-          <RouterLink :to="{ name: 'AdminDisputeDetail', params: { id: data.id } }">
+    <div v-if="loading" class="bs-empty">Loading…</div>
+    <div v-else-if="open.length === 0" class="bs-empty">
+      <i class="pi pi-check-circle text-green-600 mr-2" />No open disputes.
+    </div>
+    <ul v-else class="space-y-2">
+      <li v-for="d in open" :key="d.id" class="bs-card p-3">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="text-sm font-semibold tabular-nums">
+                {{ fmtMoney(d.amount, d.currency) }}
+              </span>
+              <span class="text-xs capitalize text-[color:var(--bs-muted)]">
+                {{ reasonLabel(d.reason) }}
+              </span>
+              <Tag
+                v-if="d.evidenceDueBy"
+                :severity="urgencySeverity(daysUntilDue(d))"
+                :value="`${daysUntilDue(d)}d left`"
+              />
+            </div>
+            <div class="text-xs text-[color:var(--bs-muted)] mt-1">
+              <span class="capitalize">{{ reasonLabel(d.status) }}</span> ·
+              created {{ relativeTime(d.createdAt) }}
+              <template v-if="d.evidenceDueBy">
+                · evidence due {{ relativeTime(d.evidenceDueBy) }}
+              </template>
+            </div>
+          </div>
+          <RouterLink :to="{ name: 'AdminDisputeDetail', params: { id: d.id } }">
             <Button label="Open" icon="pi pi-search" size="small" />
           </RouterLink>
-        </template>
-      </Column>
-    </DataTable>
+        </div>
+      </li>
+    </ul>
 
     <div v-if="closed.length > 0" class="mt-8">
       <h2 class="text-lg font-semibold">Recently closed</h2>
       <p class="text-sm text-[color:var(--bs-muted)] mb-3">
         Last 50 closed disputes, newest first.
       </p>
-      <DataTable :value="closed" data-key="id" :rows="50" striped-rows>
-        <Column header="Amount">
-          <template #body="{ data }">
-            <span class="font-semibold tabular-nums">
-              {{ fmtMoney(data.amount, data.currency) }}
-            </span>
-          </template>
-        </Column>
-        <Column header="Reason">
-          <template #body="{ data }">
-            <span class="capitalize">{{ reasonLabel(data.reason) }}</span>
-          </template>
-        </Column>
-        <Column header="Outcome">
-          <template #body="{ data }">
-            <Tag
-              :severity="outcomeSeverity(data.outcome)"
-              :value="data.outcome"
-            />
-          </template>
-        </Column>
-        <Column header="Closed">
-          <template #body="{ data }">
-            {{ relativeTime(data.updatedAt) }}
-          </template>
-        </Column>
-        <Column header="">
-          <template #body="{ data }">
-            <RouterLink
-              :to="{ name: 'AdminDisputeDetail', params: { id: data.id } }"
-            >
+      <ul class="space-y-2">
+        <li v-for="d in closed" :key="d.id" class="bs-card p-3">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="text-sm font-semibold tabular-nums">
+                  {{ fmtMoney(d.amount, d.currency) }}
+                </span>
+                <span class="text-xs capitalize text-[color:var(--bs-muted)]">
+                  {{ reasonLabel(d.reason) }}
+                </span>
+                <Tag :severity="outcomeSeverity(d.outcome)" :value="d.outcome" />
+              </div>
+              <div class="text-xs text-[color:var(--bs-muted)] mt-1">
+                closed {{ relativeTime(d.updatedAt) }}
+              </div>
+            </div>
+            <RouterLink :to="{ name: 'AdminDisputeDetail', params: { id: d.id } }">
               <Button label="Open" icon="pi pi-search" size="small" outlined />
             </RouterLink>
-          </template>
-        </Column>
-      </DataTable>
+          </div>
+        </li>
+      </ul>
     </div>
   </section>
 </template>

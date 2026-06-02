@@ -2,14 +2,17 @@
 import { onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import Button from "primevue/button";
-import DataTable from "primevue/datatable";
-import Column from "primevue/column";
 import {
   listIncompleteApprovals,
   listPendingApplications,
 } from "@/firebase/services/tradespeople";
 import type { TradespersonDoc, WithId } from "@/firebase/interfaces";
 import { useFormatters } from "@/composables/useFormatters";
+import { tradeLabel } from "@/data/trades";
+
+function tradesLabel(t: WithId<TradespersonDoc>): string {
+  return t.trades.map((k) => tradeLabel(k)).join(", ") || "—";
+}
 
 const pending = ref<WithId<TradespersonDoc>[]>([]);
 // Apps where the application is approved but the profile isn't live yet
@@ -41,29 +44,28 @@ onMounted(refresh);
       <Button label="Refresh" icon="pi pi-refresh" outlined :loading="loading" @click="refresh" />
     </div>
 
-    <DataTable :value="pending" :loading="loading" data-key="id" :rows="50" striped-rows>
-      <template #empty>
-        <div class="bs-empty"><i class="pi pi-check-circle text-green-600 mr-2" />Queue clear.</div>
-      </template>
-      <Column field="id" header="Tradesperson UID">
-        <template #body="{ data }">
-          <code class="text-xs">{{ data.id.slice(0, 10) }}…</code>
-        </template>
-      </Column>
-      <Column header="Trades">
-        <template #body="{ data }">{{ data.trades.join(", ") || "—" }}</template>
-      </Column>
-      <Column header="Submitted">
-        <template #body="{ data }">{{ relativeTime(data.submittedAt) }}</template>
-      </Column>
-      <Column header="">
-        <template #body="{ data }">
-          <RouterLink :to="{ name: 'AdminApplication', params: { uid: data.id } }">
-            <Button label="Review" icon="pi pi-search" size="small" />
-          </RouterLink>
-        </template>
-      </Column>
-    </DataTable>
+    <div v-if="loading" class="bs-empty">Loading…</div>
+    <div v-else-if="pending.length === 0" class="bs-empty">
+      <i class="pi pi-check-circle text-green-600 mr-2" />Queue clear.
+    </div>
+    <ul v-else class="space-y-2">
+      <li
+        v-for="t in pending"
+        :key="t.id"
+        class="bs-card p-3 flex flex-wrap items-center justify-between gap-3"
+      >
+        <div class="min-w-0">
+          <div class="text-sm font-medium">{{ tradesLabel(t) }}</div>
+          <div class="text-xs text-[color:var(--bs-muted)] mt-0.5">
+            Submitted {{ relativeTime(t.submittedAt) }} ·
+            <code>{{ t.id.slice(0, 10) }}…</code>
+          </div>
+        </div>
+        <RouterLink :to="{ name: 'AdminApplication', params: { uid: t.id } }">
+          <Button label="Review" icon="pi pi-search" size="small" />
+        </RouterLink>
+      </li>
+    </ul>
 
     <!-- "Approved but not yet live": application got approved before the
          per-item ID/cert checks landed, so the profile isn't visible to
@@ -74,34 +76,31 @@ onMounted(refresh);
         Application approved, but ID or at least one certification still needs review before the
         profile goes live.
       </p>
-      <DataTable :value="incomplete" data-key="id" :rows="50" striped-rows>
-        <Column field="id" header="Tradesperson UID">
-          <template #body="{ data }">
-            <code class="text-xs">{{ data.id.slice(0, 10) }}…</code>
-          </template>
-        </Column>
-        <Column header="Trades">
-          <template #body="{ data }">{{ data.trades.join(", ") || "—" }}</template>
-        </Column>
-        <Column header="Blocked on">
-          <template #body="{ data }">
-            <span class="text-xs text-amber-700">
-              <template v-if="!data.idVerified && (data.verifiedTrades?.length ?? 0) === 0">
-                ID + cert
-              </template>
-              <template v-else-if="!data.idVerified">ID</template>
-              <template v-else>cert</template>
-            </span>
-          </template>
-        </Column>
-        <Column header="">
-          <template #body="{ data }">
-            <RouterLink :to="{ name: 'AdminApplication', params: { uid: data.id } }">
-              <Button label="Review" icon="pi pi-search" size="small" outlined />
-            </RouterLink>
-          </template>
-        </Column>
-      </DataTable>
+      <ul class="space-y-2">
+        <li
+          v-for="t in incomplete"
+          :key="t.id"
+          class="bs-card p-3 flex flex-wrap items-center justify-between gap-3"
+        >
+          <div class="min-w-0">
+            <div class="text-sm font-medium">{{ tradesLabel(t) }}</div>
+            <div class="text-xs text-[color:var(--bs-muted)] mt-0.5">
+              Blocked on
+              <span class="text-amber-700 font-medium">
+                <template v-if="!t.idVerified && (t.verifiedTrades?.length ?? 0) === 0">
+                  ID + cert
+                </template>
+                <template v-else-if="!t.idVerified">ID</template>
+                <template v-else>cert</template>
+              </span>
+              · <code>{{ t.id.slice(0, 10) }}…</code>
+            </div>
+          </div>
+          <RouterLink :to="{ name: 'AdminApplication', params: { uid: t.id } }">
+            <Button label="Review" icon="pi pi-search" size="small" outlined />
+          </RouterLink>
+        </li>
+      </ul>
     </div>
   </section>
 </template>
