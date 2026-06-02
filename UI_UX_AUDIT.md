@@ -1,5 +1,38 @@
 # Blue Seal — UI/UX Audit & Unification Plan
 
+## Implementation status (updated)
+
+All seven phases were executed on `claude/ui-ux-audit-unification-839kN`. Every
+commit passed `lint && build && test:run`; no Firebase rules/functions/indexes
+were touched, so no deploy was required.
+
+- ✅ **Phase 0** — live job-detail status (`subscribeJob`), B1 decline-dialog,
+  B2 trade label, B3 onboarding title, B4/R3 missing tokens.
+- ✅ **Phase 1** — PrimeVue branded to Blue Seal blue (`src/theme/preset.ts`).
+- ✅ **Phase 2** — radius/micro-type/elevation scales + tokenized job-status
+  palette + `skills/design-system.md`.
+- ✅ **Phase 3+4** — `hybrid` layout + Home→dashboard redirect + layout
+  crossfade; nav-schema fixes (admin mobile home tab, tradie Profile dedup).
+- ✅ **Phase 5** — `StatusBanner`, `verificationStatus.ts`, shared `.bs-cert-card`
+  CSS, `VerifiedBadge` covers all four trust signals, `useConfirmAction`
+  replaces all 5 `window.confirm()` calls.
+- ✅ **Phase 6** — admin queues (vetting + disputes) reflow as card rows;
+  terminology aligned to "Unverified".
+
+**Deliberately deferred (follow-ups, not blockers):**
+- Full `<VerificationUploadCard>` base-component *merge* — the cards differ
+  enough that a merge is risky; instead the shared CSS + status vocabulary were
+  unified, which captures most of the consistency win.
+- `<TabBar>` extraction (JobTabBar + 2 inlined copies) and a shared
+  `<LoadingState>`/skeleton convention — mechanical but broad; not yet done.
+- `ApplicationReviewView`'s 5 near-identical reject dialogs (dedup pending).
+- The `AdminDashboard` backfill/migration card — left in place pending
+  confirmation that prod backfill is complete (don't remove one-way tools blind).
+
+Original plan follows unchanged for reference.
+
+---
+
 > Status: **proposal for review**. Produced from a five-front audit of the entire `src/` frontend
 > (93 components) covering the design system, navigation/chrome, and the client, tradesperson,
 > and admin journeys. No application code has been changed yet — this document is the plan.
