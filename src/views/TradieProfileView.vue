@@ -6,12 +6,14 @@ import Tag from "primevue/tag";
 import Rating from "primevue/rating";
 import Avatar from "primevue/avatar";
 import { getTradesperson } from "@/firebase/services/tradespeople";
+import { getProspect } from "@/firebase/services/prospects";
 import { listReviewsFor } from "@/firebase/services/reviews";
 import {
   listAcceptedVouchesFor,
   listAcceptedVouchesFrom,
 } from "@/firebase/services/vouches";
 import type {
+  ProspectDoc,
   ReviewDoc,
   TradespersonDoc,
   VouchDoc,
@@ -23,9 +25,14 @@ import { useAuthStore } from "@/stores/auth";
 import { useToast } from "@/composables/useToast";
 import CalendarView from "@/components/CalendarView.vue";
 import VerifiedBadge from "@/components/VerifiedBadge.vue";
+import ProspectProfile from "@/components/ProspectProfile.vue";
 
 const route = useRoute();
 const tradie = ref<WithId<TradespersonDoc> | null>(null);
+// If the :uid resolves to a seeded prospect instead of a real tradesperson,
+// we render the unverified ProspectProfile at this same URL (prospects share
+// the /tradies/:id profile route — there's no separate /prospects/ page).
+const prospect = ref<WithId<ProspectDoc> | null>(null);
 const reviews = ref<WithId<ReviewDoc>[]>([]);
 // Two-direction peer-endorsement chips. vouchesFrom = people this tradie
 // vouches for; vouchesFor = people who've vouched for this tradie. Both
@@ -122,24 +129,40 @@ function reviewerInitial(r: WithId<ReviewDoc>): string {
 
 onMounted(async () => {
   const uid = route.params.uid as string;
-  // Parallel — vouches reads are independent of the tradesperson + reviews
-  // fetches and we want the chips visible without waiting.
-  const [t, r, vFrom, vFor] = await Promise.all([
-    getTradesperson(uid),
-    listReviewsFor(uid),
-    listAcceptedVouchesFrom(uid),
-    listAcceptedVouchesFor(uid),
-  ]);
-  tradie.value = t;
-  reviews.value = r;
-  vouchesFrom.value = vFrom;
-  vouchesFor.value = vFor;
-  loading.value = false;
+  try {
+    // getTradesperson REJECTS (not resolves null) when the doc isn't publicly
+    // readable: a prospect id (no tradespeople doc), or a draft/rejected
+    // profile a non-owner can't read — the tradespeople read rule has no
+    // resource==null clause, so getDoc throws permission-denied. Treat any such
+    // failure as "not a readable tradie" and fall through to the prospect
+    // lookup, instead of letting the rejection hang the page on "Loading…".
+    const t = await getTradesperson(uid).catch(() => null);
+    if (t) {
+      tradie.value = t;
+      // Reviews + vouches only apply to real tradies; fetch them in parallel.
+      const [r, vFrom, vFor] = await Promise.all([
+        listReviewsFor(uid),
+        listAcceptedVouchesFrom(uid),
+        listAcceptedVouchesFor(uid),
+      ]);
+      reviews.value = r;
+      vouchesFrom.value = vFrom;
+      vouchesFor.value = vFor;
+    } else {
+      // Not a readable tradesperson — maybe a seeded prospect on this route.
+      prospect.value = await getProspect(uid).catch(() => null);
+    }
+  } finally {
+    loading.value = false;
+  }
 });
 </script>
 
 <template>
-  <section class="bs-container py-6">
+  <!-- Prospect (seeded, unverified) profile shares this route — render its full
+       body instead of the tradesperson layout when the id resolves to one. -->
+  <ProspectProfile v-if="!loading && prospect" :prospect="prospect" />
+  <section v-else class="bs-container py-6">
     <div v-if="loading" class="bs-empty">Loading…</div>
     <div v-else-if="!tradie" class="bs-empty">
       <i class="pi pi-times-circle text-3xl mb-2 block"></i>

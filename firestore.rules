@@ -121,6 +121,11 @@ service cloud.firestore {
     // ---------- tradespeople (public profile, owner-editable while vetting) ----------
     match /tradespeople/{tradieId} {
       // Public read only when visible. Owner + admin always read.
+      // NOTE: exposing under-review (pending/info_requested) profiles publicly
+      // is deferred — the public doc still carries vettingNotes + payouts, and
+      // Firestore reads are all-or-nothing, so opening this would leak admin
+      // notes + Stripe state. Move those fields to a private subdoc first (see
+      // QA_SECURITY_AUDIT.md), then re-open this read.
       allow read: if (resource != null && resource.data.isVisible == true)
                   || isOwner(tradieId) || isAdmin();
       allow create: if isOwner(tradieId)

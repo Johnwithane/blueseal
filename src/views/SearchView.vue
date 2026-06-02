@@ -31,7 +31,9 @@ const location = ref<LocationValue>({
   radiusKm: 50,
 });
 const results = ref<Array<WithId<TradespersonDoc> & { distanceKm: number }>>([]);
-// Seeded, unclaimed listings shown below the verified results (Phase 2).
+// Seeded, unclaimed listings shown below the verified results ("Not yet
+// verified"). (Exposing submitted-but-unapproved REAL tradespeople here is
+// deferred until their sensitive fields move off the public doc.)
 const prospectResults = ref<Array<WithId<ProspectDoc> & { distanceKm: number }>>([]);
 const loading = ref(false);
 const error = ref<string | null>(null);
@@ -53,23 +55,20 @@ async function search() {
     // Verified tradespeople + seeded prospects in parallel. Prospect search is
     // non-fatal — if it fails (e.g. index still building), the verified results
     // still render; prospects are supplementary.
+    const geo = {
+      trade: trade.value ?? undefined,
+      centerLat: location.value.lat,
+      centerLng: location.value.lng,
+      radiusKm: location.value.radiusKm,
+      limit: 50,
+    };
     const [tradies, prospects] = await Promise.all([
       searchTradespeople({
-        trade: trade.value ?? undefined,
-        centerLat: location.value.lat,
-        centerLng: location.value.lng,
-        radiusKm: location.value.radiusKm,
+        ...geo,
         minRating: minRating.value || undefined,
         availability: availability.value === "any" ? undefined : availability.value,
-        limit: 50,
       }),
-      searchProspects({
-        trade: trade.value ?? undefined,
-        centerLat: location.value.lat,
-        centerLng: location.value.lng,
-        radiusKm: location.value.radiusKm,
-        limit: 50,
-      }).catch((e) => {
+      searchProspects(geo).catch((e) => {
         console.warn("[search] prospect search failed", e);
         return [];
       }),
@@ -157,7 +156,10 @@ watch(
 
     <div v-if="loading" class="bs-empty">Searching…</div>
     <template v-else>
-      <div v-if="!results.length && !prospectResults.length" class="bs-empty">
+      <div
+        v-if="!results.length && !prospectResults.length"
+        class="bs-empty"
+      >
         <i class="pi pi-search mb-2 block text-3xl"></i>
         <p>No results yet. Set a location and search.</p>
       </div>

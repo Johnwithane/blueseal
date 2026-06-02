@@ -35,18 +35,13 @@ const routes: RouteRecordRaw[] = [
     meta: { layout: "public" },
   },
   {
+    // Shared public profile for both real tradespeople AND seeded prospects.
+    // TradieProfileView resolves the :uid: a real tradesperson renders the full
+    // verified layout; a seeded prospect renders the unverified ProspectProfile
+    // body. One URL namespace — there is no separate /prospects/ route.
     path: "/tradies/:uid",
     name: "TradieProfile",
     component: () => import("@/views/TradieProfileView.vue"),
-    meta: { layout: "public" },
-  },
-  {
-    // Public profile for a seeded, unclaimed prospect (Phase 2). Distinct from
-    // /tradies/:uid — prospects live in a separate collection and never render
-    // as verified.
-    path: "/prospects/:id",
-    name: "ProspectProfile",
-    component: () => import("@/views/ProspectProfileView.vue"),
     meta: { layout: "public" },
   },
   {

@@ -27,7 +27,7 @@ const avatarInitial = computed(() => {
 
 <template>
   <RouterLink
-    :to="{ name: 'ProspectProfile', params: { id: props.prospect.id } }"
+    :to="{ name: 'TradieProfile', params: { uid: props.prospect.id } }"
     class="bs-card p-4 hover:shadow-md transition-shadow no-underline text-inherit block"
   >
     <div class="flex items-start gap-3">

@@ -1,12 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
-import { flushPromises, mount } from "@vue/test-utils";
-import ProspectProfileView from "./ProspectProfileView.vue";
+import { mount } from "@vue/test-utils";
+import ProspectProfile from "./ProspectProfile.vue";
 import type { ProspectDoc, WithId } from "@/firebase/interfaces";
 
-const getProspect = vi.fn();
-
-vi.mock("vue-router", () => ({ useRoute: () => ({ params: { id: "p1" } }) }));
-vi.mock("@/firebase/services/prospects", () => ({ getProspect: (...a: unknown[]) => getProspect(...a) }));
 vi.mock("@/composables/useFormatters", () => ({
   useFormatters: () => ({ money: (cents: number) => `$${(cents / 100).toFixed(0)}` }),
 }));
@@ -23,12 +19,14 @@ function prospect(partial: Partial<WithId<ProspectDoc>> = {}): WithId<ProspectDo
     hourlyRate: null,
     languages: ["English"],
     serviceRadiusKm: 25,
+    locationLabel: "Vernon, BC",
     ...partial,
   } as unknown as WithId<ProspectDoc>;
 }
 
-async function mountView() {
-  const wrapper = mount(ProspectProfileView, {
+function mountProfile(p = prospect()) {
+  return mount(ProspectProfile, {
+    props: { prospect: p },
     global: {
       stubs: {
         Tag: { props: ["value", "severity"], template: '<span class="p-tag">{{ value }}</span>' },
@@ -40,41 +38,30 @@ async function mountView() {
       },
     },
   });
-  await flushPromises();
-  return wrapper;
 }
 
-describe("ProspectProfileView", () => {
-  it("renders the unverified banner + badge and the bio", async () => {
-    getProspect.mockResolvedValue(prospect());
-    const wrapper = await mountView();
+describe("ProspectProfile", () => {
+  it("renders the unverified banner + badge, bio, and location", () => {
+    const wrapper = mountProfile();
     expect(wrapper.text()).toContain("Unverified");
     expect(wrapper.text()).toContain("hasn't been verified by Blue Seal yet");
     expect(wrapper.text()).toContain("Family-run since 1990.");
+    expect(wrapper.text()).toContain("Vernon, BC");
   });
 
-  it("shows NO verified/rating/reviews/recommendations UI", async () => {
-    getProspect.mockResolvedValue(prospect());
-    const wrapper = await mountView();
-    const text = wrapper.text();
+  it("shows NO verified/rating/reviews/recommendations UI", () => {
+    const text = mountProfile().text();
     expect(text).not.toContain("ID verified");
     expect(text).not.toContain("Reviews");
     expect(text).not.toContain("Recommendations");
-    expect(text).not.toContain("/ 5"); // the rating block in TradieProfileView
-    expect(wrapper.find(".pi-verified").exists()).toBe(false);
+    expect(text).not.toContain("/ 5");
   });
 
-  it("renders the CTA disabled (outreach is wired in Phase 3)", async () => {
-    getProspect.mockResolvedValue(prospect());
-    const wrapper = await mountView();
-    const cta = wrapper.findAll("button").find((b) => b.text().includes("Request this pro"));
+  it("renders the CTA disabled (outreach is wired in Phase 3)", () => {
+    const cta = mountProfile()
+      .findAll("button")
+      .find((b) => b.text().includes("Request this pro"));
     expect(cta).toBeDefined();
     expect(cta!.attributes("disabled")).toBeDefined();
-  });
-
-  it("shows a not-found state when the prospect is missing", async () => {
-    getProspect.mockResolvedValue(null);
-    const wrapper = await mountView();
-    expect(wrapper.text()).toContain("Profile not found.");
   });
 });
