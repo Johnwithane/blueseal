@@ -331,8 +331,8 @@ async function submit() {
 :deep(.p-rating .p-rating-option:hover .p-rating-icon),
 :deep(.p-rating-on .p-icon),
 :deep(.p-rating-on-icon) {
-  color: #f59e0b !important;
-  fill: #f59e0b !important;
+  color: var(--bs-amber) !important;
+  fill: var(--bs-amber) !important;
 }
 
 /* Custom close button — a small circular ✕ matching the look of

@@ -481,8 +481,8 @@ onMounted(async () => {
 .review-row__rating :deep(.p-rating-icon),
 .review-row__rating :deep(.p-icon),
 .review-row__rating :deep(.p-rating-on-icon) {
-  color: #f59e0b !important;
-  fill: #f59e0b !important;
+  color: var(--bs-amber) !important;
+  fill: var(--bs-amber) !important;
 }
 .review-row__rating :deep(.p-rating-icon),
 .review-row__rating :deep(.p-icon) {

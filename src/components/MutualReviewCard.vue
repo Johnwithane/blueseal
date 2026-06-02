@@ -290,7 +290,7 @@ function textOf(r: WithId<ReviewDoc> | WithId<ClientReviewDoc> | null): string {
 .review-readonly :deep(.p-rating-icon),
 .review-readonly :deep(.p-icon),
 .review-readonly :deep(.p-rating-on-icon) {
-  color: #f59e0b !important;
-  fill: #f59e0b !important;
+  color: var(--bs-amber) !important;
+  fill: var(--bs-amber) !important;
 }
 </style>
