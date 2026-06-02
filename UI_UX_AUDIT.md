@@ -15,17 +15,19 @@ were touched, so no deploy was required.
   crossfade; nav-schema fixes (admin mobile home tab, tradie Profile dedup).
 - ✅ **Phase 5** — `StatusBanner`, `verificationStatus.ts`, shared `.bs-cert-card`
   CSS, `VerifiedBadge` covers all four trust signals, `useConfirmAction`
-  replaces all 5 `window.confirm()` calls.
+  replaces all 5 `window.confirm()` calls. Plus the follow-ups: shared
+  `<LoadingState>` (≈14 loaders), `<TabBar>` (JobTabBar + dashboard + account),
+  and `<RejectReasonDialog>` (4 admin reject dialogs).
 - ✅ **Phase 6** — admin queues (vetting + disputes) reflow as card rows;
   terminology aligned to "Unverified".
+- ✅ **Polish** — brand hex literals routed through `--bs-*` tokens.
 
-**Deliberately deferred (follow-ups, not blockers):**
-- Full `<VerificationUploadCard>` base-component *merge* — the cards differ
-  enough that a merge is risky; instead the shared CSS + status vocabulary were
-  unified, which captures most of the consistency win.
-- `<TabBar>` extraction (JobTabBar + 2 inlined copies) and a shared
-  `<LoadingState>`/skeleton convention — mechanical but broad; not yet done.
-- `ApplicationReviewView`'s 5 near-identical reject dialogs (dedup pending).
+**Remaining (deliberate non-goals):**
+- Full `<VerificationUploadCard>` base-component *merge* — the four cards differ
+  enough (no-cert declaration, insurer/policy, clearance/province, ID doc-type)
+  that a merge is high-risk for little gain; the shared CSS + status vocabulary
+  were unified instead, capturing most of the consistency win. Recommend
+  leaving as-is.
 - The `AdminDashboard` backfill/migration card — left in place pending
   confirmation that prod backfill is complete (don't remove one-way tools blind).
 
