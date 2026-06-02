@@ -45,11 +45,11 @@ async function mountView() {
 }
 
 describe("ProspectProfileView", () => {
-  it("renders the pending-verification banner + badge and the bio", async () => {
+  it("renders the unverified banner + badge and the bio", async () => {
     getProspect.mockResolvedValue(prospect());
     const wrapper = await mountView();
-    expect(wrapper.text()).toContain("Pending verification");
-    expect(wrapper.text()).toContain("added from public business records");
+    expect(wrapper.text()).toContain("Unverified");
+    expect(wrapper.text()).toContain("hasn't been verified by Blue Seal yet");
     expect(wrapper.text()).toContain("Family-run since 1990.");
   });
 

@@ -280,6 +280,11 @@ export interface ProspectDoc {
   // Discovery subset — mirrors the TradespersonDoc fields that search + the
   // card render, so a prospect card looks like a (badged) tradie card.
   displayName: string;
+  // Avatar shown on the card + profile. For seeded listings we don't have a
+  // real photo, so the importer fills this with a deterministic generated
+  // avatar (initials on a gradient) unless a real image URL was supplied. Null
+  // falls back to an initial-circle in the UI.
+  photoURL: string | null;
   companyName: string | null;
   bio: string;
   trades: string[]; // canonical keys (src/data/trades.ts), primary at [0]

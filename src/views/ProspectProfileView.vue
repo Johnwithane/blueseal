@@ -51,18 +51,15 @@ onMounted(async () => {
       <p>Profile not found.</p>
     </div>
     <template v-else>
-      <!-- Provenance / status banner. Always shown — a seeded prospect is, by
-           definition, not yet verified. -->
+      <!-- Status banner. Always shown — this profile isn't verified yet. -->
       <div
         class="mb-4 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50/60 p-3"
       >
         <i class="pi pi-info-circle text-lg mt-0.5 text-amber-700" aria-hidden="true"></i>
         <div class="text-sm">
-          <div class="font-semibold text-amber-900">Pending verification</div>
+          <div class="font-semibold text-amber-900">Unverified</div>
           <p class="text-amber-900/80">
-            This tradesperson was added from public business records. They haven't
-            claimed their profile or verified their identity and credentials with
-            Blue Seal yet.
+            This tradesperson hasn't been verified by Blue Seal yet.
           </p>
         </div>
       </div>
@@ -70,6 +67,13 @@ onMounted(async () => {
       <header class="bs-card p-5">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start">
           <Avatar
+            v-if="prospect.photoURL"
+            :image="prospect.photoURL"
+            size="xlarge"
+            shape="circle"
+          />
+          <Avatar
+            v-else
             :label="avatarInitial"
             size="xlarge"
             shape="circle"
@@ -80,7 +84,7 @@ onMounted(async () => {
               <h1 class="text-2xl font-bold">
                 {{ displayName || tradeLabel(prospect.trades[0]) }}
               </h1>
-              <Tag value="Pending verification" severity="warn" />
+              <Tag value="Unverified" severity="warn" />
             </div>
             <div v-if="prospect.companyName" class="text-sm text-[color:var(--bs-muted)]">
               {{ prospect.companyName }}

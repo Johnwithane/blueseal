@@ -42,8 +42,8 @@ function mountCard(p = prospect()) {
 }
 
 describe("ProspectCard", () => {
-  it("shows the Pending verification badge", () => {
-    expect(mountCard().text()).toContain("Pending verification");
+  it("shows the Unverified badge", () => {
+    expect(mountCard().text()).toContain("Unverified");
   });
 
   it("shows NO trust UI — no ID-verified tag, no rating, no verified pills", () => {

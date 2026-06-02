@@ -106,6 +106,9 @@ export const seededProspectRowSchema = z.object({
 
   // Discovery / profile fields.
   displayName: z.string().trim().min(1).max(120),
+  // Optional real image (e.g. a business logo found during research). When
+  // absent, the importer fills photoURL with a deterministic generated avatar.
+  photoURL: z.string().trim().url().max(500).nullable().default(null),
   businessName: z.string().trim().max(160).nullable().default(null),
   bio: z.string().trim().max(1000).default(""),
   primaryTrade: tradeKey,

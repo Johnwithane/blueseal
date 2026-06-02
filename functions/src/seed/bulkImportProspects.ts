@@ -35,6 +35,12 @@ const emailHashOf = (email: string): string => sha256(email.trim().toLowerCase()
 const prospectIdOf = (externalKey: string): string =>
   `p_${sha256(externalKey.trim().toLowerCase()).slice(0, 24)}`;
 
+// Deterministic generated avatar (initials on a gradient) for seeded listings
+// with no real photo. Honest placeholder — it's clearly an illustrated avatar,
+// not a claimed real face.
+const avatarFor = (name: string): string =>
+  `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(name)}`;
+
 interface RowError {
   rowIndex: number;
   message: string;
@@ -157,6 +163,7 @@ export const bulkImportProspects = onCall(
         const ref = db.doc(`prospects/${p.id}`);
         batch.set(ref, {
           displayName: row.displayName,
+          photoURL: row.photoURL ?? avatarFor(row.displayName),
           companyName: row.businessName,
           bio: row.bio,
           trades,

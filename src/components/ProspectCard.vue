@@ -32,6 +32,13 @@ const avatarInitial = computed(() => {
   >
     <div class="flex items-start gap-3">
       <Avatar
+        v-if="props.prospect.photoURL"
+        :image="props.prospect.photoURL"
+        size="large"
+        shape="circle"
+      />
+      <Avatar
+        v-else
         :label="avatarInitial"
         size="large"
         shape="circle"
@@ -42,7 +49,7 @@ const avatarInitial = computed(() => {
           <span class="font-semibold truncate">
             {{ props.prospect.displayName?.trim() || tradeLabel(props.prospect.trades[0]) }}
           </span>
-          <Tag value="Pending verification" severity="warn" />
+          <Tag value="Unverified" severity="warn" />
         </div>
         <div class="text-xs text-[color:var(--bs-muted)] mt-0.5">
           {{ props.prospect.trades.map(tradeLabel).join(" • ") }}

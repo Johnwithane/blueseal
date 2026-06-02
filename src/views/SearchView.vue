@@ -168,12 +168,11 @@ watch(
 
         <!-- Seeded, unclaimed listings — clearly separated below the verified
              results so they never outrank a vetted tradesperson, and labelled
-             "pending verification" so clients aren't misled. -->
+             "not yet verified" so clients aren't misled. -->
         <section v-if="prospectResults.length" class="mt-6">
-          <h2 class="text-lg font-semibold">Not yet on Blue Seal</h2>
+          <h2 class="text-lg font-semibold">Not yet verified</h2>
           <p class="mb-3 text-sm text-[color:var(--bs-muted)]">
-            Found in public records — pending verification. They haven't verified
-            their identity or credentials yet.
+            These tradespeople haven't been verified by Blue Seal yet.
           </p>
           <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <ProspectCard v-for="p in prospectResults" :key="p.id" :prospect="p" />
