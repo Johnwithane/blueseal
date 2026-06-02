@@ -298,6 +298,10 @@ export interface ProspectDoc {
   locationApprox: GeoPoint;
   geohashPublic: string; // length-6 geohash, same derivation as tradespeople
   serviceRadiusKm: number;
+  // Human location label (e.g. "Vernon, BC") + optional public business
+  // website. Populated for research-sourced listings; optional on older docs.
+  locationLabel?: string | null;
+  website?: string | null;
 
   // Listing state. `isListed` is the prospect analogue of isVisible, but means
   // "unvetted seeded listing", never "trusted". searchProspects filters on it.

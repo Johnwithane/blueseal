@@ -91,6 +91,11 @@ onMounted(async () => {
             </div>
             <div class="mt-1 text-sm text-[color:var(--bs-muted)]">
               {{ tradesWithYears.map((t) => t.label).join(" · ") }}
+            </div>
+            <div class="mt-1 text-sm text-[color:var(--bs-muted)]">
+              <span v-if="prospect.locationLabel">
+                <i class="pi pi-map-marker text-xs"></i> {{ prospect.locationLabel }}
+              </span>
               <span v-if="prospect.serviceRadiusKm">
                 • {{ prospect.serviceRadiusKm }} km radius</span>
             </div>

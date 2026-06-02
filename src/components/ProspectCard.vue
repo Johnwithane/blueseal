@@ -54,6 +54,12 @@ const avatarInitial = computed(() => {
         <div class="text-xs text-[color:var(--bs-muted)] mt-0.5">
           {{ props.prospect.trades.map(tradeLabel).join(" • ") }}
         </div>
+        <div
+          v-if="props.prospect.locationLabel"
+          class="text-xs text-[color:var(--bs-muted)] mt-0.5"
+        >
+          <i class="pi pi-map-marker text-[10px]"></i> {{ props.prospect.locationLabel }}
+        </div>
       </div>
     </div>
 
