@@ -757,11 +757,16 @@ function onReturnToApplicants() {
   <section
     class="bs-container py-3 sm:py-6"
     :class="{ 'job-detail--cta-on': showStickyCTA }"
+    style="--job-topbar-h: 2.75rem"
   >
-    <button type="button" class="job-detail__back" @click="goBack">
-      <i class="pi pi-arrow-left" aria-hidden="true"></i>
-      <span>Back</span>
-    </button>
+    <!-- Sticky Back bar. The JobTabBar below docks directly beneath it (its
+         sticky top is set to this bar's height via --job-topbar-h). -->
+    <div class="job-detail__topbar">
+      <button type="button" class="job-detail__back" @click="goBack">
+        <i class="pi pi-arrow-left" aria-hidden="true"></i>
+        <span>Back</span>
+      </button>
+    </div>
 
     <LoadingState v-if="loading" class="mt-4" />
     <div v-else-if="loadError" class="bs-empty mt-4">
@@ -1228,13 +1233,24 @@ function onReturnToApplicants() {
 </template>
 
 <style scoped>
-/* Prominent back affordance (the bottom nav is hidden on this route). */
+/* Sticky top bar holding the Back action (the bottom nav is hidden on this
+   route, so Back is the primary way out). Full-bleed white so content scrolls
+   cleanly underneath it; the JobTabBar docks flush beneath via --job-topbar-h. */
+.job-detail__topbar {
+  position: sticky;
+  top: 0;
+  z-index: 21;
+  height: var(--job-topbar-h, 2.75rem);
+  display: flex;
+  align-items: center;
+  background: white;
+  margin-inline: -1rem;
+  padding-inline: 0.5rem;
+}
 .job-detail__back {
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
-  margin-bottom: 0.5rem;
-  margin-left: -0.5rem;
   padding: 0.375rem 0.625rem;
   border: 0;
   background: transparent;

@@ -30,11 +30,10 @@ const emit = defineEmits<{
 <style scoped>
 .job-tab-bar {
   position: sticky;
-  /* AppShell renders this route inside its content column with no top
-     chrome above it on either viewport — the side panel sits to the left
-     on desktop, and mobileCompact hides the bottom nav on mobile. So the
-     tab bar can always stick to the top edge of the content column. */
-  top: 0;
+  /* Docks directly beneath JobDetailView's sticky Back bar — its `top` offset
+     equals that bar's height (--job-topbar-h, set on the job-detail section).
+     Falls back to 0 if the var isn't provided. */
+  top: var(--job-topbar-h, 0);
   z-index: 20;
   background: white;
   border-bottom: 1px solid var(--bs-border);
