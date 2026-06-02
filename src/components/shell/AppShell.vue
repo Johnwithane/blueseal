@@ -29,7 +29,10 @@ const mobileCompact = computed(() => route.meta.mobileCompact === true);
     <SidePanel class="app-shell__side" />
     <div class="app-shell__main">
       <TradieStatusBanner :class="{ 'hidden sm:block': mobileCompact }" />
-      <main class="app-shell__content">
+      <main
+        class="app-shell__content"
+        :class="{ 'app-shell__content--compact': mobileCompact }"
+      >
         <div
           v-if="title"
           class="bs-container"
@@ -87,6 +90,12 @@ const mobileCompact = computed(() => route.meta.mobileCompact === true);
   /* Reserve room for the fixed bottom nav on mobile so the last row of
      content isn't covered. 56px = bar height (48 + 8 padding) + safe area. */
   padding-bottom: calc(56px + env(safe-area-inset-bottom));
+}
+/* mobileCompact routes (/jobs/:id) hide the bottom nav, so there's nothing to
+   reserve for here — the view supplies its own bottom spacing (e.g. the sticky
+   CTA reserve). Without this the page would over-reserve a phantom 56px. */
+.app-shell__content--compact {
+  padding-bottom: 0;
 }
 @media (min-width: 768px) {
   .app-shell__content {

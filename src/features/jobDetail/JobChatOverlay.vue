@@ -156,7 +156,12 @@ watch(visible, (v) => {
 <style scoped>
 .job-chat-overlay {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  /* dvh, not inset:0/100vh — track the *visible* viewport so the composer at
+     the bottom of the panel isn't hidden behind the mobile URL bar. */
+  height: 100dvh;
   z-index: 60;
   display: flex;
   justify-content: flex-end;

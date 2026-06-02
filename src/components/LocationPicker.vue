@@ -170,7 +170,10 @@ onMounted(async () => {
     // Plain scroll wheel / one-finger drag zooms directly — no "use ctrl +
     // scroll" gate. The map sits in a short fixed-height box, not a long
     // scrolling column, so hijacking the wheel here doesn't trap the page.
-    gestureHandling: "greedy",
+    // "cooperative" so a one-finger vertical drag over the map scrolls the
+    // page (the picker sits mid-form with fields below it) — two fingers or a
+    // tap engages map pan/zoom. "greedy" trapped page scroll on mobile.
+    gestureHandling: "cooperative",
   });
 
   // Airbnb-style result pins layer. Tapping a pin bubbles the id up so the

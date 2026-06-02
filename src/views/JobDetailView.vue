@@ -1215,3 +1215,15 @@ function onReturnToApplicants() {
     </Dialog>
   </section>
 </template>
+
+<style scoped>
+/* When the fixed status CTA bar is shown, reserve its height at the bottom of
+   the page so the last row of content (and the tab content) isn't trapped
+   underneath it. Bar ≈ large button (3rem) + 0.75rem top padding + bottom
+   safe-area padding; reserve a touch more. AppShell zeroes its own bottom-nav
+   reserve on this mobileCompact route, so this is the only bottom reservation
+   and doesn't double up. */
+.job-detail--cta-on {
+  padding-bottom: calc(80px + env(safe-area-inset-bottom));
+}
+</style>

@@ -708,8 +708,8 @@ function close() {
 }
 @media (max-width: 639px) {
   .finish-sheet-dialog {
-    height: 100vh;
-    max-height: 100vh;
+    height: 100dvh;
+    max-height: 100dvh;
     border-radius: 0;
   }
 }
