@@ -108,6 +108,17 @@ body {
   .pac-target-input {
     font-size: 16px !important;
   }
+
+  /* Toasts: PrimeVue fixes the container at ~25rem anchored top-right/center,
+     which overflows a 375px screen (cut off / off-centre). Pin it to the
+     screen with a small inset on both sides so toasts are always fully in
+     view, and cancel top-center's translateX so it doesn't shift off-screen. */
+  .p-toast {
+    width: auto !important;
+    left: 0.75rem !important;
+    right: 0.75rem !important;
+    transform: none !important;
+  }
 }
 
 h1, h2, h3, h4, h5, h6 {

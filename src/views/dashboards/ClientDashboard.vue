@@ -65,21 +65,14 @@ function formatBudget(min: number, max: number): string {
 
 <template>
   <section class="bs-container pb-8 pt-3">
-    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-      <!-- Welcome line is desktop-only — the "Jobs" page title already orients
-           on mobile, where vertical space is scarce. -->
-      <p class="hidden text-[color:var(--bs-muted)] sm:block">
-        Welcome{{ auth.user?.displayName ? `, ${auth.user.displayName}` : "" }} — your jobs and posted requests.
-      </p>
-      <div class="flex flex-wrap gap-2">
-        <RouterLink to="/jobs/post">
-          <Button label="Post a job" icon="pi pi-megaphone" size="small" />
-        </RouterLink>
-        <RouterLink to="/search">
-          <Button label="Find a tradesperson" icon="pi pi-search" outlined size="small" />
-        </RouterLink>
-      </div>
-    </div>
+    <!-- "Post a job" sits on the title row (top-right). Find-a-tradesperson is
+         reached via the Search tab in the bottom nav, so it's no longer a
+         header button here. -->
+    <Teleport defer to="#app-shell-header-action">
+      <RouterLink to="/jobs/post">
+        <Button label="Post a job" icon="pi pi-megaphone" size="small" />
+      </RouterLink>
+    </Teleport>
 
     <div class="mb-3">
       <SelectButton v-model="view" :options="viewOptions" option-label="label" option-value="value" />

@@ -5,6 +5,7 @@ import Button from "primevue/button";
 import Select from "primevue/select";
 import Rating from "primevue/rating";
 import Message from "primevue/message";
+import Dialog from "primevue/dialog";
 import {
   searchTradespeople,
   getTradespersonContact,
@@ -144,6 +145,26 @@ async function search() {
   } finally {
     loading.value = false;
   }
+}
+
+// Facebook-style location popup. The map lives inside a modal (not inline on
+// the page) so it can't trap page scroll / trigger the mobile zoom. The page
+// shows just a location field; tapping it opens the dialog with a DRAFT
+// location, and "Apply" commits + re-searches.
+const showLocationDialog = ref(false);
+const draftLocation = ref<LocationValue>({ lat: null, lng: null, radiusKm: 50 });
+
+function openLocationDialog() {
+  draftLocation.value = { ...location.value };
+  showLocationDialog.value = true;
+}
+
+function applyLocation() {
+  location.value = { ...draftLocation.value };
+  showLocationDialog.value = false;
+  // Re-search explicitly — the auto-search watcher below only fires for the
+  // initial seed (when there are no results yet).
+  search();
 }
 
 // Auto-search whenever a location lands — including a location restored from
@@ -287,12 +308,19 @@ onMounted(async () => {
         </div>
       </div>
 
-      <div class="mt-4">
-        <LocationPicker
-          v-model="location"
-          :markers="mapMarkers"
-          @marker-click="onMarkerClick"
-        />
+      <div class="mt-3">
+        <label class="text-xs font-medium">Location</label>
+        <button type="button" class="bs-location-field mt-1" @click="openLocationDialog">
+          <i class="pi pi-map-marker text-[color:var(--bs-muted)]" aria-hidden="true"></i>
+          <span v-if="hasLocation(location)" class="min-w-0 flex-1 truncate text-left">
+            {{ location.label || "Selected area" }}
+            <span class="text-[color:var(--bs-muted)]">· {{ location.radiusKm }} km</span>
+          </span>
+          <span v-else class="flex-1 text-left text-[color:var(--bs-muted)]">
+            Set location
+          </span>
+          <i class="pi pi-pencil text-xs text-[color:var(--bs-blue)]" aria-hidden="true"></i>
+        </button>
       </div>
 
       <div class="mt-4 flex justify-end">
@@ -304,6 +332,34 @@ onMounted(async () => {
         />
       </div>
     </div>
+
+    <!-- Location picker popup (Facebook-style). The map is contained here so it
+         never interferes with page scroll / the fixed bottom bar. -->
+    <Dialog
+      v-model:visible="showLocationDialog"
+      modal
+      header="Change location"
+      :style="{ width: '34rem', maxWidth: '94vw' }"
+      :dismissable-mask="true"
+    >
+      <p class="mb-3 text-sm text-[color:var(--bs-muted)]">
+        Search by city, neighbourhood or postal code — or drop the pin on the map.
+      </p>
+      <LocationPicker
+        v-model="draftLocation"
+        :markers="mapMarkers"
+        @marker-click="onMarkerClick"
+      />
+      <template #footer>
+        <Button label="Cancel" text @click="showLocationDialog = false" />
+        <Button
+          label="Apply"
+          icon="pi pi-check"
+          :disabled="!hasLocation(draftLocation)"
+          @click="applyLocation"
+        />
+      </template>
+    </Dialog>
 
     <Message v-if="error" severity="warn" :closable="false" class="mb-3">
       {{ error }}
@@ -339,3 +395,28 @@ onMounted(async () => {
     </template>
   </section>
 </template>
+
+<style scoped>
+/* Location field — looks like the other form inputs but acts as a button that
+   opens the location popup. */
+.bs-location-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--bs-border);
+  border-radius: 6px;
+  background: #fff;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  transition: border-color 120ms ease;
+}
+.bs-location-field:hover {
+  border-color: var(--bs-blue);
+}
+.bs-location-field:focus-visible {
+  outline: 2px solid var(--bs-blue);
+  outline-offset: 1px;
+}
+</style>

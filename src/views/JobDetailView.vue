@@ -62,6 +62,14 @@ const toast = useToast();
 const confirmDialog = useConfirm();
 const { dateTime, money } = useFormatters();
 
+// Back affordance — the bottom nav is hidden on the job page (mobileCompact),
+// so this is the primary way out. Prefer real history; fall back to the
+// dashboard for deep-links / fresh loads where there's nothing to go back to.
+function goBack() {
+  if (window.history.state?.back) router.back();
+  else router.push({ name: "Dashboard" });
+}
+
 function formatScheduled(
   start: { toDate(): Date } | null | undefined,
   end: { toDate(): Date } | null | undefined,
@@ -750,7 +758,10 @@ function onReturnToApplicants() {
     class="bs-container py-3 sm:py-6"
     :class="{ 'job-detail--cta-on': showStickyCTA }"
   >
-    <RouterLink to="/dashboard" class="text-xs text-[color:var(--bs-muted)]">← Dashboard</RouterLink>
+    <button type="button" class="job-detail__back" @click="goBack">
+      <i class="pi pi-arrow-left" aria-hidden="true"></i>
+      <span>Back</span>
+    </button>
 
     <LoadingState v-if="loading" class="mt-4" />
     <div v-else-if="loadError" class="bs-empty mt-4">
@@ -1217,6 +1228,26 @@ function onReturnToApplicants() {
 </template>
 
 <style scoped>
+/* Prominent back affordance (the bottom nav is hidden on this route). */
+.job-detail__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-bottom: 0.5rem;
+  margin-left: -0.5rem;
+  padding: 0.375rem 0.625rem;
+  border: 0;
+  background: transparent;
+  border-radius: 0.5rem;
+  color: var(--bs-blue);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.job-detail__back:hover {
+  background: var(--bs-surface-alt);
+}
+
 /* When the fixed status CTA bar is shown, reserve its height at the bottom of
    the page so the last row of content (and the tab content) isn't trapped
    underneath it. Bar ≈ large button (3rem) + 0.75rem top padding + bottom

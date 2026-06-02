@@ -35,10 +35,14 @@ const mobileCompact = computed(() => route.meta.mobileCompact === true);
       >
         <div
           v-if="title"
-          class="bs-container"
+          class="bs-container flex flex-wrap items-center justify-between gap-x-3 gap-y-2"
           :class="{ 'hidden sm:block': mobileCompact }"
         >
           <h1 class="app-shell__title">{{ title }}</h1>
+          <!-- Teleport target: a view can inject a header action (e.g. the
+               client's "Post a job", the admin's queue links) so it sits on
+               the title row, top-right, instead of taking its own row below. -->
+          <div id="app-shell-header-action" class="flex flex-wrap justify-end gap-2"></div>
         </div>
         <slot />
       </main>
