@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from "vue";
-import { useRoute } from "vue-router";
+import { ref, watch, onMounted, computed } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import Button from "primevue/button";
 import Select from "primevue/select";
 import Rating from "primevue/rating";
@@ -12,7 +12,8 @@ import {
 } from "@/firebase/services/tradespeople";
 import { searchProspects } from "@/firebase/services/prospects";
 import { useAuthStore } from "@/stores/auth";
-import { TRADES } from "@/data/trades";
+import { TRADES, tradeLabel } from "@/data/trades";
+import type { AvatarMarkerData } from "@/utils/avatarMarker";
 import TradieCard from "@/components/TradieCard.vue";
 import ProspectCard from "@/components/ProspectCard.vue";
 import LocationPicker, {
@@ -21,6 +22,7 @@ import LocationPicker, {
 import type { ProspectDoc, TradespersonDoc, WithId } from "@/firebase/interfaces";
 
 const route = useRoute();
+const router = useRouter();
 const auth = useAuthStore();
 
 function tradeFromQuery(value: unknown): string | null {
@@ -67,6 +69,37 @@ const results = ref<Array<WithId<TradespersonDoc> & { distanceKm: number }>>([])
 const prospectResults = ref<Array<WithId<ProspectDoc> & { distanceKm: number }>>([]);
 const loading = ref(false);
 const error = ref<string | null>(null);
+
+// Airbnb-style result pins for the map. Both verified members and seeded
+// prospects carry a coarse `locationApprox`; skip any without one (e.g. an
+// admin-grant profile that never set a location).
+const mapMarkers = computed<AvatarMarkerData[]>(() => [
+  ...results.value
+    .filter((t) => t.locationApprox)
+    .map((t) => ({
+      id: t.id,
+      lat: t.locationApprox.latitude,
+      lng: t.locationApprox.longitude,
+      photoURL: t.photoURL ?? null,
+      initial: (t.displayName?.trim() || tradeLabel(t.trades[0] ?? "")).slice(0, 1),
+      variant: "verified" as const,
+    })),
+  ...prospectResults.value
+    .filter((p) => p.locationApprox)
+    .map((p) => ({
+      id: p.id,
+      lat: p.locationApprox.latitude,
+      lng: p.locationApprox.longitude,
+      photoURL: p.photoURL ?? null,
+      initial: (p.displayName?.trim() || tradeLabel(p.trades[0] ?? "")).slice(0, 1),
+      variant: "prospect" as const,
+    })),
+]);
+
+// Tapping a map pin opens that profile — same destination as the card.
+function onMarkerClick(id: string) {
+  router.push({ name: "TradieProfile", params: { uid: id } });
+}
 
 const AVAILABILITY_OPTIONS: { label: string; value: AvailabilityFilter }[] = [
   { label: "Any time", value: "any" },
@@ -254,7 +287,11 @@ onMounted(async () => {
       </div>
 
       <div class="mt-4">
-        <LocationPicker v-model="location" />
+        <LocationPicker
+          v-model="location"
+          :markers="mapMarkers"
+          @marker-click="onMarkerClick"
+        />
       </div>
 
       <div class="mt-4 flex justify-end">

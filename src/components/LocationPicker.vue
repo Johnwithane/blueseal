@@ -4,6 +4,11 @@ import Slider from "primevue/slider";
 import Button from "primevue/button";
 import Message from "primevue/message";
 import { useGoogleMaps } from "@/composables/useGoogleMaps";
+import {
+  createAvatarMarkerLayer,
+  type AvatarMarkerData,
+  type AvatarMarkerLayer,
+} from "@/utils/avatarMarker";
 
 export interface LocationValue {
   lat: number | null;
@@ -18,11 +23,14 @@ const props = withDefaults(
     minRadius?: number;
     maxRadius?: number;
     country?: string;
+    // Optional Airbnb-style result pins drawn on the same map.
+    markers?: AvatarMarkerData[];
   }>(),
   {
     minRadius: 1,
     maxRadius: 200,
     country: "",
+    markers: () => [],
   },
 );
 
@@ -31,6 +39,8 @@ const countryRestriction =
 
 const emit = defineEmits<{
   "update:modelValue": [value: LocationValue];
+  // Fired when a result pin is tapped (carries the tradie/prospect id).
+  "marker-click": [id: string];
 }>();
 
 const mapEl = ref<HTMLDivElement | null>(null);
@@ -44,6 +54,7 @@ let map: google.maps.Map | null = null;
 let marker: google.maps.Marker | null = null;
 let circle: google.maps.Circle | null = null;
 let autocomplete: google.maps.places.Autocomplete | null = null;
+let markerLayer: AvatarMarkerLayer | null = null;
 
 function emitChange(lat: number | null, lng: number | null, newLabel?: string) {
   emit("update:modelValue", {
@@ -127,6 +138,13 @@ watch(radiusKm, (km) => {
   });
 });
 
+// Re-render the result pins whenever the parent's marker set changes
+// (e.g. a fresh search returns different results).
+watch(
+  () => props.markers,
+  (m) => markerLayer?.setMarkers(m),
+);
+
 onMounted(async () => {
   try {
     await useGoogleMaps().load();
@@ -149,7 +167,16 @@ onMounted(async () => {
     streetViewControl: false,
     fullscreenControl: false,
     clickableIcons: false,
+    // Plain scroll wheel / one-finger drag zooms directly — no "use ctrl +
+    // scroll" gate. The map sits in a short fixed-height box, not a long
+    // scrolling column, so hijacking the wheel here doesn't trap the page.
+    gestureHandling: "greedy",
   });
+
+  // Airbnb-style result pins layer. Tapping a pin bubbles the id up so the
+  // parent can open that profile.
+  markerLayer = createAvatarMarkerLayer(map, (id) => emit("marker-click", id));
+  markerLayer.setMarkers(props.markers);
 
   if (hasInitial) {
     setLocation(props.modelValue.lat!, props.modelValue.lng!, props.modelValue.label);
@@ -188,9 +215,11 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   marker?.setMap(null);
   circle?.setMap(null);
+  markerLayer?.clear();
   if (autocomplete) google.maps.event.clearInstanceListeners(autocomplete);
   marker = null;
   circle = null;
+  markerLayer = null;
   map = null;
   autocomplete = null;
 });
