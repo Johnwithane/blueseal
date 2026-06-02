@@ -10,6 +10,15 @@
   --bs-text: #111827;
   --bs-muted: #6b7280;
   --bs-border: #e5e7eb;
+  /* Neutral surface for hover/active rows, zebra stripes and unread tints.
+     Referenced in ~14 files (ProfileMenu, NotificationsPanel, JobList, etc.)
+     that previously pointed at an undefined var — without this they rendered
+     transparent. */
+  --bs-surface-alt: #f9fafb;
+  /* Alias for the muted text colour. Several components reference
+     --bs-text-muted (a fork of --bs-muted); converge them here so both
+     resolve identically rather than falling back to inherited colour. */
+  --bs-text-muted: var(--bs-muted);
 
   /* Typography */
   --bs-font-body: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;

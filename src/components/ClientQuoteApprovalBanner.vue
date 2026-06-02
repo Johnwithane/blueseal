@@ -189,36 +189,40 @@ async function onSubmitDecline() {
         </p>
       </div>
     </div>
-
-    <Dialog
-      v-model:visible="showDeclineDialog"
-      modal
-      header="Discuss the quote"
-      :style="{ width: '30rem', maxWidth: '92vw' }"
-    >
-      <p class="text-sm text-[color:var(--bs-text)] mb-3">
-        What would you like to change or talk through? The tradesperson sees this
-        in the chat and can send a revised quote.
-      </p>
-      <Textarea
-        v-model="reason"
-        rows="4"
-        class="w-full"
-        :maxlength="1000"
-        placeholder="e.g. Can we swap the premium fixture for a standard one? Or — the price looks high for the scope, can we discuss?"
-        autofocus
-      />
-      <template #footer>
-        <Button label="Cancel" text :disabled="declining" @click="showDeclineDialog = false" />
-        <Button
-          label="Send"
-          icon="pi pi-send"
-          severity="warn"
-          :loading="declining"
-          :disabled="declining"
-          @click="onSubmitDecline"
-        />
-      </template>
-    </Dialog>
   </div>
+
+  <!-- Decline / discuss dialog. Rendered at the template root — NOT inside the
+       v-else awaiting stub — so it's mounted in both states. The "Discuss /
+       change" trigger lives in the v-if actionable banner above, so a dialog
+       nested in the v-else would never mount when that trigger is visible. -->
+  <Dialog
+    v-model:visible="showDeclineDialog"
+    modal
+    header="Discuss the quote"
+    :style="{ width: '30rem', maxWidth: '92vw' }"
+  >
+    <p class="text-sm text-[color:var(--bs-text)] mb-3">
+      What would you like to change or talk through? The tradesperson sees this
+      in the chat and can send a revised quote.
+    </p>
+    <Textarea
+      v-model="reason"
+      rows="4"
+      class="w-full"
+      :maxlength="1000"
+      placeholder="e.g. Can we swap the premium fixture for a standard one? Or — the price looks high for the scope, can we discuss?"
+      autofocus
+    />
+    <template #footer>
+      <Button label="Cancel" text :disabled="declining" @click="showDeclineDialog = false" />
+      <Button
+        label="Send"
+        icon="pi pi-send"
+        severity="warn"
+        :loading="declining"
+        :disabled="declining"
+        @click="onSubmitDecline"
+      />
+    </template>
+  </Dialog>
 </template>

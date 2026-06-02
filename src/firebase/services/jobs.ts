@@ -101,6 +101,24 @@ export async function getJob(id: string): Promise<WithId<JobDoc> | null> {
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
 
+// Live single-doc subscription. JobDetailView uses this (not getJob) so a
+// status change driven by the *other* party — e.g. the client accepting a
+// quote while the tradesperson has the job open — reflects immediately
+// instead of requiring a manual refresh. `onError` surfaces the
+// permission-denied case (stale/cross-account deep link) to the caller's
+// error state, mirroring the one-shot getJob catch it replaces.
+export function subscribeJob(
+  id: string,
+  cb: (job: WithId<JobDoc> | null) => void,
+  onError?: (err: Error) => void,
+): () => void {
+  return onSnapshot(
+    jobRef(id),
+    (snap) => cb(snap.exists() ? { id: snap.id, ...snap.data() } : null),
+    onError,
+  );
+}
+
 export async function updateJobStatus(id: string, status: JobStatus): Promise<void> {
   if (status === "complete") {
     await updateDoc(doc(db, "jobs", id), { status, completedAt: serverTimestamp() });

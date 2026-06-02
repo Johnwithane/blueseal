@@ -674,7 +674,7 @@ async function withdrawForEdits() {
         <div class="text-xs uppercase tracking-wide text-[color:var(--bs-blue)] font-semibold">
           Onboarding
         </div>
-        <h1 class="text-xs sm:text-2xl font-bold leading-tight whitespace-nowrap">Build your verified profile</h1>
+        <h1 class="text-lg sm:text-2xl font-bold leading-tight">Build your verified profile</h1>
       </div>
       <div class="flex items-center gap-2 sm:gap-3">
         <span

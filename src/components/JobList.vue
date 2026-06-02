@@ -9,6 +9,7 @@ import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 import { archiveJob, unarchiveJob } from "@/firebase/services/jobs";
 import { STATUS_LABEL, STATUS_SEVERITY } from "@/utils/jobStatus";
+import { tradeLabel } from "@/data/trades";
 import JobCounterparty from "@/components/JobCounterparty.vue";
 
 const props = withDefaults(
@@ -268,7 +269,7 @@ function counterpartyPhoto(job: WithId<JobDoc>): string | null | undefined {
               <div class="min-w-0 flex-1">
                 <div class="line-clamp-1 text-sm font-medium">{{ job.title }}</div>
                 <div class="mt-0.5 text-xs text-[color:var(--bs-muted)]">
-                  {{ job.trade }}
+                  {{ tradeLabel(job.trade) }}
                 </div>
               </div>
               <div class="flex shrink-0 items-center gap-1.5">

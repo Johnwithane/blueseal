@@ -9,7 +9,7 @@ import Avatar from "primevue/avatar";
 import {
   CANCELLABLE_STATUSES,
   cancelJob,
-  getJob,
+  subscribeJob,
   getJobPrivateNotes,
   markJobPaid,
   markUpfrontFeePaid,
@@ -93,6 +93,9 @@ const reviewPair = ref<WithId<ReviewPairDoc> | null>(null);
 // active — without that, the user has to hunt through tabs to find
 // the review prompt after a job is paid.
 let unsubscribeReviewPair: (() => void) | null = null;
+// Live subscription to the job doc itself. Owned here so status changes from
+// the counterparty propagate to the banners + sticky CTA without a refresh.
+let unsubscribeJob: (() => void) | null = null;
 const intakeFields = ref<IntakeField[]>([]);
 const invoiceId = ref<string | null>(null);
 // True only for invoices sent through the Stripe Connect pipeline (i.e.
@@ -367,37 +370,45 @@ async function load() {
       }
     }
     const id = route.params.id as string;
-    job.value = await getJob(id);
-    if (!job.value) return;
-    const [remote, invoice] = await Promise.all([
-      getIntakeSchema(job.value.trade),
-      getInvoiceByJobId(id),
-    ]);
-    intakeFields.value = remote?.fields ?? SEED_INTAKE_SCHEMAS[job.value.trade] ?? [];
-    invoiceId.value = invoice?.id ?? null;
-    invoicePayable.value = !!invoice?.payment?.clientSecret;
-
-    scheduledStart.value = job.value.scheduledStart?.toDate() ?? null;
-    scheduledEnd.value = job.value.scheduledEnd?.toDate() ?? null;
-    // Private notes live in a tradie-only subdoc; the client can't read it
-    // (rules deny it), so only fetch when the viewer is the tradesperson.
-    privateNotes.value = isTradie.value ? await getJobPrivateNotes(job.value.id) : "";
-    intakeDraft.value = { ...(job.value.intakeFormData ?? {}) };
-
-    // Clients see a "Your tradesperson" panel — fetch the tradesperson doc
-    // so we can render their photo + badges. Read can fail gracefully when
-    // the tradie has gone invisible (suspended/de-listed): rules require
-    // isVisible:true for non-owners. The panel falls back to a generic
-    // "your tradesperson" display when tradieInfo stays null.
-    if (isClient.value && job.value) {
-      try {
-        tradieInfo.value = await getTradesperson(job.value.tradespersonId);
-      } catch {
-        tradieInfo.value = null;
-      }
-    } else {
-      tradieInfo.value = null;
-    }
+    // The job doc rides a live subscription so status changes from the other
+    // party (e.g. client accepts a quote) update the banners + sticky CTA
+    // without a manual refresh. The heavier dependent reads (intake schema,
+    // invoice, private notes, tradie info) and the editable drafts run ONCE
+    // on the first snapshot — re-running them on every snapshot would both
+    // waste reads and clobber in-progress edits (intake draft, notes).
+    let firstSnapshot = true;
+    unsubscribeJob?.();
+    unsubscribeJob = subscribeJob(
+      id,
+      (j) => {
+        job.value = j;
+        if (!firstSnapshot) return;
+        firstSnapshot = false;
+        if (!j) {
+          loading.value = false;
+          return;
+        }
+        void loadJobDependents(j)
+          .catch((e) => {
+            loadError.value = humanizeError(e);
+            job.value = null;
+          })
+          .finally(() => {
+            loading.value = false;
+            void maybeAutoUpdateLog();
+          });
+      },
+      (e) => {
+        console.warn(
+          "[JobDetailView] subscription failed",
+          { jobId: id, signedInAs: auth.fbUser?.uid ?? null },
+          e,
+        );
+        loadError.value = humanizeError(e);
+        job.value = null;
+        loading.value = false;
+      },
+    );
   } catch (e) {
     console.warn(
       "[JobDetailView] read failed",
@@ -406,10 +417,42 @@ async function load() {
     );
     loadError.value = humanizeError(e);
     job.value = null;
-  } finally {
     loading.value = false;
   }
-  void maybeAutoUpdateLog();
+}
+
+// One-time dependent loads keyed off the resolved job. Kept separate from the
+// live job subscription so it runs exactly once per mount (see load()).
+async function loadJobDependents(j: WithId<JobDoc>) {
+  const [remote, invoice] = await Promise.all([
+    getIntakeSchema(j.trade),
+    getInvoiceByJobId(j.id),
+  ]);
+  intakeFields.value = remote?.fields ?? SEED_INTAKE_SCHEMAS[j.trade] ?? [];
+  invoiceId.value = invoice?.id ?? null;
+  invoicePayable.value = !!invoice?.payment?.clientSecret;
+
+  scheduledStart.value = j.scheduledStart?.toDate() ?? null;
+  scheduledEnd.value = j.scheduledEnd?.toDate() ?? null;
+  // Private notes live in a tradie-only subdoc; the client can't read it
+  // (rules deny it), so only fetch when the viewer is the tradesperson.
+  privateNotes.value = isTradie.value ? await getJobPrivateNotes(j.id) : "";
+  intakeDraft.value = { ...(j.intakeFormData ?? {}) };
+
+  // Clients see a "Your tradesperson" panel — fetch the tradesperson doc
+  // so we can render their photo + badges. Read can fail gracefully when
+  // the tradie has gone invisible (suspended/de-listed): rules require
+  // isVisible:true for non-owners. The panel falls back to a generic
+  // "your tradesperson" display when tradieInfo stays null.
+  if (isClient.value) {
+    try {
+      tradieInfo.value = await getTradesperson(j.tradespersonId);
+    } catch {
+      tradieInfo.value = null;
+    }
+  } else {
+    tradieInfo.value = null;
+  }
 }
 
 onMounted(load);
@@ -437,6 +480,8 @@ watch(
 onUnmounted(() => {
   unsubscribeReviewPair?.();
   unsubscribeReviewPair = null;
+  unsubscribeJob?.();
+  unsubscribeJob = null;
 });
 
 // Banner state — only derived once both job + pair are loaded. We
