@@ -766,13 +766,12 @@ function onReturnToApplicants() {
         <i class="pi pi-arrow-left" aria-hidden="true"></i>
         <span>Back</span>
       </button>
-      <!-- Status lives in the top bar (not next to the title) so the title
-           gets the full width below. -->
+      <!-- Status on the right of the top bar; the title gets full width below. -->
       <Tag
         v-if="job"
         :value="STATUS_LABEL[job.status]"
         :severity="STATUS_SEVERITY[job.status]"
-        class="ml-1 shrink-0"
+        class="shrink-0"
       />
     </div>
 
@@ -1244,9 +1243,11 @@ function onReturnToApplicants() {
   height: var(--job-topbar-h, 2.75rem);
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
   background: white;
   margin-inline: -1rem;
-  padding-inline: 0.5rem;
+  padding-inline: 0.75rem;
 }
 .job-detail__back {
   display: inline-flex;
