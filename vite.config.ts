@@ -22,6 +22,7 @@ export default defineConfig({
         "apple-touch-icon.png",
         "robots.txt",
         "icons/blueseal_logo.png",
+        "icons/blueseal_logo_Character.png",
       ],
       manifest: {
         name: "Blue Seal",

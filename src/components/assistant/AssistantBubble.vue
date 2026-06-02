@@ -81,7 +81,7 @@ onBeforeUnmount(() => store.reset());
       @click="store.open()"
     >
       <span class="bs-ai-fab__glyph" aria-hidden="true">
-        <img src="/icons/blueseal_logo.png" alt="" />
+        <img src="/icons/blueseal_logo_Character.png" alt="" />
       </span>
       <span class="bs-ai-fab__label">AI</span>
     </button>

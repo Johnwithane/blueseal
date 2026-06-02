@@ -131,7 +131,7 @@ const emptyHint = computed(() => {
          headline, contextual hint. -->
     <div v-if="!hasMessages" class="bs-ai-thread__empty">
       <span class="bs-ai-avatar bs-ai-avatar--lg bs-ai-avatar--float" aria-hidden="true">
-        <img src="/icons/blueseal_logo.png" alt="" />
+        <img src="/icons/blueseal_logo_Character.png" alt="" />
       </span>
       <h3 class="bs-ai-thread__empty-title">{{ emptyHeadline }}</h3>
       <p class="bs-ai-thread__empty-hint">{{ emptyHint }}</p>
@@ -152,7 +152,7 @@ const emptyHint = computed(() => {
         <div class="bs-ai-row__avatar">
           <template v-if="m.showAvatar && m.role === 'assistant'">
             <span class="bs-ai-avatar bs-ai-avatar--sm" aria-hidden="true">
-              <img src="/icons/blueseal_logo.png" alt="" />
+              <img src="/icons/blueseal_logo_Character.png" alt="" />
             </span>
           </template>
           <template v-else-if="m.showAvatar && m.role === 'user'">
@@ -199,7 +199,7 @@ const emptyHint = computed(() => {
       <div v-if="store.sending" class="bs-ai-row bs-ai-row--assistant">
         <div class="bs-ai-row__avatar">
           <span class="bs-ai-avatar bs-ai-avatar--sm" aria-hidden="true">
-            <img src="/icons/blueseal_logo.png" alt="" />
+            <img src="/icons/blueseal_logo_Character.png" alt="" />
           </span>
         </div>
         <div class="bs-ai-row__body">

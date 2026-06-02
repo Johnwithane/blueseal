@@ -14,8 +14,8 @@ const { sideItems, isActive } = useNavItems();
          logo always goes home. The role "Jobs"/"Dashboard" nav item covers
          the in-app home. -->
     <RouterLink to="/" class="side-panel__brand">
-      <img src="/icons/blueseal_logo.png" alt="" class="h-8 w-auto" />
-      <span class="side-panel__brand-text">Blue Seal</span>
+      <img src="/icons/blueseal_logo_Character.png" alt="" class="h-12 w-auto" />
+      <span class="side-panel__brand-text">BlueSeal</span>
     </RouterLink>
 
     <nav class="side-panel__nav" aria-label="Primary">

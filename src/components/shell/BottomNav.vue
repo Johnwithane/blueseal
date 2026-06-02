@@ -42,7 +42,7 @@ const isHomeActive = computed(() => route.path === "/");
       aria-label="Home"
     >
       <img
-        src="/icons/blueseal_logo.png"
+        src="/icons/blueseal_logo_Character.png"
         alt=""
         class="bottom-tab__brand-icon"
       />
@@ -126,8 +126,8 @@ const isHomeActive = computed(() => route.path === "/");
    as the other tabs so the bar height stays consistent and the logo sits
    above the iOS home indicator. */
 .bottom-tab__brand-icon {
-  height: 2.5rem;
-  width: 2.5rem;
+  height: 3rem;
+  width: 3rem;
   object-fit: contain;
 }
 </style>

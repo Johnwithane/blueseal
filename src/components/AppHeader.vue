@@ -177,11 +177,11 @@ function openMenu(e: Event) {
   <header class="sticky top-0 z-30 border-b border-[color:var(--bs-border)] bg-white">
     <div class="bs-container flex items-center justify-between gap-3 py-3">
       <router-link to="/" class="flex items-center gap-2 text-inherit no-underline">
-        <img src="/icons/blueseal_logo.png" alt="" class="h-9 w-auto" />
+        <img src="/icons/blueseal_logo_Character.png" alt="" class="h-12 w-auto" />
         <span
           class="text-2xl tracking-wide text-[color:var(--bs-blue-dark)]"
           style="font-family: var(--bs-font-logo)"
-        >Blue Seal</span>
+        >BlueSeal</span>
       </router-link>
 
       <!-- Role-aware primary nav (desktop only). Hidden on mobile; the same

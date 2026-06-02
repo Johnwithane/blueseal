@@ -142,7 +142,7 @@ onMounted(async () => {
             <img
               src="/icons/blueseal_logo.png"
               alt="Blue Seal"
-              class="relative h-[78%] w-auto mx-auto bs-float bs-glow"
+              class="relative h-[100%] w-auto mx-auto bs-float bs-glow"
             />
             <div
               class="hidden sm:block absolute -bottom-2 -right-4 bs-card !bg-white !text-[color:var(--bs-text)] px-4 py-3 shadow-2xl rotate-[4deg] text-left"
@@ -352,12 +352,12 @@ onMounted(async () => {
               <Button label="Message" icon="pi pi-comments" size="small" outlined />
             </div>
           </div>
-          <img
+          <!-- <img
             src="/icons/blueseal_logo.png"
             alt=""
             aria-hidden="true"
             class="absolute -bottom-6 -left-6 h-20 w-20 bs-float bs-glow opacity-95"
-          />
+          /> -->
         </div>
       </div>
     </section>
@@ -457,9 +457,9 @@ onMounted(async () => {
           src="/icons/blueseal_logo.png"
           alt=""
           aria-hidden="true"
-          class="mx-auto h-20 w-auto bs-float bs-glow"
+          class="mx-auto h-60 w-auto bs-float bs-glow"
         />
-        <h2 class="mt-6 text-3xl sm:text-5xl font-bold tracking-tight">
+        <h2 class="mt-0 text-3xl sm:text-5xl font-bold tracking-tight">
           Ready to seal the deal?
         </h2>
         <p class="mt-4 text-white/85 text-lg max-w-2xl mx-auto">
