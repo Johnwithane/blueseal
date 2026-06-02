@@ -335,13 +335,6 @@ router.beforeEach(async (to) => {
   const requiresAuth = !!to.meta.requiresAuth;
   const requiredRole = (to.meta.role as RoleGuard | undefined) ?? "any";
 
-  // Signed-in users don't need the marketing splash — send them to their
-  // dashboard so the brand/logo (and any stale "/" link) keeps them inside the
-  // app shell instead of dropping them onto the public homepage.
-  if (to.name === "Home" && auth.isAuthenticated) {
-    return { name: "Dashboard" };
-  }
-
   if (requiresAuth && !auth.isAuthenticated) {
     return { name: "Home" };
   }
