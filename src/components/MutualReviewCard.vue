@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import Rating from "primevue/rating";
+import Avatar from "primevue/avatar";
+import Dialog from "primevue/dialog";
 import ReviewPrompt from "@/components/ReviewPrompt.vue";
 import {
   getClientReviewById,
@@ -52,6 +54,21 @@ const myReview = ref<WithId<ReviewDoc> | WithId<ClientReviewDoc> | null>(null);
 const theirReview = ref<WithId<ReviewDoc> | WithId<ClientReviewDoc> | null>(null);
 
 const dialogOpen = ref(false);
+// Separate dialog for VIEWING the revealed reviews (the bar opens this).
+const reviewsDialogOpen = ref(false);
+
+// My own avatar + name (the counterparty's are passed in as props). Pulled
+// from the job doc so both parties' photos show in the reviews popup.
+const myPhotoUrl = computed(() =>
+  props.isClient ? props.job.clientPhotoURL : props.job.tradespersonPhotoURL,
+);
+const myName = computed(() =>
+  props.isClient ? props.job.clientName : props.job.tradespersonName,
+);
+
+function initialOf(name: string | null | undefined): string {
+  return (name?.trim()?.[0] ?? "?").toUpperCase();
+}
 
 const role = computed<"client" | "tradesperson" | null>(() => {
   if (props.isClient) return "client";
@@ -77,10 +94,6 @@ const theirReviewId = computed(() =>
   role.value === "client"
     ? pair.value?.tradieReviewId ?? null
     : pair.value?.clientReviewId ?? null,
-);
-
-const myCounterpartyHeading = computed(() =>
-  `${props.counterpartyName}'s review`,
 );
 
 onMounted(() => {
@@ -186,81 +199,125 @@ function textOf(r: WithId<ReviewDoc> | WithId<ClientReviewDoc> | null): string {
          component now mounts in JobDetailView's banner area so the
          reviews land at the top of every tab, not buried under the
          invoice. -->
-    <div v-if="showRevealedContent" class="bs-card p-4 space-y-3">
-      <h3 class="font-semibold text-sm flex items-center gap-2">
-        <i class="pi pi-eye text-emerald-600"></i>
-        Reviews
-      </h3>
+    <!-- Reviews bar — opens the reviews in a popup (rather than rendering them
+         inline) so the job page stays compact. -->
+    <button
+      v-if="showRevealedContent"
+      type="button"
+      class="bs-card w-full flex items-center gap-3 p-4 text-left transition-shadow hover:shadow-md"
+      @click="reviewsDialogOpen = true"
+    >
+      <i class="pi pi-star-fill text-lg text-[color:var(--bs-amber)]" aria-hidden="true"></i>
+      <div class="min-w-0 flex-1">
+        <div class="font-semibold text-sm">Reviews</div>
+        <div class="text-xs text-[color:var(--bs-muted)] truncate">
+          Tap to read {{ counterpartyName }}'s review and yours
+        </div>
+      </div>
+      <i class="pi pi-chevron-right text-[color:var(--bs-muted)]" aria-hidden="true"></i>
+    </button>
 
-      <div
-        v-if="theirReview"
-        class="rounded-lg border border-[color:var(--bs-border)] p-3"
-      >
-        <div class="flex items-center justify-between mb-1">
-          <span class="text-xs font-semibold uppercase tracking-wide text-[color:var(--bs-muted)]">
-            {{ myCounterpartyHeading }}
-          </span>
-          <span class="text-[10px] text-[color:var(--bs-muted)]">
-            {{ formatDate(pair?.revealedAt) }}
-          </span>
-        </div>
-        <div class="flex items-center gap-2 mb-1">
-          <Rating
-            :model-value="ratingOf(theirReview)"
-            readonly
-            :cancel="false"
-            class="review-readonly"
-          />
-          <span class="text-sm font-medium">{{ ratingOf(theirReview) }} / 5</span>
-        </div>
-        <p
-          v-if="textOf(theirReview)"
-          class="text-sm text-[color:var(--bs-text)] whitespace-pre-wrap"
+    <!-- Reviews popup: counterparty's review + yours, each with the
+         reviewer's profile picture. -->
+    <Dialog
+      v-model:visible="reviewsDialogOpen"
+      modal
+      header="Reviews"
+      :style="{ width: '32rem', maxWidth: '92vw' }"
+    >
+      <div class="space-y-3">
+        <div
+          v-if="theirReview"
+          class="rounded-lg border border-[color:var(--bs-border)] p-3"
         >
-          {{ textOf(theirReview) }}
-        </p>
-        <p v-else class="text-xs italic text-[color:var(--bs-muted)]">
-          No written comment.
-        </p>
-      </div>
-      <div
-        v-else-if="isLocked"
-        class="rounded-lg border border-dashed border-[color:var(--bs-border)] p-3 text-xs text-[color:var(--bs-muted)]"
-      >
-        {{ counterpartyName }} didn't leave a review before the window closed.
-      </div>
+          <div class="flex items-center gap-2 mb-2">
+            <Avatar
+              v-if="counterpartyPhotoUrl"
+              :image="counterpartyPhotoUrl"
+              shape="circle"
+            />
+            <Avatar
+              v-else
+              :label="initialOf(counterpartyName)"
+              shape="circle"
+              style="background-color: var(--bs-blue); color: white; font-weight: 600;"
+            />
+            <div class="min-w-0 flex-1">
+              <div class="text-sm font-semibold truncate">{{ counterpartyName }}</div>
+              <div class="text-[10px] text-[color:var(--bs-muted)]">
+                {{ formatDate(pair?.revealedAt) }}
+              </div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 mb-1">
+            <Rating
+              :model-value="ratingOf(theirReview)"
+              readonly
+              :cancel="false"
+              class="review-readonly"
+            />
+            <span class="text-sm font-medium">{{ ratingOf(theirReview) }} / 5</span>
+          </div>
+          <p
+            v-if="textOf(theirReview)"
+            class="text-sm text-[color:var(--bs-text)] whitespace-pre-wrap"
+          >
+            {{ textOf(theirReview) }}
+          </p>
+          <p v-else class="text-xs italic text-[color:var(--bs-muted)]">
+            No written comment.
+          </p>
+        </div>
+        <div
+          v-else-if="isLocked"
+          class="rounded-lg border border-dashed border-[color:var(--bs-border)] p-3 text-xs text-[color:var(--bs-muted)]"
+        >
+          {{ counterpartyName }} didn't leave a review before the window closed.
+        </div>
 
-      <div
-        v-if="myReview"
-        class="rounded-lg border border-[color:var(--bs-border)] p-3"
-      >
-        <div class="flex items-center justify-between mb-1">
-          <span class="text-xs font-semibold uppercase tracking-wide text-[color:var(--bs-muted)]">
-            Your review
-          </span>
-        </div>
-        <div class="flex items-center gap-2 mb-1">
-          <Rating
-            :model-value="ratingOf(myReview)"
-            readonly
-            :cancel="false"
-            class="review-readonly"
-          />
-          <span class="text-sm font-medium">{{ ratingOf(myReview) }} / 5</span>
-        </div>
-        <p
-          v-if="textOf(myReview)"
-          class="text-sm text-[color:var(--bs-text)] whitespace-pre-wrap"
+        <div
+          v-if="myReview"
+          class="rounded-lg border border-[color:var(--bs-border)] p-3"
         >
-          {{ textOf(myReview) }}
-        </p>
+          <div class="flex items-center gap-2 mb-2">
+            <Avatar
+              v-if="myPhotoUrl"
+              :image="myPhotoUrl"
+              shape="circle"
+            />
+            <Avatar
+              v-else
+              :label="initialOf(myName)"
+              shape="circle"
+              style="background-color: var(--bs-blue); color: white; font-weight: 600;"
+            />
+            <div class="min-w-0 flex-1">
+              <div class="text-sm font-semibold truncate">You</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 mb-1">
+            <Rating
+              :model-value="ratingOf(myReview)"
+              readonly
+              :cancel="false"
+              class="review-readonly"
+            />
+            <span class="text-sm font-medium">{{ ratingOf(myReview) }} / 5</span>
+          </div>
+          <p
+            v-if="textOf(myReview)"
+            class="text-sm text-[color:var(--bs-text)] whitespace-pre-wrap"
+          >
+            {{ textOf(myReview) }}
+          </p>
+        </div>
       </div>
-    </div>
+    </Dialog>
 
     <!-- Locked out + I never submitted: tiny apology line so the user
          understands why the action surface vanished. -->
     <div
-      v-else-if="showLockedOutMessage"
+      v-if="showLockedOutMessage"
       class="bs-card p-3 text-xs text-[color:var(--bs-muted)]"
     >
       The 14-day review window closed without your review. You can no longer

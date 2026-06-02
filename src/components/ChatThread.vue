@@ -16,6 +16,7 @@ import { useAuthStore } from "@/stores/auth";
 import { compressToWebp } from "@/utils/image";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
+import ImageLightbox from "@/components/ImageLightbox.vue";
 
 const props = defineProps<{
   chatId: string;
@@ -30,6 +31,8 @@ const auth = useAuthStore();
 const toast = useToast();
 
 const messages = ref<WithId<MessageDoc>[]>([]);
+// Tapping a chat photo opens it in a lightbox (not a new tab).
+const lightboxSrc = ref<string | null>(null);
 const text = ref("");
 const sending = ref(false);
 const fileInput = ref<HTMLInputElement | null>(null);
@@ -316,11 +319,10 @@ async function uploadPhoto(e: Event) {
               ]"
             >
               <template v-if="m.raw.photoUrl && isAllowedPhotoUrl(m.raw.photoUrl)">
-                <a
-                  :href="m.raw.photoUrl"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
                   class="bs-chat__photo-link"
+                  @click="lightboxSrc = m.raw.photoUrl ?? null"
                 >
                   <img
                     :src="m.raw.photoUrl"
@@ -328,7 +330,7 @@ async function uploadPhoto(e: Event) {
                     alt="Chat photo"
                     loading="lazy"
                   />
-                </a>
+                </button>
               </template>
               <div v-if="m.raw.text" class="bs-chat__text">{{ m.raw.text }}</div>
             </div>
@@ -393,6 +395,8 @@ async function uploadPhoto(e: Event) {
       <Button icon="pi pi-image" outlined type="button" @click="fileInput?.click()" />
       <Button icon="pi pi-send" type="submit" :loading="sending" :disabled="!text.trim()" />
     </form>
+
+    <ImageLightbox :src="lightboxSrc" @close="lightboxSrc = null" />
   </div>
 </template>
 
@@ -534,6 +538,11 @@ async function uploadPhoto(e: Event) {
 .bs-chat__photo-link {
   display: block;
   margin: -0.1rem -0.3rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  width: 100%;
 }
 .bs-chat__photo-link + .bs-chat__text {
   margin-top: 0.5rem;

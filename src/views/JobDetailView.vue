@@ -766,6 +766,14 @@ function onReturnToApplicants() {
         <i class="pi pi-arrow-left" aria-hidden="true"></i>
         <span>Back</span>
       </button>
+      <!-- Status lives in the top bar (not next to the title) so the title
+           gets the full width below. -->
+      <Tag
+        v-if="job"
+        :value="STATUS_LABEL[job.status]"
+        :severity="STATUS_SEVERITY[job.status]"
+        class="ml-1 shrink-0"
+      />
     </div>
 
     <LoadingState v-if="loading" class="mt-4" />
@@ -787,18 +795,11 @@ function onReturnToApplicants() {
       </RouterLink>
     </div>
     <template v-else-if="job">
-      <header class="flex items-start justify-between gap-2 mt-1 mb-3">
-        <div class="min-w-0 flex-1">
-          <h1 class="text-lg font-bold break-words leading-tight">{{ job.title }}</h1>
-          <div class="text-[11px] text-[color:var(--bs-muted)] mt-0.5 truncate">
-            {{ tradeLabel(job.trade) }} · {{ job.address.line1 }}, {{ job.address.city }}
-          </div>
+      <header class="mt-1 mb-3">
+        <h1 class="text-xl font-bold break-words leading-tight">{{ job.title }}</h1>
+        <div class="text-[11px] text-[color:var(--bs-muted)] mt-0.5 truncate">
+          {{ tradeLabel(job.trade) }} · {{ job.address.line1 }}, {{ job.address.city }}
         </div>
-        <Tag
-          :value="STATUS_LABEL[job.status]"
-          :severity="STATUS_SEVERITY[job.status]"
-          class="shrink-0"
-        />
       </header>
 
       <!-- Mutual-review banner: top-of-page surface for the review loop.
