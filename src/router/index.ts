@@ -325,7 +325,10 @@ const routes: RouteRecordRaw[] = [
 const router = createRouter({
   history: createWebHistory(),
   routes,
-  scrollBehavior: () => ({ top: 0 }),
+  // Restore the previous scroll position on back/forward (so returning to the
+  // search results from a profile lands where you left off); fresh navigations
+  // scroll to the top.
+  scrollBehavior: (_to, _from, savedPosition) => savedPosition ?? { top: 0 },
 });
 
 router.beforeEach(async (to) => {

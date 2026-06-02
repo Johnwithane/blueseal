@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useRoute, RouterLink } from "vue-router";
+import { useRoute, useRouter, RouterLink } from "vue-router";
 import Button from "primevue/button";
 import Tag from "primevue/tag";
 import Rating from "primevue/rating";
@@ -29,6 +29,15 @@ import ProspectProfile from "@/components/ProspectProfile.vue";
 import LoadingState from "@/components/LoadingState.vue";
 
 const route = useRoute();
+const router = useRouter();
+
+// History-aware back — returns to the search list (with its scroll preserved by
+// the router's scrollBehavior) when you came from there; falls back to /search
+// for deep links with no history.
+function goBack() {
+  if (window.history.state?.back) router.back();
+  else router.push({ name: "Search" });
+}
 const tradie = ref<WithId<TradespersonDoc> | null>(null);
 // If the :uid resolves to a seeded prospect instead of a real tradesperson,
 // we render the unverified ProspectProfile at this same URL (prospects share
@@ -160,6 +169,14 @@ onMounted(async () => {
 </script>
 
 <template>
+  <!-- Back to the search list (or wherever you came from), keeping your place. -->
+  <div class="bs-container pt-3">
+    <button type="button" class="profile-back" @click="goBack">
+      <i class="pi pi-arrow-left" aria-hidden="true"></i>
+      <span>Back</span>
+    </button>
+  </div>
+
   <!-- Prospect (seeded, unverified) profile shares this route — render its full
        body instead of the tradesperson layout when the id resolves to one. -->
   <ProspectProfile v-if="!loading && prospect" :prospect="prospect" />
@@ -474,6 +491,24 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.profile-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-left: -0.5rem;
+  padding: 0.375rem 0.625rem;
+  border: 0;
+  background: transparent;
+  border-radius: 0.5rem;
+  color: var(--bs-blue);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.profile-back:hover {
+  background: var(--bs-surface-alt);
+}
+
 /* Amber stars on the review row rating to match the modal + revealed
    reviews — the brand green default reads as "approved" rather than
    "rating." Smaller size since the reviewer name is the headline,

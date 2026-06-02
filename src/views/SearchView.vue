@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, computed } from "vue";
+import { ref, watch, onMounted, onUnmounted, computed } from "vue";
+import { searchCache } from "./searchCache";
 import { useRoute, useRouter } from "vue-router";
 import Button from "primevue/button";
 import Select from "primevue/select";
@@ -72,6 +73,55 @@ const prospectResults = ref<Array<WithId<ProspectDoc> & { distanceKm: number }>>
 const loading = ref(false);
 const error = ref<string | null>(null);
 
+// Restore from the in-memory cache (kept live below) so navigating back from a
+// profile shows the same results immediately — no refetch, no lost place.
+if (searchCache.value) {
+  trade.value = searchCache.value.trade;
+  results.value = searchCache.value.results;
+  prospectResults.value = searchCache.value.prospectResults;
+}
+
+// --- Lazy rendering ---------------------------------------------------------
+// Render the fetched results in pages so a long list doesn't all hit the DOM
+// at once on mobile; an IntersectionObserver sentinel loads the next page as
+// the user nears the bottom.
+const PAGE_SIZE = 9;
+const visibleCount = ref(searchCache.value?.visibleCount ?? PAGE_SIZE);
+const visibleResults = computed(() => results.value.slice(0, visibleCount.value));
+const visibleProspects = computed(() =>
+  prospectResults.value.slice(0, Math.max(0, visibleCount.value - results.value.length)),
+);
+const hasMore = computed(
+  () => visibleCount.value < results.value.length + prospectResults.value.length,
+);
+
+const sentinel = ref<HTMLElement | null>(null);
+let io: IntersectionObserver | null = null;
+watch(sentinel, (el) => {
+  if (!io) {
+    io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && hasMore.value) visibleCount.value += PAGE_SIZE;
+      },
+      { rootMargin: "400px" },
+    );
+  }
+  io.disconnect();
+  if (el) io.observe(el);
+});
+
+// Keep the cache live so a later remount restores the latest state.
+watch([results, prospectResults, visibleCount, trade], () => {
+  searchCache.value = {
+    trade: trade.value,
+    results: results.value,
+    prospectResults: prospectResults.value,
+    visibleCount: visibleCount.value,
+  };
+});
+
+onUnmounted(() => io?.disconnect());
+
 // Airbnb-style result pins for the map. Both verified members and seeded
 // prospects carry a coarse `locationApprox`; skip any without one (e.g. an
 // admin-grant profile that never set a location).
@@ -140,6 +190,7 @@ async function search() {
     ]);
     results.value = tradies;
     prospectResults.value = prospects;
+    visibleCount.value = PAGE_SIZE; // reset paging for the new result set
   } catch (e) {
     error.value = (e as Error).message;
   } finally {
@@ -323,11 +374,12 @@ onMounted(async () => {
         </button>
       </div>
 
-      <div class="mt-4 flex justify-end">
+      <div class="mt-4 sm:flex sm:justify-end">
         <Button
           label="Search"
           icon="pi pi-search"
           :loading="loading"
+          class="w-full sm:w-auto"
           @click="search"
         />
       </div>
@@ -376,22 +428,31 @@ onMounted(async () => {
         <p>No results yet. Set a location and search.</p>
       </div>
       <template v-else>
-        <div v-if="results.length" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <TradieCard v-for="t in results" :key="t.id" :tradie="t" />
+        <div v-if="visibleResults.length" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <TradieCard v-for="t in visibleResults" :key="t.id" :tradie="t" />
         </div>
 
         <!-- Seeded, unclaimed listings — clearly separated below the verified
              results so they never outrank a vetted tradesperson, and labelled
              "not yet verified" so clients aren't misled. -->
-        <section v-if="prospectResults.length" class="mt-6">
+        <section v-if="visibleProspects.length" class="mt-6">
           <h2 class="text-lg font-semibold">Unverified tradespeople</h2>
           <p class="mb-3 text-sm text-[color:var(--bs-muted)]">
             These tradespeople haven't been verified by Blue Seal yet.
           </p>
           <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <ProspectCard v-for="p in prospectResults" :key="p.id" :prospect="p" />
+            <ProspectCard v-for="p in visibleProspects" :key="p.id" :prospect="p" />
           </div>
         </section>
+
+        <!-- Infinite-scroll sentinel: renders the next page as it nears view. -->
+        <div
+          v-if="hasMore"
+          ref="sentinel"
+          class="py-4 text-center text-sm text-[color:var(--bs-muted)]"
+        >
+          <i class="pi pi-spin pi-spinner mr-1"></i> Loading more…
+        </div>
       </template>
     </template>
   </section>
