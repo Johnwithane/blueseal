@@ -116,7 +116,7 @@ onBeforeUnmount(() => store.reset());
   cursor: pointer;
   /* Brand-aligned blue gradient — distinctly "AI" without going full
      Gemini-rainbow. The deep-blue end keeps it readable on light pages. */
-  background: linear-gradient(135deg, #6dd5ed 0%, #49a1d3 45%, #1d406a 100%);
+  background: linear-gradient(135deg, #6dd5ed 0%, var(--bs-blue) 45%, var(--bs-blue-dark) 100%);
   box-shadow:
     0 8px 24px rgba(29, 64, 106, 0.28),
     0 1px 0 rgba(255, 255, 255, 0.35) inset;

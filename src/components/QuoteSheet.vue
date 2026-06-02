@@ -888,9 +888,9 @@ function close() {
     </div>
 
     <template #footer>
-      <div class="flex items-center gap-2 w-full">
-        <Button label="Cancel" text :disabled="submitting" @click="close" />
-        <span class="flex-1"></span>
+      <div class="flex flex-col-reverse gap-2 w-full sm:flex-row sm:items-center">
+        <Button label="Cancel" text :disabled="submitting" class="w-full sm:w-auto" @click="close" />
+        <span class="hidden flex-1 sm:block"></span>
         <Button
           :label="
             totals.total > 0
@@ -904,6 +904,7 @@ function close() {
           icon="pi pi-send"
           :loading="submitting"
           :disabled="!canSubmit"
+          class="w-full sm:w-auto"
           @click="onSubmit"
         />
       </div>
@@ -933,8 +934,8 @@ function close() {
 }
 @media (max-width: 639px) {
   .quote-sheet-dialog {
-    height: 100vh;
-    max-height: 100vh;
+    height: 100dvh;
+    max-height: 100dvh;
     border-radius: 0;
   }
 }

@@ -38,6 +38,7 @@ import { useFormatters } from "@/composables";
 import { humanizeError } from "@/utils/errors";
 import VerifiedBadge from "@/components/VerifiedBadge.vue";
 import JobCounterparty from "@/components/JobCounterparty.vue";
+import LoadingState from "@/components/LoadingState.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -267,17 +268,15 @@ const visibleApplications = computed(() =>
 
 <template>
   <section class="bs-container py-6 max-w-3xl">
-    <div v-if="loading" class="bs-card p-6 text-center text-[color:var(--bs-muted)]">
-      <i class="pi pi-spin pi-spinner mr-2"></i>Loading post…
-    </div>
+    <LoadingState v-if="loading" label="Loading post…" />
 
     <Message v-else-if="error" severity="error" :closable="false">{{ error }}</Message>
 
     <template v-else-if="post">
       <!-- HEADER -->
       <div class="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h1 class="text-2xl font-bold">{{ post.title }}</h1>
+        <div class="min-w-0">
+          <h1 class="text-2xl font-bold break-words">{{ post.title }}</h1>
           <div class="text-xs text-[color:var(--bs-muted)] mt-1">
             {{ tradeLabel(post.trade) }} • {{ relativeTime(post.createdAt) }}
           </div>
@@ -415,20 +414,16 @@ const visibleApplications = computed(() =>
                   v-if="applicantTradies.get(app.tradespersonId)"
                   class="flex flex-wrap gap-1 mt-1.5"
                 >
-                  <span
+                  <VerifiedBadge
                     v-if="applicantTradies.get(app.tradespersonId)!.idVerified"
-                    class="inline-flex items-center gap-1 text-[10px] font-medium bg-emerald-100 text-emerald-800 rounded-full px-1.5 py-0.5"
-                    title="ID verified by Blue Seal"
-                  >
-                    <i class="pi pi-id-card text-[10px]" />ID
-                  </span>
-                  <span
+                    kind="id"
+                    variant="pill"
+                  />
+                  <VerifiedBadge
                     v-if="(applicantTradies.get(app.tradespersonId)!.verifiedTrades?.length ?? 0) > 0"
-                    class="inline-flex items-center gap-1 text-[10px] font-medium bg-blue-100 text-blue-800 rounded-full px-1.5 py-0.5"
-                    title="Trade certification verified"
-                  >
-                    <i class="pi pi-verified text-[10px]" />Cert
-                  </span>
+                    kind="cert"
+                    variant="pill"
+                  />
                   <VerifiedBadge
                     v-if="applicantTradies.get(app.tradespersonId)!.insuranceVerified"
                     kind="insurance"

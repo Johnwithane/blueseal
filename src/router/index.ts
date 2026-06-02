@@ -8,8 +8,16 @@ type RoleGuard = Role | "any";
 //   - "public" (default if unset) → AppHeader/Footer marketing chrome
 //   - "app"                       → AppShell (side panel + bottom nav)
 //   - "chromeless"                → no chrome (onboarding wizard)
+//   - "hybrid"                    → AppShell when signed in, public chrome when
+//                                   signed out. For crossover routes (search,
+//                                   post-a-job, public profiles) that BOTH a
+//                                   logged-out visitor and a signed-in user
+//                                   reach — signed-in users stay in their app
+//                                   shell instead of being ejected into the
+//                                   marketing chrome mid-task. App.vue resolves
+//                                   the effective layout from auth state.
 // `meta.title` is rendered as the page h1 by AppShell when layout is "app".
-type LayoutKind = "public" | "app" | "chromeless";
+type LayoutKind = "public" | "app" | "chromeless" | "hybrid";
 
 declare module "vue-router" {
   interface RouteMeta {
@@ -32,7 +40,9 @@ const routes: RouteRecordRaw[] = [
     path: "/search",
     name: "Search",
     component: () => import("@/views/SearchView.vue"),
-    meta: { layout: "public" },
+    // Hybrid: a signed-in client reaches Search from their app nav, so it
+    // renders in the shell for them and the marketing chrome for visitors.
+    meta: { layout: "hybrid" },
   },
   {
     // Shared public profile for both real tradespeople AND seeded prospects.
@@ -42,7 +52,9 @@ const routes: RouteRecordRaw[] = [
     path: "/tradies/:uid",
     name: "TradieProfile",
     component: () => import("@/views/TradieProfileView.vue"),
-    meta: { layout: "public" },
+    // Hybrid: signed-in clients browse profiles from inside the app; visitors
+    // see the public marketing chrome.
+    meta: { layout: "hybrid" },
   },
   {
     path: "/request/:uid",
@@ -222,9 +234,10 @@ const routes: RouteRecordRaw[] = [
     name: "PostJob",
     component: () => import("@/views/PostJobView.vue"),
     // Auth-at-submit: the form persists draft to localStorage and bounces to
-    // sign-in only when the user hits "Post". Letting unauthed users into the
-    // route is intentional — keep public chrome so the sign-in CTA stays.
-    meta: { layout: "public" },
+    // sign-in only when the user hits "Post". Hybrid layout keeps the sign-in
+    // CTA + marketing chrome for visitors, but a signed-in user posting a job
+    // stays inside their app shell instead of being kicked to public chrome.
+    meta: { layout: "hybrid" },
   },
   {
     path: "/jobs/browse",
@@ -312,7 +325,10 @@ const routes: RouteRecordRaw[] = [
 const router = createRouter({
   history: createWebHistory(),
   routes,
-  scrollBehavior: () => ({ top: 0 }),
+  // Restore the previous scroll position on back/forward (so returning to the
+  // search results from a profile lands where you left off); fresh navigations
+  // scroll to the top.
+  scrollBehavior: (_to, _from, savedPosition) => savedPosition ?? { top: 0 },
 });
 
 router.beforeEach(async (to) => {

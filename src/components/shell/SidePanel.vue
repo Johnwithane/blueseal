@@ -10,8 +10,9 @@ const { sideItems, isActive } = useNavItems();
 
 <template>
   <aside class="side-panel">
-    <!-- Logo + brand. Clicks land the user on the marketing homepage; the
-         "Jobs" / "Dashboard" item below covers the in-app home. -->
+    <!-- Logo + brand → the homepage (root), per product convention that the
+         logo always goes home. The role "Jobs"/"Dashboard" nav item covers
+         the in-app home. -->
     <RouterLink to="/" class="side-panel__brand">
       <img src="/icons/blueseal_logo.png" alt="" class="h-8 w-auto" />
       <span class="side-panel__brand-text">Blue Seal</span>

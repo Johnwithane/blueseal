@@ -8,9 +8,12 @@ import Message from "primevue/message";
 import type { IdDocType } from "@/firebase/interfaces";
 import { compressOrPassPdf } from "@/utils/image";
 import { useToast } from "@/composables/useToast";
+import { useConfirmAction } from "@/composables/useConfirmAction";
 import { humanizeError } from "@/utils/errors";
+import { VERIFICATION_SEVERITY, VERIFICATION_LABEL } from "@/utils/verificationStatus";
 
 const toast = useToast();
+const { confirmDestructive } = useConfirmAction();
 
 const props = defineProps<{
   status: "none" | "pending" | "approved" | "rejected";
@@ -60,27 +63,25 @@ async function onFile(e: Event) {
   }
 }
 
-async function removeUploaded() {
-  if (!window.confirm("Remove this ID? You'll need to upload a new one.")) return;
-  removing.value = true;
-  try {
-    if (localFileUrl.value) {
-      URL.revokeObjectURL(localFileUrl.value);
-      localFileUrl.value = null;
-      localFileName.value = null;
-    }
-    emit("removed");
-  } finally {
-    removing.value = false;
-  }
+function removeUploaded() {
+  confirmDestructive(
+    { message: "Remove this ID? You'll need to upload a new one.", header: "Remove ID" },
+    () => {
+      removing.value = true;
+      try {
+        if (localFileUrl.value) {
+          URL.revokeObjectURL(localFileUrl.value);
+          localFileUrl.value = null;
+          localFileName.value = null;
+        }
+        emit("removed");
+      } finally {
+        removing.value = false;
+      }
+    },
+  );
 }
 
-const statusSeverity = {
-  none: "secondary" as const,
-  pending: "warn" as const,
-  approved: "success" as const,
-  rejected: "danger" as const,
-};
 
 const documentTypeOptions = [
   { label: "Driver's licence", value: "drivers_license" as IdDocType },
@@ -95,7 +96,7 @@ const hasUpload = computed(() => props.status !== "none");
   <div class="bs-card p-3">
     <div class="flex items-center justify-between gap-2 flex-wrap">
       <div class="font-semibold">Government-issued photo ID</div>
-      <Tag :value="props.status" :severity="statusSeverity[props.status]" />
+      <Tag :value="VERIFICATION_LABEL[props.status]" :severity="VERIFICATION_SEVERITY[props.status]" />
     </div>
     <p class="text-xs text-[color:var(--bs-muted)] mt-1">
       Driver's licence, passport, or provincial ID. Stored under strict

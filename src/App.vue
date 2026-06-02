@@ -21,9 +21,15 @@ const primeToast = primeUseToast();
 // `meta.layout` decides which shell wraps the route. Unset → "public" (the
 // marketing AppHeader/Footer chrome). "app" mounts the Instagram-style
 // AppShell; "chromeless" renders the view alone (onboarding wizard).
-const layout = computed<"public" | "app" | "chromeless">(
-  () => (route.meta.layout as "public" | "app" | "chromeless" | undefined) ?? "public",
-);
+// "hybrid" resolves to "app" for signed-in users and "public" for visitors —
+// so crossover routes (search, post-a-job, public profiles) keep a signed-in
+// user inside their shell instead of ejecting them to the marketing chrome.
+const layout = computed<"public" | "app" | "chromeless">(() => {
+  const declared =
+    (route.meta.layout as "public" | "app" | "chromeless" | "hybrid" | undefined) ?? "public";
+  if (declared === "hybrid") return auth.isAuthenticated ? "app" : "public";
+  return declared;
+});
 
 // Start the notifications subscription as soon as the app mounts. The store
 // itself watches auth.fbUser.uid so it survives sign-in/out without us having
@@ -110,23 +116,31 @@ function openFromToast(notifId: string) {
 
 <template>
   <div class="min-h-full flex flex-col">
-    <template v-if="layout === 'public'">
-      <AppHeader />
-      <TradieStatusBanner />
-      <main class="flex-1">
+    <!-- Fade between chrome systems so crossing the public↔app boundary
+         (sign-in, or a visitor→member transition on a hybrid route) is a
+         smooth crossfade rather than an abrupt swap. Keyed on `layout` so
+         it only fires when the chrome KIND changes — navigating within the
+         same layout doesn't animate. Transition classes are global
+         (main.css) so they reach the AppShell child root past scoped CSS. -->
+    <Transition name="bs-layout" mode="out-in">
+      <div v-if="layout === 'public'" key="public" class="flex flex-1 flex-col">
+        <AppHeader />
+        <TradieStatusBanner />
+        <main class="flex-1">
+          <RouterView />
+        </main>
+        <AppFooter />
+      </div>
+
+      <AppShell v-else-if="layout === 'app'" key="app" class="flex-1">
+        <RouterView />
+      </AppShell>
+
+      <main v-else key="chromeless" class="flex-1">
+        <!-- Chromeless: onboarding wizard renders with no shell. -->
         <RouterView />
       </main>
-      <AppFooter />
-    </template>
-
-    <AppShell v-else-if="layout === 'app'" class="flex-1">
-      <RouterView />
-    </AppShell>
-
-    <main v-else class="flex-1">
-      <!-- Chromeless: onboarding wizard renders with no shell. -->
-      <RouterView />
-    </main>
+    </Transition>
 
     <Toast position="top-right" />
     <!-- Live notification toasts. Separate group + position so they don't

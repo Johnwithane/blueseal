@@ -17,6 +17,7 @@ import { compressOrPassPdf } from "@/utils/image";
 import { useToast } from "@/composables/useToast";
 import { useFormatters } from "@/composables/useFormatters";
 import { humanizeError } from "@/utils/errors";
+import { VERIFICATION_SEVERITY } from "@/utils/verificationStatus";
 
 const props = defineProps<{
   tradespersonId: string;
@@ -50,11 +51,6 @@ const editing = ref(false);
 // owner can submit a fresh upload (a new setDoc overwrite, same as create).
 const replacing = ref(false);
 
-const statusSeverity = {
-  pending: "warn" as const,
-  approved: "success" as const,
-  rejected: "danger" as const,
-};
 
 const hasUpload = computed(() => props.existing != null);
 const coverageDollarsLabel = computed(() => {
@@ -241,7 +237,7 @@ async function saveEdit() {
         <Tag
           v-if="existing && existing.status !== 'pending'"
           :value="existing.status"
-          :severity="statusSeverity[existing.status]"
+          :severity="VERIFICATION_SEVERITY[existing.status]"
         />
         <i class="pi pi-chevron-down bs-cert-card__chevron" aria-hidden="true"></i>
       </div>
@@ -444,33 +440,3 @@ async function saveEdit() {
     </div>
   </details>
 </template>
-
-<style scoped>
-.bs-cert-card {
-  padding: 0;
-}
-.bs-cert-card > summary {
-  list-style: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  padding: 0.75rem;
-  user-select: none;
-}
-.bs-cert-card > summary::-webkit-details-marker {
-  display: none;
-}
-.bs-cert-card__chevron {
-  transition: transform 0.18s ease;
-  color: var(--bs-muted);
-}
-.bs-cert-card[open] > summary .bs-cert-card__chevron {
-  transform: rotate(180deg);
-}
-.bs-cert-card__body {
-  padding: 0 0.75rem 0.75rem;
-}
-</style>

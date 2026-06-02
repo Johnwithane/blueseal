@@ -498,7 +498,7 @@ async function markPaid() {
           :allow-empty="false"
           class="text-xs"
         />
-        <div v-if="discountMode !== 'off'" class="mt-3 grid grid-cols-2 gap-2">
+        <div v-if="discountMode !== 'off'" class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
           <div>
             <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">
               {{ discountMode === "percent" ? "Percent off" : "Amount off" }}

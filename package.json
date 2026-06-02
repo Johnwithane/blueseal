@@ -28,6 +28,7 @@
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "marked": "^18.0.4",
+    "pdfjs-dist": "^6.0.227",
     "pinia": "^2.3.0",
     "primeicons": "^7.0.0",
     "primevue": "^4.2.5",

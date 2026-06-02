@@ -9,6 +9,7 @@ import { ref as storageRef, getDownloadURL } from "firebase/storage";
 import { storage } from "@/firebase/config";
 import IntakeFormRenderer from "@/components/IntakeFormRenderer.vue";
 import VerifiedBadge from "@/components/VerifiedBadge.vue";
+import ImageLightbox from "@/components/ImageLightbox.vue";
 import type {
   IntakeField,
   JobDoc,
@@ -35,6 +36,8 @@ const props = defineProps<{
 // current origin and renders nothing. Resolve each path to a download URL
 // once and cache by path.
 const photoUrls = ref<Map<string, string>>(new Map());
+// Tapping an intake photo opens it in a lightbox (not a new tab).
+const lightboxSrc = ref<string | null>(null);
 watch(
   () => props.job.intakePhotos,
   async (paths) => {
@@ -128,13 +131,13 @@ function tradieAvatarInitial() {
         v-if="job.intakePhotos.length"
         class="grid grid-cols-3 sm:grid-cols-4 gap-2 mt-3"
       >
-        <a
+        <button
           v-for="p in job.intakePhotos"
           :key="p"
-          :href="photoUrls.get(p) || '#'"
-          target="_blank"
-          rel="noopener"
-          class="aspect-square rounded overflow-hidden bg-[color:var(--bs-bg)] border border-[color:var(--bs-border)]"
+          type="button"
+          :disabled="!photoUrls.get(p)"
+          class="aspect-square rounded overflow-hidden bg-[color:var(--bs-bg)] border border-[color:var(--bs-border)] p-0"
+          @click="lightboxSrc = photoUrls.get(p) ?? null"
         >
           <img
             v-if="photoUrls.get(p)"
@@ -142,8 +145,10 @@ function tradieAvatarInitial() {
             class="h-full w-full object-cover"
             alt=""
           />
-        </a>
+        </button>
       </div>
+
+      <ImageLightbox :src="lightboxSrc" @close="lightboxSrc = null" />
 
       <!-- Marketplace-sourced jobs skip the trade-specific intake entirely
            — the post description + photos above already serve that purpose.

@@ -16,6 +16,7 @@ import {
 import type { TimeEntryDoc, WithId } from "@/firebase/interfaces";
 import { useFormatters } from "@/composables/useFormatters";
 import { useToast } from "@/composables/useToast";
+import { useConfirmAction } from "@/composables/useConfirmAction";
 import { humanizeError } from "@/utils/errors";
 
 const props = defineProps<{
@@ -26,6 +27,7 @@ const props = defineProps<{
 
 const { dateTime, money } = useFormatters();
 const toast = useToast();
+const { confirmDestructive } = useConfirmAction();
 
 const entries = ref<WithId<TimeEntryDoc>[]>([]);
 const loading = ref(true);
@@ -116,14 +118,18 @@ async function saveNotes(entry: WithId<TimeEntryDoc>, notes: string) {
   }
 }
 
-async function remove(entry: WithId<TimeEntryDoc>) {
-  if (!confirm("Delete this time entry?")) return;
-  try {
-    await deleteTimeEntry(props.jobId, entry.id);
-    toast.success("Entry deleted");
-  } catch (e) {
-    toast.error("Couldn't delete", humanizeError(e));
-  }
+function remove(entry: WithId<TimeEntryDoc>) {
+  confirmDestructive(
+    { message: "Delete this time entry?", header: "Delete time entry", acceptLabel: "Delete" },
+    async () => {
+      try {
+        await deleteTimeEntry(props.jobId, entry.id);
+        toast.success("Entry deleted");
+      } catch (e) {
+        toast.error("Couldn't delete", humanizeError(e));
+      }
+    },
+  );
 }
 
 function liveElapsedLabel(e: WithId<TimeEntryDoc>): string {

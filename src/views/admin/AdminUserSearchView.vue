@@ -19,6 +19,7 @@ import { useFormatters } from "@/composables/useFormatters";
 import { humanizeError } from "@/utils/errors";
 import { tradeLabel } from "@/data/trades";
 import { STATUS_LABEL, STATUS_SEVERITY } from "@/utils/jobStatus";
+import LoadingState from "@/components/LoadingState.vue";
 
 const { dateTime, relativeTime, money, date } = useFormatters();
 
@@ -178,7 +179,7 @@ function vettingSeverity(s: string): "info" | "success" | "warn" | "danger" {
       {{ error }}
     </Message>
 
-    <div v-if="loading" class="bs-empty mt-3">Searching…</div>
+    <LoadingState v-if="loading" class="mt-3" label="Searching…" />
 
     <div
       v-else-if="searched && results.length === 0"

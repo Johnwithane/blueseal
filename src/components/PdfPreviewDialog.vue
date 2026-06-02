@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { onBeforeUnmount, ref, watch } from "vue";
 import Dialog from "primevue/dialog";
 import Button from "primevue/button";
 
@@ -15,9 +15,18 @@ const emit = defineEmits<{
   "update:visible": [v: boolean];
 }>();
 
-// Object URL for the current Blob. Recreated whenever the blob prop
-// changes, and revoked on close / unmount so we don't leak memory.
+// We rasterize the PDF to page images (pdf.js) and show those instead of an
+// <iframe src="blob:…pdf">. Inline PDF-in-iframe is unreliable on mobile
+// browsers (iOS Safari + many Android browsers render blank or force a
+// download), so the previous preview was invisible on phones. Page images
+// render identically everywhere. The Download / Open actions still hand over
+// the real vector PDF.
 const objectUrl = ref<string | null>(null);
+const pageImages = ref<string[]>([]);
+const rendering = ref(false);
+const renderError = ref(false);
+// Guards against an earlier (slower) render overwriting a newer blob's pages.
+let renderSeq = 0;
 
 function revoke() {
   if (objectUrl.value) {
@@ -26,12 +35,56 @@ function revoke() {
   }
 }
 
+async function renderBlob(blob: Blob): Promise<void> {
+  const seq = ++renderSeq;
+  rendering.value = true;
+  renderError.value = false;
+  pageImages.value = [];
+  try {
+    // Lazy-load pdf.js (and its worker) only on first preview so it stays off
+    // the main bundle.
+    const pdfjs = await import("pdfjs-dist");
+    const workerUrl = (await import("pdfjs-dist/build/pdf.worker.min.mjs?url")).default;
+    pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+
+    const data = await blob.arrayBuffer();
+    if (seq !== renderSeq) return;
+    const doc = await pdfjs.getDocument({ data }).promise;
+
+    // Crisp on retina without rasterizing absurdly large bitmaps.
+    const scale = Math.min(2, (window.devicePixelRatio || 1) * 1.5);
+    const imgs: string[] = [];
+    for (let i = 1; i <= doc.numPages; i++) {
+      if (seq !== renderSeq) return;
+      const page = await doc.getPage(i);
+      const viewport = page.getViewport({ scale });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) continue;
+      await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+      imgs.push(canvas.toDataURL("image/png"));
+    }
+    if (seq !== renderSeq) return;
+    pageImages.value = imgs;
+  } catch (e) {
+    console.warn("[PdfPreview] render failed", e);
+    if (seq === renderSeq) renderError.value = true;
+  } finally {
+    if (seq === renderSeq) rendering.value = false;
+  }
+}
+
 watch(
   () => props.blob,
   (b) => {
     revoke();
+    pageImages.value = [];
+    renderError.value = false;
     if (b) {
       objectUrl.value = URL.createObjectURL(b);
+      void renderBlob(b);
     }
   },
   { immediate: true },
@@ -40,18 +93,14 @@ watch(
 watch(
   () => props.visible,
   (v) => {
-    if (!v) revoke();
+    if (!v) {
+      revoke();
+      pageImages.value = [];
+    }
   },
 );
 
 onBeforeUnmount(revoke);
-
-// Append `#toolbar=1&view=FitH` so the embedded PDF viewer shows its
-// toolbar (download + print buttons) and fits the page width by
-// default — Chrome / Edge / Firefox respect these PDF Open Params.
-const iframeSrc = computed(() =>
-  objectUrl.value ? `${objectUrl.value}#toolbar=1&view=FitH` : "",
-);
 
 function close() {
   emit("update:visible", false);
@@ -85,12 +134,22 @@ function openInNewTab() {
     @update:visible="(v) => emit('update:visible', v)"
   >
     <div class="pdf-preview-body">
-      <iframe
-        v-if="objectUrl"
-        :src="iframeSrc"
-        class="pdf-iframe"
-        title="PDF preview"
-      ></iframe>
+      <div v-if="pageImages.length" class="pdf-pages">
+        <img
+          v-for="(src, i) in pageImages"
+          :key="i"
+          :src="src"
+          class="pdf-page"
+          :alt="`Page ${i + 1}`"
+        />
+      </div>
+      <div v-else-if="renderError" class="pdf-loading">
+        <i class="pi pi-file-pdf text-3xl text-[color:var(--bs-muted)]"></i>
+        <p class="mt-2 px-6 text-center text-sm text-[color:var(--bs-muted)]">
+          Couldn't show a preview here. Use <strong>Open</strong> or
+          <strong>Download</strong> below to view the PDF.
+        </p>
+      </div>
       <div v-else class="pdf-loading">
         <i class="pi pi-spin pi-spinner text-2xl text-[color:var(--bs-muted)]"></i>
         <p class="mt-2 text-sm text-[color:var(--bs-muted)]">Rendering PDF…</p>
@@ -98,11 +157,11 @@ function openInNewTab() {
     </div>
 
     <template #footer>
-      <div class="flex items-center gap-2 w-full">
+      <div class="flex flex-wrap items-center gap-2 w-full">
         <Button label="Close" text @click="close" />
         <span class="flex-1"></span>
         <Button
-          label="Open in new tab"
+          label="Open"
           icon="pi pi-external-link"
           outlined
           size="small"
@@ -148,8 +207,8 @@ function openInNewTab() {
 }
 @media (max-width: 639px) {
   .pdf-preview-dialog {
-    height: 100vh;
-    max-height: 100vh;
+    height: 100dvh;
+    max-height: 100dvh;
     border-radius: 0;
   }
 }
@@ -163,12 +222,25 @@ function openInNewTab() {
   background: #525659; /* matches Chrome's built-in PDF viewer grey */
 }
 
-.pdf-iframe {
+/* Scrollable stack of rasterized page images. */
+.pdf-pages {
   flex: 1;
+  min-height: 0;
   width: 100%;
-  height: 100%;
-  border: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+}
+.pdf-page {
+  width: 100%;
+  max-width: 760px;
+  height: auto;
   background: white;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
 }
 
 .pdf-loading {

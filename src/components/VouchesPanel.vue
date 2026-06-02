@@ -10,6 +10,7 @@ import Avatar from "primevue/avatar";
 import Message from "primevue/message";
 import { useAuthStore } from "@/stores/auth";
 import { useToast } from "@/composables/useToast";
+import { useConfirmAction } from "@/composables/useConfirmAction";
 import { humanizeError } from "@/utils/errors";
 import { tradeLabel } from "@/data/trades";
 import { useFormatters } from "@/composables/useFormatters";
@@ -30,6 +31,7 @@ import { searchVisibleTradiesByName } from "@/firebase/services/tradespeople";
 
 const auth = useAuthStore();
 const toast = useToast();
+const { confirmDestructive } = useConfirmAction();
 const { relativeTime } = useFormatters();
 
 const outgoing = ref<WithId<VouchDoc>[]>([]);
@@ -254,14 +256,18 @@ async function decline(v: WithId<VouchDoc>) {
   }
 }
 
-async function revoke(v: WithId<VouchDoc>) {
-  if (!confirm("Remove this recommendation?")) return;
-  try {
-    await revokeVouch(v.id);
-    toast.success("Recommendation removed");
-  } catch (e) {
-    toast.error(humanizeError(e));
-  }
+function revoke(v: WithId<VouchDoc>) {
+  confirmDestructive(
+    { message: "Remove this recommendation?", header: "Remove recommendation" },
+    async () => {
+      try {
+        await revokeVouch(v.id);
+        toast.success("Recommendation removed");
+      } catch (e) {
+        toast.error(humanizeError(e));
+      }
+    },
+  );
 }
 
 function avatarInitial(name: string): string {

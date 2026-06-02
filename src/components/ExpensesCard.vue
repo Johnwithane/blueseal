@@ -20,6 +20,7 @@ import type { ExpenseCategory, ExpenseDoc, WithId } from "@/firebase/interfaces"
 import { compressOrPassPdf } from "@/utils/image";
 import { useFormatters } from "@/composables/useFormatters";
 import { useToast } from "@/composables/useToast";
+import { useConfirmAction } from "@/composables/useConfirmAction";
 import { humanizeError } from "@/utils/errors";
 
 const props = defineProps<{
@@ -30,6 +31,7 @@ const props = defineProps<{
 
 const { date, money } = useFormatters();
 const toast = useToast();
+const { confirmDestructive } = useConfirmAction();
 
 const expenses = ref<WithId<ExpenseDoc>[]>([]);
 const loading = ref(true);
@@ -140,14 +142,22 @@ async function changeBilled(entry: WithId<ExpenseDoc>, dollars: number | null) {
   await patchField(entry, { billedAmount: cents });
 }
 
-async function remove(entry: WithId<ExpenseDoc>) {
-  if (!confirm("Delete this expense and its receipt?")) return;
-  try {
-    await deleteExpense(props.jobId, entry.id);
-    toast.success("Expense deleted");
-  } catch (e) {
-    toast.error("Couldn't delete", humanizeError(e));
-  }
+function remove(entry: WithId<ExpenseDoc>) {
+  confirmDestructive(
+    {
+      message: "Delete this expense and its receipt?",
+      header: "Delete expense",
+      acceptLabel: "Delete",
+    },
+    async () => {
+      try {
+        await deleteExpense(props.jobId, entry.id);
+        toast.success("Expense deleted");
+      } catch (e) {
+        toast.error("Couldn't delete", humanizeError(e));
+      }
+    },
+  );
 }
 
 async function viewReceipt(entry: WithId<ExpenseDoc>) {

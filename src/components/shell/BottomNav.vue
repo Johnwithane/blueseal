@@ -8,34 +8,32 @@ import ProfileMenu from "@/components/shell/ProfileMenu.vue";
 const { mobileItems, isActive } = useNavItems();
 const route = useRoute();
 
-// Split the mobile tabs in half so the Blue Seal brand logo can sit in the
-// center of the bar. The brand tab routes to "/" — without this there's no
-// way back to the marketing homepage from inside the app on mobile (the
-// side panel's brand link only exists on desktop).
-const splitIndex = computed(() => Math.ceil(mobileItems.value.length / 2));
-const firstHalf = computed(() => mobileItems.value.slice(0, splitIndex.value));
-const secondHalf = computed(() => mobileItems.value.slice(splitIndex.value));
+// Unified mobile bar layout, consistent across roles:
+//   [ destination ] [ destination ] [ LOGO ] [ ALERTS ] [ PROFILE ]
+// Alerts (notifications) and Profile always sit together on the right; the
+// role's primary destinations sit left of the centre logo. Each role exposes
+// exactly two mobile destinations (useNavItems), so the bar is always 5 cells.
+// Notifications is pulled out of the destination list and rendered in its
+// fixed right slot rather than flowing with the others.
+const leftItems = computed(() =>
+  mobileItems.value.filter((i) => i.key !== "notifications"),
+);
+// The brand logo routes to the homepage ("/" renders it for everyone).
 const isHomeActive = computed(() => route.path === "/");
 </script>
 
 <template>
   <nav class="bottom-nav" aria-label="Primary mobile">
-    <template v-for="item in firstHalf" :key="item.key">
-      <NotificationsButton
-        v-if="item.key === 'notifications'"
-        variant="tab"
-        :label="item.mobileLabel ?? item.label"
-      />
-      <RouterLink
-        v-else
-        :to="item.to"
-        class="bottom-tab"
-        :class="{ 'bottom-tab--active': isActive(item) }"
-      >
-        <i :class="['pi', item.icon, 'bottom-tab__icon']" aria-hidden="true"></i>
-        <span class="bottom-tab__label">{{ item.mobileLabel ?? item.label }}</span>
-      </RouterLink>
-    </template>
+    <RouterLink
+      v-for="item in leftItems"
+      :key="item.key"
+      :to="item.to"
+      class="bottom-tab"
+      :class="{ 'bottom-tab--active': isActive(item) }"
+    >
+      <i :class="['pi', item.icon, 'bottom-tab__icon']" aria-hidden="true"></i>
+      <span class="bottom-tab__label">{{ item.mobileLabel ?? item.label }}</span>
+    </RouterLink>
 
     <RouterLink
       to="/"
@@ -50,23 +48,7 @@ const isHomeActive = computed(() => route.path === "/");
       />
     </RouterLink>
 
-    <template v-for="item in secondHalf" :key="item.key">
-      <NotificationsButton
-        v-if="item.key === 'notifications'"
-        variant="tab"
-        :label="item.mobileLabel ?? item.label"
-      />
-      <RouterLink
-        v-else
-        :to="item.to"
-        class="bottom-tab"
-        :class="{ 'bottom-tab--active': isActive(item) }"
-      >
-        <i :class="['pi', item.icon, 'bottom-tab__icon']" aria-hidden="true"></i>
-        <span class="bottom-tab__label">{{ item.mobileLabel ?? item.label }}</span>
-      </RouterLink>
-    </template>
-
+    <NotificationsButton variant="tab" label="Alerts" />
     <ProfileMenu variant="tab" />
   </nav>
 </template>

@@ -9,6 +9,7 @@ import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 import { archiveJob, unarchiveJob } from "@/firebase/services/jobs";
 import { STATUS_LABEL, STATUS_SEVERITY } from "@/utils/jobStatus";
+import { tradeLabel } from "@/data/trades";
 import JobCounterparty from "@/components/JobCounterparty.vue";
 
 const props = withDefaults(
@@ -77,17 +78,19 @@ const SECTION_LABEL: Record<JobStatus, { client: string; tradesperson: string }>
   cancelled: { client: "Cancelled", tradesperson: "Cancelled" },
 };
 
+// Per-status accent. Values live in main.css (--bs-status-*) so the kanban
+// dots and these list section colours share one source of truth.
 const SECTION_COLOR: Record<JobStatus, string> = {
-  requested: "#0ea5e9",
-  accepted: "#a0d6f1",
-  quoted: "#f59e0b",
-  awaiting_upfront_payment: "#d97706",
-  in_progress: "#0d47a1",
-  awaiting_client_approval: "#f97316",
-  awaiting_payment: "#7c3aed",
-  complete: "#10b981",
-  reviewed: "#6b7280",
-  cancelled: "#ef4444",
+  requested: "var(--bs-status-requested)",
+  accepted: "var(--bs-status-accepted)",
+  quoted: "var(--bs-status-quoted)",
+  awaiting_upfront_payment: "var(--bs-status-awaiting_upfront_payment)",
+  in_progress: "var(--bs-status-in_progress)",
+  awaiting_client_approval: "var(--bs-status-awaiting_client_approval)",
+  awaiting_payment: "var(--bs-status-awaiting_payment)",
+  complete: "var(--bs-status-complete)",
+  reviewed: "var(--bs-status-reviewed)",
+  cancelled: "var(--bs-status-cancelled)",
 };
 
 const filter = ref<"all" | JobStatus>("all");
@@ -268,7 +271,7 @@ function counterpartyPhoto(job: WithId<JobDoc>): string | null | undefined {
               <div class="min-w-0 flex-1">
                 <div class="line-clamp-1 text-sm font-medium">{{ job.title }}</div>
                 <div class="mt-0.5 text-xs text-[color:var(--bs-muted)]">
-                  {{ job.trade }}
+                  {{ tradeLabel(job.trade) }}
                 </div>
               </div>
               <div class="flex shrink-0 items-center gap-1.5">

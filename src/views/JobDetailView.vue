@@ -9,7 +9,7 @@ import Avatar from "primevue/avatar";
 import {
   CANCELLABLE_STATUSES,
   cancelJob,
-  getJob,
+  subscribeJob,
   getJobPrivateNotes,
   markJobPaid,
   markUpfrontFeePaid,
@@ -53,6 +53,7 @@ import ScheduleTab from "@/features/jobDetail/ScheduleTab.vue";
 import InvoiceTab from "@/features/jobDetail/InvoiceTab.vue";
 import JobChatButton from "@/features/jobDetail/JobChatButton.vue";
 import JobChatOverlay from "@/features/jobDetail/JobChatOverlay.vue";
+import LoadingState from "@/components/LoadingState.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -60,6 +61,14 @@ const auth = useAuthStore();
 const toast = useToast();
 const confirmDialog = useConfirm();
 const { dateTime, money } = useFormatters();
+
+// Back affordance — the bottom nav is hidden on the job page (mobileCompact),
+// so this is the primary way out. Prefer real history; fall back to the
+// dashboard for deep-links / fresh loads where there's nothing to go back to.
+function goBack() {
+  if (window.history.state?.back) router.back();
+  else router.push({ name: "Dashboard" });
+}
 
 function formatScheduled(
   start: { toDate(): Date } | null | undefined,
@@ -93,6 +102,9 @@ const reviewPair = ref<WithId<ReviewPairDoc> | null>(null);
 // active — without that, the user has to hunt through tabs to find
 // the review prompt after a job is paid.
 let unsubscribeReviewPair: (() => void) | null = null;
+// Live subscription to the job doc itself. Owned here so status changes from
+// the counterparty propagate to the banners + sticky CTA without a refresh.
+let unsubscribeJob: (() => void) | null = null;
 const intakeFields = ref<IntakeField[]>([]);
 const invoiceId = ref<string | null>(null);
 // True only for invoices sent through the Stripe Connect pipeline (i.e.
@@ -367,37 +379,45 @@ async function load() {
       }
     }
     const id = route.params.id as string;
-    job.value = await getJob(id);
-    if (!job.value) return;
-    const [remote, invoice] = await Promise.all([
-      getIntakeSchema(job.value.trade),
-      getInvoiceByJobId(id),
-    ]);
-    intakeFields.value = remote?.fields ?? SEED_INTAKE_SCHEMAS[job.value.trade] ?? [];
-    invoiceId.value = invoice?.id ?? null;
-    invoicePayable.value = !!invoice?.payment?.clientSecret;
-
-    scheduledStart.value = job.value.scheduledStart?.toDate() ?? null;
-    scheduledEnd.value = job.value.scheduledEnd?.toDate() ?? null;
-    // Private notes live in a tradie-only subdoc; the client can't read it
-    // (rules deny it), so only fetch when the viewer is the tradesperson.
-    privateNotes.value = isTradie.value ? await getJobPrivateNotes(job.value.id) : "";
-    intakeDraft.value = { ...(job.value.intakeFormData ?? {}) };
-
-    // Clients see a "Your tradesperson" panel — fetch the tradesperson doc
-    // so we can render their photo + badges. Read can fail gracefully when
-    // the tradie has gone invisible (suspended/de-listed): rules require
-    // isVisible:true for non-owners. The panel falls back to a generic
-    // "your tradesperson" display when tradieInfo stays null.
-    if (isClient.value && job.value) {
-      try {
-        tradieInfo.value = await getTradesperson(job.value.tradespersonId);
-      } catch {
-        tradieInfo.value = null;
-      }
-    } else {
-      tradieInfo.value = null;
-    }
+    // The job doc rides a live subscription so status changes from the other
+    // party (e.g. client accepts a quote) update the banners + sticky CTA
+    // without a manual refresh. The heavier dependent reads (intake schema,
+    // invoice, private notes, tradie info) and the editable drafts run ONCE
+    // on the first snapshot — re-running them on every snapshot would both
+    // waste reads and clobber in-progress edits (intake draft, notes).
+    let firstSnapshot = true;
+    unsubscribeJob?.();
+    unsubscribeJob = subscribeJob(
+      id,
+      (j) => {
+        job.value = j;
+        if (!firstSnapshot) return;
+        firstSnapshot = false;
+        if (!j) {
+          loading.value = false;
+          return;
+        }
+        void loadJobDependents(j)
+          .catch((e) => {
+            loadError.value = humanizeError(e);
+            job.value = null;
+          })
+          .finally(() => {
+            loading.value = false;
+            void maybeAutoUpdateLog();
+          });
+      },
+      (e) => {
+        console.warn(
+          "[JobDetailView] subscription failed",
+          { jobId: id, signedInAs: auth.fbUser?.uid ?? null },
+          e,
+        );
+        loadError.value = humanizeError(e);
+        job.value = null;
+        loading.value = false;
+      },
+    );
   } catch (e) {
     console.warn(
       "[JobDetailView] read failed",
@@ -406,10 +426,42 @@ async function load() {
     );
     loadError.value = humanizeError(e);
     job.value = null;
-  } finally {
     loading.value = false;
   }
-  void maybeAutoUpdateLog();
+}
+
+// One-time dependent loads keyed off the resolved job. Kept separate from the
+// live job subscription so it runs exactly once per mount (see load()).
+async function loadJobDependents(j: WithId<JobDoc>) {
+  const [remote, invoice] = await Promise.all([
+    getIntakeSchema(j.trade),
+    getInvoiceByJobId(j.id),
+  ]);
+  intakeFields.value = remote?.fields ?? SEED_INTAKE_SCHEMAS[j.trade] ?? [];
+  invoiceId.value = invoice?.id ?? null;
+  invoicePayable.value = !!invoice?.payment?.clientSecret;
+
+  scheduledStart.value = j.scheduledStart?.toDate() ?? null;
+  scheduledEnd.value = j.scheduledEnd?.toDate() ?? null;
+  // Private notes live in a tradie-only subdoc; the client can't read it
+  // (rules deny it), so only fetch when the viewer is the tradesperson.
+  privateNotes.value = isTradie.value ? await getJobPrivateNotes(j.id) : "";
+  intakeDraft.value = { ...(j.intakeFormData ?? {}) };
+
+  // Clients see a "Your tradesperson" panel — fetch the tradesperson doc
+  // so we can render their photo + badges. Read can fail gracefully when
+  // the tradie has gone invisible (suspended/de-listed): rules require
+  // isVisible:true for non-owners. The panel falls back to a generic
+  // "your tradesperson" display when tradieInfo stays null.
+  if (isClient.value) {
+    try {
+      tradieInfo.value = await getTradesperson(j.tradespersonId);
+    } catch {
+      tradieInfo.value = null;
+    }
+  } else {
+    tradieInfo.value = null;
+  }
 }
 
 onMounted(load);
@@ -437,6 +489,8 @@ watch(
 onUnmounted(() => {
   unsubscribeReviewPair?.();
   unsubscribeReviewPair = null;
+  unsubscribeJob?.();
+  unsubscribeJob = null;
 });
 
 // Banner state — only derived once both job + pair are loaded. We
@@ -703,10 +757,25 @@ function onReturnToApplicants() {
   <section
     class="bs-container py-3 sm:py-6"
     :class="{ 'job-detail--cta-on': showStickyCTA }"
+    style="--job-topbar-h: 2.75rem"
   >
-    <RouterLink to="/dashboard" class="text-xs text-[color:var(--bs-muted)]">← Dashboard</RouterLink>
+    <!-- Sticky Back bar. The JobTabBar below docks directly beneath it (its
+         sticky top is set to this bar's height via --job-topbar-h). -->
+    <div class="job-detail__topbar">
+      <button type="button" class="job-detail__back" @click="goBack">
+        <i class="pi pi-arrow-left" aria-hidden="true"></i>
+        <span>Back</span>
+      </button>
+      <!-- Status on the right of the top bar; the title gets full width below. -->
+      <Tag
+        v-if="job"
+        :value="STATUS_LABEL[job.status]"
+        :severity="STATUS_SEVERITY[job.status]"
+        class="shrink-0"
+      />
+    </div>
 
-    <div v-if="loading" class="bs-empty mt-4">Loading…</div>
+    <LoadingState v-if="loading" class="mt-4" />
     <div v-else-if="loadError" class="bs-empty mt-4">
       <i class="pi pi-exclamation-circle text-3xl mb-2 block text-amber-600"></i>
       <p class="font-medium">We couldn't open this job.</p>
@@ -725,18 +794,11 @@ function onReturnToApplicants() {
       </RouterLink>
     </div>
     <template v-else-if="job">
-      <header class="flex items-start justify-between gap-2 mt-1 mb-3">
-        <div class="min-w-0 flex-1">
-          <h1 class="text-lg font-bold break-words leading-tight">{{ job.title }}</h1>
-          <div class="text-[11px] text-[color:var(--bs-muted)] mt-0.5 truncate">
-            {{ tradeLabel(job.trade) }} · {{ job.address.line1 }}, {{ job.address.city }}
-          </div>
+      <header class="mt-1 mb-3">
+        <h1 class="text-xl font-bold break-words leading-tight">{{ job.title }}</h1>
+        <div class="text-[11px] text-[color:var(--bs-muted)] mt-0.5 truncate">
+          {{ tradeLabel(job.trade) }} · {{ job.address.line1 }}, {{ job.address.city }}
         </div>
-        <Tag
-          :value="STATUS_LABEL[job.status]"
-          :severity="STATUS_SEVERITY[job.status]"
-          class="shrink-0"
-        />
       </header>
 
       <!-- Mutual-review banner: top-of-page surface for the review loop.
@@ -1169,3 +1231,48 @@ function onReturnToApplicants() {
     </Dialog>
   </section>
 </template>
+
+<style scoped>
+/* Sticky top bar holding the Back action (the bottom nav is hidden on this
+   route, so Back is the primary way out). Full-bleed white so content scrolls
+   cleanly underneath it; the JobTabBar docks flush beneath via --job-topbar-h. */
+.job-detail__topbar {
+  position: sticky;
+  top: 0;
+  z-index: 21;
+  height: var(--job-topbar-h, 2.75rem);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  background: white;
+  margin-inline: -1rem;
+  padding-inline: 0.75rem;
+}
+.job-detail__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.625rem;
+  border: 0;
+  background: transparent;
+  border-radius: 0.5rem;
+  color: var(--bs-blue);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.job-detail__back:hover {
+  background: var(--bs-surface-alt);
+}
+
+/* When the fixed status CTA bar is shown, reserve its height at the bottom of
+   the page so the last row of content (and the tab content) isn't trapped
+   underneath it. Bar ≈ large button (3rem) + 0.75rem top padding + bottom
+   safe-area padding; reserve a touch more. AppShell zeroes its own bottom-nav
+   reserve on this mobileCompact route, so this is the only bottom reservation
+   and doesn't double up. */
+.job-detail--cta-on {
+  padding-bottom: calc(80px + env(safe-area-inset-bottom));
+}
+</style>

@@ -6,6 +6,7 @@ import SelectButton from "primevue/selectbutton";
 import Message from "primevue/message";
 import Dialog from "primevue/dialog";
 import DatePicker from "primevue/datepicker";
+import TabBar from "@/components/TabBar.vue";
 import { useAuthStore } from "@/stores/auth";
 import { getTradesperson, setWeeklyAvailability } from "@/firebase/services/tradespeople";
 import { subscribeTradieJobs } from "@/firebase/services/jobs";
@@ -55,6 +56,10 @@ const viewOptions: { label: string; value: DashboardView; icon: string }[] = [
   { label: "Calendar", value: "calendar", icon: "pi-calendar" },
   { label: "Applied", value: "applied", icon: "pi-send" },
 ];
+// Mapped to the shared TabBar's {key,label,icon} shape.
+const viewTabs = computed(() =>
+  viewOptions.map((o) => ({ key: o.value, label: o.label, icon: o.icon })),
+);
 
 const viewHint = computed(() => {
   if (view.value === "board") return "Pipeline overview. Tap a card to open the job.";
@@ -276,23 +281,12 @@ const awaitingVerificationMessage = computed(() => {
          component is named/aria-labelled for job sections. -->
     <div class="bs-tradie-tab-bar">
       <div class="bs-container">
-        <div role="tablist" class="tab-row" aria-label="Dashboard views">
-          <button
-            v-for="opt in viewOptions"
-            :key="opt.value"
-            type="button"
-            role="tab"
-            :aria-selected="view === opt.value"
-            :aria-label="opt.label"
-            :tabindex="view === opt.value ? 0 : -1"
-            class="tab"
-            :class="{ 'tab--active': view === opt.value }"
-            @click="view = opt.value"
-          >
-            <i :class="['pi', opt.icon, 'icon']" aria-hidden="true"></i>
-            <span class="label">{{ opt.label }}</span>
-          </button>
-        </div>
+        <TabBar
+          :tabs="viewTabs"
+          :model-value="view"
+          aria-label="Dashboard views"
+          @update:model-value="view = $event as DashboardView"
+        />
       </div>
     </div>
 
@@ -481,71 +475,12 @@ const awaitingVerificationMessage = computed(() => {
 </template>
 
 <style scoped>
+/* Sticky positioning wrapper; the tab row itself is the shared <TabBar>. */
 .bs-tradie-tab-bar {
   position: sticky;
   top: 0;
   z-index: 20;
   background: white;
   border-bottom: 1px solid var(--bs-border);
-}
-
-.tab-row {
-  display: flex;
-  gap: 0;
-}
-
-.tab {
-  flex: 1 1 0;
-  min-width: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.75rem 0.5rem;
-  background: transparent;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  color: var(--bs-muted);
-  font-size: 0.875rem;
-  font-weight: 500;
-  letter-spacing: -0.01em;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: color 120ms ease, border-color 120ms ease;
-  min-height: 44px;
-}
-
-.tab:hover {
-  color: var(--bs-text);
-}
-
-.tab--active {
-  color: var(--bs-blue);
-  border-bottom-color: var(--bs-blue);
-  font-weight: 600;
-}
-
-.tab:focus-visible {
-  outline: 2px solid var(--bs-blue);
-  outline-offset: -2px;
-}
-
-.icon {
-  font-size: 1.05rem;
-  line-height: 1;
-}
-
-/* Mobile: icons only — four tabs are too tight at 375px with labels. The
-   label stays in the DOM via aria-label on the button for screen readers. */
-.label {
-  display: none;
-}
-@media (min-width: 640px) {
-  .label {
-    display: inline;
-  }
-  .icon {
-    font-size: 0.95rem;
-  }
 }
 </style>

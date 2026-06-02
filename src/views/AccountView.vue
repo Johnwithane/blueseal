@@ -46,6 +46,7 @@ import TradieDocsManager from "@/components/TradieDocsManager.vue";
 import VouchesPanel from "@/components/VouchesPanel.vue";
 import PayoutsPanel from "@/components/PayoutsPanel.vue";
 import LocationPicker, { type LocationValue } from "@/components/LocationPicker.vue";
+import TabBar from "@/components/TabBar.vue";
 
 const auth = useAuthStore();
 const route = useRoute();
@@ -744,7 +745,7 @@ async function grantAdminAllRoles() {
 </script>
 
 <template>
-  <section class="bs-container max-w-2xl py-6">
+  <section class="bs-container max-w-2xl pb-6 pt-3">
     <!-- Tradesperson quick-actions. Lives above the tab bar so the public
          profile is always one tap away regardless of which tab is open —
          View + Share are the two things tradies most often need from this
@@ -782,22 +783,13 @@ async function grantAdminAllRoles() {
          is reflected in ?tab= so reloads and deep links stay put. The tab
          row sticks to the top of the AppShell content column (no AppHeader
          above it anymore), so the offset is 0. -->
-    <div role="tablist" aria-label="Account sections" class="account-tab-row">
-      <button
-        v-for="t in visibleTabs"
-        :key="t.key"
-        type="button"
-        role="tab"
-        :aria-selected="activeTab === t.key"
-        :aria-label="t.label"
-        :tabindex="activeTab === t.key ? 0 : -1"
-        class="account-tab"
-        :class="{ 'account-tab--active': activeTab === t.key }"
-        @click="setTab(t.key)"
-      >
-        <i :class="['pi', t.icon, 'account-tab-icon']" aria-hidden="true"></i>
-        <span class="account-tab-label">{{ t.label }}</span>
-      </button>
+    <div class="account-tab-bar">
+      <TabBar
+        :tabs="visibleTabs"
+        :model-value="activeTab"
+        aria-label="Account sections"
+        @update:model-value="setTab($event as TabKey)"
+      />
     </div>
 
     <Message v-if="error" severity="error" :closable="false" class="mb-4">{{ error }}</Message>
@@ -1452,7 +1444,7 @@ async function grantAdminAllRoles() {
         </p>
 
         <div class="mt-4 rounded-lg border border-[color:var(--bs-border)] p-4">
-          <div class="flex items-start justify-between gap-3">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h3 class="font-semibold">Download your data</h3>
               <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
@@ -1482,7 +1474,7 @@ async function grantAdminAllRoles() {
         </div>
 
         <div class="mt-4 rounded-lg border border-red-200 bg-red-50/30 p-4">
-          <div class="flex items-start justify-between gap-3">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h3 class="font-semibold text-red-700">Delete my account</h3>
               <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
@@ -1568,82 +1560,17 @@ async function grantAdminAllRoles() {
 </template>
 
 <style scoped>
-/* Tab bar — mirrors src/features/jobDetail/JobTabBar.vue. AppShell renders
-   the page title above this view but doesn't sit between us and the
-   viewport edge on scroll, so the sticky offset is 0. */
-.account-tab-row {
+/* Sticky positioning wrapper; the tab row itself is the shared <TabBar>.
+   AppShell renders the page title above this view but doesn't sit between us
+   and the viewport edge on scroll, so the sticky offset is 0. */
+.account-tab-bar {
   position: sticky;
   top: 0;
   z-index: 10;
-  display: flex;
-  gap: 0;
   margin-inline: -1rem;
   margin-bottom: 1.5rem;
   padding-inline: 1rem;
   background: white;
   border-bottom: 1px solid var(--bs-border);
-  overflow-x: auto;
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-.account-tab-row::-webkit-scrollbar {
-  display: none;
-}
-
-.account-tab {
-  position: relative;
-  flex: 1 1 0;
-  min-width: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.75rem 0.5rem;
-  background: transparent;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  color: var(--bs-muted);
-  font-size: 0.875rem;
-  font-weight: 500;
-  letter-spacing: -0.01em;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: color 120ms ease, border-color 120ms ease;
-  min-height: 44px;
-}
-
-.account-tab:hover {
-  color: var(--bs-text);
-}
-
-.account-tab--active {
-  color: var(--bs-blue);
-  border-bottom-color: var(--bs-blue);
-  font-weight: 600;
-}
-
-.account-tab:focus-visible {
-  outline: 2px solid var(--bs-blue);
-  outline-offset: -2px;
-}
-
-.account-tab-icon {
-  font-size: 1.05rem;
-  line-height: 1;
-}
-
-/* Mobile: icons only (label still in DOM for screen readers via aria-label
-   on the button itself). */
-.account-tab-label {
-  display: none;
-}
-
-@media (min-width: 640px) {
-  .account-tab-label {
-    display: inline;
-  }
-  .account-tab-icon {
-    font-size: 0.95rem;
-  }
 }
 </style>

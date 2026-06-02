@@ -37,6 +37,9 @@ import { useToast } from "@/composables/useToast";
 import { tradeLabel } from "@/data/trades";
 import { useFormatters } from "@/composables/useFormatters";
 import { registryForIssuingBody } from "@/utils/certRegistries";
+import { VERIFICATION_SEVERITY, VERIFICATION_LABEL } from "@/utils/verificationStatus";
+import LoadingState from "@/components/LoadingState.vue";
+import RejectReasonDialog from "@/components/RejectReasonDialog.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -226,11 +229,6 @@ async function submitReject() {
   router.replace({ name: "AdminVetting" });
 }
 
-const certSeverity = {
-  pending: "warn" as const,
-  approved: "success" as const,
-  rejected: "danger" as const,
-};
 
 async function copyCertNumber(certNumber: string) {
   try {
@@ -261,7 +259,7 @@ const approveBlockerHint = computed(() => {
   <section class="bs-container py-6">
     <RouterLink to="/admin/vetting" class="text-xs text-[color:var(--bs-muted)]">← Queue</RouterLink>
 
-    <div v-if="loading" class="bs-empty mt-4">Loading…</div>
+    <LoadingState v-if="loading" class="mt-4" />
     <template v-else-if="tradie">
       <header class="mt-2 mb-4">
         <div class="text-sm text-[color:var(--bs-muted)]">
@@ -288,7 +286,7 @@ const approveBlockerHint = computed(() => {
           <article v-for="c in certs" :key="c.id" class="border-t py-3 first:border-t-0 first:pt-0">
             <div class="flex items-center justify-between">
               <div class="font-medium">{{ tradeLabel(c.trade) }}</div>
-              <Tag :value="c.status" :severity="certSeverity[c.status]" />
+              <Tag :value="VERIFICATION_LABEL[c.status]" :severity="VERIFICATION_SEVERITY[c.status]" />
             </div>
             <div class="text-xs text-[color:var(--bs-muted)]">
               {{ c.issuingBody }} • #{{ c.certNumber }}
@@ -359,7 +357,7 @@ const approveBlockerHint = computed(() => {
           <template v-else>
             <div class="flex items-center justify-between mb-2">
               <div class="font-medium">{{ idDoc.documentType }}</div>
-              <Tag :value="idDoc.status" :severity="certSeverity[idDoc.status]" />
+              <Tag :value="VERIFICATION_LABEL[idDoc.status]" :severity="VERIFICATION_SEVERITY[idDoc.status]" />
             </div>
             <div v-if="!idFileUrl" class="bs-empty">Loading document…</div>
             <Button
@@ -389,8 +387,8 @@ const approveBlockerHint = computed(() => {
             <h2 class="font-semibold">Insurance verification</h2>
             <Tag
               v-if="insurance"
-              :value="insurance.status"
-              :severity="certSeverity[insurance.status]"
+              :value="VERIFICATION_LABEL[insurance.status]"
+              :severity="VERIFICATION_SEVERITY[insurance.status]"
             />
           </div>
           <div v-if="!insurance" class="bs-empty">Not submitted (optional).</div>
@@ -438,7 +436,7 @@ const approveBlockerHint = computed(() => {
         <section class="bs-card p-4">
           <div class="flex items-center justify-between mb-2">
             <h2 class="font-semibold">WSIB / workers' comp</h2>
-            <Tag v-if="wsib" :value="wsib.status" :severity="certSeverity[wsib.status]" />
+            <Tag v-if="wsib" :value="VERIFICATION_LABEL[wsib.status]" :severity="VERIFICATION_SEVERITY[wsib.status]" />
           </div>
           <div v-if="!wsib" class="bs-empty">Not submitted (optional).</div>
           <template v-else>
@@ -483,7 +481,7 @@ const approveBlockerHint = computed(() => {
       </div>
 
       <!-- Decision bar -->
-      <footer class="bs-card p-4 mt-6 flex flex-wrap gap-2 items-center justify-between">
+      <footer class="bs-card p-4 mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div class="text-sm text-[color:var(--bs-muted)]">
           <template v-if="canApproveApplication">
             One click approves every pending cert + ID and sets their profile <strong>live</strong>.
@@ -492,14 +490,15 @@ const approveBlockerHint = computed(() => {
             {{ approveBlockerHint }}
           </template>
         </div>
-        <div class="flex gap-2">
-          <Button label="Request info" icon="pi pi-question-circle" outlined @click="showRequestInfo = true; notesInput = ''" />
-          <Button label="Reject" icon="pi pi-ban" severity="danger" outlined @click="showReject = true; notesInput = ''" />
+        <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+          <Button label="Request info" icon="pi pi-question-circle" outlined class="w-full sm:w-auto" @click="showRequestInfo = true; notesInput = ''" />
+          <Button label="Reject" icon="pi pi-ban" severity="danger" outlined class="w-full sm:w-auto" @click="showReject = true; notesInput = ''" />
           <Button
             label="Approve everything"
             icon="pi pi-check"
             severity="success"
             :disabled="!canApproveApplication"
+            class="col-span-2 w-full sm:col-span-1 sm:w-auto"
             @click="approveAll"
           />
         </div>
@@ -522,29 +521,26 @@ const approveBlockerHint = computed(() => {
       </template>
     </Dialog>
 
-    <Dialog v-model:visible="showRejectCert" modal header="Reject certification" :style="{ width: '32rem', maxWidth: '92vw' }">
-      <Textarea v-model="rejectReason" rows="4" class="w-full" placeholder="Reason for rejection" maxlength="2000" />
-      <template #footer>
-        <Button label="Cancel" text @click="showRejectCert = false" />
-        <Button label="Reject" icon="pi pi-ban" severity="danger" :disabled="!rejectReason.trim()" @click="confirmRejectCert" />
-      </template>
-    </Dialog>
+    <RejectReasonDialog
+      v-model:visible="showRejectCert"
+      v-model:reason="rejectReason"
+      header="Reject certification"
+      @confirm="confirmRejectCert"
+    />
 
-    <Dialog v-model:visible="showRejectId" modal header="Reject ID" :style="{ width: '32rem', maxWidth: '92vw' }">
-      <Textarea v-model="rejectReason" rows="4" class="w-full" placeholder="Reason for rejection" maxlength="2000" />
-      <template #footer>
-        <Button label="Cancel" text @click="showRejectId = false" />
-        <Button label="Reject" icon="pi pi-ban" severity="danger" :disabled="!rejectReason.trim()" @click="confirmRejectId" />
-      </template>
-    </Dialog>
+    <RejectReasonDialog
+      v-model:visible="showRejectId"
+      v-model:reason="rejectReason"
+      header="Reject ID"
+      @confirm="confirmRejectId"
+    />
 
-    <Dialog v-model:visible="showRejectInsurance" modal header="Reject insurance" :style="{ width: '32rem', maxWidth: '92vw' }">
-      <Textarea v-model="rejectReason" rows="4" class="w-full" placeholder="Reason for rejection" maxlength="2000" />
-      <template #footer>
-        <Button label="Cancel" text @click="showRejectInsurance = false" />
-        <Button label="Reject" icon="pi pi-ban" severity="danger" :disabled="!rejectReason.trim()" @click="confirmRejectInsurance" />
-      </template>
-    </Dialog>
+    <RejectReasonDialog
+      v-model:visible="showRejectInsurance"
+      v-model:reason="rejectReason"
+      header="Reject insurance"
+      @confirm="confirmRejectInsurance"
+    />
 
     <Dialog
       :visible="viewer !== null"
@@ -581,12 +577,11 @@ const approveBlockerHint = computed(() => {
       </template>
     </Dialog>
 
-    <Dialog v-model:visible="showRejectWsib" modal header="Reject WSIB" :style="{ width: '32rem', maxWidth: '92vw' }">
-      <Textarea v-model="rejectReason" rows="4" class="w-full" placeholder="Reason for rejection" maxlength="2000" />
-      <template #footer>
-        <Button label="Cancel" text @click="showRejectWsib = false" />
-        <Button label="Reject" icon="pi pi-ban" severity="danger" :disabled="!rejectReason.trim()" @click="confirmRejectWsib" />
-      </template>
-    </Dialog>
+    <RejectReasonDialog
+      v-model:visible="showRejectWsib"
+      v-model:reason="rejectReason"
+      header="Reject WSIB"
+      @confirm="confirmRejectWsib"
+    />
   </section>
 </template>

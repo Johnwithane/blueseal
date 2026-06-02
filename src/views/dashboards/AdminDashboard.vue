@@ -29,6 +29,7 @@ import { humanizeError } from "@/utils/errors";
 import type { TradespersonDoc, WithId } from "@/firebase/interfaces";
 import { useFormatters } from "@/composables";
 import { tradeLabel } from "@/data/trades";
+import LoadingState from "@/components/LoadingState.vue";
 
 const pending = ref<WithId<TradespersonDoc>[]>([]);
 const loading = ref(true);
@@ -178,32 +179,21 @@ onMounted(async () => {
 
 <template>
   <section class="bs-container py-8">
-    <div class="flex items-center justify-between mb-6">
-      <div>
-        <p class="text-[color:var(--bs-muted)]">
-          {{ pending.length }} application{{ pending.length === 1 ? "" : "s" }} awaiting review.
-        </p>
-      </div>
-      <div class="flex flex-wrap gap-2">
-        <RouterLink to="/admin/users">
-          <Button label="User search" icon="pi pi-user-edit" outlined />
-        </RouterLink>
-        <RouterLink to="/admin/site-content">
-          <Button label="Site content" icon="pi pi-pencil" outlined />
-        </RouterLink>
-        <RouterLink to="/admin/disputes">
-          <Button
-            label="Disputes"
-            icon="pi pi-exclamation-triangle"
-            outlined
-            severity="warn"
-          />
-        </RouterLink>
-        <RouterLink to="/admin/vetting">
-          <Button label="Open vetting queue" icon="pi pi-arrow-right" />
-        </RouterLink>
-      </div>
-    </div>
+    <!-- Queue links sit on the title row (top-right). Vetting isn't here — it's
+         the admin's bottom-nav tab. Users is kept (compact) so it stays
+         reachable on mobile, where it isn't in the bottom bar. The pending
+         count lives in the "Pending vetting" stat card below, so no subtitle. -->
+    <Teleport defer to="#app-shell-header-action">
+      <RouterLink to="/admin/users">
+        <Button label="Users" icon="pi pi-user-edit" outlined size="small" />
+      </RouterLink>
+      <RouterLink to="/admin/site-content">
+        <Button label="Site content" icon="pi pi-pencil" outlined size="small" />
+      </RouterLink>
+      <RouterLink to="/admin/disputes">
+        <Button label="Disputes" icon="pi pi-exclamation-triangle" outlined severity="warn" size="small" />
+      </RouterLink>
+    </Teleport>
 
     <div class="grid sm:grid-cols-3 gap-4 mb-6">
       <div class="bs-card p-5">
@@ -345,7 +335,7 @@ onMounted(async () => {
       </div>
     </div>
 
-    <div v-if="loading" class="bs-empty">Loading…</div>
+    <LoadingState v-if="loading" />
     <div v-else-if="pending.length === 0" class="bs-empty">
       <i class="pi pi-check-circle text-3xl mb-2 block text-green-600"></i>
       <p>Queue clear. Nice work.</p>

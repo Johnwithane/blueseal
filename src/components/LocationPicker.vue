@@ -25,12 +25,18 @@ const props = withDefaults(
     country?: string;
     // Optional Airbnb-style result pins drawn on the same map.
     markers?: AvatarMarkerData[];
+    // Map gesture mode. "cooperative" (default) lets a one-finger drag scroll
+    // the page when the picker is inline mid-form. "greedy" lets scroll/drag
+    // zoom & pan the map directly — use it when the picker is inside a modal,
+    // where there's no page scroll to trap.
+    gesture?: "greedy" | "cooperative" | "auto" | "none";
   }>(),
   {
     minRadius: 1,
     maxRadius: 200,
     country: "",
     markers: () => [],
+    gesture: "cooperative",
   },
 );
 
@@ -55,6 +61,47 @@ let marker: google.maps.Marker | null = null;
 let circle: google.maps.Circle | null = null;
 let autocomplete: google.maps.places.Autocomplete | null = null;
 let markerLayer: AvatarMarkerLayer | null = null;
+let geocoder: google.maps.Geocoder | null = null;
+// Guards against out-of-order reverse-geocode results when the point changes
+// quickly (drag, repeated clicks) — only the latest lookup applies its label.
+let citySeq = 0;
+
+// Address-component types to try, most-specific city first.
+const CITY_TYPES = [
+  "locality",
+  "postal_town",
+  "sublocality",
+  "administrative_area_level_3",
+  "administrative_area_level_2",
+];
+
+// Reverse-geocode the chosen point to its nearest city and use that as the
+// label (the user wants the city name, not a raw address / "Selected area").
+async function resolveCityLabel(lat: number, lng: number): Promise<void> {
+  const seq = ++citySeq;
+  try {
+    if (!geocoder) geocoder = new google.maps.Geocoder();
+    const { results } = await geocoder.geocode({ location: { lat, lng } });
+    if (seq !== citySeq || !results?.length) return; // a newer point won
+    let city: string | null = null;
+    for (const type of CITY_TYPES) {
+      for (const r of results) {
+        const comp = r.address_components?.find((c) => c.types.includes(type));
+        if (comp) {
+          city = comp.long_name;
+          break;
+        }
+      }
+      if (city) break;
+    }
+    if (city) {
+      label.value = city;
+      emitChange(lat, lng, city);
+    }
+  } catch {
+    /* geocoding failed (quota / network) — keep whatever label we have */
+  }
+}
 
 function emitChange(lat: number | null, lng: number | null, newLabel?: string) {
   emit("update:modelValue", {
@@ -88,6 +135,7 @@ function setLocation(lat: number, lng: number, newLabel?: string) {
       circle?.setCenter({ lat: p.lat(), lng: p.lng() });
       fitToCircle();
       emitChange(p.lat(), p.lng(), "");
+      void resolveCityLabel(p.lat(), p.lng());
     });
   } else {
     marker.setPosition(pos);
@@ -112,6 +160,8 @@ function setLocation(lat: number, lng: number, newLabel?: string) {
   if (newLabel !== undefined) label.value = newLabel;
   fitToCircle();
   emitChange(lat, lng, newLabel);
+  // Always resolve the point to its nearest city for the label.
+  void resolveCityLabel(lat, lng);
 }
 
 function useMyLocation() {
@@ -167,10 +217,10 @@ onMounted(async () => {
     streetViewControl: false,
     fullscreenControl: false,
     clickableIcons: false,
-    // Plain scroll wheel / one-finger drag zooms directly — no "use ctrl +
-    // scroll" gate. The map sits in a short fixed-height box, not a long
-    // scrolling column, so hijacking the wheel here doesn't trap the page.
-    gestureHandling: "greedy",
+    // Gesture mode is caller-controlled (see the `gesture` prop). In the
+    // search popup it's "greedy" so scroll/drag zoom & pan the map directly;
+    // inline forms use "cooperative" so a one-finger drag scrolls the page.
+    gestureHandling: props.gesture,
   });
 
   // Airbnb-style result pins layer. Tapping a pin bubbles the id up so the

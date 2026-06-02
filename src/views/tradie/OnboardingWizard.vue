@@ -674,7 +674,7 @@ async function withdrawForEdits() {
         <div class="text-xs uppercase tracking-wide text-[color:var(--bs-blue)] font-semibold">
           Onboarding
         </div>
-        <h1 class="text-xs sm:text-2xl font-bold leading-tight whitespace-nowrap">Build your verified profile</h1>
+        <h1 class="text-lg sm:text-2xl font-bold leading-tight">Build your verified profile</h1>
       </div>
       <div class="flex items-center gap-2 sm:gap-3">
         <span
@@ -718,22 +718,25 @@ async function withdrawForEdits() {
       class="bs-status-banner bs-status-banner--info mb-4"
       role="status"
     >
-      <div class="flex items-start gap-3">
-        <i class="pi pi-clock text-xl" aria-hidden="true"></i>
-        <div class="flex-1">
-          <div class="font-semibold">Application under review</div>
-          <p class="text-sm mt-1 mb-0">
-            Your application is in the queue<span v-if="submittedAt">
-              — submitted {{ relativeTime(submittedAt) }}</span>. Our team typically
-            reviews within 48 hours. Your form is locked while you wait so changes
-            don't pull you out of the queue accidentally.
-          </p>
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-start">
+        <div class="flex flex-1 items-start gap-3 min-w-0">
+          <i class="pi pi-clock text-xl" aria-hidden="true"></i>
+          <div class="min-w-0">
+            <div class="font-semibold">Application under review</div>
+            <p class="text-sm mt-1 mb-0">
+              Your application is in the queue<span v-if="submittedAt">
+                — submitted {{ relativeTime(submittedAt) }}</span>. Our team typically
+              reviews within 48 hours. Your form is locked while you wait so changes
+              don't pull you out of the queue accidentally.
+            </p>
+          </div>
         </div>
         <Button
           label="Withdraw to edit"
           icon="pi pi-pencil"
           severity="secondary"
           outlined
+          class="shrink-0 self-start"
           @click="withdrawConfirmOpen = true"
         />
       </div>
