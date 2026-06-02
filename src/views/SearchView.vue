@@ -1,12 +1,17 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { ref, watch, onMounted } from "vue";
 import { useRoute } from "vue-router";
 import Button from "primevue/button";
 import Select from "primevue/select";
 import Rating from "primevue/rating";
 import Message from "primevue/message";
-import { searchTradespeople, type AvailabilityFilter } from "@/firebase/services/tradespeople";
+import {
+  searchTradespeople,
+  getTradespersonContact,
+  type AvailabilityFilter,
+} from "@/firebase/services/tradespeople";
 import { searchProspects } from "@/firebase/services/prospects";
+import { useAuthStore } from "@/stores/auth";
 import { TRADES } from "@/data/trades";
 import TradieCard from "@/components/TradieCard.vue";
 import ProspectCard from "@/components/ProspectCard.vue";
@@ -16,6 +21,7 @@ import LocationPicker, {
 import type { ProspectDoc, TradespersonDoc, WithId } from "@/firebase/interfaces";
 
 const route = useRoute();
+const auth = useAuthStore();
 
 function tradeFromQuery(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -25,11 +31,35 @@ function tradeFromQuery(value: unknown): string | null {
 const trade = ref<string | null>(tradeFromQuery(route.query.trade));
 const minRating = ref(0);
 const availability = ref<AvailabilityFilter>("any");
-const location = ref<LocationValue>({
-  lat: null,
-  lng: null,
-  radiusKm: 50,
-});
+
+// Sticky location persistence. Bare camelCase key matches the existing
+// localStorage draft convention in PostJobView.vue.
+const SEARCH_LOCATION_KEY = "searchLocation";
+
+// Restore the last-used search location so a returning user never has to
+// re-pick where they're searching. Returns null when nothing valid is stored.
+function loadStoredLocation(): LocationValue | null {
+  try {
+    const raw = localStorage.getItem(SEARCH_LOCATION_KEY);
+    if (!raw) return null;
+    const v = JSON.parse(raw) as Partial<LocationValue>;
+    if (typeof v.lat === "number" && typeof v.lng === "number") {
+      return {
+        lat: v.lat,
+        lng: v.lng,
+        radiusKm: typeof v.radiusKm === "number" ? v.radiusKm : 50,
+        label: typeof v.label === "string" ? v.label : undefined,
+      };
+    }
+  } catch {
+    /* corrupt JSON or storage unavailable — fall through to a blank location */
+  }
+  return null;
+}
+
+const location = ref<LocationValue>(
+  loadStoredLocation() ?? { lat: null, lng: null, radiusKm: 50 },
+);
 const results = ref<Array<WithId<TradespersonDoc> & { distanceKm: number }>>([]);
 // Seeded, unclaimed listings shown below the verified results ("Not yet
 // verified"). (Exposing submitted-but-unapproved REAL tradespeople here is
@@ -82,12 +112,15 @@ async function search() {
   }
 }
 
-// Auto-search the first time a location lands
+// Auto-search whenever a location lands — including a location restored from
+// localStorage or seeded from the account on mount (immediate: true), so the
+// page renders results straight away instead of an empty shell.
 watch(
   () => [location.value.lat, location.value.lng] as const,
   ([lat, lng]) => {
     if (lat != null && lng != null && results.value.length === 0) search();
   },
+  { immediate: true },
 );
 
 // Keep dropdown in sync if the URL query changes (e.g. tapping a different trade tile)
@@ -97,6 +130,90 @@ watch(
     trade.value = tradeFromQuery(q);
   },
 );
+
+// --- Sticky search location -----------------------------------------------
+// Marketplace-style: never make the user re-pick where they're searching.
+// Persist every resolved location, and on first visit (nothing stored) seed a
+// sensible starting point so a signed-in user doesn't face a blank slate.
+
+function hasLocation(l: LocationValue): boolean {
+  return l.lat != null && l.lng != null;
+}
+
+// Mirror the location to localStorage on every change so it sticks across
+// visits. Guarded so a half-set value never overwrites a good stored one.
+watch(
+  location,
+  (l) => {
+    if (!hasLocation(l)) return;
+    try {
+      localStorage.setItem(SEARCH_LOCATION_KEY, JSON.stringify(l));
+    } catch {
+      /* quota / private mode — non-fatal, we just don't persist this time */
+    }
+  },
+  { deep: true },
+);
+
+// Seed from a signed-in tradesperson's saved service location (exact point +
+// label live in the owner-only private contact subdoc). Returns true if it set
+// a location. Clients (no tradie profile) and permission errors fall through.
+async function seedFromAccount(uid: string): Promise<boolean> {
+  try {
+    const contact = await getTradespersonContact(uid);
+    const point = contact?.location;
+    if (!point) return false;
+    location.value = {
+      lat: point.latitude,
+      lng: point.longitude,
+      radiusKm: location.value.radiusKm,
+      label: contact?.primaryAddressText || undefined,
+    };
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Use the device location ONLY when permission was already granted — so a
+// first-time / logged-out visitor never gets an unprompted browser GPS dialog.
+// The explicit "Use my location" button in LocationPicker covers the opt-in.
+async function seedFromGeolocationIfGranted(): Promise<void> {
+  if (!navigator.geolocation || !navigator.permissions) return;
+  try {
+    const status = await navigator.permissions.query({
+      name: "geolocation" as PermissionName,
+    });
+    if (status.state !== "granted") return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        location.value = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          radiusKm: location.value.radiusKm,
+          label: "Current location",
+        };
+      },
+      () => {
+        /* permission revoked between query and read — ignore */
+      },
+    );
+  } catch {
+    /* Permissions API doesn't support geolocation here — skip silently */
+  }
+}
+
+onMounted(async () => {
+  // localStorage already hydrated `location` at setup and the immediate
+  // auto-search watcher has it covered — nothing left to resolve.
+  if (hasLocation(location.value)) return;
+  // Public route: wait for auth to settle before reading the signed-in user.
+  await auth.init();
+  const uid = auth.fbUser?.uid;
+  if (uid && (await seedFromAccount(uid))) return;
+  // Last resort: device location, but only if already permitted.
+  await seedFromGeolocationIfGranted();
+});
 </script>
 
 <template>
