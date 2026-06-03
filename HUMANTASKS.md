@@ -6,6 +6,24 @@ Tasks are grouped by the phase that introduced them so you can see why each one 
 
 ---
 
+## Help Center + support portal (added 2026-06-03)
+
+The Help Center (`/help`), FAQ (`/faq`), and homepage feature showcase shipped fully working. Content is hardcoded in `src/data/help.ts` (no CMS — edit it in code; see CLAUDE.md → "Help Center & FAQ upkeep"). Two follow-ups need your input:
+
+### [ ] Confirm the support email address
+
+- **Why:** The Help Center contact form composes a prefilled email to a support inbox. The address is currently a **placeholder** (`SUPPORT_EMAIL = "support@blueseal.ca"` in `src/data/support.ts`).
+- **What:** Set up the real support inbox and update `SUPPORT_EMAIL` to match. No deploy needed beyond shipping hosting.
+- **Verify:** Open `/help` → scroll to **Contact support** → fill the form → **Send message** opens your mail client addressed to the right inbox with subject/body prefilled.
+
+### [ ] (Optional) Upgrade the contact form to a database-backed ticket queue
+
+- **Why:** You chose a real in-app contact form. The current version uses `mailto:` (zero backend) so it could ship from the web session, which can't run `firebase deploy`. A proper ticket form (so admins triage requests in-app, like the disputes queue) needs a new `supportTickets` Firestore collection **and its security rules deployed before the code commits** (CLAUDE.md rule #8).
+- **What (when you want it):** I'll add the `supportTickets` interface + Zod schema + service + rules (allow signed-in create, admin read/update) + a rules test + an admin queue view + swap the form's submit from `mailto:` to a service call. Then: `firebase deploy --only firestore:rules` → confirm `✔` → commit. Needs a machine with Firebase deploy access (or grant this environment access).
+- **Verify:** Submitting the form writes a `supportTickets` doc; it shows in the admin queue; a non-admin can't read others' tickets.
+
+---
+
 ## Seeded prospects — outreach + magic-link claim (added 2026-06-01)
 
 The seeded-prospect directory + claim flow ships safe-by-default: leads are

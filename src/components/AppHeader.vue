@@ -157,6 +157,11 @@ const items = computed(() => {
   list.push(
     { separator: true },
     {
+      label: "Help & support",
+      icon: "pi pi-question-circle",
+      command: () => router.push({ name: "HelpCenter" }),
+    },
+    {
       label: "Sign out",
       icon: "pi pi-sign-out",
       command: async () => {

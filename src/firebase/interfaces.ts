@@ -1364,6 +1364,43 @@ export interface HomeContentDoc {
 }
 
 // ---------------------------------------------------------------------------
+// Help Center / FAQ content types.
+//
+// The content itself is hardcoded in src/data/help.ts (no CMS, no Firestore
+// doc) — editing it is a deliberate code change. See CLAUDE.md: every major
+// feature should be checked against the Help Center / FAQ. These types are
+// shared by the data module, the search index, and the Help views.
+// ---------------------------------------------------------------------------
+
+/** Who an article/FAQ is most relevant to. "all" shows it to everyone. */
+export type HelpAudience = "all" | "client" | "tradesperson";
+
+export interface HelpCategory {
+  id: string; // stable slug, referenced by article.categoryId
+  title: string;
+  description: string;
+  icon: string; // PrimeIcons class, e.g. "pi pi-bolt"
+}
+
+export interface HelpArticle {
+  slug: string; // unique URL id (/help/:slug)
+  categoryId: string;
+  title: string;
+  excerpt: string; // one-line summary for cards + search snippets
+  body: string; // Markdown (rendered with `marked`)
+  keywords: string[]; // extra search terms not necessarily in the body
+  audience: HelpAudience;
+  popular?: boolean; // surfaced on the Help Center landing
+}
+
+export interface FaqItem {
+  question: string;
+  answer: string; // Markdown
+  categoryId: string;
+  audience: HelpAudience;
+}
+
+// ---------------------------------------------------------------------------
 // notifications/{notifId}
 // In-app inbox per user. Writes are Cloud-Function-only (rules block client
 // create + delete); the recipient can only flip `read` (and timestamp it).

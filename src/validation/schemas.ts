@@ -336,3 +336,71 @@ export const aiChatInputSchema = z
     { message: "scope=job requires a jobId", path: ["jobId"] },
   );
 export type AiChatInput = z.infer<typeof aiChatInputSchema>;
+
+// ---------------------------------------------------------------------------
+// Help Center content (siteContent/help). Validated at the boundary before an
+// admin write so the public Help Center never has to defend against malformed
+// data. The audience enum gates who an article/FAQ is shown to.
+// ---------------------------------------------------------------------------
+const helpAudienceEnum = z.enum(["all", "client", "tradesperson"]);
+const helpSlugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+export const helpCategorySchema = z.object({
+  id: z.string().trim().regex(helpSlugRegex, "Use a lowercase slug (e.g. getting-started)").max(60),
+  title: z.string().trim().min(2).max(80),
+  description: z.string().trim().min(2).max(240),
+  icon: z.string().trim().min(2).max(60),
+});
+
+export const helpArticleSchema = z.object({
+  slug: z.string().trim().regex(helpSlugRegex, "Use a lowercase slug (e.g. find-a-tradesperson)").max(80),
+  categoryId: z.string().trim().min(1).max(60),
+  title: z.string().trim().min(2).max(120),
+  excerpt: z.string().trim().min(2).max(240),
+  body: z.string().trim().min(2).max(20000),
+  keywords: z.array(z.string().trim().min(1).max(40)).max(40),
+  audience: helpAudienceEnum,
+  popular: z.boolean().optional(),
+});
+
+export const helpFaqSchema = z.object({
+  question: z.string().trim().min(2).max(200),
+  answer: z.string().trim().min(2).max(2000),
+  categoryId: z.string().trim().min(1).max(60),
+  audience: helpAudienceEnum,
+});
+
+export const helpContentSchema = z
+  .object({
+    categories: z.array(helpCategorySchema).max(40),
+    articles: z.array(helpArticleSchema).max(400),
+    faqs: z.array(helpFaqSchema).max(400),
+  })
+  .superRefine((data, ctx) => {
+    // Slugs must be unique (they're the article URL) and every article/FAQ
+    // must point at a real category — a dangling categoryId would render an
+    // orphaned, unreachable article.
+    const catIds = new Set(data.categories.map((c) => c.id));
+    const seenCat = new Set<string>();
+    data.categories.forEach((c, i) => {
+      if (seenCat.has(c.id)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Duplicate category id "${c.id}"`, path: ["categories", i, "id"] });
+      }
+      seenCat.add(c.id);
+    });
+    const seenSlug = new Set<string>();
+    data.articles.forEach((a, i) => {
+      if (seenSlug.has(a.slug)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Duplicate article slug "${a.slug}"`, path: ["articles", i, "slug"] });
+      }
+      seenSlug.add(a.slug);
+      if (!catIds.has(a.categoryId)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Article "${a.slug}" references unknown category "${a.categoryId}"`, path: ["articles", i, "categoryId"] });
+      }
+    });
+    data.faqs.forEach((f, i) => {
+      if (!catIds.has(f.categoryId)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: `FAQ #${i + 1} references unknown category "${f.categoryId}"`, path: ["faqs", i, "categoryId"] });
+      }
+    });
+  });
