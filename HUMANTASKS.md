@@ -10,11 +10,9 @@ Tasks are grouped by the phase that introduced them so you can see why each one 
 
 The full SEO foundation shipped in code: per-route metadata + Open Graph/Twitter cards + JSON-LD (`@unhead/vue` via `useSeo`), build-time prerendering of all public content pages (so crawlers and LLMs that don't run JavaScript get real HTML — `scripts/prerender.ts`), a generated `sitemap.xml` + `llms.txt`, 57 per-trade landing pages (`/trades`, `/trades/:trade`), a tightened `robots.txt`, and a fix for the PWA install icons (the manifest pointed at non-existent `android-chrome-*` files). Everything deploys with a normal `firebase deploy --only hosting`. A few things only you can do:
 
-### [ ] Create a proper 1200×630 Open Graph share image
+### [x] Open Graph share image — accepted: using the brand logo for now (2026-06-03)
 
-- **Why:** Social/LLM link previews look best with a 1200×630 landscape card. We currently fall back to the square 2048×2048 brand mark (`public/icons/blueseal_logo_LARGE.png`), which works but isn't ideal.
-- **What:** Design a 1200×630 PNG (logo + tagline "Trusted trades. Sealed with proof."), save it to `public/og/default.png`, then update `DEFAULT_OG_IMAGE` in `src/seo/site.ts` to point at it. Optionally add per-trade cards later.
-- **Verify:** After deploy, paste a page URL into the [Facebook Sharing Debugger](https://developers.facebook.com/tools/debug/) and [X Card Validator](https://cards-dev.twitter.com/validator) — the new image should appear.
+- Decision: ship with the square 2048×2048 brand mark (`public/icons/blueseal_logo_LARGE.png`) as the default share image. It's valid and renders fine; a dedicated 1200×630 landscape card can be added later by saving it to `public/og/default.png` and pointing `DEFAULT_OG_IMAGE` (`src/seo/site.ts`) at it.
 
 ### [ ] Verify the site in Google Search Console + Bing, submit the sitemap
 
