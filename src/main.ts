@@ -1,5 +1,6 @@
 import { createApp } from "vue";
 import { createPinia } from "pinia";
+import { createHead } from "@unhead/vue/client";
 import PrimeVue from "primevue/config";
 import ToastService from "primevue/toastservice";
 import ConfirmationService from "primevue/confirmationservice";
@@ -14,6 +15,7 @@ import { useAuthStore } from "./stores/auth";
 const app = createApp(App);
 
 app.use(createPinia());
+app.use(createHead());
 app.use(router);
 app.use(PrimeVue, {
   theme: {

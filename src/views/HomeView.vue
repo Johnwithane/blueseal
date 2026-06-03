@@ -7,8 +7,12 @@ import { useAuthStore } from "@/stores/auth";
 import { getHomeContent } from "@/firebase/services/siteContent";
 import type { Testimonial } from "@/firebase/interfaces";
 import { HELP_CONTENT_SEED } from "@/data/help";
+import { useSeo } from "@/composables/useSeo";
+import { homeSeo } from "@/seo/content";
 
 const auth = useAuthStore();
+
+useSeo(homeSeo());
 
 // Hero CTAs branch on the user's active view-mode so a tradesperson sees
 // "go work" actions and everyone else sees "go hire" actions.

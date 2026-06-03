@@ -32,9 +32,11 @@ export default defineConfig({
         background_color: "#ffffff",
         display: "standalone",
         start_url: "/",
+        // These must point at files that exist in public/ — the previous
+        // android-chrome-* paths 404'd, so the install prompt had no icon.
         icons: [
-          { src: "/android-chrome-192x192.png", sizes: "192x192", type: "image/png" },
-          { src: "/android-chrome-512x512.png", sizes: "512x512", type: "image/png" },
+          { src: "/android-icon-192x192.png", sizes: "192x192", type: "image/png" },
+          { src: "/icons/blueseal_logo.png", sizes: "512x512", type: "image/png" },
         ],
       },
       workbox: {

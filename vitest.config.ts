@@ -14,7 +14,8 @@ export default defineConfig({
     // emulator via the dedicated `npm run test:rules` script + its own
     // config. They'd crash here (no emulator) and they don't belong in
     // the unit-test sweep anyway.
-    exclude: ["node_modules/**", "dist/**", "tests/rules/**", "functions/**"],
+    // e2e/ holds Playwright specs — they use Playwright's runner, not vitest.
+    exclude: ["node_modules/**", "dist/**", "tests/rules/**", "functions/**", "e2e/**"],
     // Stub the VITE_FIREBASE_* env vars so modules that import
     // @/firebase/config can initialize at module-load time without
     // pulling real credentials into the test runner. The values are

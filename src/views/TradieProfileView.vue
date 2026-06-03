@@ -20,6 +20,9 @@ import type {
   WithId,
 } from "@/firebase/interfaces";
 import { tradeLabel } from "@/data/trades";
+import { useSeo } from "@/composables/useSeo";
+import { tradiePersonLd } from "@/seo/jsonld";
+import { clampDescription } from "@/seo/markdown";
 import { useFormatters } from "@/composables/useFormatters";
 import { useAuthStore } from "@/stores/auth";
 import { useToast } from "@/composables/useToast";
@@ -121,6 +124,41 @@ async function share() {
 const isOwnProfile = computed(
   () => !!auth.fbUser && auth.fbUser.uid === (route.params.uid as string),
 );
+
+// SEO: index only publicly-visible, verified tradesperson profiles. Owner
+// previews (not yet vetted), seeded prospects, not-found and the loading state
+// all stay noindex so we never surface a half-built or unverified profile —
+// or a real person's name on an empty page — in search/LLM results.
+useSeo(() => {
+  const t = tradie.value;
+  if (!t || !t.isVisible) {
+    return { title: "Tradesperson profile", noindex: true };
+  }
+  const primaryTrade = tradeLabel(t.trades[0] ?? "");
+  const name = displayName.value || primaryTrade;
+  const path = `/tradies/${t.id}`;
+  const description = clampDescription(
+    `${name} is a verified ${t.trades.map(tradeLabel).join(", ")} on Blue Seal — ` +
+      `ID-checked, certified and reviewed. ${t.bio ?? ""}`.replace(/\s+/g, " ").trim(),
+  );
+  return {
+    title: `${name} — ${primaryTrade}`,
+    description,
+    path,
+    type: "profile",
+    image: t.photoURL || undefined,
+    jsonLd: [
+      tradiePersonLd({
+        name,
+        path,
+        trade: primaryTrade,
+        image: t.photoURL || undefined,
+        ratingValue: t.ratingCount ? t.ratingAvg : undefined,
+        reviewCount: t.ratingCount,
+      }),
+    ],
+  };
+});
 
 function vouchInitial(name: string): string {
   return (name || "?").trim().slice(0, 1).toUpperCase();

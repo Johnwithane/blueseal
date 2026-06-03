@@ -20,6 +20,10 @@ ui-debug.log
 *.sln
 *.sw?
 coverage/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
 *.log
 functions/lib/
 functions/node_modules/

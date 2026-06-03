@@ -10,6 +10,9 @@ import { useAuthStore } from "@/stores/auth";
 import { signInSchema } from "@/validation/schemas";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
+import { useSeo } from "@/composables/useSeo";
+
+useSeo({ title: "Sign in", noindex: true });
 
 const auth = useAuthStore();
 const router = useRouter();

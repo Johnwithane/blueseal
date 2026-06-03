@@ -64,7 +64,7 @@ The MVP runs end-to-end as soon as you:
 
    Or click "Enable" in Cloud Console → APIs & Services. Without this, AI callables return a friendly error pointing back here.
 
-6. **PWA icons.** The install icons are the `android-chrome-192x192.png` / `android-chrome-512x512.png` already in `public/`. The header/brand mark is `public/icons/blueseal_logo.png`. Replace either set to rebrand.
+6. **PWA icons.** The install icons (declared in `vite.config.ts` → manifest) are `public/android-icon-192x192.png` (192) and `public/icons/blueseal_logo.png` (512). The header/brand mark is also `public/icons/blueseal_logo.png`. Replace either set to rebrand — keep the manifest paths pointing at files that actually exist in `public/`.
 
 7. **Custom domain.** In Firebase Hosting console → Add custom domain → `blueseal.app`. Update CSP `connect-src` in `firebase.json` if you add new external services.
 

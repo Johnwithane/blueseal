@@ -16,6 +16,7 @@ const year = new Date().getFullYear();
       </div>
       <nav class="flex flex-wrap gap-4">
         <router-link to="/search">Find a tradesperson</router-link>
+        <router-link to="/trades">Browse trades</router-link>
         <router-link to="/sign-up?as=tradesperson">I'm a tradesperson</router-link>
         <router-link to="/help">Help &amp; support</router-link>
       </nav>
