@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { TRADES } from "@/data/trades";
+import { SUPPORT_TOPICS } from "@/data/support";
 
 const tradeKeys = TRADES.map((t) => t.key) as [string, ...string[]];
 const tradeKeyEnum = z.enum(tradeKeys);
@@ -404,3 +405,19 @@ export const helpContentSchema = z
       }
     });
   });
+
+// ---------------------------------------------------------------------------
+// Support ticket (supportTickets/{id}) — the Help Center contact form input.
+// Validated client-side before the create; the Firestore rules enforce the
+// same shape server-side (defence in depth). Topic is constrained to the
+// known list so the admin queue stays tidy.
+// ---------------------------------------------------------------------------
+const supportTopicEnum = z.enum(SUPPORT_TOPICS as unknown as [string, ...string[]]);
+
+export const supportTicketSchema = z.object({
+  name: z.string().trim().min(2, "Enter your name").max(80),
+  email: z.string().trim().toLowerCase().email("Enter a valid email").max(200),
+  topic: supportTopicEnum,
+  message: z.string().trim().min(5, "Add a short message").max(2000),
+});
+export type SupportTicketInput = z.infer<typeof supportTicketSchema>;

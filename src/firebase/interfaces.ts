@@ -1401,6 +1401,28 @@ export interface FaqItem {
 }
 
 // ---------------------------------------------------------------------------
+// supportTickets/{ticketId} — messages from the Help Center contact form.
+// A signed-in user creates one (status starts "open", fields validated by
+// rules); admins read + triage them from /admin/support and change the
+// status. Signed-out visitors fall back to the email (mailto) flow instead,
+// so this collection never takes unauthenticated writes. No Cloud Function —
+// it's a direct client create under tight rules.
+// ---------------------------------------------------------------------------
+export type SupportTicketStatus = "open" | "in_progress" | "resolved" | "closed";
+
+export interface SupportTicketDoc {
+  userId: string; // uid of the signed-in submitter
+  name: string;
+  email: string; // reply-to (prefilled from the account, editable)
+  topic: string; // one of SUPPORT_TOPICS (src/data/support.ts)
+  message: string;
+  status: SupportTicketStatus;
+  handledBy: string | null; // admin uid who last changed the status
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+// ---------------------------------------------------------------------------
 // notifications/{notifId}
 // In-app inbox per user. Writes are Cloud-Function-only (rules block client
 // create + delete); the recipient can only flip `read` (and timestamp it).

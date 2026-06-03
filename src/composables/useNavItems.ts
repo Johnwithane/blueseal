@@ -181,6 +181,14 @@ export function useNavItems(): {
           matches: prefix("/admin/users"),
         },
         {
+          key: "support",
+          label: "Support",
+          icon: "pi-question-circle",
+          to: "/admin/support",
+          mobile: false,
+          matches: prefix("/admin/support"),
+        },
+        {
           key: "site-content",
           label: "Site content",
           icon: "pi-file-edit",

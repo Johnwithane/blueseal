@@ -1,11 +1,11 @@
 <script setup lang="ts">
 // Help Center contact form.
 //
-// INTERIM IMPLEMENTATION: submitting composes a prefilled email to
-// SUPPORT_EMAIL (mailto) — fully functional with no backend. The planned
-// Firestore-backed version (write a supportTickets doc that admins triage)
-// is deferred until its security rules can be deployed; swapping `submit()`
-// to a service call is the only change needed then. See HUMANTASKS.md.
+// Signed-in users file a real support ticket (supportTickets/{id}) that admins
+// triage at /admin/support. Signed-out visitors — or any case where the ticket
+// write is refused (e.g. the rules aren't deployed yet) — fall back to a
+// prefilled email (mailto) so the form always works. SUPPORT_EMAIL is a
+// placeholder; confirm the real inbox (see HUMANTASKS.md).
 import { computed, ref } from "vue";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
@@ -13,6 +13,8 @@ import Textarea from "primevue/textarea";
 import Select from "primevue/select";
 import { useAuthStore } from "@/stores/auth";
 import { useToast } from "@/composables/useToast";
+import { createSupportTicket } from "@/firebase/services/support";
+import { supportTicketSchema } from "@/validation/schemas";
 import { SUPPORT_EMAIL, SUPPORT_TOPICS } from "@/data/support";
 
 const auth = useAuthStore();
@@ -22,16 +24,16 @@ const name = ref(auth.user?.displayName ?? "");
 const email = ref(auth.user?.email ?? "");
 const topic = ref<string>(SUPPORT_TOPICS[0]);
 const message = ref("");
+const sending = ref(false);
+const sent = ref(false);
 
 const canSubmit = computed(
   () => name.value.trim().length > 1 && email.value.trim().length > 3 && message.value.trim().length > 4,
 );
 
-function submit() {
-  if (!canSubmit.value) {
-    toast.warn("Almost there", "Add your name, email, and a short message.");
-    return;
-  }
+// Open the user's mail client with everything prefilled. Used for signed-out
+// visitors and as the fallback when a ticket write is refused.
+function openMailto() {
   const subject = `[Support] ${topic.value}`;
   const body = [
     `Name: ${name.value.trim()}`,
@@ -40,11 +42,49 @@ function submit() {
     "",
     message.value.trim(),
   ].join("\n");
-  // Open the user's mail client with everything prefilled.
   window.location.href = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(
     subject,
   )}&body=${encodeURIComponent(body)}`;
-  toast.success("Opening your email", "We've prefilled a message to our support team.");
+}
+
+async function submit() {
+  if (!canSubmit.value) {
+    toast.warn("Almost there", "Add your name, email, and a short message.");
+    return;
+  }
+
+  const parsed = supportTicketSchema.safeParse({
+    name: name.value,
+    email: email.value,
+    topic: topic.value,
+    message: message.value,
+  });
+  if (!parsed.success) {
+    toast.warn("Check your details", parsed.error.issues[0]?.message ?? "Please review the form.");
+    return;
+  }
+
+  // Signed-out visitors don't have a ticket path — go straight to email.
+  if (!auth.isAuthenticated) {
+    openMailto();
+    toast.success("Opening your email", "We've prefilled a message to our support team.");
+    return;
+  }
+
+  sending.value = true;
+  try {
+    await createSupportTicket(parsed.data);
+    sent.value = true;
+    toast.success("Message sent", "Our team will get back to you by email. Thanks!");
+    message.value = "";
+  } catch {
+    // Ticket write failed (e.g. rules not deployed yet) — degrade to email so
+    // the user is never stuck.
+    openMailto();
+    toast.info("Opening your email instead", "We've prefilled a message to our support team.");
+  } finally {
+    sending.value = false;
+  }
 }
 </script>
 
@@ -87,7 +127,13 @@ function submit() {
       <p class="text-xs text-[color:var(--bs-muted)]">
         We'll reply by email to the address above.
       </p>
-      <Button type="submit" label="Send message" icon="pi pi-send" :disabled="!canSubmit" />
+      <Button
+        type="submit"
+        :label="sent ? 'Sent — send another?' : 'Send message'"
+        :icon="sent ? 'pi pi-check' : 'pi pi-send'"
+        :loading="sending"
+        :disabled="!canSubmit"
+      />
     </div>
   </form>
 </template>

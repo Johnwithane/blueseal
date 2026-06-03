@@ -8,19 +8,20 @@ Tasks are grouped by the phase that introduced them so you can see why each one 
 
 ## Help Center + support portal (added 2026-06-03)
 
-The Help Center (`/help`), FAQ (`/faq`), and homepage feature showcase shipped fully working. Content is hardcoded in `src/data/help.ts` (no CMS — edit it in code; see CLAUDE.md → "Help Center & FAQ upkeep"). Two follow-ups need your input:
+The Help Center (`/help`), FAQ (`/faq`), and homepage feature showcase shipped fully working. Content is hardcoded in `src/data/help.ts` (no CMS — edit it in code; see CLAUDE.md → "Help Center & FAQ upkeep"). The contact form now files real support tickets that admins triage at `/admin/support`. Two follow-ups need you:
+
+### [ ] ⚠️ Deploy the `supportTickets` Firestore rules (REQUIRED before the ticket form works in prod)
+
+- **Why:** The Help Center contact form writes a `supportTickets` doc for signed-in users, and `/admin/support` reads/triages them. The new security rules for that collection are committed in `firestore.rules` but **were not deployed from the web session (it can't run `firebase deploy`)** — so per CLAUDE.md rule #8 they must be deployed before this ships to prod.
+- **Safe by design:** until the rules are live, the contact form **automatically falls back to the email (mailto) flow** on a permission error, so nothing is user-visibly broken in the meantime — you just won't see tickets in `/admin/support` yet.
+- **What:** `firebase deploy --only firestore:rules` → confirm `✔ Deploy complete!`. (Rules-only; no functions/indexes/storage changed.)
+- **Verify:** Signed in, open `/help` → **Contact support** → send a message → it appears in `/admin/support`; change its status; a non-admin can't read tickets. The rules tests already cover all of this (`tests/rules/supportTickets.test.ts`, green locally).
 
 ### [ ] Confirm the support email address
 
-- **Why:** The Help Center contact form composes a prefilled email to a support inbox. The address is currently a **placeholder** (`SUPPORT_EMAIL = "support@blueseal.ca"` in `src/data/support.ts`).
+- **Why:** Signed-out visitors (and the fallback path) compose a prefilled email to a support inbox. The address is currently a **placeholder** (`SUPPORT_EMAIL = "support@blueseal.ca"` in `src/data/support.ts`). The admin "Reply" button also emails the ticket's sender.
 - **What:** Set up the real support inbox and update `SUPPORT_EMAIL` to match. No deploy needed beyond shipping hosting.
-- **Verify:** Open `/help` → scroll to **Contact support** → fill the form → **Send message** opens your mail client addressed to the right inbox with subject/body prefilled.
-
-### [ ] (Optional) Upgrade the contact form to a database-backed ticket queue
-
-- **Why:** You chose a real in-app contact form. The current version uses `mailto:` (zero backend) so it could ship from the web session, which can't run `firebase deploy`. A proper ticket form (so admins triage requests in-app, like the disputes queue) needs a new `supportTickets` Firestore collection **and its security rules deployed before the code commits** (CLAUDE.md rule #8).
-- **What (when you want it):** I'll add the `supportTickets` interface + Zod schema + service + rules (allow signed-in create, admin read/update) + a rules test + an admin queue view + swap the form's submit from `mailto:` to a service call. Then: `firebase deploy --only firestore:rules` → confirm `✔` → commit. Needs a machine with Firebase deploy access (or grant this environment access).
-- **Verify:** Submitting the form writes a `supportTickets` doc; it shows in the admin queue; a non-admin can't read others' tickets.
+- **Verify:** Signed out, open `/help` → **Contact support** → **Send message** opens your mail client addressed to the right inbox with subject/body prefilled.
 
 ---
 
