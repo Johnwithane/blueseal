@@ -23,6 +23,8 @@ import LocationPicker, {
 } from "@/components/LocationPicker.vue";
 import type { ProspectDoc, TradespersonDoc, WithId } from "@/firebase/interfaces";
 import LoadingState from "@/components/LoadingState.vue";
+import { useSeo } from "@/composables/useSeo";
+import { searchSeo, tradePageSeo } from "@/seo/content";
 
 const route = useRoute();
 const router = useRouter();
@@ -36,6 +38,11 @@ function tradeFromQuery(value: unknown): string | null {
 const trade = ref<string | null>(tradeFromQuery(route.query.trade));
 const minRating = ref(0);
 const availability = ref<AvailabilityFilter>("any");
+
+// SEO: when a trade filter is active, point the canonical at the clean
+// /trades/:trade landing page so filtered search variants consolidate there
+// instead of competing as duplicate ?trade= URLs.
+useSeo(() => (trade.value ? (tradePageSeo(trade.value) ?? searchSeo()) : searchSeo()));
 
 // Sticky location persistence. Bare camelCase key matches the existing
 // localStorage draft convention in PostJobView.vue.

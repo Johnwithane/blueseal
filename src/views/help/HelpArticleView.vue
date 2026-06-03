@@ -10,6 +10,8 @@ import { useHelpContent } from "@/composables/useHelpContent";
 import { useToast } from "@/composables/useToast";
 import HelpSearchBox from "@/components/help/HelpSearchBox.vue";
 import MarkdownProse from "@/components/help/MarkdownProse.vue";
+import { useSeo } from "@/composables/useSeo";
+import { helpArticleSeo } from "@/seo/content";
 
 const route = useRoute();
 const toast = useToast();
@@ -23,6 +25,9 @@ const category = computed(() =>
 const related = computed(() =>
   article.value ? relatedArticles(article.value) : [],
 );
+
+// Unknown slug → noindex "not found" head; known article → full article SEO.
+useSeo(() => helpArticleSeo(slug.value) ?? { title: "Article not found", noindex: true });
 
 const rated = ref(false);
 function rate(helpful: boolean) {

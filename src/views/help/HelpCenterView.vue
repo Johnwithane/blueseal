@@ -7,8 +7,12 @@ import Button from "primevue/button";
 import { useHelpContent } from "@/composables/useHelpContent";
 import HelpSearchBox from "@/components/help/HelpSearchBox.vue";
 import HelpContactForm from "@/components/help/HelpContactForm.vue";
+import { useSeo } from "@/composables/useSeo";
+import { helpCenterSeo } from "@/seo/content";
 
 const { categories, popularArticles, articlesInCategory } = useHelpContent();
+
+useSeo(helpCenterSeo());
 </script>
 
 <template>

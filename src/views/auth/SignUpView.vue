@@ -10,6 +10,9 @@ import Divider from "primevue/divider";
 import { useAuthStore } from "@/stores/auth";
 import { signUpSchema } from "@/validation/schemas";
 import { humanizeError } from "@/utils/errors";
+import { useSeo } from "@/composables/useSeo";
+
+useSeo({ title: "Create your account", noindex: true });
 
 const auth = useAuthStore();
 const router = useRouter();

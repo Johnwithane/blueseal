@@ -19,6 +19,15 @@ import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 import { createJobPostSchema } from "@/validation/schemas";
 import type { Urgency } from "@/firebase/interfaces";
+import { useSeo } from "@/composables/useSeo";
+
+useSeo({
+  title: "Post a job and get quotes",
+  description:
+    "Describe your job and get quotes from verified, ID-checked tradespeople near you. " +
+    "Free to post on Blue Seal — compare pros, chat, schedule and pay in one place.",
+  path: "/jobs/post",
+});
 
 const router = useRouter();
 const auth = useAuthStore();

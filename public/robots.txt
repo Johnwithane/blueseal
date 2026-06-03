@@ -1,6 +1,22 @@
+# Blue Seal — https://blueseal.app
+# Public marketing/content + verified profiles are crawlable; the app's
+# authenticated surfaces are not. AI crawlers are welcome (see llms.txt).
 User-agent: *
 Allow: /
 Disallow: /admin
 Disallow: /dashboard
+Disallow: /account
+Disallow: /onboarding
+Disallow: /payouts
+Disallow: /invoices
+Disallow: /jobs/
+Disallow: /my-applications
+Disallow: /request/
+Disallow: /request-prospect/
+Disallow: /claim
+# Allow the public job-posting landing page while blocking job instances above.
+Allow: /jobs/post
+# Auth pages are crawlable but carry a baked noindex tag (so it's honoured even
+# by crawlers that don't run JavaScript) — they're intentionally not Disallowed.
 
 Sitemap: https://blueseal.app/sitemap.xml

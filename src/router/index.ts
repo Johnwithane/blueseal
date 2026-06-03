@@ -56,6 +56,20 @@ const routes: RouteRecordRaw[] = [
     // see the public marketing chrome.
     meta: { layout: "hybrid" },
   },
+  // Public trade landing pages (SEO discovery surface). Hybrid so a signed-in
+  // user browsing trades stays in their app shell; visitors get marketing chrome.
+  {
+    path: "/trades",
+    name: "TradesIndex",
+    component: () => import("@/views/TradesIndexView.vue"),
+    meta: { layout: "hybrid" },
+  },
+  {
+    path: "/trades/:trade",
+    name: "TradePage",
+    component: () => import("@/views/TradePageView.vue"),
+    meta: { layout: "hybrid" },
+  },
   {
     path: "/request/:uid",
     name: "RequestQuote",

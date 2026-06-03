@@ -9,9 +9,13 @@ import InputText from "primevue/inputtext";
 import { useHelpContent } from "@/composables/useHelpContent";
 import MarkdownProse from "@/components/help/MarkdownProse.vue";
 import { highlight } from "@/utils/helpSearch";
+import { useSeo } from "@/composables/useSeo";
+import { faqSeo } from "@/seo/content";
 
 const route = useRoute();
 const { categories, faqs } = useHelpContent();
+
+useSeo(faqSeo());
 
 const q = ref(typeof route.query.q === "string" ? route.query.q : "");
 const terms = computed(() =>

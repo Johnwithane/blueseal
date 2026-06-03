@@ -6,6 +6,9 @@ import Message from "primevue/message";
 import { useAuthStore } from "@/stores/auth";
 import { forgotPasswordSchema } from "@/validation/schemas";
 import { humanizeError } from "@/utils/errors";
+import { useSeo } from "@/composables/useSeo";
+
+useSeo({ title: "Reset your password", noindex: true });
 
 const auth = useAuthStore();
 

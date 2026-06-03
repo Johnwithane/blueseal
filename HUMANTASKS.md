@@ -6,6 +6,28 @@ Tasks are grouped by the phase that introduced them so you can see why each one 
 
 ---
 
+## SEO + LLM discoverability pass (added 2026-06-03)
+
+The full SEO foundation shipped in code: per-route metadata + Open Graph/Twitter cards + JSON-LD (`@unhead/vue` via `useSeo`), build-time prerendering of all public content pages (so crawlers and LLMs that don't run JavaScript get real HTML — `scripts/prerender.ts`), a generated `sitemap.xml` + `llms.txt`, 57 per-trade landing pages (`/trades`, `/trades/:trade`), a tightened `robots.txt`, and a fix for the PWA install icons (the manifest pointed at non-existent `android-chrome-*` files). Everything deploys with a normal `firebase deploy --only hosting`. A few things only you can do:
+
+### [ ] Create a proper 1200×630 Open Graph share image
+
+- **Why:** Social/LLM link previews look best with a 1200×630 landscape card. We currently fall back to the square 2048×2048 brand mark (`public/icons/blueseal_logo_LARGE.png`), which works but isn't ideal.
+- **What:** Design a 1200×630 PNG (logo + tagline "Trusted trades. Sealed with proof."), save it to `public/og/default.png`, then update `DEFAULT_OG_IMAGE` in `src/seo/site.ts` to point at it. Optionally add per-trade cards later.
+- **Verify:** After deploy, paste a page URL into the [Facebook Sharing Debugger](https://developers.facebook.com/tools/debug/) and [X Card Validator](https://cards-dev.twitter.com/validator) — the new image should appear.
+
+### [ ] Verify the site in Google Search Console + Bing, submit the sitemap
+
+- **Why:** Verification unlocks indexing insight (coverage, queries, Core Web Vitals) and lets you submit the sitemap so discovery isn't left to chance.
+- **What:** Add `blueseal.app` in [Google Search Console](https://search.google.com/search-console) and [Bing Webmaster Tools](https://www.bing.com/webmasters) (DNS TXT or HTML-file verification — if HTML-file, drop it in `public/`). Submit `https://blueseal.app/sitemap.xml` in both. Confirm `https://blueseal.app/robots.txt` and `https://blueseal.app/llms.txt` resolve.
+- **Verify:** Use GSC's **URL Inspection** on `/`, a `/trades/:trade` page, and a `/help/:slug` page — each should report the baked title/description and be eligible for indexing. Run the [Rich Results Test](https://search.google.com/test/rich-results) on the homepage (Organization + FAQ) and a trade page (Service).
+
+### [ ] (Optional) Dynamic per-profile social images for tradespeople
+
+- **Why:** Tradesperson profiles (`/tradies/:uid`) are indexable and carry `Person` JSON-LD, but their share image is the generic default and they rely on JS rendering (they're dynamic, so not prerendered). A small Cloud Function that renders a per-profile OG card — and/or on-demand prerendering for verified profiles — would sharpen sharing + non-JS-crawler visibility. Deferred; not needed for launch.
+
+---
+
 ## Help Center + support portal (added 2026-06-03)
 
 The Help Center (`/help`), FAQ (`/faq`), and homepage feature showcase shipped fully working. Content is hardcoded in `src/data/help.ts` (no CMS — edit it in code; see CLAUDE.md → "Help Center & FAQ upkeep"). The contact form now files real support tickets that admins triage at `/admin/support`. Two follow-ups need you:
