@@ -449,7 +449,7 @@ onMounted(async () => {
           <div
             v-for="(f, i) in standoutFeatures"
             :key="f.title"
-            class="bs-reveal bs-card flex items-stretch gap-3 p-6 transition-shadow hover:shadow-md sm:gap-5 sm:p-7"
+            class="bs-reveal bs-card flex flex-col gap-4 p-6 transition-shadow hover:shadow-md sm:flex-row sm:items-stretch sm:gap-5 sm:p-7"
             :style="{ transitionDelay: `${i * 70}ms` }"
           >
             <div class="min-w-0 flex-1">
@@ -469,7 +469,7 @@ onMounted(async () => {
             <!-- One mascot per card — zoomed in and cropped at the waist for a more dynamic feel.
                  No fixed width: the box shrinks to the image, so it only crops vertically (never
                  the sides), while the fixed height makes the waist cut. -->
-            <div class="pointer-events-none relative h-28 shrink-0 self-end overflow-hidden lg:h-36">
+            <div class="pointer-events-none relative h-28 shrink-0 self-center overflow-hidden sm:self-end lg:h-36">
               <SealCharacter :name="f.seal" class="block h-40 w-auto max-w-none lg:h-56" />
             </div>
           </div>
