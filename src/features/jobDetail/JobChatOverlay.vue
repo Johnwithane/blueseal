@@ -170,8 +170,9 @@ watch(visible, (v) => {
 .backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(15, 23, 42, 0.32);
-  backdrop-filter: blur(2px);
+  /* No blur — keep the job screen readable behind the chat; a slightly
+     stronger dark tint provides the contrast the blur used to. */
+  background: rgba(15, 23, 42, 0.45);
 }
 
 .panel {

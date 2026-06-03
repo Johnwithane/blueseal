@@ -50,8 +50,9 @@ hand-map Tailwind colour classes to statuses (a recurring drift — see audit R7
 
 ## Typography
 
-- Body: `--bs-font-body` (Roboto). Headings: `--bs-font-heading` (Concert One).
-  Hero/display: `--bs-font-display` (Titan One). Hand: `--bs-font-hand`.
+- Body: `--bs-font-body` (Roboto). Headings: `--bs-font-heading` (Poltawski
+  Nowy). Hero/display: `--bs-font-display` (Poltawski Nowy). Hand:
+  `--bs-font-hand`.
 - Micro text (below `text-xs` / 12px): use `--bs-text-micro` (11px), **not**
   `text-[10px]`/`text-[11px]`.
 - Heading size guidance (apply via Tailwind): page title `text-2xl`,
@@ -77,9 +78,10 @@ re-skin phase rather than changed silently:
 1. **PrimeVue preset.** `main.ts` runs stock Aura (green primary). Branding it
    to `--bs-blue` via `definePreset` is the highest-leverage visual fix but
    re-skins every default control at once — paused pending sign-off.
-2. **Heading weight.** `main.css` sets `h1–h6 { font-weight: 400 }` (for the
-   single-weight Concert One display font) while ~27 views apply `font-bold`.
-   Pick one — Roboto-bold headings, or Concert-One-400 — then drop the conflict.
+2. **Heading weight.** `main.css` sets `h1–h6 { font-weight: 400 }` while ~27
+   views apply `font-bold`. Poltawski Nowy ships a real 400–700 range, so
+   `font-bold` now renders a true bold cut (not faux) — but the base-400 rule
+   and the per-view `font-bold` still disagree. Pick one and drop the conflict.
 3. **Hex → token sweep.** ~120 raw hex remain in components. The tokens above
    make migration mechanical; do it alongside the re-skin so any colour shift
    is reviewed in one pass. Consider a lint rule banning raw hex once migrated.

@@ -216,7 +216,7 @@ async function renderPdf(
 
   // Wordmark — tradesperson's company name (or display name) when their
   // logo is in use; Blue Seal otherwise. Bold Helvetica stands in for the
-  // brand's Concert One until we ship embedded fonts.
+  // brand's Poltawski Nowy until we ship embedded fonts.
   const usingTradieLogo = tradieLogoDataUrl != null;
   const wordmarkTitle = usingTradieLogo
     ? (party.tradesperson.companyName?.trim() || party.tradesperson.name)
