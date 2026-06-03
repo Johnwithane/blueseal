@@ -144,7 +144,7 @@ onMounted(async () => {
               alt="Blue Seal"
               class="relative h-[100%] w-auto mx-auto bs-float bs-glow"
             />
-            <div
+            <!-- <div
               class="hidden sm:block absolute -bottom-2 -right-4 bs-card !bg-white !text-[color:var(--bs-text)] px-4 py-3 shadow-2xl rotate-[4deg] text-left"
             >
               <div class="flex items-center gap-3">
@@ -156,8 +156,8 @@ onMounted(async () => {
                   <div class="text-[color:var(--bs-muted)] text-xs">Admin-reviewed in 48h</div>
                 </div>
               </div>
-            </div>
-            <div
+            </div> -->
+            <!-- <div
               class="hidden sm:block absolute -top-2 -left-4 bs-card !bg-white !text-[color:var(--bs-text)] px-4 py-3 shadow-2xl rotate-[-5deg] text-left"
             >
               <div class="flex items-center gap-2 text-sm font-semibold">
@@ -165,7 +165,7 @@ onMounted(async () => {
                 <span class="text-amber-500 tracking-tight">★★★★★</span>
               </div>
               <div class="text-[color:var(--bs-muted)] text-xs">From 1,200+ jobs</div>
-            </div>
+            </div> -->
           </div>
         </div>
       </div>
