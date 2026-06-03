@@ -7,6 +7,7 @@ import { computed } from "vue";
 import { useRoute, RouterLink } from "vue-router";
 import Button from "primevue/button";
 import { TRADES } from "@/data/trades";
+import SealCharacter from "@/components/SealCharacter.vue";
 import { useSeo } from "@/composables/useSeo";
 import { tradePageSeo, TRUST_POINTS, HOW_IT_WORKS } from "@/seo/content";
 
@@ -36,22 +37,31 @@ useSeo(() => tradePageSeo(tradeKey.value) ?? { title: "Trade not found", noindex
         <span>{{ label }}</span>
       </nav>
 
-      <header class="max-w-2xl">
-        <h1 class="text-3xl font-bold">Hire a verified {{ label }} in Canada</h1>
-        <p class="mt-2 text-[color:var(--bs-muted)]">
-          Find a verified, ID-checked {{ label.toLowerCase() }} on Blue Seal. Compare certified
-          pros across Canada, request quotes, schedule and pay — all in one trusted job thread,
-          with mutual reviews after every job.
-        </p>
-        <div class="mt-5 flex flex-wrap gap-3">
-          <RouterLink :to="`/search?trade=${trade.key}`">
-            <Button :label="`Find a ${label} near you`" icon="pi pi-search" />
-          </RouterLink>
-          <RouterLink to="/jobs/post">
-            <Button label="Post a job, get quotes" icon="pi pi-send" severity="secondary" outlined />
-          </RouterLink>
-        </div>
-      </header>
+      <div class="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between sm:gap-8">
+        <header class="max-w-2xl">
+          <h1 class="text-3xl font-bold">Hire a verified {{ label }} in Canada</h1>
+          <p class="mt-2 text-[color:var(--bs-muted)]">
+            Find a verified, ID-checked {{ label.toLowerCase() }} on Blue Seal. Compare certified
+            pros across Canada, request quotes, schedule and pay — all in one trusted job thread,
+            with mutual reviews after every job.
+          </p>
+          <div class="mt-5 flex flex-wrap gap-3">
+            <RouterLink :to="`/search?trade=${trade.key}`">
+              <Button :label="`Find a ${label} near you`" icon="pi pi-search" />
+            </RouterLink>
+            <RouterLink to="/jobs/post">
+              <Button label="Post a job, get quotes" icon="pi pi-send" severity="secondary" outlined />
+            </RouterLink>
+          </div>
+        </header>
+        <!-- This trade's mascot (generic tradesperson fallback if no art yet) -->
+        <SealCharacter
+          :name="`trade-${trade.key}`"
+          fallback="pose-toolbelt"
+          eager
+          class="mx-auto h-48 w-auto shrink-0 drop-shadow-xl sm:mx-0 sm:h-56 lg:h-64"
+        />
+      </div>
 
       <div class="mt-10 grid gap-8 md:grid-cols-2">
         <section>

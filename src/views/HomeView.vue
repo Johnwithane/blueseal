@@ -7,6 +7,7 @@ import { useAuthStore } from "@/stores/auth";
 import { getHomeContent } from "@/firebase/services/siteContent";
 import type { Testimonial } from "@/firebase/interfaces";
 import { HELP_CONTENT_SEED } from "@/data/help";
+import SealCharacter from "@/components/SealCharacter.vue";
 import { useSeo } from "@/composables/useSeo";
 import { homeSeo } from "@/seo/content";
 
@@ -54,43 +55,51 @@ const houseImg =
 const chatImg =
   "https://images.unsplash.com/photo-1645651964715-d200ce0939cc?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.1.0";
 
-const featuredTrades = TRADES.slice(0, 8);
+// Trades grid is progressively revealed — start with one batch, "Load more"
+// reveals the next, up to the full canonical list.
+const TRADES_STEP = 12; // divisible by 2/3/4 — even rows at every breakpoint
+const visibleTradeCount = ref(TRADES_STEP);
+const visibleTrades = computed(() => TRADES.slice(0, visibleTradeCount.value));
+const hasMoreTrades = computed(() => visibleTradeCount.value < TRADES.length);
+function loadMoreTrades() {
+  visibleTradeCount.value = Math.min(visibleTradeCount.value + TRADES_STEP, TRADES.length);
+}
 
 // "What sets us apart" — the standout features showcased mid-page. Kept as
 // data so the markup stays a clean loop. Points are short, concrete proof —
 // no fee figures or SLAs (those aren't live; see MONETIZATION.md).
 const standoutFeatures = [
   {
-    icon: "pi pi-sparkles",
     kicker: "AI built in",
     title: "An AI sidekick on every job",
     blurb:
       "Diagnose a problem from a photo, draft a quote in seconds, and summarize a long thread — without leaving the conversation.",
     points: ["Photo-based diagnosis", "Faster, clearer quotes", "Instant job summaries"],
+    seal: "scene-ai",
   },
   {
-    icon: "pi pi-comments",
     kicker: "One job, one thread",
     title: "Chat + a status board, together",
     blurb:
       "Messages, photos, and a live status board live in one place — from requested to quoted to in progress to done. Nothing scattered across texts and email.",
     points: ["Job-scoped chat", "Shared photos & files", "Clear status at a glance"],
+    seal: "scene-chat",
   },
   {
-    icon: "pi pi-verified",
     kicker: "Real verification",
     title: "Every pro, verified four ways",
     blurb:
       "Government ID, trade certification, insurance, and WSIB / workers' comp — each manually reviewed by our team before a pro can take work.",
     points: ["Government ID", "Trade certification", "Insurance + WSIB on file"],
+    seal: "scene-verified",
   },
   {
-    icon: "pi pi-credit-card",
     kicker: "Money, handled",
     title: "Quotes to invoices to paid",
     blurb:
       "Build a quote, auto-invoice on completion, and pay securely in-app — with receipts saved to the job for both sides.",
     points: ["Itemised quotes", "Auto-invoicing", "In-app pay & payouts"],
+    seal: "scene-invoice",
   },
 ];
 
@@ -262,28 +271,39 @@ onMounted(async () => {
           </p>
         </div>
 
-        <div class="bs-reveal mt-10 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div class="bs-reveal mt-10 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           <RouterLink
-            v-for="t in featuredTrades"
+            v-for="t in visibleTrades"
             :key="t.key"
             :to="{ name: 'Search', query: { trade: t.key } }"
-            class="bs-trade-tile p-5 no-underline text-inherit group"
+            class="bs-trade-tile group flex flex-col items-center p-5 text-center no-underline text-inherit"
           >
-            <div
-              class="h-12 w-12 rounded-xl grid place-items-center bg-gradient-to-br from-[#a0d6f1] to-[#49a1d3] text-white shadow-sm"
+            <!-- Trade mascot is the hero (generic tradesperson fallback if no art yet) -->
+            <SealCharacter
+              :name="`trade-${t.key}`"
+              fallback="pose-toolbelt"
+              class="pointer-events-none h-28 w-auto drop-shadow-md transition-transform duration-300 group-hover:scale-105 sm:h-32"
+            />
+            <div class="mt-3 font-semibold text-[color:var(--bs-blue-dark)]">{{ t.label }}</div>
+            <span
+              class="mt-2 inline-flex items-center gap-1 rounded-full bg-[color:var(--bs-blue-light)]/50 px-3 py-1 text-xs font-semibold text-[color:var(--bs-blue-dark)] transition group-hover:bg-[color:var(--bs-blue)] group-hover:text-white"
             >
-              <i :class="[t.icon, 'bs-trade-icon', 'text-2xl']"></i>
-            </div>
-            <div class="mt-4 font-semibold text-[color:var(--bs-blue-dark)]">{{ t.label }}</div>
-            <div class="mt-1 text-xs text-[color:var(--bs-muted)] flex items-center gap-1">
-              Browse <i class="pi pi-arrow-right text-[10px] transition-transform group-hover:translate-x-0.5"></i>
-            </div>
+              Browse <i class="pi pi-arrow-right text-[10px]"></i>
+            </span>
           </RouterLink>
         </div>
 
-        <div class="bs-reveal mt-8 text-center">
-          <RouterLink to="/search">
-            <Button label="See all trades" icon="pi pi-arrow-right" icon-pos="right" outlined />
+        <div class="mt-8 text-center">
+          <Button
+            v-if="hasMoreTrades"
+            label="Load more trades"
+            icon="pi pi-arrow-down"
+            icon-pos="right"
+            outlined
+            @click="loadMoreTrades"
+          />
+          <RouterLink v-else to="/search">
+            <Button label="Browse all trades in search" icon="pi pi-arrow-right" icon-pos="right" outlined />
           </RouterLink>
         </div>
       </div>
@@ -403,12 +423,10 @@ onMounted(async () => {
               <Button label="Message" icon="pi pi-comments" size="small" outlined />
             </div>
           </div>
-          <!-- <img
-            src="/icons/blueseal_logo.png"
-            alt=""
-            aria-hidden="true"
-            class="absolute -bottom-6 -left-6 h-20 w-20 bs-float bs-glow opacity-95"
-          /> -->
+          <SealCharacter
+            name="pose-toolbelt"
+            class="pointer-events-none absolute -left-4 bottom-0 h-44 w-auto drop-shadow-2xl lg:-left-8 lg:h-52"
+          />
         </div>
       </div>
     </section>
@@ -431,28 +449,29 @@ onMounted(async () => {
           <div
             v-for="(f, i) in standoutFeatures"
             :key="f.title"
-            class="bs-reveal bs-card p-6 sm:p-7 transition-shadow hover:shadow-md"
+            class="bs-reveal bs-card flex items-stretch gap-3 p-6 transition-shadow hover:shadow-md sm:gap-5 sm:p-7"
             :style="{ transitionDelay: `${i * 70}ms` }"
           >
-            <div class="flex items-start gap-4">
-              <div class="h-12 w-12 shrink-0 rounded-xl grid place-items-center bg-gradient-to-br from-[#a0d6f1] to-[#49a1d3] text-white shadow-sm">
-                <i :class="[f.icon, 'text-2xl']"></i>
-              </div>
-              <div>
-                <div class="text-xs font-semibold uppercase tracking-wider text-[color:var(--bs-blue)]">{{ f.kicker }}</div>
-                <h3 class="mt-0.5 text-lg font-semibold text-[color:var(--bs-blue-dark)]">{{ f.title }}</h3>
-              </div>
+            <div class="min-w-0 flex-1">
+              <div class="text-xs font-semibold uppercase tracking-wider text-[color:var(--bs-blue)]">{{ f.kicker }}</div>
+              <h3 class="mt-0.5 text-lg font-semibold text-[color:var(--bs-blue-dark)]">{{ f.title }}</h3>
+              <p class="mt-3 text-sm leading-relaxed text-[color:var(--bs-muted)]">{{ f.blurb }}</p>
+              <ul class="mt-4 flex flex-wrap gap-2">
+                <li
+                  v-for="p in f.points"
+                  :key="p"
+                  class="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--bs-blue-light)]/40 px-3 py-1 text-xs font-medium text-[color:var(--bs-blue-dark)]"
+                >
+                  <i class="pi pi-check text-[10px]"></i>{{ p }}
+                </li>
+              </ul>
             </div>
-            <p class="mt-4 text-sm leading-relaxed text-[color:var(--bs-muted)]">{{ f.blurb }}</p>
-            <ul class="mt-4 flex flex-wrap gap-2">
-              <li
-                v-for="p in f.points"
-                :key="p"
-                class="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--bs-blue-light)]/40 px-3 py-1 text-xs font-medium text-[color:var(--bs-blue-dark)]"
-              >
-                <i class="pi pi-check text-[10px]"></i>{{ p }}
-              </li>
-            </ul>
+            <!-- One mascot per card — zoomed in and cropped at the waist for a more dynamic feel.
+                 No fixed width: the box shrinks to the image, so it only crops vertically (never
+                 the sides), while the fixed height makes the waist cut. -->
+            <div class="pointer-events-none relative h-28 shrink-0 self-end overflow-hidden lg:h-36">
+              <SealCharacter :name="f.seal" class="block h-40 w-auto max-w-none lg:h-56" />
+            </div>
           </div>
         </div>
       </div>
@@ -519,6 +538,10 @@ onMounted(async () => {
               <Button label="Browse all FAQs" icon="pi pi-arrow-right" icon-pos="right" outlined />
             </RouterLink>
           </div>
+          <SealCharacter
+            name="pose-thinking"
+            class="pointer-events-none mt-8 hidden h-56 w-auto lg:block"
+          />
         </div>
 
         <div class="bs-reveal space-y-2">

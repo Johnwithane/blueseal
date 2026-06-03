@@ -8,6 +8,7 @@ import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import { useHelpContent } from "@/composables/useHelpContent";
 import MarkdownProse from "@/components/help/MarkdownProse.vue";
+import SealCharacter from "@/components/SealCharacter.vue";
 import { highlight } from "@/utils/helpSearch";
 import { useSeo } from "@/composables/useSeo";
 import { faqSeo } from "@/seo/content";
@@ -54,14 +55,17 @@ const total = computed(() => groups.value.reduce((n, g) => n + g.items.length, 0
       <span>FAQ</span>
     </nav>
 
-    <header class="mt-3">
-      <h1 class="text-3xl font-bold tracking-tight text-[color:var(--bs-blue-dark)]">
-        Frequently asked questions
-      </h1>
-      <p class="mt-2 text-[color:var(--bs-muted)]">
-        Quick answers to the things people ask most. Can't find it?
-        <RouterLink to="/help#contact" class="font-medium">Contact support</RouterLink>.
-      </p>
+    <header class="mt-3 flex items-start justify-between gap-4">
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight text-[color:var(--bs-blue-dark)]">
+          Frequently asked questions
+        </h1>
+        <p class="mt-2 text-[color:var(--bs-muted)]">
+          Quick answers to the things people ask most. Can't find it?
+          <RouterLink to="/help#contact" class="font-medium">Contact support</RouterLink>.
+        </p>
+      </div>
+      <SealCharacter name="pose-thinking" class="hidden h-28 w-auto shrink-0 drop-shadow-md sm:block lg:h-36" />
     </header>
 
     <div class="relative mt-6">
@@ -109,6 +113,7 @@ const total = computed(() => groups.value.reduce((n, g) => n + g.items.length, 0
     </div>
 
     <div v-else class="bs-empty mt-8">
+      <SealCharacter name="pose-shrug" class="mx-auto mb-3 h-32 w-auto sm:h-40" />
       <p class="font-medium text-[color:var(--bs-text)]">No questions match "{{ q }}".</p>
       <p class="mt-1 text-sm">Try different words, or contact support.</p>
       <RouterLink to="/help#contact" class="mt-3 inline-block">

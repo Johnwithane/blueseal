@@ -4,6 +4,7 @@
 // and LLMs get the full trade list as real HTML.
 import { RouterLink } from "vue-router";
 import { TRADES } from "@/data/trades";
+import SealCharacter from "@/components/SealCharacter.vue";
 import { useSeo } from "@/composables/useSeo";
 import { tradesIndexSeo } from "@/seo/content";
 
@@ -20,14 +21,24 @@ useSeo(tradesIndexSeo());
       </p>
     </header>
 
-    <ul class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+    <ul class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
       <li v-for="t in TRADES" :key="t.key">
         <RouterLink
           :to="`/trades/${t.key}`"
-          class="flex items-center gap-3 rounded-lg border border-[color:var(--bs-border)] bg-white p-3 hover:border-[color:var(--bs-blue)] hover:shadow-sm transition"
+          class="bs-trade-tile group flex h-full flex-col items-center p-5 text-center no-underline text-inherit"
         >
-          <i :class="t.icon" class="text-xl text-[color:var(--bs-blue)]" aria-hidden="true"></i>
-          <span class="text-sm font-medium">{{ t.label }}</span>
+          <!-- Trade mascot is the hero (generic tradesperson fallback if no art yet) -->
+          <SealCharacter
+            :name="`trade-${t.key}`"
+            fallback="pose-toolbelt"
+            class="pointer-events-none h-28 w-auto drop-shadow-md transition-transform duration-300 group-hover:scale-105 sm:h-32"
+          />
+          <div class="mt-3 font-semibold text-[color:var(--bs-blue-dark)]">{{ t.label }}</div>
+          <span
+            class="mt-2 inline-flex items-center gap-1 rounded-full bg-[color:var(--bs-blue-light)]/50 px-3 py-1 text-xs font-semibold text-[color:var(--bs-blue-dark)] transition group-hover:bg-[color:var(--bs-blue)] group-hover:text-white"
+          >
+            Browse <i class="pi pi-arrow-right text-[10px]"></i>
+          </span>
         </RouterLink>
       </li>
     </ul>

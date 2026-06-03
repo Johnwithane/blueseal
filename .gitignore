@@ -31,3 +31,7 @@ functions/node_modules/
 .claude/
 *.tsbuildinfo
 functions/set-admin.mjs
+
+# Mascot source art — only the optimized .webp ships (run npm run optimize:characters)
+public/characters/png/
+public/characters/raw/

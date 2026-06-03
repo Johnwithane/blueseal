@@ -7,6 +7,7 @@ import Button from "primevue/button";
 import { useHelpContent } from "@/composables/useHelpContent";
 import HelpSearchBox from "@/components/help/HelpSearchBox.vue";
 import HelpContactForm from "@/components/help/HelpContactForm.vue";
+import SealCharacter from "@/components/SealCharacter.vue";
 import { useSeo } from "@/composables/useSeo";
 import { helpCenterSeo } from "@/seo/content";
 
@@ -22,6 +23,7 @@ useSeo(helpCenterSeo());
       <div class="absolute inset-0 bs-gradient-brand"></div>
       <div class="pointer-events-none absolute -top-20 -left-20 h-72 w-72 rounded-full bg-white/15 blur-3xl"></div>
       <div class="relative bs-container py-14 sm:py-20 text-center">
+        <SealCharacter name="pose-wave" eager class="mx-auto mb-3 h-36 w-auto drop-shadow-xl sm:h-44" />
         <span class="bs-kicker justify-center !text-[#a0d6f1]">Help Center</span>
         <h1 class="bs-display mt-3 text-3xl sm:text-5xl">How can we help?</h1>
         <p class="mx-auto mt-3 max-w-xl text-white/85">
@@ -99,7 +101,7 @@ useSeo(helpCenterSeo());
       <section id="contact" class="scroll-mt-20">
         <div class="bs-card overflow-hidden">
           <div class="grid md:grid-cols-[0.9fr_1.1fr]">
-            <div class="bs-gradient-deep p-8 text-white">
+            <div class="relative overflow-hidden bs-gradient-deep p-8 text-white">
               <span class="bs-kicker !text-[#a0d6f1]">Still need help?</span>
               <h2 class="mt-3 text-2xl font-bold tracking-tight">Talk to our team</h2>
               <p class="mt-3 text-white/85">
@@ -110,6 +112,10 @@ useSeo(helpCenterSeo());
                 <li class="flex items-center gap-2"><i class="pi pi-check-circle text-[#a0d6f1]"></i> Real people, real answers</li>
                 <li class="flex items-center gap-2"><i class="pi pi-check-circle text-[#a0d6f1]"></i> We can review the job, chat & invoice</li>
               </ul>
+              <SealCharacter
+                name="scene-support"
+                class="pointer-events-none absolute bottom-0 right-2 hidden h-40 w-auto drop-shadow-xl sm:block lg:h-44"
+              />
             </div>
             <div class="p-6 sm:p-8">
               <HelpContactForm />
