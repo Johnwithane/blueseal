@@ -6,6 +6,7 @@ import { TRADES } from "@/data/trades";
 import { useAuthStore } from "@/stores/auth";
 import { getHomeContent } from "@/firebase/services/siteContent";
 import type { Testimonial } from "@/firebase/interfaces";
+import { HELP_CONTENT_SEED } from "@/data/help";
 
 const auth = useAuthStore();
 
@@ -50,6 +51,52 @@ const chatImg =
   "https://images.unsplash.com/photo-1645651964715-d200ce0939cc?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.1.0";
 
 const featuredTrades = TRADES.slice(0, 8);
+
+// "What sets us apart" — the standout features showcased mid-page. Kept as
+// data so the markup stays a clean loop. Points are short, concrete proof —
+// no fee figures or SLAs (those aren't live; see MONETIZATION.md).
+const standoutFeatures = [
+  {
+    icon: "pi pi-sparkles",
+    kicker: "AI built in",
+    title: "An AI sidekick on every job",
+    blurb:
+      "Diagnose a problem from a photo, draft a quote in seconds, and summarize a long thread — without leaving the conversation.",
+    points: ["Photo-based diagnosis", "Faster, clearer quotes", "Instant job summaries"],
+  },
+  {
+    icon: "pi pi-comments",
+    kicker: "One job, one thread",
+    title: "Chat + a status board, together",
+    blurb:
+      "Messages, photos, and a live status board live in one place — from requested to quoted to in progress to done. Nothing scattered across texts and email.",
+    points: ["Job-scoped chat", "Shared photos & files", "Clear status at a glance"],
+  },
+  {
+    icon: "pi pi-verified",
+    kicker: "Real verification",
+    title: "Every pro, verified four ways",
+    blurb:
+      "Government ID, trade certification, insurance, and WSIB / workers' comp — each manually reviewed by our team before a pro can take work.",
+    points: ["Government ID", "Trade certification", "Insurance + WSIB on file"],
+  },
+  {
+    icon: "pi pi-credit-card",
+    kicker: "Money, handled",
+    title: "Quotes to invoices to paid",
+    blurb:
+      "Build a quote, auto-invoice on completion, and pay securely in-app — with receipts saved to the job for both sides.",
+    points: ["Itemised quotes", "Auto-invoicing", "In-app pay & payouts"],
+  },
+];
+
+// A short FAQ teaser pulled from the curated Help Center baseline. Static
+// import (no fetch) — the full, CMS-editable set lives at /faq and /help.
+const homeFaqs = HELP_CONTENT_SEED.faqs.slice(0, 5);
+const openFaq = ref<number | null>(0);
+function toggleFaq(i: number) {
+  openFaq.value = openFaq.value === i ? null : i;
+}
 
 // Testimonials come from siteContent/home — editable in the admin panel.
 // Hide the section entirely when empty so we don't ship fake quotes.
@@ -362,44 +409,46 @@ onMounted(async () => {
       </div>
     </section>
 
-    <!-- WHY BLUE SEAL — feature cards -->
+    <!-- WHAT SETS US APART — standout feature showcase -->
     <section class="py-20 bg-[color:var(--bs-bg)]">
       <div class="bs-container">
         <div class="bs-reveal max-w-2xl">
-          <span class="bs-kicker">Why Blue Seal</span>
+          <span class="bs-kicker">What sets us apart</span>
           <h2 class="mt-3 text-3xl sm:text-4xl font-bold tracking-tight text-[color:var(--bs-blue-dark)]">
-            Built for trust, designed for clarity.
+            More than a directory. A whole job, handled.
           </h2>
+          <p class="mt-3 text-[color:var(--bs-muted)] text-lg">
+            Other sites hand you a phone number and wish you luck. Blue Seal runs the entire job —
+            verified pros, smart tools, and clean paperwork from first message to final review.
+          </p>
         </div>
 
-        <div class="mt-10 grid md:grid-cols-2 lg:grid-cols-4 gap-5">
-          <div class="bs-reveal bs-card p-6">
-            <div class="h-11 w-11 rounded-xl grid place-items-center bg-[color:var(--bs-blue-light)] text-[color:var(--bs-blue-dark)]">
-              <i class="pi pi-verified text-xl"></i>
+        <div class="mt-10 grid gap-5 md:grid-cols-2">
+          <div
+            v-for="(f, i) in standoutFeatures"
+            :key="f.title"
+            class="bs-reveal bs-card p-6 sm:p-7 transition-shadow hover:shadow-md"
+            :style="{ transitionDelay: `${i * 70}ms` }"
+          >
+            <div class="flex items-start gap-4">
+              <div class="h-12 w-12 shrink-0 rounded-xl grid place-items-center bg-gradient-to-br from-[#a0d6f1] to-[#49a1d3] text-white shadow-sm">
+                <i :class="[f.icon, 'text-2xl']"></i>
+              </div>
+              <div>
+                <div class="text-xs font-semibold uppercase tracking-wider text-[color:var(--bs-blue)]">{{ f.kicker }}</div>
+                <h3 class="mt-0.5 text-lg font-semibold text-[color:var(--bs-blue-dark)]">{{ f.title }}</h3>
+              </div>
             </div>
-            <h3 class="mt-4 font-semibold text-[color:var(--bs-blue-dark)]">Real verification</h3>
-            <p class="mt-1 text-sm text-[color:var(--bs-muted)]">Cert + photo ID, manually reviewed by Blue Seal admins. No bots, no shortcuts.</p>
-          </div>
-          <div class="bs-reveal bs-card p-6" style="transition-delay: 60ms">
-            <div class="h-11 w-11 rounded-xl grid place-items-center bg-[color:var(--bs-blue-light)] text-[color:var(--bs-blue-dark)]">
-              <i class="pi pi-star text-xl"></i>
-            </div>
-            <h3 class="mt-4 font-semibold text-[color:var(--bs-blue-dark)]">Mutual reviews</h3>
-            <p class="mt-1 text-sm text-[color:var(--bs-muted)]">Both sides build reputation. Better clients, better tradespeople, fewer surprises.</p>
-          </div>
-          <div class="bs-reveal bs-card p-6" style="transition-delay: 120ms">
-            <div class="h-11 w-11 rounded-xl grid place-items-center bg-[color:var(--bs-blue-light)] text-[color:var(--bs-blue-dark)]">
-              <i class="pi pi-comments text-xl"></i>
-            </div>
-            <h3 class="mt-4 font-semibold text-[color:var(--bs-blue-dark)]">One job, one thread</h3>
-            <p class="mt-1 text-sm text-[color:var(--bs-muted)]">Chat, photos, schedule and invoice — all scoped to a single job. Nothing gets lost.</p>
-          </div>
-          <div class="bs-reveal bs-card p-6" style="transition-delay: 180ms">
-            <div class="h-11 w-11 rounded-xl grid place-items-center bg-[color:var(--bs-blue-light)] text-[color:var(--bs-blue-dark)]">
-              <i class="pi pi-bolt text-xl"></i>
-            </div>
-            <h3 class="mt-4 font-semibold text-[color:var(--bs-blue-dark)]">AI built in</h3>
-            <p class="mt-1 text-sm text-[color:var(--bs-muted)]">Diagnose, quote, and summarize faster — without leaving the conversation.</p>
+            <p class="mt-4 text-sm leading-relaxed text-[color:var(--bs-muted)]">{{ f.blurb }}</p>
+            <ul class="mt-4 flex flex-wrap gap-2">
+              <li
+                v-for="p in f.points"
+                :key="p"
+                class="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--bs-blue-light)]/40 px-3 py-1 text-xs font-medium text-[color:var(--bs-blue-dark)]"
+              >
+                <i class="pi pi-check text-[10px]"></i>{{ p }}
+              </li>
+            </ul>
           </div>
         </div>
       </div>
@@ -442,6 +491,54 @@ onMounted(async () => {
               </div>
             </figcaption>
           </figure>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ TEASER -->
+    <section class="py-20 bg-white">
+      <div class="bs-container grid gap-10 lg:grid-cols-[0.8fr_1.2fr] items-start">
+        <div class="bs-reveal">
+          <span class="bs-kicker">Good to know</span>
+          <h2 class="mt-3 text-3xl sm:text-4xl font-bold tracking-tight text-[color:var(--bs-blue-dark)]">
+            Questions? <span class="bs-hand text-[color:var(--bs-blue)]">We've got answers.</span>
+          </h2>
+          <p class="mt-3 text-[color:var(--bs-muted)]">
+            The basics, up front. For everything else, our Help Center is searchable and our team is a
+            message away.
+          </p>
+          <div class="mt-6 flex flex-wrap gap-3">
+            <RouterLink to="/help">
+              <Button label="Visit the Help Center" icon="pi pi-compass" />
+            </RouterLink>
+            <RouterLink to="/faq">
+              <Button label="Browse all FAQs" icon="pi pi-arrow-right" icon-pos="right" outlined />
+            </RouterLink>
+          </div>
+        </div>
+
+        <div class="bs-reveal space-y-2">
+          <div
+            v-for="(f, i) in homeFaqs"
+            :key="f.question"
+            class="bs-card overflow-hidden"
+          >
+            <button
+              type="button"
+              class="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
+              :aria-expanded="openFaq === i"
+              @click="toggleFaq(i)"
+            >
+              <span class="font-medium text-[color:var(--bs-blue-dark)]">{{ f.question }}</span>
+              <i
+                class="pi pi-chevron-down shrink-0 text-[color:var(--bs-muted)] transition-transform"
+                :class="openFaq === i ? 'rotate-180' : ''"
+              ></i>
+            </button>
+            <div v-if="openFaq === i" class="px-5 pb-4 text-sm text-[color:var(--bs-muted)]">
+              {{ f.answer }}
+            </div>
+          </div>
         </div>
       </div>
     </section>

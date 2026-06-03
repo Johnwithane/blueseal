@@ -99,6 +99,9 @@ Deploy Firebase changes (IF rules / indexes / storage / functions touched):
   firebase deploy --only firestore:rules,storage,firestore:indexes,functions
   → confirm success in CLI output before continuing
   ↓
+Help/FAQ check: did this add/change something users can see or do?
+  → if so, update the Help Center / FAQ (src/data/help.ts). See below.
+  ↓
 Commit: "Phase N: short feature description"
   ↓
 Pattern check: did anything repeat 3+ times? Extract to skills/
@@ -376,6 +379,20 @@ If you write the same pattern 3+ times, **stop and extract**:
 
 We're keeping it lightweight at the start — no separate ADR folder until we actually have decisions worth tracking formally.
 
+### Help Center & FAQ upkeep
+
+The Help Center, FAQ, and homepage FAQ teaser are all driven by **one hardcoded source of truth**: [`src/data/help.ts`](./src/data/help.ts) (`HELP_CONTENT_SEED` — categories, articles, FAQs). There is **no CMS / admin editor and no Firestore doc** — editing help content is a deliberate code change, on purpose, so it goes through review like everything else.
+
+**The rule:** whenever you ship a change that a user can *see or do* differently — a new feature, a renamed flow, a changed payment/verification step, a new role capability — **check `src/data/help.ts` and update it in the same feature commit.** Ask: "Would a real user now have a question this doesn't answer, or read an answer that's now wrong?" If yes, add/edit the relevant FAQ entry and/or article.
+
+Guidelines when editing:
+- **Stay accurate.** Don't promise SLAs, fee figures, timelines, or guarantees that aren't actually live in the product. (E.g. the fee model in `MONETIZATION.md` is *proposed* — keep help copy qualitative until it ships.)
+- **Keep `audience` right** (`all` / `client` / `tradesperson`) and point every article/FAQ at a real `categoryId`.
+- **Slugs are URLs** — unique, lowercase, and stable once shipped (a renamed slug breaks existing links). Add a new article rather than renaming if a link is already out there.
+- **Bodies/answers are Markdown.** The integrity test (`src/utils/helpSearch.test.ts` → "HELP_CONTENT_SEED integrity") validates the whole set against `helpContentSchema` (unique slugs, valid category refs, length caps) — `npm run test:run` fails if you break it.
+
+When a feature is big enough to warrant its own walkthrough, add a full **article** (not just an FAQ) and mark it `popular: true` if it's a top task.
+
 ---
 
 ## What this project is NOT (sanity check list)
@@ -399,6 +416,7 @@ If you find yourself building any of the above, stop and ask.
 - [ ] If schema changed, `interfaces.ts` + `firestore.rules` + service functions all consistent
 - [ ] **If `firestore.rules` / `storage.rules` / `firestore.indexes.json` / `functions/` changed → `firebase deploy --only ...` ran successfully BEFORE this commit** (see [Firebase deployment discipline](#firebase-deployment-discipline))
 - [ ] If a new pattern emerged 3+ times, it's been promoted (skill or note here)
+- [ ] **If the change affects what users see/do → Help Center / FAQ (`src/data/help.ts`) updated** (see [Help Center & FAQ upkeep](#help-center--faq-upkeep))
 - [ ] If an open question got answered, `design.md` § 14 reflects it
 - [ ] Mobile (375px) tested
 - [ ] Commit message follows convention

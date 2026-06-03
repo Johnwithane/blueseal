@@ -70,6 +70,27 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, role: "client", layout: "app", title: "Request" },
   },
 
+  // Help Center / FAQ. Hybrid so a signed-in user reaching help from inside
+  // the app stays in their shell, while visitors get the marketing chrome.
+  {
+    path: "/help",
+    name: "HelpCenter",
+    component: () => import("@/views/help/HelpCenterView.vue"),
+    meta: { layout: "hybrid", title: "Help Center" },
+  },
+  {
+    path: "/help/:slug",
+    name: "HelpArticle",
+    component: () => import("@/views/help/HelpArticleView.vue"),
+    meta: { layout: "hybrid", title: "Help" },
+  },
+  {
+    path: "/faq",
+    name: "Faq",
+    component: () => import("@/views/help/FaqView.vue"),
+    meta: { layout: "hybrid", title: "FAQ" },
+  },
+
   // Legal
   {
     path: "/privacy",
@@ -305,6 +326,12 @@ const routes: RouteRecordRaw[] = [
     name: "AdminDisputes",
     component: () => import("@/views/admin/DisputesQueueView.vue"),
     meta: { requiresAuth: true, role: "admin", layout: "app", title: "Disputes" },
+  },
+  {
+    path: "/admin/support",
+    name: "AdminSupport",
+    component: () => import("@/views/admin/AdminSupportView.vue"),
+    meta: { requiresAuth: true, role: "admin", layout: "app", title: "Support" },
   },
   {
     path: "/admin/disputes/:id",
