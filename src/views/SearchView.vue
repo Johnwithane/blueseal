@@ -21,6 +21,7 @@ import {
 import { useAuthStore } from "@/stores/auth";
 import { TRADES, tradeLabel } from "@/data/trades";
 import { suggestTrades } from "@/data/tradeKeywords";
+import { saveRequestPrefill } from "@/utils/requestPrefill";
 import type { AvatarMarkerData } from "@/utils/avatarMarker";
 import TradieCard from "@/components/TradieCard.vue";
 import ProspectCard from "@/components/ProspectCard.vue";
@@ -236,6 +237,10 @@ async function search() {
     return;
   }
   error.value = null;
+  // Carry the client's own words through to the request form so they don't
+  // retype them after picking a tradesperson. Only when they actually
+  // described something — a bare trade-filter search shouldn't pre-fill.
+  if (describe.value.trim()) saveRequestPrefill(describe.value);
   loading.value = true;
   try {
     // Verified tradespeople + seeded prospects in parallel. Prospect search is

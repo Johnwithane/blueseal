@@ -20,6 +20,12 @@ import { useToast } from "@/composables/useToast";
 import { useGoogleMaps } from "@/composables/useGoogleMaps";
 import { compressToWebp } from "@/utils/image";
 import { humanizeError } from "@/utils/errors";
+import {
+  readRequestPrefill,
+  clearRequestPrefill,
+  deriveTitle,
+  deriveUrgency,
+} from "@/utils/requestPrefill";
 import { jobRequestSchema } from "@/validation/schemas";
 
 const route = useRoute();
@@ -54,7 +60,24 @@ const addressAutocompleteEl = ref<HTMLInputElement | null>(null);
 const submitting = ref(false);
 const error = ref<string | null>(null);
 
+// True when we seeded the form from the search-box description, so we can show
+// a "review this" note. Dismissible — the note, not the values.
+const prefilledFromSearch = ref(false);
+
+// Seed title/description/urgency from what the client typed in search (if
+// fresh). Only fills empty fields, so it never clobbers anything the user
+// already touched. All values stay fully editable.
+function applySearchPrefill() {
+  const text = readRequestPrefill();
+  if (!text) return;
+  if (!description.value) description.value = text;
+  if (!title.value) title.value = deriveTitle(text);
+  if (urgency.value === "flexible") urgency.value = deriveUrgency(text);
+  prefilledFromSearch.value = true;
+}
+
 onMounted(async () => {
+  applySearchPrefill();
   tradie.value = await getTradesperson(tradieUid);
   selectedTrade.value = tradie.value?.trades[0] ?? "";
   await loadIntake();
@@ -250,6 +273,8 @@ async function submit() {
       text: `New request: ${parsed.data.title}`,
     });
 
+    // Request submitted — the carried-over search description has done its job.
+    clearRequestPrefill();
     toast.success("Request sent", "We'll let the tradesperson know.");
     router.push({ name: "JobDetail", params: { id: jobId } });
   } catch (e) {
@@ -271,6 +296,15 @@ async function submit() {
     <p class="text-[color:var(--bs-muted)]">
       Photos and trade-specific details help you get an accurate quote.
     </p>
+
+    <Message
+      v-if="prefilledFromSearch"
+      severity="info"
+      class="mt-4"
+      @close="prefilledFromSearch = false"
+    >
+      We filled in the title, details and urgency from your search — please review and tweak before sending.
+    </Message>
 
     <Message v-if="error" severity="error" :closable="false" class="mt-4">{{ error }}</Message>
 

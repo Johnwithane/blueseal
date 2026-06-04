@@ -150,6 +150,8 @@ Not sure who's the right fit, or want pros to come to you? **Post a job** instea
     keywords: ["quote", "estimate", "request", "photos", "details"],
     body: `From a tradesperson's profile, tap **Request a quote**. You'll answer a few trade-specific questions and can attach **photos** so the pro understands the job before quoting.
 
+If you described your job in search first, the title, details and urgency come **pre-filled** from what you typed — just review and tweak before sending.
+
 That creates a **job thread** between you and the tradesperson. From there you can chat, share more photos, and receive a quote. When the quote looks right, you accept it and the job moves forward — schedule, work, invoice, and review all happen in the same thread.
 
 Quotes can include an optional upfront amount for materials or to hold a booking; you'll always see exactly what you're agreeing to before you accept.`,
