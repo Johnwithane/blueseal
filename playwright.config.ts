@@ -11,7 +11,9 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   workers: process.env.CI ? 1 : undefined,
-  reporter: "list",
+  // `list` for live CI logs; `html` writes playwright-report/ with embedded
+  // attachments (the 375px search screenshot) for the uploaded artifact.
+  reporter: [["list"], ["html", { open: "never" }]],
   use: {
     baseURL: `http://localhost:${PORT}`,
     trace: "on-first-retry",
