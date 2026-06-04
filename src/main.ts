@@ -26,8 +26,24 @@ app.use(PrimeVue, {
 app.use(ToastService);
 app.use(ConfirmationService);
 
+// Fade out and remove the boot splash (see index.html) once the app is on
+// screen — or if auth init fails, so the splash never stays stuck covering the
+// page (the baked crawler markup shows through as a fallback in that case).
+function dismissBootSplash() {
+  const el = document.getElementById("bs-splash");
+  if (!el) return;
+  el.classList.add("bs-splash--out");
+  setTimeout(() => el.remove(), 300);
+}
+
 // Initialize auth before mounting so guards see a consistent state.
 const authStore = useAuthStore();
-authStore.init().then(() => {
-  app.mount("#app");
-});
+authStore
+  .init()
+  .then(() => {
+    app.mount("#app");
+  })
+  .catch((err) => {
+    console.error("[main] auth init failed before mount", err);
+  })
+  .finally(dismissBootSplash);
