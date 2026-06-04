@@ -13,6 +13,7 @@ import {
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/firebase/config";
 import { typedConverter } from "@/firebase/converters";
+import { TRADES, type TradeOption } from "@/data/trades";
 import type {
   AssistantConversationDoc,
   AssistantMessageDoc,
@@ -203,4 +204,29 @@ export async function updateJobLog(
   if (opts.force) payload.force = true;
   const { data } = await fn(payload);
   return data;
+}
+
+/**
+ * AI fallback for the "describe what you need" search box: maps a free-text
+ * problem description to canonical trades when the instant client-side keyword
+ * matcher (src/data/tradeKeywords.ts) comes up short. Signed-in only and
+ * rate-limited server-side (one Vertex call per invocation).
+ *
+ * The callable returns trade KEYS + a short reason; we enrich each with the
+ * label/icon from the canonical TRADES list here (never trusting the function
+ * for display data) and drop any key that isn't a real trade.
+ */
+export interface AiTradeSuggestion extends TradeOption {
+  reason: string;
+}
+export async function suggestTradesFromText(text: string): Promise<AiTradeSuggestion[]> {
+  const fn = httpsCallable<
+    { text: string },
+    { ok: true; suggestions: { key: string; reason: string }[] }
+  >(functions, "aiSuggestTrades");
+  const { data } = await fn({ text });
+  return data.suggestions.flatMap((s) => {
+    const trade = TRADES.find((t) => t.key === s.key);
+    return trade ? [{ ...trade, reason: s.reason }] : [];
+  });
 }
