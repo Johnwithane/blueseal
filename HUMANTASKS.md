@@ -6,15 +6,15 @@ Tasks are grouped by the phase that introduced them so you can see why each one 
 
 ---
 
-## "Describe what you need" search — AI matcher (added 2026-06-04)
+## "Describe what you need" search — AI matcher REMOVED (updated 2026-06-05)
 
-The search page now lets clients describe a job in plain English and suggests the right trade. The instant keyword matcher (`src/data/tradeKeywords.ts`) is already fully live — it's client-only, nothing to deploy. The **AI fallback** ("Ask Blue Seal AI") calls a new Cloud Function and needs a one-line deploy before it works.
+The public "Ask Blue Seal AI" trade-matcher was **removed**. We didn't want a Vertex/Gemini endpoint any signed-in user could trigger on the public search page; the deterministic, offline keyword matcher (`src/data/tradeKeywords.ts`) is now the sole trade-finder and was made substantially more robust to compensate. The `aiSuggestTrades` callable, its client wrapper, and the "Ask Blue Seal AI" button are all gone from the codebase.
 
-### [ ] Deploy the AI trade matcher (functions only)
+### [ ] (Only if it was ever deployed) Delete the orphaned `aiSuggestTrades` function
 
-- **Why:** Adds the `aiSuggestTrades` callable (Vertex/Gemini) behind the "Ask Blue Seal AI" button — the fallback for phrasing the keyword lexicon misses. Until it's deployed, the button just shows a friendly "unavailable" message; the instant keyword suggestions and the rest of search work regardless (graceful degradation), so shipping the client ahead of the deploy can't break anything.
-- **What:** `firebase deploy --only functions`. No rules/indexes/storage changes — it reuses the existing `aiUsage` + `rateLimits` collections and the shared `"ai"` daily cap. Vertex AI is already enabled on the project (existing AI tools use it).
-- **Verify:** Signed in on **Find a tradesperson**, type something unusual the keyword matcher misses (e.g. *"my interlock is heaving and lifting"*) → click **Ask Blue Seal AI** → it returns sensible trades (e.g. Hardscaping/Paving) with a one-line reason. Counts against the 100/day AI cap per user.
+- **Why:** The original deploy task below was **never checked off**, so the callable almost certainly never went live — in which case there's nothing to do here. But to be certain no orphaned endpoint lingers in prod, run one functions deploy: Firebase compares the deployed set to the code (which no longer exports `aiSuggestTrades`) and will offer to delete it.
+- **What:** `firebase deploy --only functions`. If it prompts `Would you like to delete aiSuggestTrades?`, answer **yes**. If `aiSuggestTrades` isn't listed, it was never deployed — nothing to delete. No rules/indexes/storage changes.
+- **Verify:** `firebase functions:list` shows no `aiSuggestTrades`.
 
 ---
 

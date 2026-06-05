@@ -14,10 +14,6 @@ import {
   type AvailabilityFilter,
 } from "@/firebase/services/tradespeople";
 import { searchProspects } from "@/firebase/services/prospects";
-import {
-  suggestTradesFromText,
-  type AiTradeSuggestion,
-} from "@/firebase/services/assistant";
 import { useAuthStore } from "@/stores/auth";
 import { TRADES, tradeLabel } from "@/data/trades";
 import { suggestTrades } from "@/data/tradeKeywords";
@@ -48,9 +44,9 @@ const availability = ref<AvailabilityFilter>("any");
 
 // "Describe what you need" → instant trade suggestions. Lets a client who knows
 // the symptom but not the trade name ("my sink is leaking") jump straight to the
-// right filter instead of scrolling a 60-item dropdown. Pure local matching —
-// see src/data/tradeKeywords.ts. (An AI fallback for phrasing the lexicon
-// misses is a separate, follow-up increment.)
+// right filter instead of scrolling a 60-item dropdown. Pure local keyword
+// matching — see src/data/tradeKeywords.ts. Deterministic and offline: no AI
+// call, nothing exposed publicly, zero per-search cost.
 const describe = ref("");
 const suggestions = computed(() => suggestTrades(describe.value));
 
@@ -68,41 +64,6 @@ function applySuggestion(key: string) {
   trade.value = key;
   search();
 }
-
-// AI fallback: when the keyword matcher misses (unusual phrasing), a signed-in
-// client can ask Vertex/Gemini to map their description to trades. On-demand
-// only (one call per click) to bound spend; logged-out users keep the instant
-// keyword matcher. Degrades gracefully — if the callable isn't deployed/enabled
-// the button just surfaces a friendly error, the page is otherwise unaffected.
-const canUseAi = computed(() => !!auth.fbUser);
-const aiLoading = ref(false);
-const aiError = ref<string | null>(null);
-const aiSuggestions = ref<AiTradeSuggestion[]>([]);
-
-async function askAi() {
-  if (aiLoading.value) return;
-  aiError.value = null;
-  aiSuggestions.value = [];
-  aiLoading.value = true;
-  try {
-    const matches = await suggestTradesFromText(describe.value.trim());
-    aiSuggestions.value = matches;
-    if (!matches.length) {
-      aiError.value = "Couldn't match that to a trade. Try rewording, or pick one below.";
-    }
-  } catch {
-    aiError.value = "Smart matching is unavailable right now — pick a trade below.";
-  } finally {
-    aiLoading.value = false;
-  }
-}
-
-// Reset AI results whenever the description changes so stale suggestions from a
-// previous query never linger against new text.
-watch(describe, () => {
-  aiSuggestions.value = [];
-  aiError.value = null;
-});
 
 // SEO: when a trade filter is active, point the canonical at the clean
 // /trades/:trade landing page so filtered search variants consolidate there
@@ -411,7 +372,7 @@ onMounted(async () => {
       <div>
         <label for="describe" class="text-xs font-medium">What do you need done?</label>
         <div class="bs-describe mt-1">
-          <i class="pi pi-sparkles" aria-hidden="true"></i>
+          <i class="pi pi-search" aria-hidden="true"></i>
           <InputText
             id="describe"
             v-model="describe"
@@ -465,45 +426,8 @@ onMounted(async () => {
 
         <!-- Typed something, nothing matched: nudge to the dropdown. -->
         <p v-else class="mt-2 text-xs text-[color:var(--bs-muted)]">
-          No trade matched that yet — try the AI, pick one below, or just search your area.
+          No trade matched that yet — try different words, pick one below, or just search your area.
         </p>
-
-        <!-- AI fallback (signed-in only): Gemini maps unusual phrasing to a
-             trade when the instant keyword matcher comes up short. -->
-        <template v-if="canUseAi && describe.trim()">
-          <div v-if="aiSuggestions.length" class="mt-3">
-            <span class="text-xs text-[color:var(--bs-muted)]">
-              <i class="pi pi-sparkles mr-1 text-[color:var(--bs-blue)]"></i>Blue Seal AI suggests:
-            </span>
-            <div class="mt-1.5 flex flex-col gap-1.5">
-              <button
-                v-for="s in aiSuggestions"
-                :key="s.key"
-                type="button"
-                class="bs-ai-suggestion"
-                :class="{ 'bs-suggestion--active': trade === s.key }"
-                @click="applySuggestion(s.key)"
-              >
-                <i :class="s.icon" aria-hidden="true"></i>
-                <span class="font-semibold">{{ s.label }}</span>
-                <span v-if="s.reason" class="bs-ai-reason">— {{ s.reason }}</span>
-              </button>
-            </div>
-          </div>
-
-          <button
-            v-else
-            type="button"
-            class="bs-ai-ask mt-2"
-            :disabled="aiLoading"
-            @click="askAi"
-          >
-            <i :class="aiLoading ? 'pi pi-spin pi-spinner' : 'pi pi-sparkles'"></i>
-            {{ aiLoading ? "Thinking…" : "Not seeing it? Ask Blue Seal AI" }}
-          </button>
-
-          <p v-if="aiError" class="mt-1.5 text-xs text-[color:var(--bs-muted)]">{{ aiError }}</p>
-        </template>
       </div>
 
       <div class="bs-describe-divider my-4"><span>or filter by trade</span></div>
@@ -675,7 +599,7 @@ onMounted(async () => {
 .bs-describe:focus-within {
   border-color: var(--bs-blue);
 }
-.bs-describe > .pi-sparkles {
+.bs-describe > .pi-search {
   color: var(--bs-blue);
 }
 .bs-describe-clear {
@@ -720,53 +644,6 @@ onMounted(async () => {
 .bs-suggestion--active {
   background: var(--bs-blue);
   color: #fff;
-}
-
-/* AI "ask" button — quieter than the primary search, clearly an AI affordance. */
-.bs-ai-ask {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.375rem 0.75rem;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--bs-blue);
-  border: 1px dashed var(--bs-blue);
-  border-radius: 999px;
-  background: #fff;
-  transition: background 120ms ease;
-}
-.bs-ai-ask:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--bs-blue) 8%, #fff);
-}
-.bs-ai-ask:disabled {
-  opacity: 0.65;
-  cursor: default;
-}
-
-/* AI suggestion rows — wider than the keyword chips so the reason fits. */
-.bs-ai-suggestion {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.875rem;
-  text-align: left;
-  border: 1px solid var(--bs-blue);
-  border-radius: 10px;
-  background: #fff;
-  color: var(--bs-blue);
-  transition: background 120ms ease, color 120ms ease;
-}
-.bs-ai-suggestion:hover,
-.bs-ai-suggestion.bs-suggestion--active {
-  background: var(--bs-blue);
-  color: #fff;
-}
-.bs-ai-reason {
-  font-size: 0.8125rem;
-  font-weight: 400;
-  opacity: 0.85;
 }
 
 /* "or filter by trade" rule. */

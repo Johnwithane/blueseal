@@ -71,7 +71,6 @@ export { pullBillablesFromJob } from "./invoicing/pullBillablesFromJob";
 export { aiDiagnose, aiQuote, aiSummarize } from "./ai/tools";
 export { aiChat } from "./ai/chat";
 export { aiSuggestReplies } from "./ai/suggestReplies";
-export { aiSuggestTrades } from "./ai/suggestTrades";
 export { aiUpdateJobLog } from "./ai/updateJobLog";
 export { parseReceipt } from "./ai/parseReceipt";
 
