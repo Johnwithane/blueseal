@@ -42,7 +42,7 @@
       href="https://fonts.googleapis.com/css2?family=Gloria+Hallelujah&family=Poltawski+Nowy:ital,wght@0,400..700;1,400..700&family=Roboto:ital,wght@0,300;0,400;0,500;0,700;0,900;1,400&display=swap"
       rel="stylesheet"
     />
-    <link rel="preload" as="image" href="/icons/blueseal_logo.png" />
+    <link rel="preload" as="image" href="/icons/blueseal_logoCircle.png" />
     <!-- Boot splash. Covers the prerendered, crawler-only markup baked into
          #app (see scripts/prerender.ts) while the SPA bundle downloads and
          auth initialises, so real browsers never see the unstyled SEO shell.
@@ -64,8 +64,8 @@
         pointer-events: none;
       }
       #bs-splash img {
-        width: 128px;
-        height: 128px;
+        width: min(55vw, 240px);
+        height: auto;
         object-fit: contain;
         animation: bs-splash-pulse 1.6s ease-in-out infinite;
       }
@@ -100,7 +100,7 @@
   <body>
     <div id="app"></div>
     <div id="bs-splash" aria-hidden="true">
-      <img src="/icons/blueseal_logo.png" alt="" width="128" height="128" />
+      <img src="/icons/blueseal_logoCircle.png" alt="" width="240" height="240" />
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
