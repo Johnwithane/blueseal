@@ -236,6 +236,35 @@ export const proposedPriceSchema = z.object({
   notes: z.string().trim().max(500).optional(),
 });
 
+// Upfront-fee input for a quote. Discriminated union: a fixed dollar amount
+// (cents) or a percentage in basis points (1bps = 0.01%, capped 0–5000 = 0–50%).
+// The server always re-derives the cents from the pre-tax base.
+export const quoteUpfrontFeeSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("fixed"), amountCents: z.number().int().min(1).max(100_000_000) }),
+  z.object({ type: z.literal("percent"), bps: z.number().int().min(1).max(5000) }),
+]);
+
+// Itemized quote attached to a marketplace application. Mirrors the submitQuote
+// callable input (functions/src/lib/quoteSchemas.ts) so client + server agree
+// on bounds; the server recomputes every total and the upfront-fee cents.
+export const applicationQuoteSchema = z.object({
+  lineItems: z.array(lineItemSchema).min(1, "Add at least one line").max(40),
+  discount: z
+    .object({
+      type: z.enum(["percent", "fixed"]),
+      value: z.number().min(0),
+      label: z.string().max(60).nullable(),
+    })
+    .nullable()
+    .default(null),
+  estimatedHours: z.number().min(0).max(10_000).nullable().default(null),
+  validUntilDays: z.number().int().min(1).max(180).default(14),
+  terms: z.string().max(2000).default(""),
+  noteToClient: z.string().max(500).default(""),
+  upfrontFee: quoteUpfrontFeeSchema.nullable().default(null),
+});
+export type ApplicationQuoteInput = z.infer<typeof applicationQuoteSchema>;
+
 export const submitApplicationSchema = z.object({
   postId: z.string().min(1).max(128),
   message: z
@@ -243,7 +272,9 @@ export const submitApplicationSchema = z.object({
     .trim()
     .min(20, "Write at least a couple of sentences")
     .max(2000),
-  proposedPrice: proposedPriceSchema,
+  // Full itemized quote — the bid the client compares + accepts. The server
+  // derives the one-line proposedPrice summary from this.
+  quote: applicationQuoteSchema,
   proposedStartDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Use a YYYY-MM-DD date")

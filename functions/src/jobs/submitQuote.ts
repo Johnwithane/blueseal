@@ -7,37 +7,8 @@ import { db } from "../lib/admin";
 import { requireRole } from "../lib/auth";
 import { postSystemMessage } from "../lib/chatSystemMessage";
 import { notify } from "../lib/notify";
-
-const LineItemSchema = z.object({
-  kind: z.enum(["hourly", "labour", "materials"]).optional(),
-  description: z.string().min(1).max(200),
-  quantity: z.number().min(0).max(10_000),
-  unitPrice: z.number().int().min(0).max(100_000_000),
-  taxRate: z.number().min(0).max(1),
-});
-
-const DiscountSchema = z.object({
-  type: z.enum(["percent", "fixed"]),
-  value: z.number().min(0),
-  label: z.string().max(60).nullable(),
-});
-
-// Upfront fee input — discriminated union so the client can pass either
-// shape unambiguously. amountCents is the dollar value at submit time;
-// bps (basis points, 0–5000 = 0–50%) is only present for "percent".
-// We re-derive amountCents server-side from the computed subtotal so a
-// malicious client can't underpay relative to the quote they're agreeing to.
-const UpfrontFeeSchema = z.discriminatedUnion("type", [
-  z.object({
-    type: z.literal("fixed"),
-    amountCents: z.number().int().min(1).max(100_000_000),
-  }),
-  z.object({
-    type: z.literal("percent"),
-    // 50% cap — see Quote upfront fee plan. 1bps = 0.01%.
-    bps: z.number().int().min(1).max(5000),
-  }),
-]);
+import { LineItemSchema, DiscountSchema, UpfrontFeeSchema } from "../lib/quoteSchemas";
+import { computeTotals, resolveUpfrontFee } from "../lib/quoteTotals";
 
 const Input = z.object({
   jobId: z.string().min(1).max(128),
@@ -56,46 +27,6 @@ interface JobData {
   title: string;
   status: string;
   chatId: string;
-}
-
-interface LineItem {
-  kind?: "hourly" | "labour" | "materials";
-  description: string;
-  quantity: number;
-  unitPrice: number;
-  taxRate: number;
-}
-
-interface Discount {
-  type: "percent" | "fixed";
-  value: number;
-  label: string | null;
-}
-
-// Duplicated mirror of src/firebase/services/invoices.ts → recomputeTotals.
-// See note in submitJobForApproval.ts for the duplication rationale.
-function computeTotals(items: LineItem[], discount: Discount | null) {
-  let subtotal = 0;
-  for (const li of items) subtotal += li.quantity * li.unitPrice;
-
-  let discountAmount = 0;
-  if (discount && subtotal > 0) {
-    if (discount.type === "percent") {
-      const pct = Math.max(0, Math.min(100, discount.value));
-      discountAmount = Math.round((subtotal * pct) / 100);
-    } else {
-      discountAmount = Math.max(0, Math.min(subtotal, Math.round(discount.value)));
-    }
-  }
-
-  const factor = subtotal > 0 ? (subtotal - discountAmount) / subtotal : 1;
-  let taxTotal = 0;
-  for (const li of items) {
-    const lineSub = li.quantity * li.unitPrice;
-    taxTotal += Math.round(lineSub * factor * li.taxRate);
-  }
-
-  return { subtotal, discountAmount, taxTotal, total: subtotal - discountAmount + taxTotal };
 }
 
 /**
@@ -171,31 +102,11 @@ export const submitQuote = onCall(CALLABLE_OPTS, async (req) => {
   }
 
   // Resolve upfront fee against the same subtotal the client will see on the
-  // accepted quote. For percent we re-derive amountCents server-side from
-  // (subtotal − discountAmount) so the dollar value is always tied to the
-  // quote's pre-tax basis (consistent with how InvoiceDiscount applies). For
-  // fixed we accept the client's amountCents but clamp to the pre-tax
-  // discounted subtotal so the fee can't exceed the quote itself.
+  // accepted quote — re-derived server-side from (subtotal − discountAmount)
+  // so the dollar value is always tied to the quote's pre-tax basis and can't
+  // be tampered with. See resolveUpfrontFee in lib/quoteTotals.ts.
   const preTaxBase = Math.max(0, totals.subtotal - totals.discountAmount);
-  let upfrontFee: { type: "fixed" | "percent"; bps?: number; amountCents: number } | null = null;
-  if (upfrontFeeInput) {
-    if (upfrontFeeInput.type === "percent") {
-      const cents = Math.round((preTaxBase * upfrontFeeInput.bps) / 10_000);
-      if (cents <= 0) {
-        throw new HttpsError(
-          "failed-precondition",
-          "Upfront fee resolves to zero — increase the percentage or pick a fixed amount.",
-        );
-      }
-      upfrontFee = { type: "percent", bps: upfrontFeeInput.bps, amountCents: cents };
-    } else {
-      const cents = Math.min(upfrontFeeInput.amountCents, preTaxBase);
-      if (cents <= 0) {
-        throw new HttpsError("failed-precondition", "Upfront fee must be greater than zero.");
-      }
-      upfrontFee = { type: "fixed", amountCents: cents };
-    }
-  }
+  const upfrontFee = resolveUpfrontFee(upfrontFeeInput, preTaxBase);
 
   const validUntilMs = Date.now() + validUntilDays * 24 * 60 * 60 * 1000;
   const validUntil = Timestamp.fromMillis(validUntilMs);

@@ -4,11 +4,12 @@ import Button from "primevue/button";
 import Tag from "primevue/tag";
 import { subscribeQuote, getQuoteByJobId, markQuoteViewed } from "@/firebase/services/quotes";
 import { getInvoicePartyInfo } from "@/firebase/services/jobs";
-import type { LineItemKind, QuoteDoc, QuoteStatus, WithId } from "@/firebase/interfaces";
+import type { QuoteDoc, QuoteStatus, WithId } from "@/firebase/interfaces";
 import { useFormatters } from "@/composables/useFormatters";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 import PdfPreviewDialog from "@/components/PdfPreviewDialog.vue";
+import QuoteBreakdown from "@/components/QuoteBreakdown.vue";
 
 const props = defineProps<{
   jobId: string;
@@ -62,7 +63,7 @@ const emit = defineEmits<{
   revise: [];
 }>();
 
-const { money, date } = useFormatters();
+const { date } = useFormatters();
 
 const quote = ref<WithId<QuoteDoc> | null>(null);
 const loading = ref(true);
@@ -128,16 +129,6 @@ const STATUS_LABEL: Record<QuoteStatus, string> = {
   withdrawn: "Withdrawn",
 };
 
-const KIND_LABEL: Record<LineItemKind, string> = {
-  hourly: "Hourly",
-  labour: "Flat rate",
-  materials: "Materials",
-};
-const KIND_ICON: Record<LineItemKind, string> = {
-  hourly: "pi-clock",
-  labour: "pi-wrench",
-  materials: "pi-box",
-};
 </script>
 
 <template>
@@ -174,121 +165,7 @@ const KIND_ICON: Record<LineItemKind, string> = {
     </button>
 
     <template v-if="!collapsed">
-    <div v-if="quote.noteToClient" class="text-sm whitespace-pre-wrap mb-3 italic">
-      "{{ quote.noteToClient }}"
-    </div>
-
-    <!-- Scroll the line-item table on narrow screens instead of squishing. -->
-    <div class="overflow-x-auto">
-    <table class="w-full text-sm border-t min-w-[28rem]">
-      <thead>
-        <tr class="text-left text-[color:var(--bs-muted)]">
-          <th class="py-1 font-medium">Item</th>
-          <th class="py-1 font-medium w-32 text-right hidden sm:table-cell">Detail</th>
-          <th class="py-1 font-medium w-28 text-right">Line</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="(li, i) in quote.lineItems" :key="i" class="border-t align-top">
-          <td class="py-1.5">
-            <div class="flex items-start gap-2">
-              <span
-                v-if="li.kind"
-                class="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded shrink-0 mt-0.5"
-                :class="
-                  li.kind === 'hourly'
-                    ? 'bg-blue-100 text-blue-700'
-                    : li.kind === 'materials'
-                    ? 'bg-amber-100 text-amber-700'
-                    : 'bg-slate-100 text-slate-700'
-                "
-              >
-                <i :class="['pi', 'text-[9px]', KIND_ICON[li.kind]]"></i>
-                {{ KIND_LABEL[li.kind] }}
-              </span>
-              <span class="min-w-0">{{ li.description }}</span>
-            </div>
-          </td>
-          <td class="py-1.5 text-right text-xs text-[color:var(--bs-muted)]">
-            <template v-if="li.kind === 'hourly'">
-              {{ li.quantity }}h × {{ money(li.unitPrice) }}/hr
-            </template>
-            <template v-else-if="li.quantity !== 1">
-              {{ li.quantity }} × {{ money(li.unitPrice) }}
-            </template>
-          </td>
-          <!-- Line total includes tax to match the InvoiceEditor + PDF
-               convention. Pre-tax subtotal is shown in the totals
-               block below so the math is still auditable. -->
-          <td class="py-1.5 text-right">{{ money(Math.round(li.quantity * li.unitPrice * (1 + (li.taxRate ?? 0)))) }}</td>
-        </tr>
-      </tbody>
-      <tfoot class="border-t">
-        <tr>
-          <td colspan="2" class="py-1 text-right text-[color:var(--bs-muted)]">Subtotal</td>
-          <td class="py-1 text-right">{{ money(quote.subtotal) }}</td>
-        </tr>
-        <tr
-          v-if="quote.discountAmount > 0"
-          class="text-[color:var(--bs-blue)]"
-        >
-          <td colspan="2" class="py-1 text-right">
-            Discount
-            <span
-              v-if="quote.discount?.label"
-              class="text-xs text-[color:var(--bs-muted)]"
-            >({{ quote.discount.label }})</span>
-          </td>
-          <td class="py-1 text-right">−{{ money(quote.discountAmount) }}</td>
-        </tr>
-        <tr>
-          <td colspan="2" class="py-1 text-right text-[color:var(--bs-muted)]">Tax</td>
-          <td class="py-1 text-right">{{ money(quote.taxTotal) }}</td>
-        </tr>
-        <tr>
-          <td colspan="2" class="py-1 text-right font-semibold">Total</td>
-          <td class="py-1 text-right font-bold">{{ money(quote.total) }}</td>
-        </tr>
-        <!-- Upfront fee — conditional row tucked under the total. It's
-             not subtracted from the quote total (the total is the agreed
-             full price); it's a precondition before work starts that
-             will credit against the final invoice. -->
-        <tr
-          v-if="quote.upfrontFee && quote.upfrontFee.amountCents > 0"
-          class="text-[color:var(--bs-blue-dark)]"
-        >
-          <td colspan="2" class="py-1 text-right text-xs">
-            <i class="pi pi-wallet text-[10px]"></i>
-            Upfront fee before work starts
-          </td>
-          <td class="py-1 text-right font-semibold text-xs">
-            {{ money(quote.upfrontFee.amountCents) }}
-          </td>
-        </tr>
-      </tfoot>
-    </table>
-    </div>
-
-    <div v-if="quote.estimatedHours" class="text-xs text-[color:var(--bs-muted)] mt-2">
-      Estimated time: {{ quote.estimatedHours }} hours
-    </div>
-
-    <div
-      v-if="quote.validUntil"
-      class="text-xs mt-2"
-      :class="quote.status === 'expired' ? 'text-red-600' : 'text-[color:var(--bs-muted)]'"
-    >
-      <i class="pi pi-calendar text-[10px]"></i>
-      Valid until {{ date(quote.validUntil) }}
-    </div>
-
-    <div
-      v-if="quote.terms"
-      class="mt-3 rounded-lg bg-[color:var(--bs-surface-alt,#f9fafb)] p-3"
-    >
-      <div class="text-xs font-semibold text-[color:var(--bs-muted)] mb-1">Terms / exclusions</div>
-      <p class="text-xs whitespace-pre-wrap">{{ quote.terms }}</p>
-    </div>
+    <QuoteBreakdown :quote="quote" :expired="quote.status === 'expired'" />
 
     <div
       v-if="quote.status === 'declined' && quote.declinedReason"

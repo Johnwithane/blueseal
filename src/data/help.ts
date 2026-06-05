@@ -166,9 +166,9 @@ Quotes can include an optional upfront amount for materials or to hold a booking
     keywords: ["post a job", "job board", "bids", "applications", "marketplace"],
     body: `Prefer to have pros reach out to you? **Post a job**. Describe the work, set a budget range, and add your area and photos.
 
-Your posting is shown to **verified tradespeople** in your trade and region, who can then apply. You review who's interested — their profile, verification, and reviews — and pick who to move forward with. Choosing an applicant opens a job thread with them.
+Your posting is shown to **verified tradespeople** in your trade and region. Each one applies with a **full itemized quote** — line items, taxes, and any upfront fee — so you're comparing real numbers, not vague estimates. On your post you can open each applicant's quote, check their profile, verification, and reviews, then **Accept** the one you want. Accepting starts the job with that pro straight away and lets the others know you've chosen someone.
 
-Your exact address stays private until you decide to share it; the public posting only shows your general area.`,
+Your exact address stays private until you accept a quote; the public posting only shows your general area.`,
   },
   {
     slug: "the-job-thread",
@@ -218,7 +218,7 @@ If something needs another look, we'll let you know what to re-upload — you wo
     body: `Once you're verified, work reaches you two ways:
 
 1. **Direct requests** — clients find your profile and request a quote. These land as new job threads; respond quickly with a clear quote to win the job.
-2. **Browse jobs** — clients post jobs to the board. Browse postings in your trade and area and **apply** to the ones you want. You can track everything you've applied to under **My applications**.
+2. **Browse jobs** — clients post jobs to the board. Browse postings in your trade and area and **apply with a full itemized quote** (line items, taxes, optional upfront fee). The client compares quotes side by side and accepts one — so a clear, well-priced quote wins the job outright. Track everything you've applied to under **My applications**.
 
 A complete, verified profile with a strong portfolio and good reviews wins more work — clients can see your reputation at a glance.`,
   },
@@ -400,7 +400,7 @@ const faqs: FaqItem[] = [
   {
     question: "What's the difference between requesting a quote and posting a job?",
     answer:
-      "Requesting a quote reaches out to one specific pro you've chosen. Posting a job lists the work so multiple verified pros in your area can apply, and you pick from them.",
+      "Requesting a quote reaches out to one specific pro you've chosen. Posting a job lists the work so multiple verified pros in your area each apply with a full itemized quote — you compare them side by side and accept one.",
     categoryId: "for-clients",
     audience: "client",
   },

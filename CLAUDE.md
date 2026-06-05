@@ -402,7 +402,7 @@ When a feature is big enough to warrant its own walkthrough, add a full **articl
 - Not a native app — PWA only.
 - Not multilingual at launch.
 - Not a self-serve marketplace — every tradie passes manual cert + ID vetting before going live.
-- Not a job-board / bid marketplace — that's deferred (see `design.md` § 12 backlog).
+- Not a lowest-bid race. The job board (`design.md` § 4.6) now lets verified tradies apply to an open post with a **full itemized quote**, and the client compares quotes and accepts one (`acceptApplicationQuote`). It's a curated compare-and-choose between vetted pros — not an anonymous reverse auction on price alone. Coexists with the direct-request flow; both converge on the same `jobs/{jobId}` pipeline.
 
 If you find yourself building any of the above, stop and ask.
 

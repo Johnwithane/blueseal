@@ -802,13 +802,40 @@ export interface ProposedPrice {
   notes?: string;
 }
 
+// A full itemized quote attached to a marketplace application (bid-marketplace
+// flow). Same money shape as QuoteDoc minus the doc-lifecycle fields
+// (jobId/quoteNumber/status/timestamps) — those are assigned by
+// acceptApplicationQuote when the client accepts and the quote is materialized
+// as quotes/{jobId}. Totals + the upfront-fee cents are recomputed server-side
+// in submitApplication, so the stored values are authoritative.
+export interface ApplicationQuote {
+  lineItems: LineItem[];
+  subtotal: number;
+  discount: InvoiceDiscount | null;
+  discountAmount: number;
+  taxTotal: number;
+  total: number;
+  currency: string;
+  upfrontFee?: QuoteUpfrontFee | null;
+  estimatedHours: number | null;
+  validUntil: Timestamp | null;
+  terms: string;
+  noteToClient: string;
+}
+
 export interface ApplicationDoc {
   tradespersonId: string;
   postId: string; // duplicated so collectionGroup queries can filter by post
   clientId: string; // duplicated so rules can validate without an extra read
   status: ApplicationStatus;
   message: string;
+  // Quick one-line summary of the bid. In the bid-marketplace flow this is
+  // derived server-side from the quote total ({ type: "fixed", amount: total })
+  // so existing list/notification rendering keeps working unchanged.
   proposedPrice: ProposedPrice;
+  // Full itemized quote (bid-marketplace flow). Null on legacy applications
+  // that only ever carried the one-line proposedPrice.
+  quote?: ApplicationQuote | null;
   proposedStartDate: Timestamp | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;

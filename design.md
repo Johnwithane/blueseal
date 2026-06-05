@@ -203,7 +203,7 @@ Target SLA: 1–2 business days. Dashboard shows queue depth + oldest pending ag
 
 ### 4.6 Job-Board Marketplace (added in Phase 5b)
 
-A second client entry path, in addition to §4.3's direct request. Lets clients who don't have a specific tradesperson in mind post an open job, see bids from verified tradies in their area, and pick one. Both flows converge on the same `jobs/{jobId}` doc and from that point the workflow is identical.
+A second client entry path, in addition to §4.3's direct request. Lets clients who don't have a specific tradesperson in mind post an open job, compare **full itemized quotes** from verified tradies in their area, and accept one. Both flows converge on the same `jobs/{jobId}` doc and from that point the workflow is identical.
 
 ```
 Landing page → "Post a job, get bids" CTA (no auth required to start)
@@ -237,27 +237,37 @@ Tradie applies via submitApplication callable:
   - Vetted (isVisible:true) tradies only.
   - One application per tradie per post (rules-enforced via doc id = uid).
   - Daily rate limit: 10 applications per tradie per 24h.
-  - Cover message ≥ 20 chars + proposed price (fixed or hourly).
+  - Cover message ≥ 20 chars + a **full itemized quote** (line items, taxes,
+    optional discount + upfront fee). Totals + the upfront-fee cents are
+    recomputed server-side (shared lib/quoteTotals.ts); a one-line
+    proposedPrice summary { type:"fixed", amount: total } is derived from it
+    so list/notification rendering is unchanged. The quote is stored on the
+    application doc (ApplicationQuote).
   - Bid-blind: tradies never see other applicants, prices, or applicationCount.
   ↓
 Client sees applicants at /jobs/posted/:postId:
-  - applicationCount + each applicant's cover message, proposed price,
-    rating, and a profile link that opens in a new tab.
-  - "Pick this tradesperson" button on each pending application.
+  - applicationCount + each applicant's cover message, full quote (expandable
+    line-item breakdown), rating, and a profile link that opens in a new tab.
+  - "Accept quote" button on each pending application (legacy quote-less
+    applications fall back to the old "Pick this tradesperson" path).
   ↓
-acceptApplication (callable, transactional):
-  - Atomic: re-checks post open + selectedApplicantId null + application
-    pending + tradie still isVisible. Pre-allocates job + chat ids so retries
-    are idempotent.
-  - Creates jobs/{newJobId} with status="accepted" + sourcePostId + copies
-    title/description/trade/address/urgency/preferredDateWindow, sets
-    intakeFormData: {} (filled later).
-  - Creates chats/{newChatId} with both parties.
-  - Marks the chosen application "selected"; updates post status="closed",
-    convertedJobId, selectedApplicantId.
-  - Post-commit: server-side copies WebP photo blobs from
-    jobPosts/{postId}/photos/ to jobs/{jobId}/intake/ via the Storage Admin
-    SDK.
+acceptApplicationQuote (callable, transactional) — the bid-marketplace accept:
+  - Merges acceptApplication + clientAcceptQuote in one atomic step. Re-checks
+    post open + selectedApplicantId null + application pending + tradie still
+    isVisible + application has a quote. Pre-allocates job + chat ids.
+  - Creates jobs/{newJobId} already active: status="in_progress" (or
+    "awaiting_upfront_payment" when the quote carried an upfront fee, with the
+    UpfrontFeeState block) + sourcePostId + copied post fields.
+  - Materializes quotes/{newJobId} with status="accepted" and an assigned
+    quoteNumber (from the tradie's nextQuoteNumber sequence).
+  - Creates chats/{newChatId}; marks the chosen application "selected"; closes
+    the post (convertedJobId, selectedApplicantId); post-commit rejects +
+    notifies the other pending applicants and copies WebP photos to
+    jobs/{jobId}/intake/.
+
+acceptApplication (callable) — legacy path, retained for quote-less
+applications: creates the job in status="accepted" (tradie then sends a formal
+quote via submitQuote). Same atomic guards + photo copy.
   ↓
 onJobPostClosed trigger fans out rejection notifications to all other
 applicants (paged in batches of 400).
@@ -613,9 +623,10 @@ Live in `functions/src/`, organized by domain (`auth/`, `vetting/`, `reviews/`, 
 
 **Job-board marketplace (§4.6)**
 - `createJobPost` — client callable; 5-open-posts cap, derives geohashes server-side, writes parent + private/meta
-- `submitApplication` — vetted-tradie callable; bid-blind contract enforced; 10-apps-per-day rate limit
+- `submitApplication` — vetted-tradie callable; bid-blind contract enforced; 10-apps-per-day rate limit; carries a full itemized quote (server-recomputed totals via lib/quoteTotals.ts, stored as ApplicationQuote)
 - `withdrawApplication` — pending-only tradie callable
-- `acceptApplication` — client (post owner) callable; transactional job + chat creation; post-commit photo copy
+- `acceptApplicationQuote` — client (post owner) callable; transactional; accepts an applicant's quote → job (in_progress / awaiting_upfront_payment) + quotes/{jobId} (accepted) + chat, rejects + notifies the other applicants, post-commit photo copy
+- `acceptApplication` — client (post owner) callable; legacy quote-less path; transactional job + chat creation; post-commit photo copy
 - `returnToApplicants` — client callable; escape hatch while job is still in `accepted` status
 - `cancelJobPost` — client callable
 - `onJobPostClosed` — trigger; pages applications and fans rejection notifications
@@ -767,7 +778,7 @@ Setup is fully covered in `TECH_STACK_SETUP.md`. Below is the product build sequ
 - 🟡 v1.1 — Saved searches with alerts, client favorites
 - 🟡 v1.1 — AI-powered matching ("describe your problem")
 - 🔵 Backlog — "Available now" mode, featured listings, service-area heatmaps
-- ✅ MVP — **Job board / bid marketplace** (§4.6) — clients post open jobs, vetted tradies apply with cover message + proposed price, client picks one. Bid-blind. Address-private until acceptance. Coexists with direct-request flow.
+- ✅ MVP — **Job board / bid marketplace** (§4.6) — clients post open jobs, vetted tradies apply with a cover message + full itemized quote, client compares quotes and accepts one (`acceptApplicationQuote`). Bid-blind. Address-private until acceptance. Coexists with direct-request flow.
 
 ### Communication
 - ✅ MVP — Per-job chat with text + photo

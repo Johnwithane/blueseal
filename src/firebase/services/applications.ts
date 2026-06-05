@@ -52,6 +52,24 @@ export async function acceptApplication(
   return data;
 }
 
+/**
+ * Bid-marketplace accept: the client accepts one applicant's full itemized
+ * quote. Atomically creates the job (active, or awaiting upfront payment),
+ * materializes quotes/{jobId} as accepted, and rejects the other applicants.
+ * Returns the new job id to navigate to.
+ */
+export async function acceptApplicationQuote(
+  postId: string,
+  applicationId: string,
+): Promise<{ jobId: string; chatId: string }> {
+  const callable = httpsCallable<
+    { postId: string; applicationId: string },
+    { jobId: string; chatId: string }
+  >(functions, "acceptApplicationQuote");
+  const { data } = await callable({ postId, applicationId });
+  return data;
+}
+
 export function subscribeApplicationsForPost(
   postId: string,
   cb: (apps: WithId<ApplicationDoc>[]) => void,

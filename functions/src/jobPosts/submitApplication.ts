@@ -7,15 +7,25 @@ import { db } from "../lib/admin";
 import { requireRoleOrAdmin } from "../lib/auth";
 import { requireVisibleTradie, rateLimitKey } from "./helpers";
 import { notify } from "../lib/notify";
+import { LineItemSchema, DiscountSchema, UpfrontFeeSchema } from "../lib/quoteSchemas";
+import { computeTotals, resolveUpfrontFee } from "../lib/quoteTotals";
+
+// Itemized quote carried on the application — the bid the client compares and
+// accepts. Mirrors submitQuote's input; totals are recomputed server-side.
+const QuoteInput = z.object({
+  lineItems: z.array(LineItemSchema).min(1).max(40),
+  discount: DiscountSchema.nullable().default(null),
+  estimatedHours: z.number().min(0).max(10_000).nullable().default(null),
+  validUntilDays: z.number().int().min(1).max(180).default(14),
+  terms: z.string().max(2000).default(""),
+  noteToClient: z.string().max(500).default(""),
+  upfrontFee: UpfrontFeeSchema.nullable().default(null),
+});
 
 const Input = z.object({
   postId: z.string().min(1).max(128),
   message: z.string().trim().min(20).max(2000),
-  proposedPrice: z.object({
-    type: z.enum(["fixed", "hourly"]),
-    amount: z.number().int().min(500).max(10_000_000),
-    notes: z.string().trim().max(500).optional(),
-  }),
+  quote: QuoteInput,
   proposedStartDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -35,8 +45,38 @@ export const submitApplication = onCall(CALLABLE_OPTS, async (req) => {
   if (!parsed.success) {
     throw new HttpsError("invalid-argument", parsed.error.issues[0]?.message ?? "Invalid input");
   }
-  const { postId, message, proposedPrice, proposedStartDate } = parsed.data;
+  const { postId, message, quote, proposedStartDate } = parsed.data;
   const ctx = { fn: "submitApplication", uid, postId };
+
+  // Recompute every total server-side so a tampered payload can't misstate the
+  // bid the client will accept. Mirrors submitQuote exactly (shared helpers).
+  const totals = computeTotals(quote.lineItems, quote.discount);
+  if (totals.total <= 0) {
+    throw new HttpsError("failed-precondition", "Quote total must be greater than zero.");
+  }
+  const preTaxBase = Math.max(0, totals.subtotal - totals.discountAmount);
+  const upfrontFee = resolveUpfrontFee(quote.upfrontFee, preTaxBase);
+  const validUntil = Timestamp.fromMillis(
+    Date.now() + quote.validUntilDays * 24 * 60 * 60 * 1000,
+  );
+
+  // The stored quote snapshot + a one-line proposedPrice derived from the
+  // total so existing list/notification rendering keeps working.
+  const applicationQuote = {
+    lineItems: quote.lineItems,
+    subtotal: totals.subtotal,
+    discount: quote.discount,
+    discountAmount: totals.discountAmount,
+    taxTotal: totals.taxTotal,
+    total: totals.total,
+    currency: "CAD",
+    upfrontFee,
+    estimatedHours: quote.estimatedHours,
+    validUntil,
+    terms: quote.terms,
+    noteToClient: quote.noteToClient,
+  };
+  const proposedPrice = { type: "fixed" as const, amount: totals.total };
 
   const postRef = db.doc(`jobPosts/${postId}`);
   const appRef = postRef.collection("applications").doc(uid);
@@ -84,6 +124,7 @@ export const submitApplication = onCall(CALLABLE_OPTS, async (req) => {
         status: "pending",
         message,
         proposedPrice,
+        quote: applicationQuote,
         proposedStartDate: proposedStartDate
           ? Timestamp.fromDate(new Date(`${proposedStartDate}T00:00:00Z`))
           : null,

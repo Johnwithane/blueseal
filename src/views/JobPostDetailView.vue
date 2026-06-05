@@ -2,9 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import Button from "primevue/button";
-import InputNumber from "primevue/inputnumber";
 import Textarea from "primevue/textarea";
-import Select from "primevue/select";
 import Tag from "primevue/tag";
 import Message from "primevue/message";
 import { useConfirm } from "primevue/useconfirm";
@@ -16,6 +14,7 @@ import {
 } from "@/firebase/services/jobPosts";
 import {
   acceptApplication,
+  acceptApplicationQuote,
   subscribeApplicationsForPost,
   subscribeMyApplicationForPost,
   submitApplication,
@@ -39,13 +38,16 @@ import { humanizeError } from "@/utils/errors";
 import VerifiedBadge from "@/components/VerifiedBadge.vue";
 import JobCounterparty from "@/components/JobCounterparty.vue";
 import LoadingState from "@/components/LoadingState.vue";
+import QuoteComposer from "@/components/QuoteComposer.vue";
+import type { QuoteComposerState } from "@/components/QuoteComposer.vue";
+import QuoteBreakdown from "@/components/QuoteBreakdown.vue";
 
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
 const toast = useToast();
 const confirm = useConfirm();
-const { relativeTime } = useFormatters();
+const { relativeTime, money } = useFormatters();
 
 const postId = computed(() => route.params.postId as string);
 const post = ref<WithId<JobPostDoc> | null>(null);
@@ -62,17 +64,25 @@ const loading = ref(true);
 // bug). Use applyError for the apply form, toast.error for other actions.
 const error = ref<string | null>(null);
 
-// Apply form (tradesperson view)
+// Apply form (tradesperson view) — now a full itemized quote.
 const applyMessage = ref("");
-const applyType = ref<"fixed" | "hourly">("fixed");
-const applyAmount = ref<number | null>(null);
-const applyNotes = ref("");
-const applyStartDate = ref<string>("");
 const submittingApply = ref(false);
 const applyError = ref<string | null>(null);
 const submittingAccept = ref(false);
+const submittingAcceptQuote = ref(false);
 const submittingCancel = ref(false);
 const submittingWithdraw = ref(false);
+
+// Quote composer state for the apply form + the tradie's stored hourly rate
+// (passed to the composer so hourly lines default to the profile rate).
+const applyHourlyRate = ref<number | null>(null);
+const composerState = ref<QuoteComposerState | null>(null);
+
+// Which applicant's full quote is expanded in the client's list.
+const expandedAppId = ref<string | null>(null);
+function toggleExpanded(id: string) {
+  expandedAppId.value = expandedAppId.value === id ? null : id;
+}
 
 let unsubMeta: (() => void) | null = null;
 let unsubApps: (() => void) | null = null;
@@ -122,6 +132,12 @@ onMounted(async () => {
         auth.fbUser.uid,
         (a) => (myApplication.value = a),
       );
+      // Seed the composer's hourly default from the tradie's profile rate.
+      try {
+        applyHourlyRate.value = (await getTradesperson(auth.fbUser.uid))?.hourlyRate ?? null;
+      } catch {
+        applyHourlyRate.value = null;
+      }
     }
   } catch (e) {
     error.value = humanizeError(e);
@@ -157,15 +173,18 @@ async function submitApply() {
   if (!post.value || submittingApply.value) return;
   applyError.value = null;
 
+  const s = composerState.value;
+  if (!s || !s.valid || !s.payload) {
+    applyError.value = s?.hasHourlyLineWithoutRate
+      ? "An hourly line has no rate — set your profile rate, override it on the line, or switch it to Flat rate."
+      : "Add at least one line item with an amount.";
+    return;
+  }
+
   const payload = {
     postId: postId.value,
     message: applyMessage.value.trim(),
-    proposedPrice: {
-      type: applyType.value,
-      amount: Math.round((applyAmount.value ?? 0) * 100),
-      ...(applyNotes.value.trim() ? { notes: applyNotes.value.trim() } : {}),
-    },
-    ...(applyStartDate.value ? { proposedStartDate: applyStartDate.value } : {}),
+    quote: s.payload,
   };
   const parsed = submitApplicationSchema.safeParse(payload);
   if (!parsed.success) {
@@ -176,11 +195,8 @@ async function submitApply() {
   submittingApply.value = true;
   try {
     await submitApplication(parsed.data);
-    toast.success("Application sent", "Clients typically respond within 24 hours.");
+    toast.success("Quote sent", "The client can compare and accept it. They typically respond within 24 hours.");
     applyMessage.value = "";
-    applyAmount.value = null;
-    applyNotes.value = "";
-    applyStartDate.value = "";
   } catch (e) {
     applyError.value = humanizeError(e);
   } finally {
@@ -188,9 +204,42 @@ async function submitApply() {
   }
 }
 
+// Applicant display name — prefer the person/company name; fall back to a
+// generic label. (Used in confirm copy + the card headline.)
+function applicantName(app: WithId<ApplicationDoc>): string {
+  const t = applicantTradies.value.get(app.tradespersonId);
+  return t?.displayName?.trim() || t?.companyName?.trim() || "This tradesperson";
+}
+
+// Bid-marketplace accept: the applicant attached a full quote → accept it
+// directly, which starts the job already-active and rejects the others.
+async function onAcceptQuote(app: WithId<ApplicationDoc>) {
+  confirm.require({
+    message:
+      `Accept ${applicantName(app)}'s quote and start the job? ` +
+      `The other applicants will be told you've chosen someone.`,
+    header: "Accept this quote?",
+    icon: "pi pi-check-circle",
+    acceptLabel: "Yes, accept",
+    rejectLabel: "Cancel",
+    accept: async () => {
+      submittingAcceptQuote.value = true;
+      try {
+        const { jobId } = await acceptApplicationQuote(postId.value, app.id);
+        router.push({ name: "JobDetail", params: { id: jobId } });
+      } catch (e) {
+        toast.error("Couldn't accept this quote", humanizeError(e));
+      } finally {
+        submittingAcceptQuote.value = false;
+      }
+    },
+  });
+}
+
+// Legacy path for applications that pre-date the quote-on-apply change
+// (app.quote == null): pick the tradesperson, then they send a formal quote.
 async function onAccept(app: WithId<ApplicationDoc>) {
-  const tradie = applicantTradies.value.get(app.tradespersonId);
-  const tradieLabel = tradie ? tradeLabel(tradie.trades[0]) : "this tradesperson";
+  const tradieLabel = applicantName(app);
   confirm.require({
     message:
       `Start a job with ${tradieLabel}? Other applicants will be told you've chosen someone. ` +
@@ -385,12 +434,18 @@ const visibleApplications = computed(() =>
                   class="font-semibold text-[color:var(--bs-blue-dark)] hover:underline"
                 >
                   {{
-                    applicantTradies.get(app.tradespersonId)
-                      ? tradeLabel(applicantTradies.get(app.tradespersonId)!.trades[0])
-                      : 'Tradesperson'
+                    applicantTradies.get(app.tradespersonId)?.displayName
+                      || applicantTradies.get(app.tradespersonId)?.companyName
+                      || 'Tradesperson'
                   }}
                   <i class="pi pi-external-link text-xs"></i>
                 </a>
+                <div
+                  v-if="applicantTradies.get(app.tradespersonId)"
+                  class="text-xs text-[color:var(--bs-muted)] mt-0.5"
+                >
+                  {{ tradeLabel(applicantTradies.get(app.tradespersonId)!.trades[0]) }}
+                </div>
                 <div
                   v-if="applicantTradies.get(app.tradespersonId)"
                   class="text-xs text-[color:var(--bs-muted)] mt-0.5"
@@ -449,8 +504,38 @@ const visibleApplications = computed(() =>
             <div v-if="app.proposedPrice.notes" class="text-xs text-[color:var(--bs-muted)] mt-2">
               Notes: {{ app.proposedPrice.notes }}
             </div>
+
+            <!-- Full itemized quote (bid-marketplace). Collapsed by default;
+                 the client expands to compare line items before accepting. -->
+            <template v-if="app.quote">
+              <button
+                type="button"
+                class="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-[color:var(--bs-blue)] hover:underline"
+                :aria-expanded="expandedAppId === app.id"
+                @click="toggleExpanded(app.id)"
+              >
+                <i :class="expandedAppId === app.id ? 'pi pi-chevron-down' : 'pi pi-chevron-right'" class="text-xs"></i>
+                {{ expandedAppId === app.id ? "Hide quote" : "View full quote" }}
+              </button>
+              <div
+                v-if="expandedAppId === app.id"
+                class="mt-2 rounded-lg border border-[color:var(--bs-border)] p-3"
+              >
+                <QuoteBreakdown :quote="app.quote" />
+              </div>
+            </template>
+
             <div v-if="post.status === 'open' && app.status === 'pending'" class="mt-3">
               <Button
+                v-if="app.quote"
+                label="Accept quote"
+                icon="pi pi-check"
+                severity="success"
+                :loading="submittingAcceptQuote"
+                @click="onAcceptQuote(app)"
+              />
+              <Button
+                v-else
                 label="Pick this tradesperson"
                 icon="pi pi-check"
                 :loading="submittingAccept"
@@ -480,7 +565,13 @@ const visibleApplications = computed(() =>
             />
           </div>
           <p class="text-sm mt-3 whitespace-pre-line">{{ myApplication.message }}</p>
-          <div class="text-xs mt-2">Proposed: {{ priceLabel(myApplication.proposedPrice) }}</div>
+          <div
+            v-if="myApplication.quote"
+            class="mt-3 rounded-lg border border-[color:var(--bs-border)] p-3"
+          >
+            <QuoteBreakdown :quote="myApplication.quote" />
+          </div>
+          <div v-else class="text-xs mt-2">Proposed: {{ priceLabel(myApplication.proposedPrice) }}</div>
           <div v-if="myApplication.status === 'pending'" class="mt-3">
             <Button
               label="Withdraw application"
@@ -498,9 +589,10 @@ const visibleApplications = computed(() =>
           class="bs-card p-5 mt-6 space-y-4"
           @submit.prevent="submitApply"
         >
-          <h2 class="text-lg font-semibold">Apply for this job</h2>
+          <h2 class="text-lg font-semibold">Send a quote</h2>
           <p class="text-xs text-[color:var(--bs-muted)]">
-            Anticipate what the client might ask — your approach, availability, what's included.
+            Your quote is what the client compares and accepts — itemize the work
+            so they can say yes with confidence.
           </p>
           <Message v-if="applyError" severity="error" :closable="false">
             {{ applyError }}
@@ -509,57 +601,29 @@ const visibleApplications = computed(() =>
             <label class="text-sm font-medium">Cover message</label>
             <Textarea
               v-model="applyMessage"
-              rows="5"
+              rows="4"
               maxlength="2000"
               placeholder="Why you're a good fit, your approach, when you can start, and what's included…"
               class="mt-1 w-full"
             />
           </div>
-          <div class="grid sm:grid-cols-3 gap-2">
-            <div>
-              <label class="text-sm font-medium">Quote type</label>
-              <Select
-                v-model="applyType"
-                :options="[
-                  { label: 'Fixed', value: 'fixed' },
-                  { label: 'Hourly', value: 'hourly' },
-                ]"
-                option-label="label"
-                option-value="value"
-                class="mt-1 w-full"
-              />
-            </div>
-            <div class="sm:col-span-2">
-              <label class="text-sm font-medium">
-                {{ applyType === 'fixed' ? 'Total price' : 'Hourly rate' }} (CAD)
-              </label>
-              <InputNumber
-                v-model="applyAmount"
-                mode="currency"
-                currency="CAD"
-                :min="5"
-                :max="100000"
-                :min-fraction-digits="0"
-                :max-fraction-digits="0"
-                class="mt-1 w-full"
-              />
-            </div>
-          </div>
-          <div>
-            <label class="text-sm font-medium">Notes (optional)</label>
-            <Textarea
-              v-model="applyNotes"
-              rows="2"
-              maxlength="500"
-              placeholder="What's included or excluded, materials, etc."
-              class="mt-1 w-full"
-            />
-          </div>
+
+          <QuoteComposer
+            :hourly-rate-cents="applyHourlyRate"
+            hide-note
+            @update:state="(s) => (composerState = s)"
+          />
+
           <Button
             type="submit"
-            label="Send application"
+            :label="
+              composerState && composerState.totals.total > 0
+                ? `Send quote — ${money(composerState.totals.total)}`
+                : 'Send quote'
+            "
             icon="pi pi-send"
             :loading="submittingApply"
+            :disabled="submittingApply"
             size="large"
           />
         </form>

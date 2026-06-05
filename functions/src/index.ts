@@ -123,6 +123,7 @@ export { createJobPost } from "./jobPosts/createJobPost";
 export { submitApplication } from "./jobPosts/submitApplication";
 export { withdrawApplication } from "./jobPosts/withdrawApplication";
 export { acceptApplication } from "./jobPosts/acceptApplication";
+export { acceptApplicationQuote } from "./jobPosts/acceptApplicationQuote";
 export { returnToApplicants } from "./jobPosts/returnToApplicants";
 export { cancelJobPost } from "./jobPosts/cancelJobPost";
 export { onJobPostCreated } from "./jobPosts/onJobPostCreated";
