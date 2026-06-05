@@ -32,14 +32,6 @@ useSeo(helpCenterSeo());
         <div class="mt-7 flex justify-center">
           <HelpSearchBox size="hero" autofocus placeholder="Search help articles…" class="w-full" />
         </div>
-        <div class="mt-4 flex flex-wrap justify-center gap-2 text-sm">
-          <RouterLink to="/faq" class="rounded-full bg-white/10 px-4 py-1.5 font-medium text-white no-underline ring-1 ring-white/25 hover:bg-white/20">
-            Browse the FAQ
-          </RouterLink>
-          <a href="#contact" class="rounded-full bg-white/10 px-4 py-1.5 font-medium text-white no-underline ring-1 ring-white/25 hover:bg-white/20">
-            Contact support
-          </a>
-        </div>
       </div>
     </section>
 
@@ -124,7 +116,10 @@ useSeo(helpCenterSeo());
         </div>
       </section>
 
-      <div class="text-center">
+      <div class="flex flex-wrap items-center justify-center gap-2">
+        <RouterLink to="/faq">
+          <Button label="Browse the FAQ" icon="pi pi-question-circle" outlined />
+        </RouterLink>
         <RouterLink to="/">
           <Button label="Back to home" icon="pi pi-home" text />
         </RouterLink>
