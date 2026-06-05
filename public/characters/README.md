@@ -76,7 +76,7 @@ seal-trade-siding.png              seal-trade-gutters.png
 seal-trade-window_installer.png    seal-trade-glazier.png
 seal-trade-garage_door.png         seal-trade-fencing.png
 seal-trade-deck_builder.png        seal-trade-stucco.png
-seal-trade-waterproofing.png       seal-trade-insulation.png
+seal-trade-waterproofing2.png       seal-trade-insulation2.png
 seal-trade-cabinetry.png           seal-trade-countertop.png
 seal-trade-wallpaper.png           seal-trade-window_treatments.png
 seal-trade-arborist.png            seal-trade-irrigation.png

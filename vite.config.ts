@@ -21,7 +21,7 @@ export default defineConfig({
         "favicon-32x32.png",
         "apple-touch-icon.png",
         "robots.txt",
-        "icons/blueseal_logo.png",
+        "icons/blueseal_logoCircle.png",
         "icons/blueseal_logo_Character.png",
       ],
       manifest: {
@@ -36,7 +36,7 @@ export default defineConfig({
         // android-chrome-* paths 404'd, so the install prompt had no icon.
         icons: [
           { src: "/android-icon-192x192.png", sizes: "192x192", type: "image/png" },
-          { src: "/icons/blueseal_logo.png", sizes: "512x512", type: "image/png" },
+          { src: "/icons/blueseal_logoCircle.png", sizes: "512x512", type: "image/png" },
         ],
       },
       workbox: {
