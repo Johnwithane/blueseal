@@ -20,6 +20,8 @@ import { humanizeError } from "@/utils/errors";
 import { tradeLabel } from "@/data/trades";
 import { STATUS_LABEL, STATUS_SEVERITY } from "@/utils/jobStatus";
 import LoadingState from "@/components/LoadingState.vue";
+import AdminUserManage from "@/components/admin/AdminUserManage.vue";
+import type { Role } from "@/firebase/interfaces";
 
 const { dateTime, relativeTime, money, date } = useFormatters();
 
@@ -133,6 +135,24 @@ function vettingSeverity(s: string): "info" | "success" | "warn" | "danger" {
   if (s === "rejected") return "danger";
   if (s === "info_requested") return "warn";
   return "info";
+}
+
+// After an admin edits a user's roles, patch the row in place and refresh the
+// tradesperson doc in the expanded panel — adding/removing the tradesperson
+// role changes whether the trades editor should appear.
+async function onRolesUpdated(user: WithId<UserDoc>, roles: Role[], activeRole: Role) {
+  user.roles = roles;
+  user.activeRole = activeRole;
+  const state = expanded.value[user.id];
+  if (state) {
+    state.tradie = roles.includes("tradesperson") ? await getTradesperson(user.id) : null;
+  }
+}
+
+// Keep the row's displayed trade list in sync after an inline trades edit.
+function onTradesUpdated(user: WithId<UserDoc>, trades: string[]) {
+  const tradie = expanded.value[user.id]?.tradie;
+  if (tradie) tradie.trades = trades;
 }
 </script>
 
@@ -485,6 +505,14 @@ function vettingSeverity(s: string): "info" | "success" | "warn" | "danger" {
             >
               No jobs on file for this account.
             </div>
+
+            <AdminUserManage
+              class="border-t border-[color:var(--bs-border)] pt-4"
+              :user="u"
+              :tradie="expanded[u.id].tradie"
+              @roles-updated="(roles, activeRole) => onRolesUpdated(u, roles, activeRole)"
+              @trades-updated="(trades) => onTradesUpdated(u, trades)"
+            />
           </template>
         </div>
       </li>

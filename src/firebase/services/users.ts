@@ -288,3 +288,17 @@ export async function grantAllRolesForAdminTesting(): Promise<{ roles: Role[] }>
   const result = await callable({});
   return { roles: result.data.roles };
 }
+
+/**
+ * Admin-only testing helper: ensures the calling admin has a visible, approved
+ * tradesperson profile and attaches *every* trade (marked verified) so they can
+ * exercise trade-specific flows. One-way — trim trades via the trades editor.
+ */
+export async function grantAllTradesForAdminTesting(): Promise<{ count: number }> {
+  const callable = httpsCallable<unknown, { ok: boolean; count: number }>(
+    functions,
+    "grantAllTradesForAdminTesting",
+  );
+  const result = await callable({});
+  return { count: result.data.count };
+}

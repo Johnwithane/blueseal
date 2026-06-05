@@ -5,8 +5,10 @@ setGlobalOptions({ region: "us-central1", maxInstances: 10 });
 // Auth & roles
 export { setRoleOnSignup } from "./auth/setRoleOnSignup";
 export { setAdminRole } from "./auth/setAdminRole";
+export { adminSetUserRoles } from "./auth/adminSetUserRoles";
 export { addRoleToSelf } from "./auth/addRoleToSelf";
 export { grantAllRolesForAdminTesting } from "./auth/grantAllRolesForAdminTesting";
+export { grantAllTradesForAdminTesting } from "./auth/grantAllTradesForAdminTesting";
 export { requestAccountDeletion } from "./auth/requestAccountDeletion";
 export { exportMyData } from "./auth/exportMyData";
 export { scheduledHardDelete } from "./auth/scheduledHardDelete";
@@ -30,6 +32,7 @@ export { onClientReviewCreated } from "./reviews/onClientReviewCreated";
 export { nudgeReviewPairs } from "./reviews/nudgeReviewPairs";
 
 // Admin one-shot ops
+export { adminSetUserTrades } from "./admin/setUserTrades";
 export { backfillReviewReviewers } from "./admin/backfillReviewReviewers";
 export { backfillJobPostClient } from "./admin/backfillJobPostClient";
 export { backfillJobPrivateNotes } from "./admin/backfillJobPrivateNotes";

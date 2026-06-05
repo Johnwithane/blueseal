@@ -20,6 +20,7 @@ import {
   exportMyData,
   getUser,
   grantAllRolesForAdminTesting,
+  grantAllTradesForAdminTesting,
   requestAccountDeletion,
   updateNotificationPrefs,
   updateUserProfile,
@@ -71,6 +72,7 @@ const sendingReset = ref(false);
 const addingTradie = ref(false);
 const addingClient = ref(false);
 const grantingAdminAllRoles = ref(false);
+const grantingAllTrades = ref(false);
 const error = ref<string | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
 
@@ -742,6 +744,30 @@ async function grantAdminAllRoles() {
     grantingAdminAllRoles.value = false;
   }
 }
+
+async function grantAllTrades() {
+  grantingAllTrades.value = true;
+  error.value = null;
+  try {
+    const { count } = await grantAllTradesForAdminTesting();
+    // The callable also ensures all roles + an approved tradesperson profile,
+    // so refresh claims/roles (same as grantAdminAllRoles) and reload the
+    // tradie doc to pick up the new trades + visibility.
+    await auth.fbUser?.getIdToken(true);
+    await auth.refreshClaims();
+    if (auth.fbUser) {
+      auth.user = await getUser(auth.fbUser.uid);
+      auth.roles = auth.user?.roles ?? auth.roles;
+      auth.activeRole = auth.user?.activeRole ?? auth.activeRole;
+      tradie.value = await getTradesperson(auth.fbUser.uid);
+    }
+    toast.success(`All ${count} trades enabled on your testing profile.`);
+  } catch (e) {
+    error.value = humanizeError(e);
+  } finally {
+    grantingAllTrades.value = false;
+  }
+}
 </script>
 
 <template>
@@ -1347,7 +1373,7 @@ async function grantAdminAllRoles() {
         </div>
 
         <div
-          v-if="auth.hasAdminRole && !(auth.hasClientRole && auth.hasTradieRole)"
+          v-if="auth.hasAdminRole"
           class="mt-4 rounded-lg border border-dashed border-[color:var(--bs-border)] p-4"
         >
           <div class="flex items-start gap-3">
@@ -1359,14 +1385,29 @@ async function grantAdminAllRoles() {
                 so you can dogfood the full client + tradesperson surface
                 (post jobs, browse the marketplace, submit applications).
               </p>
-              <div class="mt-3">
+              <div class="mt-3 flex flex-wrap gap-2">
                 <Button
+                  v-if="!(auth.hasClientRole && auth.hasTradieRole)"
                   label="Enable all roles for testing"
                   icon="pi pi-bolt"
                   :loading="grantingAdminAllRoles"
                   @click="grantAdminAllRoles"
                 />
+                <Button
+                  label="Enable all trades (testing)"
+                  icon="pi pi-list"
+                  severity="secondary"
+                  outlined
+                  :loading="grantingAllTrades"
+                  @click="grantAllTrades"
+                />
               </div>
+              <p class="mt-2 text-xs text-[color:var(--bs-muted)]">
+                "Enable all trades" attaches every trade to your tradesperson
+                profile (marked verified) so you can test trade-specific flows.
+                To trim them later, edit your trades from
+                <RouterLink to="/admin/users" class="underline">Admin → User Search</RouterLink>.
+              </p>
             </div>
           </div>
         </div>
