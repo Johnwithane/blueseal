@@ -10,11 +10,10 @@ Tasks are grouped by the phase that introduced them so you can see why each one 
 
 The public "Ask Blue Seal AI" trade-matcher was **removed**. We didn't want a Vertex/Gemini endpoint any signed-in user could trigger on the public search page; the deterministic, offline keyword matcher (`src/data/tradeKeywords.ts`) is now the sole trade-finder and was made substantially more robust to compensate. The `aiSuggestTrades` callable, its client wrapper, and the "Ask Blue Seal AI" button are all gone from the codebase.
 
-### [ ] (Only if it was ever deployed) Delete the orphaned `aiSuggestTrades` function
+### [x] Deleted the live `aiSuggestTrades` function from prod (2026-06-05)
 
-- **Why:** The original deploy task below was **never checked off**, so the callable almost certainly never went live — in which case there's nothing to do here. But to be certain no orphaned endpoint lingers in prod, run one functions deploy: Firebase compares the deployed set to the code (which no longer exports `aiSuggestTrades`) and will offer to delete it.
-- **What:** `firebase deploy --only functions`. If it prompts `Would you like to delete aiSuggestTrades?`, answer **yes**. If `aiSuggestTrades` isn't listed, it was never deployed — nothing to delete. No rules/indexes/storage changes.
-- **Verify:** `firebase functions:list` shows no `aiSuggestTrades`.
+- **What happened:** Despite the original deploy task never being checked off, `aiSuggestTrades` *was* live in prod (us-central1) — so the public Vertex endpoint really did exist. Removed it surgically with `firebase functions:delete aiSuggestTrades --region us-central1 --force` (a targeted delete, not a full functions redeploy — the other ~80 functions were left untouched).
+- **Verified:** `firebase functions:list` no longer shows `aiSuggestTrades`.
 
 ---
 
