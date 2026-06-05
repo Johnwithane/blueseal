@@ -271,25 +271,27 @@ onMounted(async () => {
           </p>
         </div>
 
-        <div class="bs-reveal mt-10 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+        <div class="bs-reveal mt-10 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <RouterLink
             v-for="t in visibleTrades"
             :key="t.key"
             :to="{ name: 'Search', query: { trade: t.key } }"
-            class="bs-trade-tile group flex flex-col items-center p-5 text-center no-underline text-inherit"
+            class="bs-trade-tile group flex items-center gap-3 p-3 no-underline text-inherit sm:p-4"
           >
-            <!-- Trade mascot is the hero (generic tradesperson fallback if no art yet) -->
+            <!-- Trade mascot on the left (generic tradesperson fallback if no art yet) -->
             <SealCharacter
               :name="`trade-${t.key}`"
               fallback="pose-toolbelt"
-              class="pointer-events-none h-28 w-auto drop-shadow-md transition-transform duration-300 group-hover:scale-105 sm:h-32"
+              class="pointer-events-none h-16 w-auto shrink-0 drop-shadow-sm transition-transform duration-300 group-hover:scale-105 sm:h-20"
             />
-            <div class="mt-3 font-semibold text-[color:var(--bs-blue-dark)]">{{ t.label }}</div>
-            <span
-              class="mt-2 inline-flex items-center gap-1 rounded-full bg-[color:var(--bs-blue-light)]/50 px-3 py-1 text-xs font-semibold text-[color:var(--bs-blue-dark)] transition group-hover:bg-[color:var(--bs-blue)] group-hover:text-white"
-            >
-              Browse <i class="pi pi-arrow-right text-[10px]"></i>
-            </span>
+            <div class="min-w-0 flex-1">
+              <div class="font-semibold leading-tight text-[color:var(--bs-blue-dark)]">{{ t.label }}</div>
+              <span
+                class="mt-1.5 inline-flex w-fit items-center gap-1 rounded-full bg-[color:var(--bs-blue-light)]/50 px-2.5 py-0.5 text-xs font-semibold text-[color:var(--bs-blue-dark)] transition group-hover:bg-[color:var(--bs-blue)] group-hover:text-white"
+              >
+                Browse <i class="pi pi-arrow-right text-[10px] transition-transform group-hover:translate-x-0.5"></i>
+              </span>
+            </div>
           </RouterLink>
         </div>
 
@@ -403,9 +405,14 @@ onMounted(async () => {
           </div>
         </div>
 
-        <!-- Floating phone-ish card -->
-        <div class="bs-reveal relative hidden md:block">
-          <div class="relative ml-auto max-w-sm rounded-3xl bg-white text-[color:var(--bs-text)] p-5 shadow-2xl ring-1 ring-white/30">
+        <!-- Floating phone-ish card + mascot beside it -->
+        <div class="bs-reveal relative hidden items-end justify-end gap-3 md:flex lg:gap-5">
+          <!-- Mascot sits beside the card (flex) so it never overlaps it; shown from lg up -->
+          <SealCharacter
+            name="pose-toolbelt"
+            class="pointer-events-none hidden h-52 w-auto shrink-0 drop-shadow-2xl lg:block"
+          />
+          <div class="relative w-full max-w-sm rounded-3xl bg-white text-[color:var(--bs-text)] p-5 shadow-2xl ring-1 ring-white/30">
             <div class="flex items-center gap-3">
               <img src="/icons/blueseal_logoCircle.png" alt="" class="h-9 w-9" />
               <div>
@@ -423,10 +430,6 @@ onMounted(async () => {
               <Button label="Message" icon="pi pi-comments" size="small" outlined />
             </div>
           </div>
-          <SealCharacter
-            name="pose-toolbelt"
-            class="pointer-events-none absolute -left-4 bottom-0 h-44 w-auto drop-shadow-2xl lg:-left-8 lg:h-52"
-          />
         </div>
       </div>
     </section>
