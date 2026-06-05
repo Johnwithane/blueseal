@@ -6,6 +6,18 @@ Tasks are grouped by the phase that introduced them so you can see why each one 
 
 ---
 
+## "Describe what you need" search — AI matcher (added 2026-06-04)
+
+The search page now lets clients describe a job in plain English and suggests the right trade. The instant keyword matcher (`src/data/tradeKeywords.ts`) is already fully live — it's client-only, nothing to deploy. The **AI fallback** ("Ask Blue Seal AI") calls a new Cloud Function and needs a one-line deploy before it works.
+
+### [ ] Deploy the AI trade matcher (functions only)
+
+- **Why:** Adds the `aiSuggestTrades` callable (Vertex/Gemini) behind the "Ask Blue Seal AI" button — the fallback for phrasing the keyword lexicon misses. Until it's deployed, the button just shows a friendly "unavailable" message; the instant keyword suggestions and the rest of search work regardless (graceful degradation), so shipping the client ahead of the deploy can't break anything.
+- **What:** `firebase deploy --only functions`. No rules/indexes/storage changes — it reuses the existing `aiUsage` + `rateLimits` collections and the shared `"ai"` daily cap. Vertex AI is already enabled on the project (existing AI tools use it).
+- **Verify:** Signed in on **Find a tradesperson**, type something unusual the keyword matcher misses (e.g. *"my interlock is heaving and lifting"*) → click **Ask Blue Seal AI** → it returns sensible trades (e.g. Hardscaping/Paving) with a one-line reason. Counts against the 100/day AI cap per user.
+
+---
+
 ## SEO + LLM discoverability pass (added 2026-06-03)
 
 The full SEO foundation shipped in code: per-route metadata + Open Graph/Twitter cards + JSON-LD (`@unhead/vue` via `useSeo`), build-time prerendering of all public content pages (so crawlers and LLMs that don't run JavaScript get real HTML — `scripts/prerender.ts`), a generated `sitemap.xml` + `llms.txt`, 57 per-trade landing pages (`/trades`, `/trades/:trade`), a tightened `robots.txt`, and a fix for the PWA install icons (the manifest pointed at non-existent `android-chrome-*` files). Everything deploys with a normal `firebase deploy --only hosting`. A few things only you can do:

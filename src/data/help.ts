@@ -128,8 +128,10 @@ If you open a link that belongs to the other role, Blue Seal switches you to it 
     excerpt: "Search by trade and location, then compare verified profiles.",
     audience: "client",
     popular: true,
-    keywords: ["search", "find pro", "filter", "distance", "rating", "shortlist"],
-    body: `Use **Find a tradesperson** to search by trade and location. Results show pros near you with their verification badges, rating, and distance.
+    keywords: ["search", "find pro", "filter", "distance", "rating", "shortlist", "which trade", "describe"],
+    body: `Use **Find a tradesperson** to search by location and trade. Results show pros near you with their verification badges, rating, and distance.
+
+**Not sure which trade you need?** Just describe the job in the **"What do you need done?"** box — type something like *"my sink is leaking"* or *"power keeps tripping"* and we'll suggest the right trade. Tap a suggestion and it sets the filter for you.
 
 A few tips:
 
@@ -147,6 +149,8 @@ Not sure who's the right fit, or want pros to come to you? **Post a job** instea
     audience: "client",
     keywords: ["quote", "estimate", "request", "photos", "details"],
     body: `From a tradesperson's profile, tap **Request a quote**. You'll answer a few trade-specific questions and can attach **photos** so the pro understands the job before quoting.
+
+If you described your job in search first, the title, details and urgency come **pre-filled** from what you typed — just review and tweak before sending.
 
 That creates a **job thread** between you and the tradesperson. From there you can chat, share more photos, and receive a quote. When the quote looks right, you accept it and the job moves forward — schedule, work, invoice, and review all happen in the same thread.
 
@@ -386,6 +390,13 @@ const faqs: FaqItem[] = [
   },
 
   // ── Hiring a tradesperson (clients) ───────────────────────────────────────
+  {
+    question: "I don't know which trade I need — how do I search?",
+    answer:
+      "On **Find a tradesperson**, use the **\"What do you need done?\"** box and describe the job in plain words — e.g. *\"my sink is leaking\"* or *\"power keeps tripping\"*. We'll suggest the right trade; tap one to set the filter. Still unsure? **Post a job** and let verified pros tell you what's involved.",
+    categoryId: "for-clients",
+    audience: "client",
+  },
   {
     question: "What's the difference between requesting a quote and posting a job?",
     answer:

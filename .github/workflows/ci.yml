@@ -60,8 +60,8 @@ jobs:
         # Reuses the dist/ built above; serve-dist.mjs mirrors Firebase Hosting.
         run: npm run test:e2e
 
-      - name: Upload Playwright report on failure
-        if: failure()
+      - name: Upload Playwright report (incl. 375px search screenshot)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
