@@ -16,9 +16,9 @@ export default defineConfig({
       // on mobile without yanking the page out from under someone mid-form.
       registerType: "prompt",
       includeAssets: [
-        "favicon.ico",
-        "favicon-16x16.png",
-        "favicon-32x32.png",
+        "faviconBS.ico",
+        "faviconBS-16x16.png",
+        "faviconBS-32x32.png",
         "apple-touch-icon.png",
         "robots.txt",
         "icons/blueseal_logoCircle.png",
