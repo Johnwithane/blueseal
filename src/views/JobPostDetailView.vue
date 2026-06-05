@@ -4,6 +4,7 @@ import { useRoute, useRouter } from "vue-router";
 import Button from "primevue/button";
 import Textarea from "primevue/textarea";
 import Tag from "primevue/tag";
+import Avatar from "primevue/avatar";
 import Message from "primevue/message";
 import { useConfirm } from "primevue/useconfirm";
 import { useAuthStore } from "@/stores/auth";
@@ -209,6 +210,24 @@ async function submitApply() {
 function applicantName(app: WithId<ApplicationDoc>): string {
   const t = applicantTradies.value.get(app.tradespersonId);
   return t?.displayName?.trim() || t?.companyName?.trim() || "This tradesperson";
+}
+
+// Avatar source for an applicant — their profile photo, or null so the card
+// renders an initial-circle instead.
+function applicantPhoto(app: WithId<ApplicationDoc>): string | null {
+  return applicantTradies.value.get(app.tradespersonId)?.photoURL ?? null;
+}
+function applicantInitial(app: WithId<ApplicationDoc>): string {
+  const name = applicantName(app);
+  return (name === "This tradesperson" ? "?" : name).slice(0, 1).toUpperCase();
+}
+// Company name shown as a secondary line — only when it adds information
+// (i.e. it exists and isn't already what we're showing as the headline name).
+function applicantCompany(app: WithId<ApplicationDoc>): string | null {
+  const t = applicantTradies.value.get(app.tradespersonId);
+  const company = t?.companyName?.trim();
+  if (!company) return null;
+  return company === applicantName(app) ? null : company;
 }
 
 // Bid-marketplace accept: the applicant attached a full quote → accept it
@@ -426,7 +445,25 @@ const visibleApplications = computed(() =>
             class="bs-card p-4"
           >
             <div class="flex items-start justify-between gap-3 flex-wrap">
-              <div class="min-w-0 flex-1">
+              <div class="flex items-start gap-3 min-w-0 flex-1">
+                <!-- Profile photo (or initial) so the client recognises who
+                     they're picking — name alone read as "Plumber" / a bare
+                     trade label in testing. -->
+                <Avatar
+                  v-if="applicantPhoto(app)"
+                  :image="applicantPhoto(app)!"
+                  shape="circle"
+                  size="large"
+                  class="shrink-0"
+                />
+                <Avatar
+                  v-else
+                  :label="applicantInitial(app)"
+                  shape="circle"
+                  size="large"
+                  class="shrink-0 !bg-[color:var(--bs-blue)] !text-white font-semibold"
+                />
+                <div class="min-w-0 flex-1">
                 <a
                   :href="`/tradies/${app.tradespersonId}`"
                   target="_blank"
@@ -440,6 +477,12 @@ const visibleApplications = computed(() =>
                   }}
                   <i class="pi pi-external-link text-xs"></i>
                 </a>
+                <div
+                  v-if="applicantCompany(app)"
+                  class="text-xs font-medium text-[color:var(--bs-text)] mt-0.5"
+                >
+                  {{ applicantCompany(app) }}
+                </div>
                 <div
                   v-if="applicantTradies.get(app.tradespersonId)"
                   class="text-xs text-[color:var(--bs-muted)] mt-0.5"
@@ -491,6 +534,7 @@ const visibleApplications = computed(() =>
                     variant="pill"
                     :expires-at="applicantTradies.get(app.tradespersonId)!.wsibExpiresAt"
                   />
+                </div>
                 </div>
               </div>
               <div class="text-right">

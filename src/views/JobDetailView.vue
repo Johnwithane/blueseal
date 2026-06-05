@@ -46,7 +46,7 @@ import type { IntakeField } from "@/firebase/interfaces";
 import { tradeLabel } from "@/data/trades";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
-import { STATUS_LABEL, STATUS_SEVERITY } from "@/utils/jobStatus";
+import { statusLabel, STATUS_SEVERITY } from "@/utils/jobStatus";
 import JobTabBar, { type JobTab } from "@/features/jobDetail/JobTabBar.vue";
 import BriefTab from "@/features/jobDetail/BriefTab.vue";
 import ScheduleTab from "@/features/jobDetail/ScheduleTab.vue";
@@ -769,7 +769,7 @@ function onReturnToApplicants() {
       <!-- Status on the right of the top bar; the title gets full width below. -->
       <Tag
         v-if="job"
-        :value="STATUS_LABEL[job.status]"
+        :value="statusLabel(job.status, isClient ? 'client' : isTradie ? 'tradesperson' : null)"
         :severity="STATUS_SEVERITY[job.status]"
         class="shrink-0"
       />
@@ -798,6 +798,29 @@ function onReturnToApplicants() {
         <h1 class="text-xl font-bold break-words leading-tight">{{ job.title }}</h1>
         <div class="text-[11px] text-[color:var(--bs-muted)] mt-0.5 truncate">
           {{ tradeLabel(job.trade) }} · {{ job.address.line1 }}, {{ job.address.city }}
+        </div>
+        <!-- Counterparty at a glance. "Requested" alone left clients unsure who
+             they'd picked; this names the other party (with avatar) right under
+             the title so it's obvious on every tab, not just the Brief card. -->
+        <div class="flex items-center gap-1.5 mt-1.5">
+          <Avatar
+            v-if="counterpartyPhotoUrl"
+            :image="counterpartyPhotoUrl"
+            shape="circle"
+            size="normal"
+            class="!w-5 !h-5"
+          />
+          <Avatar
+            v-else
+            :label="counterpartyInitials"
+            shape="circle"
+            size="normal"
+            class="!w-5 !h-5 !text-[10px] !bg-[color:var(--bs-blue)] !text-white font-semibold"
+          />
+          <span class="text-xs text-[color:var(--bs-muted)]">
+            {{ isClient ? "with" : "for" }}
+            <span class="font-medium text-[color:var(--bs-text)]">{{ counterpartyName }}</span>
+          </span>
         </div>
       </header>
 

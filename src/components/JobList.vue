@@ -8,7 +8,7 @@ import { useFormatters } from "@/composables/useFormatters";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 import { archiveJob, unarchiveJob } from "@/firebase/services/jobs";
-import { STATUS_LABEL, STATUS_SEVERITY } from "@/utils/jobStatus";
+import { statusLabel, STATUS_SEVERITY } from "@/utils/jobStatus";
 import { tradeLabel } from "@/data/trades";
 import JobCounterparty from "@/components/JobCounterparty.vue";
 
@@ -276,7 +276,7 @@ function counterpartyPhoto(job: WithId<JobDoc>): string | null | undefined {
               </div>
               <div class="flex shrink-0 items-center gap-1.5">
                 <Tag
-                  :value="STATUS_LABEL[job.status]"
+                  :value="statusLabel(job.status, props.viewerRole)"
                   :severity="STATUS_SEVERITY[job.status]"
                 />
                 <Tag
