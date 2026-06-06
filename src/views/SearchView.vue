@@ -4,7 +4,6 @@ import { searchCache } from "./searchCache";
 import { useRoute, useRouter } from "vue-router";
 import Button from "primevue/button";
 import Select from "primevue/select";
-import InputText from "primevue/inputtext";
 import Rating from "primevue/rating";
 import Message from "primevue/message";
 import Dialog from "primevue/dialog";
@@ -16,9 +15,10 @@ import {
 import { searchProspects } from "@/firebase/services/prospects";
 import { useAuthStore } from "@/stores/auth";
 import { TRADES, tradeLabel } from "@/data/trades";
-import { suggestTrades } from "@/data/tradeKeywords";
+import type { TradeSuggestion } from "@/data/tradeKeywords";
 import { saveRequestPrefill } from "@/utils/requestPrefill";
 import type { AvatarMarkerData } from "@/utils/avatarMarker";
+import TradeDescribeBox from "@/components/TradeDescribeBox.vue";
 import TradieCard from "@/components/TradieCard.vue";
 import ProspectCard from "@/components/ProspectCard.vue";
 import LocationPicker, {
@@ -42,26 +42,15 @@ const trade = ref<string | null>(tradeFromQuery(route.query.trade));
 const minRating = ref(0);
 const availability = ref<AvailabilityFilter>("any");
 
-// "Describe what you need" → instant trade suggestions. Lets a client who knows
-// the symptom but not the trade name ("my sink is leaking") jump straight to the
-// right filter instead of scrolling a 60-item dropdown. Pure local keyword
-// matching — see src/data/tradeKeywords.ts. Deterministic and offline: no AI
-// call, nothing exposed publicly, zero per-search cost.
+// "Describe what you need" → instant trade suggestions (TradeDescribeBox). Lets
+// a client who knows the symptom or room but not the trade name jump straight to
+// the right filter instead of scrolling a 60-item dropdown.
 const describe = ref("");
-const suggestions = computed(() => suggestTrades(describe.value));
-
-// Empty-state prompts that teach the box's purpose by example.
-const DESCRIBE_EXAMPLES = [
-  "My sink is leaking",
-  "Power keeps tripping",
-  "Need a new fence",
-  "Furnace won't heat",
-];
 
 // Tapping a suggestion sets the trade filter and searches — the dropdown below
 // updates in lockstep (shared `trade` ref) so the choice is visible.
-function applySuggestion(key: string) {
-  trade.value = key;
+function applySuggestion(s: TradeSuggestion) {
+  trade.value = s.key;
   search();
 }
 
@@ -369,66 +358,12 @@ onMounted(async () => {
     <div class="bs-card bs-form mb-4 p-4">
       <!-- Describe-what-you-need: plain-English → suggested trades, so clients
            who don't know the trade name don't have to scroll the dropdown. -->
-      <div>
-        <label for="describe" class="text-xs font-medium">What do you need done?</label>
-        <div class="bs-describe mt-1">
-          <i class="pi pi-search" aria-hidden="true"></i>
-          <InputText
-            id="describe"
-            v-model="describe"
-            placeholder="Describe it in your own words…"
-            class="flex-1 border-0 bg-transparent shadow-none focus:shadow-none"
-            autocomplete="off"
-          />
-          <button
-            v-if="describe"
-            type="button"
-            class="bs-describe-clear"
-            aria-label="Clear"
-            @click="describe = ''"
-          >
-            <i class="pi pi-times" aria-hidden="true"></i>
-          </button>
-        </div>
-
-        <!-- Empty state: example prompts that teach the box. -->
-        <div v-if="!describe.trim()" class="mt-2 flex flex-wrap items-center gap-1.5">
-          <span class="text-xs text-[color:var(--bs-muted)]">Try:</span>
-          <button
-            v-for="ex in DESCRIBE_EXAMPLES"
-            :key="ex"
-            type="button"
-            class="bs-chip"
-            @click="describe = ex"
-          >
-            {{ ex }}
-          </button>
-        </div>
-
-        <!-- Live suggestions as they type. -->
-        <div v-else-if="suggestions.length" class="mt-2">
-          <span class="text-xs text-[color:var(--bs-muted)]">Sounds like you need:</span>
-          <div class="mt-1.5 flex flex-wrap gap-2">
-            <button
-              v-for="s in suggestions"
-              :key="s.key"
-              type="button"
-              class="bs-suggestion"
-              :class="{ 'bs-suggestion--active': trade === s.key }"
-              :title="`Matched: ${s.matched.join(', ')}`"
-              @click="applySuggestion(s.key)"
-            >
-              <i :class="s.icon" aria-hidden="true"></i>
-              <span>{{ s.label }}</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Typed something, nothing matched: nudge to the dropdown. -->
-        <p v-else class="mt-2 text-xs text-[color:var(--bs-muted)]">
-          No trade matched that yet — try different words, pick one below, or just search your area.
-        </p>
-      </div>
+      <TradeDescribeBox
+        v-model="describe"
+        :active-key="trade"
+        no-match-hint="No trade matched that yet — try different words, pick one below, or just search your area."
+        @select="applySuggestion"
+      />
 
       <div class="bs-describe-divider my-4"><span>or filter by trade</span></div>
 
@@ -582,68 +517,6 @@ onMounted(async () => {
 .bs-location-field:focus-visible {
   outline: 2px solid var(--bs-blue);
   outline-offset: 1px;
-}
-
-/* "Describe what you need" input — a borderless InputText inside a bordered
-   shell with a leading sparkle, so it reads as the primary, modern entry. */
-.bs-describe {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.125rem 0.625rem;
-  border: 1px solid var(--bs-border);
-  border-radius: 8px;
-  background: #fff;
-  transition: border-color 120ms ease;
-}
-.bs-describe:focus-within {
-  border-color: var(--bs-blue);
-}
-.bs-describe > .pi-search {
-  color: var(--bs-blue);
-}
-.bs-describe-clear {
-  display: flex;
-  padding: 0.25rem;
-  color: var(--bs-muted);
-  border-radius: 999px;
-}
-.bs-describe-clear:hover {
-  background: var(--bs-surface, #f1f5f9);
-}
-
-/* Example prompt chips (empty state). */
-.bs-chip {
-  padding: 0.25rem 0.625rem;
-  font-size: 0.8125rem;
-  border: 1px solid var(--bs-border);
-  border-radius: 999px;
-  background: #fff;
-  color: var(--bs-text, inherit);
-  transition: border-color 120ms ease, background 120ms ease;
-}
-.bs-chip:hover {
-  border-color: var(--bs-blue);
-}
-
-/* Suggested-trade chips (live results). */
-.bs-suggestion {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.375rem 0.75rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  border: 1px solid var(--bs-blue);
-  border-radius: 999px;
-  background: #fff;
-  color: var(--bs-blue);
-  transition: background 120ms ease, color 120ms ease;
-}
-.bs-suggestion:hover,
-.bs-suggestion--active {
-  background: var(--bs-blue);
-  color: #fff;
 }
 
 /* "or filter by trade" rule. */

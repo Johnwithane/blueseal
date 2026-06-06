@@ -166,6 +166,8 @@ Quotes can include an optional upfront amount for materials or to hold a booking
     keywords: ["post a job", "job board", "bids", "applications", "marketplace"],
     body: `Prefer to have pros reach out to you? **Post a job**. Describe the work, set a budget range, and add your area and photos.
 
+**Not sure which trade you need?** Start in the **"What do you need done?"** box at the top — describe the job in plain words, or just name the room (e.g. *"bathroom"* or *"kitchen"*). We'll suggest the trades that usually handle it; tap one and we set the trade and pre-fill your title, description and urgency. Everything stays editable, so just review and tweak before posting.
+
 When you pick a trade, we'll ask a few **trade-specific questions** (for tiling, say, the area, square footage, tile type, and whether materials are on-site). Answering them up front means tradespeople can quote accurately the first time — fewer back-and-forth messages, fewer surprises once work starts. Your answers appear on the posting and carry through to the job.
 
 Your posting is shown to **verified tradespeople** in your trade and region. Each one applies with a **full itemized quote** — line items, taxes, and any upfront fee — so you're comparing real numbers, not vague estimates. On your post you can open each applicant's quote, check their profile, verification, and reviews, then **Accept** the one you want. Accepting starts the job with that pro straight away and lets the others know you've chosen someone.

@@ -518,6 +518,51 @@ export const TRADE_KEYWORDS: Record<string, string[]> = {
   ],
 };
 
+// ---------------------------------------------------------------------------
+// Room / project areas → the cluster of trades they usually involve.
+//
+// A symptom names ONE trade ("leaking tap" → plumber). A room or project names
+// SEVERAL: type "bathroom" and you might need a plumber, a tiler, a drywaller,
+// a painter… This map lets a client who only knows the SPACE — not the trades —
+// get a sensible spread to consider.
+//
+// Each list is ordered MOST-RELEVANT FIRST. These are applied ADDITIVELY in
+// suggestTrades: specific keyword matches always rank first, then a matched
+// area appends its remaining trades. So a room word never overrides real intent
+// ("wasp nest under the deck" stays pest_control), it just fills in the cluster.
+// ---------------------------------------------------------------------------
+export const PROJECT_AREAS: Record<string, string[]> = {
+  bathroom: [
+    "plumber", "tiling", "drywall", "general_contractor", "painter",
+    "glazier", "countertop", "cabinetry", "electrician", "flooring",
+  ],
+  ensuite: ["plumber", "tiling", "drywall", "general_contractor", "glazier", "painter"],
+  "powder room": ["plumber", "tiling", "drywall", "painter", "countertop"],
+  washroom: ["plumber", "tiling", "drywall", "painter"],
+  kitchen: [
+    "cabinetry", "countertop", "plumber", "electrician", "tiling",
+    "appliance_repair", "general_contractor", "painter", "flooring",
+  ],
+  basement: [
+    "waterproofing", "framer", "drywall", "general_contractor", "insulation",
+    "electrician", "flooring", "painter",
+  ],
+  attic: ["insulation", "electrician", "roofer", "pest_control", "hvac"],
+  laundry: ["plumber", "appliance_repair", "electrician", "gasfitter", "cabinetry"],
+  bedroom: ["painter", "flooring", "carpenter", "electrician", "drywall"],
+  "living room": ["painter", "flooring", "electrician", "drywall", "carpenter"],
+  "dining room": ["painter", "flooring", "electrician", "drywall"],
+  garage: ["garage_door", "concrete", "electrician", "flooring", "drywall"],
+  deck: ["deck_builder", "carpenter", "painter"],
+  patio: ["deck_builder", "hardscaping", "concrete"],
+  driveway: ["concrete", "hardscaping", "pressure_washing", "excavation"],
+  yard: ["landscaper", "fencing", "hardscaping", "arborist", "deck_builder"],
+  backyard: ["landscaper", "deck_builder", "fencing", "hardscaping", "arborist"],
+  exterior: ["siding", "painter", "roofer", "gutters", "pressure_washing"],
+  "whole house": ["general_contractor", "painter", "flooring", "electrician"],
+  "whole home": ["general_contractor", "painter", "flooring", "electrician"],
+};
+
 export interface TradeSuggestion extends TradeOption {
   /** Keywords from the query that drove this suggestion — for the "why" hint. */
   matched: string[];
@@ -592,12 +637,28 @@ export function suggestTrades(query: string, max = 4): TradeSuggestion[] {
   // they tie on), then how many keywords hit.
   const longest = (s: TradeSuggestion) =>
     s.matched.reduce((n, kw) => Math.max(n, kw.length), 0);
-  return scored
-    .sort(
-      (a, b) =>
-        b.score - a.score ||
-        longest(b) - longest(a) ||
-        b.matched.length - a.matched.length,
-    )
-    .slice(0, max);
+  scored.sort(
+    (a, b) =>
+      b.score - a.score ||
+      longest(b) - longest(a) ||
+      b.matched.length - a.matched.length,
+  );
+
+  // Room / project areas: a named SPACE implies a cluster of trades. Append the
+  // ones no keyword already surfaced (most-relevant first), so "bathroom" alone
+  // yields plumber/tiler/drywaller… while a specific hit still leads. Additive
+  // by design — this never reorders the keyword matches above.
+  const present = new Set(scored.map((s) => s.key));
+  for (const [area, tradeList] of Object.entries(PROJECT_AREAS)) {
+    if (scored.length >= max) break;
+    if (!keywordHits(q, tokens, area)) continue;
+    for (const key of tradeList) {
+      const trade = TRADE_BY_KEY.get(key);
+      if (!trade || present.has(key)) continue;
+      present.add(key);
+      scored.push({ ...trade, matched: [area], score: 0 });
+    }
+  }
+
+  return scored.slice(0, max);
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { TRADES } from "@/data/trades";
-import { TRADE_KEYWORDS, suggestTrades } from "@/data/tradeKeywords";
+import { TRADE_KEYWORDS, PROJECT_AREAS, suggestTrades } from "@/data/tradeKeywords";
 
 describe("TRADE_KEYWORDS integrity", () => {
   const tradeKeys = new Set(TRADES.map((t) => t.key));
@@ -175,5 +175,50 @@ describe("suggestTrades", () => {
     const keys = suggestTrades("the fence fell over").map((s) => s.key);
     expect(keys).toContain("fencing");
     expect(keys).not.toContain("plumber");
+  });
+
+  it("expands a named room/area into its cluster of trades", () => {
+    function keys(q: string): string[] {
+      return suggestTrades(q).map((s) => s.key);
+    }
+    // Naming only the SPACE surfaces the spread of trades it usually involves.
+    const bathroom = keys("bathroom");
+    expect(bathroom).toContain("plumber");
+    expect(bathroom).toContain("tiling");
+
+    const kitchen = keys("redo my kitchen");
+    expect(kitchen).toContain("cabinetry");
+    expect(kitchen).toContain("plumber");
+
+    expect(keys("finish my basement")).toContain("waterproofing");
+    expect(keys("garage needs work")).toContain("garage_door");
+  });
+
+  it("keeps a specific keyword hit ranked above the room cluster", () => {
+    // "sink" pins plumber to the top even though "bathroom" pulls in a cluster.
+    expect(topKey("my bathroom sink is leaking")).toBe("plumber");
+    // The room word must never override clear intent located in that room.
+    expect(topKey("wasp nest under the deck")).toBe("pest_control");
+  });
+});
+
+describe("PROJECT_AREAS integrity", () => {
+  const tradeKeys = new Set(TRADES.map((t) => t.key));
+
+  it("every cluster points at real trade keys", () => {
+    for (const [area, keys] of Object.entries(PROJECT_AREAS)) {
+      for (const key of keys) {
+        expect(tradeKeys.has(key), `area "${area}" → unknown trade "${key}"`).toBe(true);
+      }
+    }
+  });
+
+  it("area terms are lowercase and survive query normalisation", () => {
+    const normalized = (s: string) =>
+      s.replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+    for (const area of Object.keys(PROJECT_AREAS)) {
+      expect(area, `"${area}" must be lowercase`).toBe(area.toLowerCase());
+      expect(normalized(area), `"${area}" has a char queries strip`).toBe(area);
+    }
   });
 });

@@ -20,7 +20,10 @@ import { useGoogleMaps } from "@/composables/useGoogleMaps";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 import { createJobPostSchema } from "@/validation/schemas";
+import { deriveTitle, deriveUrgency } from "@/utils/requestPrefill";
 import type { IntakeField, Urgency } from "@/firebase/interfaces";
+import type { TradeSuggestion } from "@/data/tradeKeywords";
+import TradeDescribeBox from "@/components/TradeDescribeBox.vue";
 import IntakeFormRenderer from "@/components/IntakeFormRenderer.vue";
 import { useSeo } from "@/composables/useSeo";
 
@@ -67,6 +70,25 @@ const addressAutocompleteEl = ref<HTMLInputElement | null>(null);
 
 const submitting = ref(false);
 const error = ref<string | null>(null);
+
+// "What do you need done?" — the smart entry: describe the job in plain English
+// (or just name the room), tap the suggested trade, and it sets the trade +
+// pre-fills the title, description and urgency below. Everything stays editable;
+// the manual trade dropdown is still there for anyone who'd rather pick.
+const describe = ref("");
+const prefilledFromDescribe = ref(false);
+
+function applyDescribe(s: TradeSuggestion) {
+  trade.value = s.key;
+  const text = describe.value.trim();
+  if (text) {
+    // Only seed empty fields — never clobber something the user already wrote.
+    if (!description.value.trim()) description.value = text;
+    if (!title.value.trim()) title.value = deriveTitle(text);
+    if (urgency.value === "flexible") urgency.value = deriveUrgency(text);
+    prefilledFromDescribe.value = true;
+  }
+}
 
 const tradeOptions = TRADES.map((t) => ({ label: t.label, value: t.key }));
 const urgencyOptions = [
@@ -357,6 +379,28 @@ async function submit() {
     <Message v-if="error" severity="error" :closable="false" class="mt-4">{{ error }}</Message>
 
     <form class="bs-form bs-card p-5 mt-4 space-y-5" @submit.prevent="submit">
+      <!-- Smart entry: describe the job (or name the room) → tap a suggested
+           trade and it sets the trade + pre-fills title/description/urgency. -->
+      <div>
+        <TradeDescribeBox
+          v-model="describe"
+          input-id="describe-job"
+          :active-key="trade"
+          :examples="['Bathroom renovation', 'Leaking kitchen tap', 'Build a fence', 'Furnace not heating']"
+          no-match-hint="No match yet — try different words, or pick a trade below."
+          @select="applyDescribe"
+        />
+        <p
+          v-if="prefilledFromDescribe"
+          class="mt-2 flex items-start gap-1.5 text-xs text-[color:var(--bs-blue-dark)]"
+        >
+          <i class="pi pi-check-circle mt-0.5"></i>
+          <span>Filled in from your description — review and tweak everything below before posting.</span>
+        </p>
+      </div>
+
+      <div class="bs-describe-divider my-1"><span>or fill it in yourself</span></div>
+
       <div>
         <label class="text-sm font-medium">What trade do you need?</label>
         <Select
@@ -558,3 +602,22 @@ async function submit() {
     </form>
   </section>
 </template>
+
+<style scoped>
+/* "or fill it in yourself" rule separating the smart describe box from the
+   manual fields. */
+.bs-describe-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.75rem;
+  color: var(--bs-muted);
+}
+.bs-describe-divider::before,
+.bs-describe-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--bs-border);
+}
+</style>
