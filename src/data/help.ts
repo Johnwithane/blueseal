@@ -234,7 +234,7 @@ A complete, verified profile with a strong portfolio and good reviews wins more 
 
 1. **Quote** — the tradesperson builds a quote with line items and totals. The client reviews and accepts it before any work starts.
 2. **Work** — the job runs; time and expenses can be tracked against it.
-3. **Invoice** — when the work is marked complete and approved, an invoice is generated from the agreed quote and any extras.
+3. **Invoice** — when the work is done, the invoice is built from the agreed quote plus tracked time, materials, and any extra charges (travel, callout, tool rental, or changes that came up along the way). The client reviews and approves it — extras included — before paying.
 4. **Receipt** — once paid, both sides have a receipt in the job thread.
 
 Everything is itemised, so there are no surprises — the client sees what they're paying for and the tradesperson has a clean record.`,
@@ -553,7 +553,7 @@ const faqs: FaqItem[] = [
   {
     question: "What does an invoice include?",
     answer:
-      "Itemised line items from the agreed quote, plus any approved extras (such as tracked time or materials), with totals and any applicable tax. Nothing should appear that you haven't seen and agreed to.",
+      "Itemised line items from the agreed quote, plus tracked time, materials, and any extra charges (travel, callout, tool rental, disposal, or changes that came up on the job), with totals and any applicable tax. You review and approve the whole invoice — extras included — before you pay, so nothing appears that you haven't agreed to.",
     categoryId: "payments-invoices",
     audience: "all",
   },

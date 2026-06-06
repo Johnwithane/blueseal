@@ -57,6 +57,19 @@ interface ExtraRow {
 }
 const extraRows = ref<ExtraRow[]>([]);
 
+// Quick-pick presets for the common one-off charges QA flagged (truck/callout,
+// travel, tool rental, etc.). Deliberately free-form: the chip only seeds the
+// description, and the tradesperson types the amount — their travel charge can
+// differ from the on-site rate, tool rental varies job to job. It just saves
+// re-typing the same labels every wrap-up.
+const EXTRA_PRESETS = [
+  "Travel time",
+  "Truck / callout charge",
+  "Tool rental",
+  "Disposal fee",
+  "Sourcing fee",
+] as const;
+
 // Quote line items, hydrated once when the sheet opens. Pre-filled so the
 // invoice picks up where the quote left off — the tradesperson can edit
 // descriptions / amounts / taxes per row, or remove what no longer applies
@@ -319,6 +332,21 @@ function addExtraRow() {
   });
 }
 
+// Seed a row from a preset chip. Description is pre-filled, so focus the
+// amount field (not the description) so the tradesperson types the charge.
+function addExtraPreset(label: string) {
+  extraRows.value = [
+    ...extraRows.value,
+    { description: label, unitPriceDollars: 0, taxRate: 0 },
+  ];
+  void nextTick(() => {
+    const inputs = document.querySelectorAll<HTMLInputElement>(
+      ".finish-sheet-extra-amount input",
+    );
+    inputs[inputs.length - 1]?.focus();
+  });
+}
+
 function removeExtraRow(i: number) {
   extraRows.value = extraRows.value.filter((_, idx) => idx !== i);
 }
@@ -502,12 +530,15 @@ function close() {
         </template>
       </section>
 
-      <!-- Extra line items -->
+      <!-- Extra line items — the home for everything outside time + receipts:
+           truck/callout charges, travel, tool rental, disposal, and any
+           change/extra the job picked up along the way. Approved by the
+           client when they sign off on this invoice. -->
       <section class="rounded-lg border border-[color:var(--bs-border)] p-3">
         <header class="flex items-center justify-between gap-2 mb-2">
           <div class="flex items-center gap-2">
             <i class="pi pi-plus-circle text-[color:var(--bs-blue)]"></i>
-            <h4 class="font-semibold text-sm">Extra line items</h4>
+            <h4 class="font-semibold text-sm">Extras &amp; charges</h4>
           </div>
           <Button
             label="Add"
@@ -517,14 +548,25 @@ function close() {
             @click="addExtraRow"
           />
         </header>
-        <p
-          v-if="extraRows.length === 0"
-          class="text-xs text-[color:var(--bs-muted)]"
-        >
-          Trip charge, sourcing fee, callout — anything one-off that isn't time or
-          a receipt.
+        <p class="text-xs text-[color:var(--bs-muted)] mb-2 leading-snug">
+          Truck/callout, travel, tool rental, disposal — plus any change or
+          extra outside the original quote. These ride on this invoice, so the
+          client approves them when they sign off.
         </p>
-        <ul v-else class="space-y-2">
+        <!-- Preset chips: one tap adds a labelled row, then type the amount. -->
+        <div class="flex flex-wrap gap-1.5 mb-3">
+          <button
+            v-for="preset in EXTRA_PRESETS"
+            :key="preset"
+            type="button"
+            class="finish-sheet-preset-chip"
+            @click="addExtraPreset(preset)"
+          >
+            <i class="pi pi-plus text-[10px]"></i>
+            {{ preset }}
+          </button>
+        </div>
+        <ul v-if="extraRows.length" class="space-y-2">
           <li
             v-for="(r, i) in extraRows"
             :key="i"
@@ -542,7 +584,7 @@ function close() {
               currency="CAD"
               :min="0"
               :max-fraction-digits="2"
-              :input-class="'text-sm w-full text-right'"
+              :input-class="'finish-sheet-extra-amount text-sm w-full text-right'"
               fluid
             />
             <Button
@@ -712,5 +754,25 @@ function close() {
     max-height: 100dvh;
     border-radius: 0;
   }
+}
+
+/* Quick-pick chips for common extra charges. */
+.finish-sheet-preset-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--bs-border);
+  background: white;
+  color: var(--bs-blue);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.1s, background 0.1s;
+}
+.finish-sheet-preset-chip:hover {
+  border-color: var(--bs-blue);
+  background: var(--bs-surface-alt);
 }
 </style>
