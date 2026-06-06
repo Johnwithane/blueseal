@@ -481,6 +481,20 @@ service cloud.firestore {
       }
     }
 
+    // ---------- applications (collection group: the tradesperson's "Applied" tab) ----------
+    // subscribeMyApplications runs collectionGroup('applications') filtered by
+    // tradespersonId == uid. Collection-group queries are NOT authorized by the
+    // nested /jobPosts/{postId}/applications rule above — that one only covers
+    // direct + per-post reads. They need this recursive-wildcard rule, scoped to
+    // the applicant's own docs (+ admin) so a tradie can't enumerate other
+    // tradies' bids: the query filters tradespersonId == uid and the rule
+    // enforces the same predicate. Writes stay callable-only (admin SDK).
+    match /{path=**}/applications/{tradieId} {
+      allow read: if isAdmin()
+        || (resource != null && resource.data.tradespersonId == uid());
+      allow write: if false;
+    }
+
     // ---------- notifications (per-user inbox; writes via Cloud Function) ----------
     // Owner can only flip read/readAt (mark-as-read). Every other field is
     // pinned to its prior value so a compromised client can't rewrite a

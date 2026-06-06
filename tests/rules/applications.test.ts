@@ -11,7 +11,16 @@ import {
   assertSucceeds,
   type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
-import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import {
+  collectionGroup,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  setDoc,
+  updateDoc,
+  where,
+} from "firebase/firestore";
 
 import {
   ADMIN_CLAIMS,
@@ -108,6 +117,32 @@ describe("applications — read access (bid marketplace)", () => {
   it("a different client cannot read another client's applicant", async () => {
     await seedApplication();
     await assertFails(getDoc(doc(fsAs(OTHER_CLIENT_UID, CLIENT_CLAIMS), ...APP_PATH)));
+  });
+});
+
+describe("applications — collection-group read (the 'Applied' tab)", () => {
+  it("a tradesperson can collection-group query their own applications", async () => {
+    await seedApplication();
+    await assertSucceeds(
+      getDocs(
+        query(
+          collectionGroup(fsAs(TRADIE_UID, TRADIE_CLAIMS), "applications"),
+          where("tradespersonId", "==", TRADIE_UID),
+        ),
+      ),
+    );
+  });
+
+  it("a tradesperson cannot collection-group query another tradie's applications", async () => {
+    await seedApplication();
+    await assertFails(
+      getDocs(
+        query(
+          collectionGroup(fsAs(OTHER_TRADIE_UID, TRADIE_CLAIMS), "applications"),
+          where("tradespersonId", "==", TRADIE_UID),
+        ),
+      ),
+    );
   });
 });
 
