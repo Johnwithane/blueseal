@@ -574,6 +574,32 @@ export const PROJECT_AREAS: Record<string, string[]> = {
   "whole home": ["general_contractor", "painter", "flooring", "electrician"],
 };
 
+// ---------------------------------------------------------------------------
+// Ambiguous symptom / object words → every trade that could be the answer.
+//
+// Some words name a problem several trades handle: a "leak" could be a plumber,
+// a roofer, a gasfitter, an HVAC tech, or a waterproofer. The lexicon files
+// these under whichever trade owns the *phrase* ("roof leak", "gas leak"), so a
+// bare "leak" would otherwise surface only one. Like PROJECT_AREAS these are
+// applied ADDITIVELY — a specific hit ("kitchen sink leaking" → plumber) still
+// leads; this just widens the net when the word stands alone. Most-likely first.
+// ---------------------------------------------------------------------------
+export const SYMPTOM_CLUSTERS: Record<string, string[]> = {
+  leak: ["plumber", "roofer", "gasfitter", "hvac", "waterproofing"],
+  crack: ["drywall", "foundation", "concrete", "mason", "glazier"],
+  vent: ["hvac", "duct_cleaning", "roofer"],
+  mold: ["waterproofing", "drywall", "hvac", "home_inspection"],
+  mould: ["waterproofing", "drywall", "hvac", "home_inspection"],
+  draft: ["insulation", "window_installer", "hvac"],
+  smell: ["gasfitter", "plumber", "septic", "pest_control", "hvac"],
+  odour: ["gasfitter", "plumber", "septic", "pest_control"],
+  odor: ["gasfitter", "plumber", "septic", "pest_control"],
+  drainage: ["landscaper", "waterproofing", "excavation", "plumber"],
+  flooded: ["waterproofing", "plumber", "junk_removal"],
+  tv: ["av_installer", "handyman", "electrician"],
+  television: ["av_installer", "handyman", "electrician"],
+};
+
 export interface TradeSuggestion extends TradeOption {
   /** Keywords from the query that drove this suggestion — for the "why" hint. */
   matched: string[];
@@ -677,7 +703,7 @@ const FUZZABLE_KEYWORDS: Array<{ kw: string; keys: string[] }> = (() => {
  */
 export function suggestTrades(query: string, max = 4): TradeSuggestion[] {
   const q = normalize(query);
-  if (q.trim().length < 3) return [];
+  if (q.trim().length < 2) return []; // allow real 2-char queries: "tv", "ac"
   const tokens = q.trim().split(" ");
 
   const scored: TradeSuggestion[] = [];
@@ -732,27 +758,32 @@ export function suggestTrades(query: string, max = 4): TradeSuggestion[] {
     rank(scored);
   }
 
-  // Room / project areas: a named SPACE implies a cluster of trades. Append the
-  // ones no keyword already surfaced (most-relevant first), so "bathroom" alone
-  // yields plumber/tiler/drywaller… while a specific hit still leads. Additive
-  // by design — this never reorders the keyword matches above.
-  const recovering = scored.length === 0; // still nothing → allow a fuzzy room hit
+  // Cluster expansions, both ADDITIVE (appended after the keyword matches above,
+  // most-relevant first, skipping anything already surfaced — so they widen the
+  // net without ever reordering a specific hit):
+  //   • SYMPTOM_CLUSTERS — an ambiguous word ("leak") → every trade it could be.
+  //   • PROJECT_AREAS    — a named room ("bathroom") → its usual trades.
+  const recovering = scored.length === 0; // still nothing → allow a fuzzy term hit
   const present = new Set(scored.map((s) => s.key));
-  for (const [area, tradeList] of Object.entries(PROJECT_AREAS)) {
-    if (scored.length >= max) break;
-    const hit =
-      keywordHits(q, tokens, area) ||
-      (recovering &&
-        !area.includes(" ") &&
-        tokens.some((t) => t.length >= 5 && withinOneEdit(t, area)));
-    if (!hit) continue;
-    for (const key of tradeList) {
-      const trade = TRADE_BY_KEY.get(key);
-      if (!trade || present.has(key)) continue;
-      present.add(key);
-      scored.push({ ...trade, matched: [area], score: 0 });
+  const appendCluster = (map: Record<string, string[]>) => {
+    for (const [term, tradeList] of Object.entries(map)) {
+      if (scored.length >= max) break;
+      const hit =
+        keywordHits(q, tokens, term) ||
+        (recovering &&
+          !term.includes(" ") &&
+          tokens.some((t) => t.length >= 5 && withinOneEdit(t, term)));
+      if (!hit) continue;
+      for (const key of tradeList) {
+        const trade = TRADE_BY_KEY.get(key);
+        if (!trade || present.has(key)) continue;
+        present.add(key);
+        scored.push({ ...trade, matched: [term], score: 0 });
+      }
     }
-  }
+  };
+  appendCluster(SYMPTOM_CLUSTERS); // symptoms first — closer to the actual problem
+  appendCluster(PROJECT_AREAS); // then the room spread
 
   return scored.slice(0, max);
 }

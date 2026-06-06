@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { TRADES } from "@/data/trades";
-import { TRADE_KEYWORDS, PROJECT_AREAS, suggestTrades } from "@/data/tradeKeywords";
+import {
+  TRADE_KEYWORDS,
+  PROJECT_AREAS,
+  SYMPTOM_CLUSTERS,
+  suggestTrades,
+} from "@/data/tradeKeywords";
 
 describe("TRADE_KEYWORDS integrity", () => {
   const tradeKeys = new Set(TRADES.map((t) => t.key));
@@ -230,6 +235,47 @@ describe("suggestTrades", () => {
     expect(suggestTrades("redo the mudroom").map((s) => s.key)).toContain("tiling");
     expect(suggestTrades("damp crawlspace").map((s) => s.key)).toContain("waterproofing");
     expect(suggestTrades("wire my home office").map((s) => s.key)).toContain("network_cabling");
+  });
+
+  it("fans an ambiguous symptom out across every trade it could be", () => {
+    // "leak" isn't only a plumber — surface roofer, gas, HVAC too.
+    const leak = suggestTrades("leak").map((s) => s.key);
+    expect(leak).toContain("plumber");
+    expect(leak).toContain("roofer");
+    expect(leak).toContain("gasfitter");
+    // ...but a specific hit still leads when there's more signal.
+    expect(topKey("my kitchen sink is leaking")).toBe("plumber");
+    // "crack" spreads across the trades that patch them.
+    const crack = suggestTrades("crack").map((s) => s.key);
+    expect(crack).toContain("drywall");
+    expect(crack).toContain("foundation");
+  });
+
+  it("maps tv / television to the AV installer", () => {
+    expect(suggestTrades("tv").map((s) => s.key)).toContain("av_installer");
+    expect(suggestTrades("television").map((s) => s.key)).toContain("av_installer");
+    expect(suggestTrades("mount my tv on the wall").map((s) => s.key)).toContain("av_installer");
+  });
+});
+
+describe("SYMPTOM_CLUSTERS integrity", () => {
+  const tradeKeys = new Set(TRADES.map((t) => t.key));
+
+  it("every cluster points at real trade keys", () => {
+    for (const [term, keys] of Object.entries(SYMPTOM_CLUSTERS)) {
+      for (const key of keys) {
+        expect(tradeKeys.has(key), `"${term}" → unknown trade "${key}"`).toBe(true);
+      }
+    }
+  });
+
+  it("terms are lowercase and survive query normalisation", () => {
+    const normalized = (s: string) =>
+      s.replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+    for (const term of Object.keys(SYMPTOM_CLUSTERS)) {
+      expect(term, `"${term}" must be lowercase`).toBe(term.toLowerCase());
+      expect(normalized(term), `"${term}" has a char queries strip`).toBe(term);
+    }
   });
 });
 
