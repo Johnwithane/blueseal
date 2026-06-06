@@ -255,6 +255,38 @@ watch(
   { immediate: true },
 );
 
+// "N nearby" counts for the describe-box suggestion chips — one trade-agnostic
+// area census (verified pros + seeded prospects), tallied by trade. Refreshed
+// only when the LOCATION changes (not per keystroke); fully non-fatal, so any
+// failure just leaves the chips without a number. Only positive counts render,
+// so trades with nobody nearby simply aren't annotated.
+const nearbyCounts = ref<Record<string, number>>({});
+async function refreshNearbyCounts() {
+  const { lat, lng, radiusKm } = location.value;
+  if (lat == null || lng == null) return;
+  const geo = { centerLat: lat, centerLng: lng, radiusKm };
+  try {
+    const [tradies, prospects] = await Promise.all([
+      searchTradespeople(geo),
+      searchProspects(geo).catch(() => []),
+    ]);
+    const counts: Record<string, number> = {};
+    for (const p of [...tradies, ...prospects]) {
+      for (const key of p.trades ?? []) counts[key] = (counts[key] ?? 0) + 1;
+    }
+    nearbyCounts.value = counts;
+  } catch {
+    /* non-fatal — chips just show no number */
+  }
+}
+watch(
+  () => [location.value.lat, location.value.lng, location.value.radiusKm] as const,
+  ([lat, lng]) => {
+    if (lat != null && lng != null) refreshNearbyCounts();
+  },
+  { immediate: true },
+);
+
 // Keep dropdown in sync if the URL query changes (e.g. tapping a different trade tile)
 watch(
   () => route.query.trade,
@@ -361,6 +393,7 @@ onMounted(async () => {
       <TradeDescribeBox
         v-model="describe"
         :active-key="trade"
+        :counts="nearbyCounts"
         no-match-hint="No trade matched that yet — try different words, pick one below, or just search your area."
         @select="applySuggestion"
       />

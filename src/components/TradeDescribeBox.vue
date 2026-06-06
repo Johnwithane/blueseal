@@ -24,6 +24,8 @@ const props = withDefaults(
     /** Input id — keep unique per page; drives the <label for>. */
     inputId?: string;
     noMatchHint?: string;
+    /** Optional trade key → count of pros nearby, to annotate suggestions. */
+    counts?: Record<string, number> | null;
   }>(),
   {
     label: "What do you need done?",
@@ -32,6 +34,7 @@ const props = withDefaults(
     activeKey: null,
     inputId: "describe",
     noMatchHint: "No trade matched that yet — try different words or pick one below.",
+    counts: null,
   },
 );
 
@@ -100,6 +103,9 @@ const suggestions = computed(() => suggestTrades(props.modelValue));
         >
           <i :class="s.icon" aria-hidden="true"></i>
           <span>{{ s.label }}</span>
+          <span v-if="counts && counts[s.key] > 0" class="bs-suggestion-count">
+            · {{ counts[s.key] }} nearby
+          </span>
         </button>
       </div>
     </div>
@@ -172,5 +178,10 @@ const suggestions = computed(() => suggestTrades(props.modelValue));
 .bs-suggestion--active {
   background: var(--bs-blue);
   color: #fff;
+}
+/* "· N nearby" count — lighter weight; inherits colour so it flips on hover. */
+.bs-suggestion-count {
+  font-weight: 500;
+  opacity: 0.75;
 }
 </style>
