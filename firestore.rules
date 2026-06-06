@@ -351,10 +351,16 @@ service cloud.firestore {
       // tradespersonId/clientId on the row let rules avoid an extra
       // parent-job lookup on every read.
       match /timeEntries/{entryId} {
+        // Authorize via the PARENT job, not the row's denormalized ids. The
+        // client's listener filters by tradespersonId (to skip stale entries
+        // from a swapped tradie), so a per-doc `resource.data.clientId == uid()`
+        // predicate can never authorize the client's LIST ("rules are not
+        // filters"). The parent lookup is resource-independent, so a list from
+        // EITHER party is authorized. Matches the jobs/private + expenses rules.
         function isJobParty() {
           return isSignedIn() && (
-            resource.data.tradespersonId == uid()
-            || resource.data.clientId == uid()
+            jobDoc(jobId).data.tradespersonId == uid()
+            || jobDoc(jobId).data.clientId == uid()
           );
         }
         allow read: if isJobParty() || isAdmin();
@@ -443,6 +449,15 @@ service cloud.firestore {
     match /jobPosts/{postId} {
       function postOpen() { return resource.data.status == 'open'; }
       function isPostOwner() { return isSignedIn() && resource.data.clientId == uid(); }
+      // Ownership by PARENT-post lookup, for nested subcollections whose own
+      // docs don't carry clientId (private/meta) or that get LISTed unfiltered
+      // (applications). isPostOwner() reads `resource.data.clientId`, which is
+      // the post doc only at the parent level — inside a subcollection match
+      // `resource` is the child doc, so this resolves ownership off the post.
+      function isPostOwnerByLookup() {
+        return isSignedIn()
+          && get(/databases/$(database)/documents/jobPosts/$(postId)).data.clientId == uid();
+      }
       function isVisibleTradie() {
         return isTradie()
           && exists(/databases/$(database)/documents/tradespeople/$(uid()))
@@ -455,7 +470,7 @@ service cloud.firestore {
       allow delete: if isAdmin();
 
       match /private/{docId} {
-        allow read:  if isPostOwner() || isAdmin();
+        allow read:  if isPostOwnerByLookup() || isAdmin();
         allow write: if false;
       }
 
@@ -476,7 +491,12 @@ service cloud.firestore {
         allow read: if isAdmin()
           || (resource == null && isSignedIn() && tradieId == uid())
           || (resource != null && resource.data.tradespersonId == uid())
-          || (resource != null && isSignedIn() && resource.data.clientId == uid());
+          // Post owner — by parent lookup so the client's UNFILTERED applicant
+          // list (subscribeApplicationsForPost) is authorized. A per-doc
+          // `resource.data.clientId == uid()` only covers single-doc gets, not
+          // the list ("rules are not filters"), which broke the client's
+          // Applicants view for every non-admin client.
+          || isPostOwnerByLookup();
         allow create, update, delete: if false;  // marketplace callables only
       }
     }

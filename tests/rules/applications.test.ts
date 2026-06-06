@@ -12,10 +12,12 @@ import {
   type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
 import {
+  collection,
   collectionGroup,
   doc,
   getDoc,
   getDocs,
+  orderBy,
   query,
   setDoc,
   updateDoc,
@@ -81,7 +83,11 @@ const baselineApplication = {
 
 async function seedApplication() {
   await env.withSecurityRulesDisabled(async (ctx) => {
-    await setDoc(doc(ctx.firestore(), ...APP_PATH), baselineApplication);
+    const fs = ctx.firestore();
+    // The parent post is required so the read rule can resolve post ownership
+    // by parent lookup (the meta/applications rules key off the post's clientId).
+    await setDoc(doc(fs, "jobPosts", POST_ID), { clientId: CLIENT_UID, status: "open" });
+    await setDoc(doc(fs, ...APP_PATH), baselineApplication);
   });
 }
 
@@ -117,6 +123,37 @@ describe("applications — read access (bid marketplace)", () => {
   it("a different client cannot read another client's applicant", async () => {
     await seedApplication();
     await assertFails(getDoc(doc(fsAs(OTHER_CLIENT_UID, CLIENT_CLAIMS), ...APP_PATH)));
+  });
+});
+
+describe("applications — per-post list (the client's applicant list)", () => {
+  // Mirrors subscribeApplicationsForPost: an UNFILTERED list of a post's
+  // applications, ordered by createdAt. Only the post owner (+ admin) may run it.
+  function appsQuery(fs: ReturnType<typeof fsAs>) {
+    return query(
+      collection(fs, "jobPosts", POST_ID, "applications"),
+      orderBy("createdAt", "asc"),
+    );
+  }
+
+  it("the post-owning client can list all applications for their post", async () => {
+    await seedApplication();
+    await assertSucceeds(getDocs(appsQuery(fsAs(CLIENT_UID, CLIENT_CLAIMS))));
+  });
+
+  it("an admin can list a post's applications", async () => {
+    await seedApplication();
+    await assertSucceeds(getDocs(appsQuery(fsAs(ADMIN_UID, ADMIN_CLAIMS))));
+  });
+
+  it("a different client cannot list another post's applications", async () => {
+    await seedApplication();
+    await assertFails(getDocs(appsQuery(fsAs(OTHER_CLIENT_UID, CLIENT_CLAIMS))));
+  });
+
+  it("a tradesperson cannot list all of a post's applications (bid-blind)", async () => {
+    await seedApplication();
+    await assertFails(getDocs(appsQuery(fsAs(TRADIE_UID, TRADIE_CLAIMS))));
   });
 });
 

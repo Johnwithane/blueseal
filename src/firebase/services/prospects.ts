@@ -79,10 +79,18 @@ export async function searchProspects(
 }
 
 export async function getProspect(id: string): Promise<WithId<ProspectDoc> | null> {
-  const snap = await getDoc(
-    doc(db, "prospects", id).withConverter(typedConverter<ProspectDoc>()),
-  );
-  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+  // The prospects read rule requires `isListed == true`, so a missing OR
+  // unlisted/suppressed prospect is denied (not just "not found") — getDoc then
+  // throws permission-denied. Callers want "no such public prospect" = null, so
+  // swallow the denial here (mirrors getQuoteByJobId's missing-doc handling).
+  try {
+    const snap = await getDoc(
+      doc(db, "prospects", id).withConverter(typedConverter<ProspectDoc>()),
+    );
+    return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+  } catch {
+    return null;
+  }
 }
 
 export interface ProspectRequestInput {
