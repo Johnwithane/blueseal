@@ -20,6 +20,7 @@ interface PostDoc {
   trade: string;
   title: string;
   description: string;
+  intakeFormData?: Record<string, unknown>;
   photos: string[];
   urgency: "flexible" | "this_week" | "urgent";
   preferredDateWindow: { start: Timestamp | null; end: Timestamp | null };
@@ -40,6 +41,8 @@ interface QuoteData {
   total: number;
   upfrontFee?: { type: "fixed" | "percent"; bps?: number; amountCents: number } | null;
   estimatedHours: number | null;
+  proposedStartDate?: Timestamp | null;
+  estimatedDuration?: string;
   validUntil: Timestamp | null;
   terms: string;
   noteToClient: string;
@@ -174,7 +177,9 @@ export const acceptApplicationQuote = onCall(CALLABLE_OPTS, async (req) => {
         trade: post.trade,
         title: post.title,
         description: post.description,
-        intakeFormData: {},
+        // Carry the post's trade-specific questionnaire answers onto the job so
+        // the detail captured up-front survives into the job brief.
+        intakeFormData: post.intakeFormData ?? {},
         intakePhotos: [], // populated post-commit after storage copy
         address: {
           line1: meta.addressPrivate.line1,
@@ -233,6 +238,8 @@ export const acceptApplicationQuote = onCall(CALLABLE_OPTS, async (req) => {
         total: quote.total,
         currency: "CAD",
         estimatedHours: quote.estimatedHours,
+        proposedStartDate: quote.proposedStartDate ?? null,
+        estimatedDuration: quote.estimatedDuration ?? "",
         validUntil: quote.validUntil,
         terms: quote.terms,
         noteToClient: quote.noteToClient,

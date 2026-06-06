@@ -20,6 +20,7 @@ const QuoteInput = z.object({
   terms: z.string().max(2000).default(""),
   noteToClient: z.string().max(500).default(""),
   upfrontFee: UpfrontFeeSchema.nullable().default(null),
+  estimatedDuration: z.string().max(80).default(""),
 });
 
 const Input = z.object({
@@ -59,6 +60,11 @@ export const submitApplication = onCall(CALLABLE_OPTS, async (req) => {
   const validUntil = Timestamp.fromMillis(
     Date.now() + quote.validUntilDays * 24 * 60 * 60 * 1000,
   );
+  // Calendar date → UTC midnight (a date, not an instant). Reused for the
+  // top-level application field and the embedded quote snapshot.
+  const proposedStartTs = proposedStartDate
+    ? Timestamp.fromDate(new Date(`${proposedStartDate}T00:00:00Z`))
+    : null;
 
   // The stored quote snapshot + a one-line proposedPrice derived from the
   // total so existing list/notification rendering keeps working.
@@ -72,6 +78,8 @@ export const submitApplication = onCall(CALLABLE_OPTS, async (req) => {
     currency: "CAD",
     upfrontFee,
     estimatedHours: quote.estimatedHours,
+    proposedStartDate: proposedStartTs,
+    estimatedDuration: quote.estimatedDuration,
     validUntil,
     terms: quote.terms,
     noteToClient: quote.noteToClient,
@@ -125,9 +133,7 @@ export const submitApplication = onCall(CALLABLE_OPTS, async (req) => {
         message,
         proposedPrice,
         quote: applicationQuote,
-        proposedStartDate: proposedStartDate
-          ? Timestamp.fromDate(new Date(`${proposedStartDate}T00:00:00Z`))
-          : null,
+        proposedStartDate: proposedStartTs,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       });

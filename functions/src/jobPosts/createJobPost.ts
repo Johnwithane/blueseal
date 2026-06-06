@@ -44,6 +44,25 @@ const Input = z.object({
     start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
     end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
   }),
+  // Trade-specific questionnaire answers (keyed by the trade's IntakeField
+  // keys). Stored verbatim on the post + carried onto the converted job.
+  // Bounded here since it's the trust boundary: cap key count and value sizes
+  // so a crafted payload can't bloat the doc. Values mirror the IntakeField
+  // types the renderer can produce (text/number/boolean/multiselect/date-ISO).
+  intakeFormData: z
+    .record(
+      z.string().max(60),
+      z.union([
+        z.string().max(2000),
+        z.number(),
+        z.boolean(),
+        z.null(),
+        z.array(z.string().max(200)).max(50),
+      ]),
+    )
+    .refine((o) => Object.keys(o).length <= 40, "Too many fields")
+    .optional()
+    .default({}),
 });
 
 const OPEN_POSTS_PER_CLIENT_CAP = 5;
@@ -110,6 +129,7 @@ export const createJobPost = onCall(CALLABLE_OPTS, async (req) => {
     trade: input.trade,
     title: input.title,
     description: input.description,
+    intakeFormData: input.intakeFormData,
     photos: input.photos,
     addressPublic: {
       city: input.addressPublic.city,

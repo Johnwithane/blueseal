@@ -19,6 +19,12 @@ const Input = z.object({
   terms: z.string().max(2000).default(""),
   noteToClient: z.string().max(500).default(""),
   upfrontFee: UpfrontFeeSchema.nullable().default(null),
+  proposedStartDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable()
+    .default(null),
+  estimatedDuration: z.string().max(80).default(""),
 });
 
 interface JobData {
@@ -63,7 +69,15 @@ export const submitQuote = onCall(CALLABLE_OPTS, async (req) => {
     terms,
     noteToClient,
     upfrontFee: upfrontFeeInput,
+    proposedStartDate,
+    estimatedDuration,
   } = parsed.data;
+
+  // Calendar date → UTC midnight Timestamp (so it round-trips as the same
+  // day regardless of the viewer's timezone). Null when not provided.
+  const proposedStartTs = proposedStartDate
+    ? Timestamp.fromDate(new Date(`${proposedStartDate}T00:00:00Z`))
+    : null;
 
   const jobRef = db.doc(`jobs/${jobId}`);
   const quoteRef = db.doc(`quotes/${jobId}`);
@@ -136,6 +150,8 @@ export const submitQuote = onCall(CALLABLE_OPTS, async (req) => {
       total: totals.total,
       currency: "CAD",
       estimatedHours,
+      proposedStartDate: proposedStartTs,
+      estimatedDuration,
       validUntil,
       terms,
       noteToClient,
@@ -163,6 +179,8 @@ export const submitQuote = onCall(CALLABLE_OPTS, async (req) => {
       taxTotal: totals.taxTotal,
       total: totals.total,
       estimatedHours,
+      proposedStartDate: proposedStartTs,
+      estimatedDuration,
       validUntil,
       terms,
       noteToClient,

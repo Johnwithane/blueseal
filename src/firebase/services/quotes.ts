@@ -127,6 +127,8 @@ export interface SubmitQuoteInput {
   terms?: string;
   noteToClient?: string;
   upfrontFee?: SubmitQuoteUpfrontFee | null;
+  proposedStartDate?: string | null; // YYYY-MM-DD; server stores at UTC midnight
+  estimatedDuration?: string; // free text, e.g. "2–3 days"
 }
 
 export async function submitQuote(

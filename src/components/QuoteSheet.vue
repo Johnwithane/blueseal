@@ -77,6 +77,11 @@ watch(
           noteToClient: existing.noteToClient ?? "",
           estimatedHours: existing.estimatedHours ?? null,
           upfrontFee: existing.upfrontFee ?? null,
+          // Stored at UTC midnight — format in UTC to get the original date back.
+          proposedStartDate: existing.proposedStartDate
+            ? existing.proposedStartDate.toDate().toISOString().slice(0, 10)
+            : null,
+          estimatedDuration: existing.estimatedDuration ?? "",
         };
       }
     } catch {

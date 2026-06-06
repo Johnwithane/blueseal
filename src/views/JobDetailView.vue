@@ -41,6 +41,7 @@ import UpfrontFeePaymentBanner from "@/components/UpfrontFeePaymentBanner.vue";
 import TradieChangesRequestedBanner from "@/components/TradieChangesRequestedBanner.vue";
 import MutualReviewCard from "@/components/MutualReviewCard.vue";
 import { SEED_INTAKE_SCHEMAS } from "@/data/intakeSchemas";
+import { firstMissingRequired } from "@/utils/intake";
 import { getIntakeSchema } from "@/firebase/services/intakeFormSchemas";
 import type { IntakeField } from "@/firebase/interfaces";
 import { tradeLabel } from "@/data/trades";
@@ -641,14 +642,10 @@ async function maybeAutoUpdateLog() {
 
 async function submitBrief() {
   if (!job.value || savingIntake.value) return;
-  for (const f of intakeFields.value) {
-    if (f.required) {
-      const v = intakeDraft.value[f.key];
-      if (v === undefined || v === null || v === "") {
-        toast.error("Missing required field", `Please fill: ${f.label}`);
-        return;
-      }
-    }
+  const missingDetail = firstMissingRequired(intakeFields.value, intakeDraft.value);
+  if (missingDetail) {
+    toast.error("Missing required field", `Please fill: ${missingDetail}`);
+    return;
   }
   savingIntake.value = true;
   try {

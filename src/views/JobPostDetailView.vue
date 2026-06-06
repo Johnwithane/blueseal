@@ -26,12 +26,15 @@ import { ref as storageRef, getDownloadURL } from "firebase/storage";
 import { storage } from "@/firebase/config";
 import type {
   ApplicationDoc,
+  IntakeField,
   JobPostDoc,
   JobPostMetaDoc,
   TradespersonDoc,
   WithId,
 } from "@/firebase/interfaces";
 import { tradeLabel } from "@/data/trades";
+import { intakeFieldsForTrade } from "@/data/intakeSchemas";
+import IntakeFormRenderer from "@/components/IntakeFormRenderer.vue";
 import { submitApplicationSchema } from "@/validation/schemas";
 import { useToast } from "@/composables/useToast";
 import { useFormatters } from "@/composables";
@@ -93,6 +96,15 @@ const isClient = computed(
   () => post.value && auth.fbUser?.uid === post.value.clientId,
 );
 const isTradie = computed(() => auth.activeRole === "tradesperson");
+
+// Trade-specific questionnaire captured at post time, shown read-only to both
+// the client and applying tradies so quotes are grounded in real detail.
+const postIntakeFields = computed<IntakeField[]>(() =>
+  post.value ? intakeFieldsForTrade(post.value.trade) : [],
+);
+const hasPostIntake = computed(
+  () => Object.keys(post.value?.intakeFormData ?? {}).length > 0,
+);
 
 onMounted(async () => {
   if (!postId.value) return;
@@ -186,6 +198,10 @@ async function submitApply() {
     postId: postId.value,
     message: applyMessage.value.trim(),
     quote: s.payload,
+    // proposedStartDate rides at the top level of the application (it's also
+    // stored on the materialized quote server-side); the composer carries it
+    // inside the payload, so lift it out here.
+    proposedStartDate: s.payload.proposedStartDate,
   };
   const parsed = submitApplicationSchema.safeParse(payload);
   if (!parsed.success) {
@@ -386,6 +402,23 @@ const visibleApplications = computed(() =>
               Exact address shared after selection.
             </div>
           </div>
+        </div>
+
+        <!-- Trade-specific details the client answered when posting. Read-only
+             for everyone; gives applicants the specifics they need to quote. -->
+        <div
+          v-if="postIntakeFields.length && hasPostIntake"
+          class="border-t border-[color:var(--bs-border)] pt-4"
+        >
+          <div class="text-xs text-[color:var(--bs-muted)] mb-3">
+            {{ tradeLabel(post.trade) }} details
+          </div>
+          <IntakeFormRenderer
+            :model-value="post.intakeFormData ?? {}"
+            :fields="postIntakeFields"
+            readonly
+            @update:model-value="() => {}"
+          />
         </div>
 
         <div v-if="post.photos.length" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">

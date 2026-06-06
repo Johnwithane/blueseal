@@ -24,6 +24,10 @@ export interface QuoteComposerPayload {
   terms: string;
   noteToClient: string;
   upfrontFee: SubmitQuoteUpfrontFee | null;
+  // Projected start date as a YYYY-MM-DD calendar string (or null), and a
+  // free-text duration estimate. The server stores the date at UTC midnight.
+  proposedStartDate: string | null;
+  estimatedDuration: string;
 }
 
 export interface QuoteComposerState {
@@ -43,6 +47,9 @@ export interface QuoteComposerInitial {
   noteToClient?: string;
   estimatedHours?: number | null;
   upfrontFee?: QuoteUpfrontFee | null;
+  /** YYYY-MM-DD calendar string (host converts any stored Timestamp first). */
+  proposedStartDate?: string | null;
+  estimatedDuration?: string;
 }
 
 const props = defineProps<{
@@ -92,6 +99,12 @@ const discountModeOptions = [
 const validUntilDays = ref<number>(14);
 const terms = ref<string>("");
 const noteToClient = ref<string>("");
+
+// Timing the client wants to see up front: when work can start and how long
+// it should take. Start date is a native YYYY-MM-DD string; duration is free
+// text so "half a day" / "2–3 days" / "1 week" all work.
+const proposedStartDate = ref<string>("");
+const estimatedDuration = ref<string>("");
 
 type UpfrontMode = "off" | "percent" | "fixed";
 const upfrontMode = ref<UpfrontMode>("off");
@@ -245,6 +258,8 @@ function reset() {
   validUntilDays.value = 14;
   terms.value = "";
   noteToClient.value = "";
+  proposedStartDate.value = "";
+  estimatedDuration.value = "";
   upfrontMode.value = "off";
   upfrontPercent.value = 20;
   upfrontDollars.value = 0;
@@ -288,6 +303,8 @@ function hydrate(initial: QuoteComposerInitial) {
   }
   terms.value = initial.terms ?? "";
   noteToClient.value = initial.noteToClient ?? "";
+  proposedStartDate.value = initial.proposedStartDate ?? "";
+  estimatedDuration.value = initial.estimatedDuration ?? "";
   const fee = initial.upfrontFee ?? null;
   if (fee) {
     if (fee.type === "percent") {
@@ -328,6 +345,8 @@ const state = computed<QuoteComposerState>(() => {
           terms: terms.value.trim(),
           noteToClient: noteToClient.value.trim(),
           upfrontFee: upfrontFeeForCallable.value,
+          proposedStartDate: proposedStartDate.value || null,
+          estimatedDuration: estimatedDuration.value.trim(),
         }
       : null,
     totals: totals.value,
@@ -626,6 +645,38 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
           class="w-32"
         />
         <span class="text-xs text-[color:var(--bs-muted)]">until {{ validUntilPreview }}</span>
+      </div>
+    </section>
+
+    <!-- Timing: when work can start + how long it should take. Shown to the
+         client alongside the quote so availability is part of the comparison. -->
+    <section class="rounded-lg border border-[color:var(--bs-border)] p-3">
+      <header class="flex items-center gap-2 mb-2">
+        <i class="pi pi-calendar-plus text-[color:var(--bs-blue)]"></i>
+        <h4 class="font-semibold text-sm">Timing</h4>
+      </header>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">
+            Projected start date
+          </label>
+          <input
+            v-model="proposedStartDate"
+            type="date"
+            class="quote-composer-date w-full rounded-md border border-[color:var(--bs-border)] px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">
+            Expected duration
+          </label>
+          <InputText
+            v-model="estimatedDuration"
+            placeholder="e.g. 2–3 days"
+            maxlength="80"
+            class="w-full text-sm"
+          />
+        </div>
       </div>
     </section>
 

@@ -16,6 +16,8 @@ defineProps<{
     total: number;
     upfrontFee?: QuoteUpfrontFee | null;
     estimatedHours?: number | null;
+    proposedStartDate?: { toDate(): Date } | null;
+    estimatedDuration?: string;
     validUntil?: { toDate(): Date } | null;
     terms?: string;
     noteToClient?: string;
@@ -25,6 +27,18 @@ defineProps<{
 }>();
 
 const { money, date } = useFormatters();
+
+// proposedStartDate is a calendar date stored at UTC midnight — format it in
+// UTC so it reads as the same day the tradesperson picked, in every timezone.
+function formatStartDate(ts: { toDate(): Date }): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "UTC",
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(ts.toDate());
+}
 
 const KIND_LABEL: Record<LineItemKind, string> = {
   hourly: "Hourly",
@@ -128,6 +142,16 @@ const KIND_ICON: Record<LineItemKind, string> = {
 
     <div v-if="quote.estimatedHours" class="text-xs text-[color:var(--bs-muted)] mt-2">
       Estimated time: {{ quote.estimatedHours }} hours
+    </div>
+
+    <div v-if="quote.proposedStartDate" class="text-xs text-[color:var(--bs-muted)] mt-2">
+      <i class="pi pi-calendar-plus text-[10px]"></i>
+      Projected start: {{ formatStartDate(quote.proposedStartDate) }}
+    </div>
+
+    <div v-if="quote.estimatedDuration" class="text-xs text-[color:var(--bs-muted)] mt-2">
+      <i class="pi pi-hourglass text-[10px]"></i>
+      Expected duration: {{ quote.estimatedDuration }}
     </div>
 
     <div

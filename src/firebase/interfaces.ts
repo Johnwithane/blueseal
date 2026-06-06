@@ -578,12 +578,13 @@ export interface JobDoc {
   trade: string;
   title: string;
   description: string;
-  // Marketplace-originated jobs (sourcePostId set) intentionally leave this
-  // as {} — the post already collected description + photos + address, so
-  // no trade-specific intake is gathered and the job goes straight to
-  // "requested". Direct-booked jobs populate this from the intake form on
-  // creation. Legacy marketplace jobs created before the skip-intake change
-  // may still carry the empty-object placeholder.
+  // Trade-specific questionnaire answers (keyed by IntakeField `key` — see
+  // src/data/intakeSchemas.ts). Direct-booked jobs populate this from the
+  // intake form on creation. Marketplace-originated jobs (sourcePostId set)
+  // copy it from the source post's intakeFormData on acceptance, so the
+  // detail captured up-front carries through to the job brief. May be {} for
+  // a trade with no questionnaire, or for legacy marketplace jobs created
+  // before the post-intake change.
   intakeFormData: Record<string, unknown>;
   intakePhotos: string[];
   address: JobAddress;
@@ -769,6 +770,12 @@ export interface JobPostDoc {
   trade: string;
   title: string;
   description: string;
+  // Trade-specific questionnaire answers captured at post time (keyed by the
+  // IntakeField `key` for the post's trade — see src/data/intakeSchemas.ts).
+  // Lets applying tradespeople quote accurately without back-and-forth. Optional:
+  // posts created before this field, or for a trade with no questionnaire, leave
+  // it undefined. Carried onto the converted JobDoc.intakeFormData on acceptance.
+  intakeFormData?: Record<string, unknown>;
   photos: string[]; // 1-8 WebP storage paths under jobPosts/{postId}/photos/
   addressPublic: AddressPublic;
   budget: BudgetRange;
@@ -818,6 +825,13 @@ export interface ApplicationQuote {
   currency: string;
   upfrontFee?: QuoteUpfrontFee | null;
   estimatedHours: number | null;
+  // When the tradesperson expects to be able to start, and how long the work
+  // should take. Optional — applications submitted before these fields landed
+  // (and any non-marketplace path) leave them undefined. proposedStartDate is
+  // stored at UTC midnight (a calendar date, not an instant) so format it in
+  // UTC when displaying. estimatedDuration is free text ("2–3 days").
+  proposedStartDate?: Timestamp | null;
+  estimatedDuration?: string;
   validUntil: Timestamp | null;
   terms: string;
   noteToClient: string;
@@ -1218,6 +1232,12 @@ export interface QuoteDoc {
   // ranges ("about 4-6 hours"). Free-form so tradies can write whatever
   // qualifier fits.
   estimatedHours: number | null;
+  // Projected start date + expected duration shown to the client with the
+  // quote. proposedStartDate is a calendar date stored at UTC midnight (format
+  // it in UTC). estimatedDuration is free text ("2–3 days"). Optional — quotes
+  // issued before these fields landed leave them undefined.
+  proposedStartDate?: Timestamp | null;
+  estimatedDuration?: string;
   // Quote expiry. Defaults to issuedAt + 14 days when the sheet submits.
   // The client banner shows "valid until {date}"; a (future) scheduled
   // function flips expired status past this date.

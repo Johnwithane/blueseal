@@ -13,6 +13,7 @@ import { createJob } from "@/firebase/services/jobs";
 import { createChat, newChatId, sendMessage } from "@/firebase/services/chats";
 import { uploadFile, makeStoragePath } from "@/firebase/services/storage";
 import { SEED_INTAKE_SCHEMAS } from "@/data/intakeSchemas";
+import { firstMissingRequired } from "@/utils/intake";
 import type { IntakeField, TradespersonDoc, WithId, Urgency } from "@/firebase/interfaces";
 import { tradeLabel } from "@/data/trades";
 import IntakeFormRenderer from "@/components/IntakeFormRenderer.vue";
@@ -157,14 +158,10 @@ async function submit() {
     error.value = "Upload at least one photo of the issue or area.";
     return;
   }
-  for (const f of intakeFields.value) {
-    if (f.required) {
-      const v = intakeData.value[f.key];
-      if (v === undefined || v === null || v === "") {
-        error.value = `Please fill: ${f.label}`;
-        return;
-      }
-    }
+  const missingDetail = firstMissingRequired(intakeFields.value, intakeData.value);
+  if (missingDetail) {
+    error.value = `Please fill: ${missingDetail}`;
+    return;
   }
 
   // Use the canonical Zod schema for everything except the not-yet-uploaded

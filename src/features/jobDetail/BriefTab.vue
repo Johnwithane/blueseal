@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
 import Avatar from "primevue/avatar";
 import Button from "primevue/button";
@@ -58,6 +58,12 @@ watch(
 
 const intakeDraft = defineModel<Record<string, unknown>>("intakeDraft", { required: true });
 const privateNotes = defineModel<string>("privateNotes", { required: true });
+
+// Marketplace jobs (sourcePostId set) come in with their intake already filled
+// from the source post, so we show it read-only rather than gating on a brief.
+const hasIntakeData = computed(
+  () => Object.keys(props.job.intakeFormData ?? {}).length > 0,
+);
 
 const emit = defineEmits<{
   "submit-brief": [];
@@ -150,13 +156,17 @@ function tradieAvatarInitial() {
 
       <ImageLightbox :src="lightboxSrc" @close="lightboxSrc = null" />
 
-      <!-- Marketplace-sourced jobs skip the trade-specific intake entirely
-           — the post description + photos above already serve that purpose.
-           Only direct-booked jobs (no sourcePostId) render the intake form. -->
-      <div v-if="intakeFields.length && !job.sourcePostId" class="mt-4">
+      <!-- Direct-booked jobs (no sourcePostId): the client completes/edits the
+           trade-specific brief here. Marketplace jobs carry their answers over
+           from the source post, so when there's intake data we render it
+           read-only. Either way it only shows if the trade has a questionnaire. -->
+      <div
+        v-if="intakeFields.length && (!job.sourcePostId || hasIntakeData)"
+        class="mt-4"
+      >
         <h4 class="font-medium text-sm mb-2">Trade-specific details</h4>
         <IntakeFormRenderer
-          v-if="isClient && job.status === 'accepted'"
+          v-if="isClient && job.status === 'accepted' && !job.sourcePostId"
           v-model="intakeDraft"
           :fields="intakeFields"
         />
@@ -167,7 +177,7 @@ function tradieAvatarInitial() {
           readonly
           @update:model-value="() => {}"
         />
-        <div v-if="isClient && job.status === 'accepted'" class="mt-3 flex flex-col sm:flex-row sm:items-center gap-2">
+        <div v-if="isClient && job.status === 'accepted' && !job.sourcePostId" class="mt-3 flex flex-col sm:flex-row sm:items-center gap-2">
           <Button
             label="Submit brief"
             icon="pi pi-send"

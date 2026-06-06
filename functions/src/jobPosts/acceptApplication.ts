@@ -19,6 +19,7 @@ interface PostDoc {
   trade: string;
   title: string;
   description: string;
+  intakeFormData?: Record<string, unknown>;
   photos: string[];
   urgency: "flexible" | "this_week" | "urgent";
   preferredDateWindow: { start: Timestamp | null; end: Timestamp | null };
@@ -70,7 +71,7 @@ interface JobPayload {
   trade: string;
   title: string;
   description: string;
-  intakeFormData: Record<string, never>;
+  intakeFormData: Record<string, unknown>;
   intakePhotos: string[];
   address: {
     line1: string;
@@ -177,14 +178,16 @@ export const acceptApplication = onCall(CALLABLE_OPTS, async (req) => {
           "Tradesperson",
         tradespersonPhotoURL: tradie.photoURL ?? null,
         // Marketplace jobs skip the "accepted" intake-gate state — the post
-        // already collected description + photos + address, so there's no
-        // trade-specific brief to wait on. Drop straight into "requested"
-        // so the tradesperson can prepare a quote immediately.
+        // already collected description + photos + address + the trade-specific
+        // questionnaire (carried over below), so there's no brief to wait on.
+        // Drop straight into "requested" so the tradesperson can quote at once.
         status: "requested",
         trade: post.trade,
         title: post.title,
         description: post.description,
-        intakeFormData: {},
+        // Carry the post's trade-specific questionnaire answers onto the job so
+        // the detail captured up-front survives into the job brief.
+        intakeFormData: post.intakeFormData ?? {},
         intakePhotos: [], // populated post-commit after storage copy
         address: {
           line1: meta.addressPrivate.line1,

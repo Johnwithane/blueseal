@@ -226,6 +226,10 @@ export const createJobPostSchema = z.object({
     start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a YYYY-MM-DD date").nullable(),
     end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a YYYY-MM-DD date").nullable(),
   }),
+  // Trade-specific questionnaire answers (keys come from the trade's intake
+  // schema). Loose on the client — values are built from typed form inputs;
+  // the createJobPost callable re-validates shape + bounds at the boundary.
+  intakeFormData: z.record(z.unknown()).default({}),
 });
 export type CreateJobPostInput = z.infer<typeof createJobPostSchema>;
 
@@ -262,6 +266,7 @@ export const applicationQuoteSchema = z.object({
   terms: z.string().max(2000).default(""),
   noteToClient: z.string().max(500).default(""),
   upfrontFee: quoteUpfrontFeeSchema.nullable().default(null),
+  estimatedDuration: z.string().max(80).default(""),
 });
 export type ApplicationQuoteInput = z.infer<typeof applicationQuoteSchema>;
 

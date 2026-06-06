@@ -10,15 +10,18 @@ import Message from "primevue/message";
 import DatePicker from "primevue/datepicker";
 import { useAuthStore } from "@/stores/auth";
 import { TRADES, tradeLabel } from "@/data/trades";
+import { intakeFieldsForTrade } from "@/data/intakeSchemas";
 import { formatBudgetGuide } from "@/data/budgetGuides";
 import { compressToWebp } from "@/utils/image";
+import { firstMissingRequired, pickIntakeAnswers } from "@/utils/intake";
 import { uploadFile } from "@/firebase/services/storage";
 import { createJobPost } from "@/firebase/services/jobPosts";
 import { useGoogleMaps } from "@/composables/useGoogleMaps";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 import { createJobPostSchema } from "@/validation/schemas";
-import type { Urgency } from "@/firebase/interfaces";
+import type { IntakeField, Urgency } from "@/firebase/interfaces";
+import IntakeFormRenderer from "@/components/IntakeFormRenderer.vue";
 import { useSeo } from "@/composables/useSeo";
 
 useSeo({
@@ -43,6 +46,9 @@ interface PendingPhoto {
 const trade = ref<string>("");
 const title = ref("");
 const description = ref("");
+// Trade-specific questionnaire answers, keyed by IntakeField key. The set of
+// questions is derived from the selected trade (intakeFieldsForTrade).
+const intakeData = ref<Record<string, unknown>>({});
 const urgency = ref<Urgency>("flexible");
 const budgetMin = ref<number | null>(null);
 const budgetMax = ref<number | null>(null);
@@ -73,6 +79,16 @@ const budgetHint = computed(() =>
   trade.value ? formatBudgetGuide(trade.value, tradeLabel(trade.value)) : null,
 );
 
+// Trade-specific questions for the chosen trade (empty if none defined).
+const intakeFields = computed<IntakeField[]>(() => intakeFieldsForTrade(trade.value));
+
+// Switching trade invalidates the previous trade's answers — clear them so we
+// never submit stale keys. Guarded on `old` being truthy so restoring a draft
+// (trade goes "" → saved value) doesn't wipe the restored answers.
+watch(trade, (next, old) => {
+  if (old && next !== old) intakeData.value = {};
+});
+
 // Restore draft on load (covers the auth-at-submit redirect round trip).
 onMounted(async () => {
   try {
@@ -82,6 +98,7 @@ onMounted(async () => {
         trade: string;
         title: string;
         description: string;
+        intakeData: Record<string, unknown>;
         urgency: Urgency;
         budgetMin: number;
         budgetMax: number;
@@ -97,6 +114,8 @@ onMounted(async () => {
       trade.value = d.trade ?? "";
       title.value = d.title ?? "";
       description.value = d.description ?? "";
+      // Assign after `trade` so the trade-reset watch (old === "") doesn't clear it.
+      intakeData.value = d.intakeData ?? {};
       urgency.value = (d.urgency ?? "flexible") as Urgency;
       budgetMin.value = d.budgetMin ?? null;
       budgetMax.value = d.budgetMax ?? null;
@@ -160,6 +179,7 @@ watch(
     trade,
     title,
     description,
+    intakeData,
     urgency,
     budgetMin,
     budgetMax,
@@ -178,6 +198,7 @@ watch(
         trade: trade.value,
         title: title.value,
         description: description.value,
+        intakeData: intakeData.value,
         urgency: urgency.value,
         budgetMin: budgetMin.value,
         budgetMax: budgetMax.value,
@@ -244,6 +265,11 @@ async function submit() {
     error.value = "Enter a budget range.";
     return;
   }
+  const missingDetail = firstMissingRequired(intakeFields.value, intakeData.value);
+  if (missingDetail) {
+    error.value = `Please answer: "${missingDetail}"`;
+    return;
+  }
 
   // Auth gate: if not signed in, draft is already persisted — bounce to sign-in.
   if (!auth.fbUser) {
@@ -272,6 +298,9 @@ async function submit() {
       trade: trade.value,
       title: title.value.trim(),
       description: description.value.trim(),
+      // Only the current trade's answered keys — pickIntakeAnswers drops empties
+      // and any leftovers from a trade the user switched away from.
+      intakeFormData: pickIntakeAnswers(intakeFields.value, intakeData.value),
       photos: photoPaths,
       addressPublic: {
         city: city.value.trim(),
@@ -363,6 +392,18 @@ async function submit() {
           {{ description.length }} / 2000
         </div>
       </div>
+
+      <!-- Trade-specific questionnaire. Appears once a trade with a defined
+           schema is chosen; the answers ride along on the post so applicants
+           can quote accurately without back-and-forth. -->
+      <fieldset v-if="intakeFields.length">
+        <legend class="text-sm font-medium">{{ tradeLabel(trade) }} details</legend>
+        <p class="text-xs text-[color:var(--bs-muted)] mt-1">
+          Answer these so tradespeople can quote accurately. Required fields are marked
+          <span class="text-red-600">*</span>.
+        </p>
+        <IntakeFormRenderer v-model="intakeData" :fields="intakeFields" class="mt-3" />
+      </fieldset>
 
       <fieldset>
         <legend class="text-sm font-medium">Budget range (CAD)</legend>

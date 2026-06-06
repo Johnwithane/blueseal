@@ -208,9 +208,11 @@ A second client entry path, in addition to §4.3's direct request. Lets clients 
 ```
 Landing page → "Post a job, get bids" CTA (no auth required to start)
   ↓
-PostJobView form (trade, title, description, photos ≥1, budget min/max CAD,
-  address with Google Places autocomplete, urgency, preferred date window).
-  Draft persists to localStorage as the user types.
+PostJobView form (trade, title, description, **trade-specific questionnaire**,
+  photos ≥1, budget min/max CAD, address with Google Places autocomplete,
+  urgency, preferred date window). Once a trade is chosen, its questionnaire
+  (src/data/intakeSchemas.ts → IntakeFormRenderer) renders inline; required
+  fields gate submission. Draft (incl. answers) persists to localStorage.
   ↓
 Submit:
   - If unauthed: stash draft, redirect to /sign-in?redirect=/jobs/post
@@ -222,8 +224,9 @@ createJobPost (callable):
   - Enforces 5 open posts per client cap.
   - Derives geohashExact (length 9) + geohashPublic (length 6, ~1.2km cell)
     server-side from the lat/lng.
-  - Writes parent jobPosts/{postId} (public-ish fields only) + private/meta
-    subdoc (exact address, applicationCount, selectedApplicantId).
+  - Writes parent jobPosts/{postId} (public-ish fields only, incl. the
+    trade-specific intakeFormData answers — bounded/re-validated server-side)
+    + private/meta subdoc (exact address, applicationCount, selectedApplicantId).
   - Sets expiresAt = now + 30d.
   ↓
 Verified tradies (isVisible:true) see the post at /jobs/browse:
@@ -257,7 +260,8 @@ acceptApplicationQuote (callable, transactional) — the bid-marketplace accept:
     isVisible + application has a quote. Pre-allocates job + chat ids.
   - Creates jobs/{newJobId} already active: status="in_progress" (or
     "awaiting_upfront_payment" when the quote carried an upfront fee, with the
-    UpfrontFeeState block) + sourcePostId + copied post fields.
+    UpfrontFeeState block) + sourcePostId + copied post fields, including the
+    post's trade-specific intakeFormData (carried onto the job brief).
   - Materializes quotes/{newJobId} with status="accepted" and an assigned
     quoteNumber (from the tradie's nextQuoteNumber sequence).
   - Creates chats/{newChatId}; marks the chosen application "selected"; closes
@@ -272,10 +276,12 @@ quote via submitQuote). Same atomic guards + photo copy.
 onJobPostClosed trigger fans out rejection notifications to all other
 applicants (paged in batches of 400).
   ↓
-Client lands in JobDetailView (status="accepted") with a "Complete the brief"
-CTA. The trade-specific IntakeFormRenderer becomes editable; saveJobIntakeAndAdvance
-writes the intake and transitions status to "requested" — the standard flow
-takes over.
+The post's trade-specific questionnaire answers carry onto the job's
+intakeFormData and show read-only on the brief tab — the detail captured at
+post time follows the work through, so there's no separate "complete the brief"
+step for marketplace jobs. (Direct /request/:uid jobs still gather the intake
+at request time via the editable IntakeFormRenderer; legacy quote-less
+acceptApplication jobs land in "requested" with whatever the post carried.)
   ↓
 Escape hatch: while status is still "accepted", the client can "Return to
 applicants" (returnToApplicants callable). This cancels the new job, flips
