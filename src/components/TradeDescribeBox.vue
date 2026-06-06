@@ -9,9 +9,10 @@
 //
 // The parent owns what a tap *does*: Search runs a search; Post-a-job pre-fills
 // the form. This component just surfaces suggestions and emits `select`.
-import { computed } from "vue";
+import { computed, watch, onBeforeUnmount } from "vue";
 import InputText from "primevue/inputtext";
 import { suggestTrades, type TradeSuggestion } from "@/data/tradeKeywords";
+import { track } from "@/utils/analytics";
 
 const props = withDefaults(
   defineProps<{
@@ -26,6 +27,8 @@ const props = withDefaults(
     noMatchHint?: string;
     /** Optional trade key → count of pros nearby, to annotate suggestions. */
     counts?: Record<string, number> | null;
+    /** Where this box lives, for miss-logging analytics ("search" | "post_job"). */
+    source?: string;
   }>(),
   {
     label: "What do you need done?",
@@ -35,6 +38,7 @@ const props = withDefaults(
     inputId: "describe",
     noMatchHint: "No trade matched that yet — try different words or pick one below.",
     counts: null,
+    source: "search",
   },
 );
 
@@ -49,6 +53,31 @@ const text = computed({
 });
 
 const suggestions = computed(() => suggestTrades(props.modelValue));
+
+// Miss-logging: when the user pauses on a query that matched NO trade, log it
+// (once per distinct term) so real gaps drive what we add to the lexicon. We
+// log only a SETTLED miss — debounced ~900ms after the last keystroke, never
+// per keystroke — and cap the term length so nothing sensitive is stashed.
+// Best-effort via the existing analytics; no new data surface.
+let missTimer: ReturnType<typeof setTimeout> | null = null;
+let lastLoggedMiss = "";
+watch(
+  () => props.modelValue,
+  (val) => {
+    if (missTimer) clearTimeout(missTimer);
+    const term = val.trim().toLowerCase().slice(0, 60);
+    if (term.length < 3) return;
+    missTimer = setTimeout(() => {
+      if (suggestions.value.length === 0 && term !== lastLoggedMiss) {
+        lastLoggedMiss = term;
+        track("search_no_match", { term, source: props.source });
+      }
+    }, 900);
+  },
+);
+onBeforeUnmount(() => {
+  if (missTimer) clearTimeout(missTimer);
+});
 </script>
 
 <template>

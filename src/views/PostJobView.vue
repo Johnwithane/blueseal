@@ -385,6 +385,7 @@ async function submit() {
         <TradeDescribeBox
           v-model="describe"
           input-id="describe-job"
+          source="post_job"
           :active-key="trade"
           :examples="['Bathroom renovation', 'Leaking kitchen tap', 'Build a fence', 'Furnace not heating']"
           no-match-hint="No match yet — try different words, or pick a trade below."
