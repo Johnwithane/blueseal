@@ -200,6 +200,37 @@ describe("suggestTrades", () => {
     // The room word must never override clear intent located in that room.
     expect(topKey("wasp nest under the deck")).toBe("pest_control");
   });
+
+  it("recovers from typos and voice-transcription slips (one-edit fuzzy)", () => {
+    expect(topKey("plumer")).toBe("plumber"); // missing letter
+    expect(topKey("electrican")).toBe("electrician"); // missing letter
+    expect(topKey("furnance")).toBe("hvac"); // extra letter
+    expect(topKey("dishwaser")).toBe("appliance_repair"); // missing letter
+    // A misspelled ROOM still expands to its cluster.
+    expect(suggestTrades("bathrom").map((s) => s.key)).toContain("plumber");
+  });
+
+  it("does not let the fuzzy fallback bleed", () => {
+    // Gibberish stays empty — no edit-distance-1 neighbour, no false suggestion.
+    expect(suggestTrades("qwerty zxcvbn")).toEqual([]);
+    // The fallback only runs on a TOTAL miss, so exact hits are never perturbed.
+    expect(topKey("my sink is leaking")).toBe("plumber");
+    // Two edits away is too far — "planter" must not become "plumber".
+    expect(suggestTrades("planter").map((s) => s.key)).not.toContain("plumber");
+  });
+
+  it("recognises common brand and Canadian regional terms", () => {
+    expect(topKey("my whirlpool fridge died")).toBe("appliance_repair");
+    expect(topKey("the garburator is jammed")).toBe("plumber");
+    expect(topKey("no hydro to the garage")).toBe("electrician");
+    expect(topKey("lennox furnace quit")).toBe("hvac");
+  });
+
+  it("expands the newer room areas", () => {
+    expect(suggestTrades("redo the mudroom").map((s) => s.key)).toContain("tiling");
+    expect(suggestTrades("damp crawlspace").map((s) => s.key)).toContain("waterproofing");
+    expect(suggestTrades("wire my home office").map((s) => s.key)).toContain("network_cabling");
+  });
 });
 
 describe("PROJECT_AREAS integrity", () => {

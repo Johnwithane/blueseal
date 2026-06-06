@@ -48,7 +48,7 @@ export const TRADE_KEYWORDS: Record<string, string[]> = {
     "bathtub", "tub", "garbage disposal", "basin", "valve", "shutoff valve",
     "hose bib", "spigot", "bidet", "urinal", "sewage", "gurgling", "p trap",
     "water line", "supply line", "water softener", "rusty water", "flooded",
-    "flooding",
+    "flooding", "garburator", "kohler", "moen", "rinnai",
   ],
   electrician: [
     "electrician", "electrical", "electric", "power", "no power", "lost power",
@@ -62,6 +62,7 @@ export const TRADE_KEYWORDS: Record<string, string[]> = {
     "service upgrade", "voltage", "knob and tube", "aluminum wiring",
     "generator", "transfer switch", "smoke detector", "buzzing",
     "burning smell", "short circuit", "junction box", "baseboard heater",
+    "hydro", "no hydro",
   ],
   hvac: [
     "hvac", "furnace", "furnace repair", "furnace not working", "new furnace",
@@ -75,7 +76,8 @@ export const TRADE_KEYWORDS: Record<string, string[]> = {
     "furnace filter", "humidifier", "dehumidifier", "too cold", "too hot",
     "cold", "cold air", "hot air", "freezing", "chilly", "warm", "stuffy",
     "no air", "vents", "pilot light", "radiant heat", "baseboard heat",
-    "carbon monoxide", "emergency heat", "hrv", "erv",
+    "carbon monoxide", "emergency heat", "hrv", "erv", "lennox", "trane",
+    "goodman", "rheem",
   ],
   carpenter: [
     "carpenter", "carpentry", "wood", "woodwork", "wood repair", "wood rot",
@@ -132,7 +134,8 @@ export const TRADE_KEYWORDS: Record<string, string[]> = {
     "freezer not freezing", "oven", "oven not heating", "oven not working",
     "stove", "stove not working", "stovetop", "cooktop", "range", "range hood",
     "wall oven", "microwave", "ice maker", "stove element", "heating element",
-    "broken appliance", "dryer vent",
+    "broken appliance", "dryer vent", "whirlpool", "maytag", "frigidaire",
+    "kitchenaid", "kenmore", "bosch",
   ],
   drywall: [
     "drywall", "drywall repair", "drywall crack", "drywall hole",
@@ -559,6 +562,14 @@ export const PROJECT_AREAS: Record<string, string[]> = {
   yard: ["landscaper", "fencing", "hardscaping", "arborist", "deck_builder"],
   backyard: ["landscaper", "deck_builder", "fencing", "hardscaping", "arborist"],
   exterior: ["siding", "painter", "roofer", "gutters", "pressure_washing"],
+  mudroom: ["flooring", "tiling", "cabinetry", "carpenter", "painter"],
+  "mud room": ["flooring", "tiling", "cabinetry", "carpenter", "painter"],
+  sunroom: ["general_contractor", "window_installer", "flooring", "hvac", "painter"],
+  crawlspace: ["waterproofing", "insulation", "pest_control", "plumber"],
+  "crawl space": ["waterproofing", "insulation", "pest_control", "plumber"],
+  "home office": ["electrician", "painter", "network_cabling", "carpenter"],
+  nursery: ["painter", "flooring", "electrician", "carpenter"],
+  closet: ["cabinetry", "carpenter", "painter"],
   "whole house": ["general_contractor", "painter", "flooring", "electrician"],
   "whole home": ["general_contractor", "painter", "flooring", "electrician"],
 };
@@ -608,6 +619,58 @@ function keywordHits(q: string, tokens: string[], kw: string): boolean {
   );
 }
 
+// True when a and b are within ONE edit — insert, delete, substitute, or
+// adjacent transposition (Damerau-Levenshtein ≤ 1). Cheap and early-exiting; it
+// runs only on the typo fallback path, never on the exact hot path.
+function withinOneEdit(a: string, b: string): boolean {
+  if (a === b) return true;
+  const la = a.length;
+  const lb = b.length;
+  if (Math.abs(la - lb) > 1) return false;
+
+  if (la === lb) {
+    let i = 0;
+    while (i < la && a[i] === b[i]) i++;
+    // substitution: everything after the first mismatch matches
+    if (a.slice(i + 1) === b.slice(i + 1)) return true;
+    // adjacent transposition: swap the mismatched pair and the rest matches
+    return a[i] === b[i + 1] && a[i + 1] === b[i] && a.slice(i + 2) === b.slice(i + 2);
+  }
+
+  // Length differs by one → a single insertion/deletion. Walk the shorter
+  // against the longer, allowing exactly one skip in the longer.
+  const short = la < lb ? a : b;
+  const long = la < lb ? b : a;
+  let i = 0;
+  let j = 0;
+  let skipped = false;
+  while (i < short.length && j < long.length) {
+    if (short[i] === long[j]) {
+      i++;
+      j++;
+    } else {
+      if (skipped) return false;
+      skipped = true;
+      j++; // consume one extra char from the longer string
+    }
+  }
+  return true;
+}
+
+// Distinctive single-word keywords (≥4 chars) → the trades that use them, for
+// the typo/voice fallback. Short words are matched strictly elsewhere and are
+// far too collision-prone to fuzz ("ant"↔"and"). Built once at module load.
+const FUZZABLE_KEYWORDS: Array<{ kw: string; keys: string[] }> = (() => {
+  const byKeyword = new Map<string, Set<string>>();
+  for (const [key, keywords] of Object.entries(TRADE_KEYWORDS)) {
+    for (const kw of keywords) {
+      if (kw.includes(" ") || kw.length < 4) continue;
+      (byKeyword.get(kw) ?? byKeyword.set(kw, new Set()).get(kw)!).add(key);
+    }
+  }
+  return [...byKeyword].map(([kw, keys]) => ({ kw, keys: [...keys] }));
+})();
+
 /**
  * Map a plain-English description to ranked trade suggestions. Returns [] for
  * trivially short input. Pure and synchronous — safe to call on every keystroke.
@@ -637,21 +700,52 @@ export function suggestTrades(query: string, max = 4): TradeSuggestion[] {
   // they tie on), then how many keywords hit.
   const longest = (s: TradeSuggestion) =>
     s.matched.reduce((n, kw) => Math.max(n, kw.length), 0);
-  scored.sort(
-    (a, b) =>
-      b.score - a.score ||
-      longest(b) - longest(a) ||
-      b.matched.length - a.matched.length,
-  );
+  const rank = (arr: TradeSuggestion[]) =>
+    arr.sort(
+      (a, b) =>
+        b.score - a.score ||
+        longest(b) - longest(a) ||
+        b.matched.length - a.matched.length,
+    );
+  rank(scored);
+
+  // Typo / voice fallback: ONLY when nothing matched exactly, try a one-edit
+  // fuzzy pass on the longer tokens ("plumer"→plumber, "electrican"→
+  // electrician, "tolet"→toilet). Gated on a total miss so the exact hot path
+  // is untouched; scored at a slight discount so a real hit always outranks it.
+  if (scored.length === 0) {
+    const fuzzy = new Map<string, string[]>();
+    for (const t of tokens) {
+      if (t.length < 5) continue;
+      for (const { kw, keys } of FUZZABLE_KEYWORDS) {
+        if (Math.abs(kw.length - t.length) > 1 || !withinOneEdit(t, kw)) continue;
+        for (const key of keys) {
+          const arr = fuzzy.get(key) ?? fuzzy.set(key, []).get(key)!;
+          if (!arr.includes(kw)) arr.push(kw);
+        }
+      }
+    }
+    for (const [key, kws] of fuzzy) {
+      const trade = TRADE_BY_KEY.get(key);
+      if (trade) scored.push({ ...trade, matched: kws, score: kws.length * 0.9 });
+    }
+    rank(scored);
+  }
 
   // Room / project areas: a named SPACE implies a cluster of trades. Append the
   // ones no keyword already surfaced (most-relevant first), so "bathroom" alone
   // yields plumber/tiler/drywaller… while a specific hit still leads. Additive
   // by design — this never reorders the keyword matches above.
+  const recovering = scored.length === 0; // still nothing → allow a fuzzy room hit
   const present = new Set(scored.map((s) => s.key));
   for (const [area, tradeList] of Object.entries(PROJECT_AREAS)) {
     if (scored.length >= max) break;
-    if (!keywordHits(q, tokens, area)) continue;
+    const hit =
+      keywordHits(q, tokens, area) ||
+      (recovering &&
+        !area.includes(" ") &&
+        tokens.some((t) => t.length >= 5 && withinOneEdit(t, area)));
+    if (!hit) continue;
     for (const key of tradeList) {
       const trade = TRADE_BY_KEY.get(key);
       if (!trade || present.has(key)) continue;
