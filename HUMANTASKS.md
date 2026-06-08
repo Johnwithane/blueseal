@@ -57,6 +57,12 @@ The code is live (functions `startGoogleBusinessConnect`, `googleOAuthCallback`,
 - **Verify:** As a verified tradesperson, **Account → Tradesperson → Google reviews → Connect Google Business** → Google consent → you land back on the Tradesperson tab with a "Google Business connected" toast, and your Google rating shows on your public profile. Disconnect removes it immediately.
 - **⚠️ Don't rotate `GOOGLE_TOKEN_ENC_KEY` after tradespeople connect** — it decrypts their stored refresh tokens. Rotating it orphans every existing connection (they'd each have to reconnect).
 
+### [ ] Flip `VITE_GOOGLE_BUSINESS_ENABLED=true` to unhide the connect UI (do LAST)
+
+- **Why:** The "Connect Google Business" panel in **Account → Tradesperson** is hidden behind a frontend flag (`VITE_GOOGLE_BUSINESS_ENABLED`, OFF by default) so tradespeople don't see a connect button that errors with "not configured" while the setup above is incomplete. The public-profile Google reviews section self-gates on real data and needs no flag. Do this step **only after** the OAuth client, function deploy, and the four env/secret values above are all live and the verify step passed.
+- **What:** Set `VITE_GOOGLE_BUSINESS_ENABLED=true` in `.env.production` (and `.env.local` for local testing against real Google), then redeploy hosting (`npm run deploy:prod`). No code change — the gate is `import.meta.env.VITE_GOOGLE_BUSINESS_ENABLED === "true"` in `src/views/AccountView.vue`.
+- **Verify:** As a verified tradesperson, **Account → Tradesperson** now shows the "Google reviews" accordion. With the flag unset/`false`, that accordion is absent.
+
 ---
 
 ## "Describe what you need" search — AI matcher REMOVED (updated 2026-06-05)

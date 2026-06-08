@@ -233,6 +233,17 @@ watch(
   { immediate: true },
 );
 
+// Feature flag for the Google Business connect panel. OFF by default: the
+// backend degrades to "not configured" until the Google Cloud OAuth app +
+// Business Profile API access (weeks-long approval) are set up, so we hide the
+// connect UI entirely rather than show a button that errors on click. Flip
+// VITE_GOOGLE_BUSINESS_ENABLED=true + redeploy hosting once setup is live
+// (see HUMANTASKS.md → "Google Business reviews integration"). The public
+// profile section self-gates on real data, so it needs no flag.
+const googleBusinessEnabled = computed(
+  () => import.meta.env.VITE_GOOGLE_BUSINESS_ENABLED === "true",
+);
+
 // Controls which Tradesperson accordion panel is open. Normally undefined
 // (all closed); we open "google-reviews" when returning from the Google OAuth
 // flow so the tradesperson lands right on the freshly-connected panel.
@@ -1302,7 +1313,7 @@ async function grantAllTrades() {
           </AccordionContent>
         </AccordionPanel>
 
-        <AccordionPanel value="google-reviews">
+        <AccordionPanel v-if="googleBusinessEnabled" value="google-reviews">
           <AccordionHeader>
             <span class="flex items-center gap-2">
               <i class="pi pi-google"></i>
