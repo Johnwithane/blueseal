@@ -276,6 +276,22 @@ export async function addRoleToSelf(
 }
 
 /**
+ * Reconciles the signed-in user's roles to satisfy implied-role invariants
+ * (currently: tradesperson ⇒ client, so a pro can hire without manually adding
+ * the client role). Idempotent and `activeRole`-preserving; returns whether
+ * anything changed plus the resulting roles. Called defensively on session
+ * init — see useAuthStore.applyAuthState.
+ */
+export async function ensureSelfRoles(): Promise<{ changed: boolean; roles: Role[] }> {
+  const callable = httpsCallable<unknown, { changed: boolean; roles: Role[] }>(
+    functions,
+    "ensureSelfRoles",
+  );
+  const result = await callable({});
+  return result.data;
+}
+
+/**
  * Admin-only testing helper: grants the calling admin all three roles +
  * provisions a visible, approved tradesperson profile so they can dogfood
  * the full client + tradesperson surface area.

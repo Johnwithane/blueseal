@@ -50,6 +50,7 @@ The code is live (functions `startGoogleBusinessConnect`, `googleOAuthCallback`,
   firebase functions:secrets:set GOOGLE_OAUTH_CLIENT_SECRET   # the OAuth client secret
   firebase functions:secrets:set GOOGLE_TOKEN_ENC_KEY         # 32 random bytes, base64 — generate with: openssl rand -base64 32
   ```
+  > **⚠️ Placeholder values are currently set.** Both secrets were given throwaway values (a literal `PLACEHOLDER…` string for the OAuth secret; a random base64 key for the enc key) so that *unrelated* function deploys aren't blocked by the non-interactive "no value for the secret" error. They are **not real** — overwrite both with the commands above before flipping `VITE_GOOGLE_BUSINESS_ENABLED` on, or the connect flow will fail. The enc-key placeholder is unused while the feature is off, so replacing it now is safe (no connections exist yet to orphan).
   And set the two non-secret env vars on the functions runtime (e.g. Cloud Console → each `google*` function → Runtime env vars, or your env file):
   - `GOOGLE_OAUTH_CLIENT_ID` — the OAuth client ID (public half).
   - `GOOGLE_OAUTH_REDIRECT_URI` — the exact callback URL from the task above.

@@ -102,9 +102,9 @@ There's nothing to pay to browse or to hire — you create an account, find a pr
     body: `Tap **Sign up** and choose how you'll use Blue Seal:
 
 - **Client** — you're hiring. You can search pros, request quotes, and post jobs right away.
-- **Tradesperson** — you're offering services. You'll go through verification before your profile goes live and you can take work.
+- **Tradesperson** — you're offering services. You'll go through verification before your profile goes live and you can take work. You can also hire — the client role is included automatically, so you can post jobs and request quotes too.
 
-You can hold more than one role on the same account. If you sign up as a client and later want to work as a tradesperson (or vice-versa), you can add the other role and switch between them from the account menu — your data stays on one login.
+Both roles live on one login. If you signed up as a client and later want to work as a tradesperson, apply for the tradesperson role from your account (it goes through the same cert + ID verification). Switch between your roles any time from the account menu — your data stays on one account.
 
 Forgot your password? Use **Forgot password** on the sign-in screen to get a reset link by email.`,
   },
@@ -115,7 +115,7 @@ Forgot your password? Use **Forgot password** on the sign-in screen to get a res
     excerpt: "Hold both roles on one account and switch views in a tap.",
     audience: "all",
     keywords: ["switch role", "two roles", "client and tradesperson", "view"],
-    body: `If your account has both a client and a tradesperson role, you can switch which one you're using at any time from the **account menu** (your avatar).
+    body: `Tradespeople can hire too — every tradesperson account includes the client role automatically, so you can switch which one you're using at any time from the **account menu** (your avatar). (Signed up as a client and want to offer services? Apply to become a verified tradesperson from your account.)
 
 Switching changes what you see — the client view shows hiring tools (search, post a job, your requests), and the tradesperson view shows work tools (browse jobs, your applications, payouts). Notifications and jobs stay tied to the right role.
 
@@ -619,7 +619,7 @@ const faqs: FaqItem[] = [
   {
     question: "Can I be both a client and a tradesperson?",
     answer:
-      "Yes. You can hold both roles on one account and switch between them from the account menu — your data stays on one login.",
+      "Yes. Every tradesperson account can also hire — the client role is included automatically, so you can post a job or request a quote without setting anything up, and switch views from the account menu. If you signed up as a client and want to offer your own services, you can apply to become a verified tradesperson (cert + ID review) from your account.",
     categoryId: "account-app",
     audience: "all",
   },

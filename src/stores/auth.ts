@@ -17,6 +17,7 @@ import { auth } from "@/firebase/config";
 import {
   addRoleToSelf as callAddRoleToSelf,
   createUser,
+  ensureSelfRoles as callEnsureSelfRoles,
   getUser,
   setActiveRole as writeActiveRole,
 } from "@/firebase/services/users";
@@ -45,6 +46,12 @@ interface State {
 // has fired — leaving the guard to read `fbUser = null` and bounce a signed-in
 // user to /sign-in.
 let initPromise: Promise<void> | null = null;
+
+// Uids we've already run the implied-role reconcile for this page-load, so
+// repeated onAuthStateChanged fires (sign-in, token refresh) don't re-call the
+// callable. A fresh page-load starts with an empty set, so a transient failure
+// retries next session.
+const impliedRolesAttempted = new Set<string>();
 
 /**
  * Normalize a claim value into a Role[] regardless of which shape it arrives in.
@@ -183,6 +190,11 @@ export const useAuthStore = defineStore("auth", {
         // still reports something useful.
         this.roles = doc?.roles?.length ? doc.roles : claimRoles;
         this.activeRole = doc?.activeRole ?? this.roles[0] ?? null;
+        // Implied-role reconcile: a tradesperson is also a client (so they can
+        // hire / post jobs without manually adding the role). Fire-and-forget
+        // so it never blocks session bootstrap; it self-heals existing
+        // tradesperson-only accounts and brand-new signups in the same session.
+        void this.ensureImpliedRoles();
       } else {
         this.user = null;
         this.roles = [];
@@ -328,6 +340,39 @@ export const useAuthStore = defineStore("auth", {
       const tokenResult = await this.fbUser.getIdTokenResult(true);
       const next = rolesFromClaims(tokenResult.claims as Record<string, unknown>);
       if (next.length > 0) this.roles = next;
+    },
+
+    /**
+     * Enforces the implied-role invariant (tradesperson ⇒ client) for the
+     * current session. No-op unless the user holds `tradesperson` without
+     * `client`, so it costs nothing for everyone else. The server callable
+     * decides what to grant and preserves `activeRole`, so a tradesperson is
+     * NOT flipped into client view — they just gain the ability to hire.
+     *
+     * Runs once per uid per page-load (see `impliedRolesAttempted`) and
+     * fire-and-forget from applyAuthState, so a failure never wedges sign-in.
+     */
+    async ensureImpliedRoles() {
+      const fbUser = this.fbUser;
+      if (!fbUser) return;
+      if (!this.roles.includes("tradesperson") || this.roles.includes("client")) return;
+      if (impliedRolesAttempted.has(fbUser.uid)) return;
+      impliedRolesAttempted.add(fbUser.uid);
+      try {
+        const result = await callEnsureSelfRoles();
+        if (!result.changed) return;
+        // Surface the new `client` claim to security rules immediately —
+        // otherwise the next Firestore write / callable still sees the stale
+        // token until the ~1h auto-refresh.
+        await fbUser.getIdToken(true);
+        this.roles = result.roles;
+        if (this.user) this.user.roles = result.roles;
+        // activeRole intentionally left as-is.
+      } catch (e) {
+        // Non-fatal: the user keeps their tradesperson role; next page-load
+        // retries. Don't surface to the UI.
+        console.warn("[auth] ensureImpliedRoles failed", e);
+      }
     },
 
     /**

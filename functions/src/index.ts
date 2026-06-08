@@ -7,6 +7,7 @@ export { setRoleOnSignup } from "./auth/setRoleOnSignup";
 export { setAdminRole } from "./auth/setAdminRole";
 export { adminSetUserRoles } from "./auth/adminSetUserRoles";
 export { addRoleToSelf } from "./auth/addRoleToSelf";
+export { ensureSelfRoles } from "./auth/ensureSelfRoles";
 export { grantAllRolesForAdminTesting } from "./auth/grantAllRolesForAdminTesting";
 export { grantAllTradesForAdminTesting } from "./auth/grantAllTradesForAdminTesting";
 export { requestAccountDeletion } from "./auth/requestAccountDeletion";
