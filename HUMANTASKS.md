@@ -6,6 +6,59 @@ Tasks are grouped by the phase that introduced them so you can see why each one 
 
 ---
 
+## Google Business reviews integration (added 2026-06-06)
+
+Opt-in "Connect Google Business" for verified tradespeople: they OAuth-connect their Google Business Profile and we display their Google reviews in a separate, attributed section on their public profile (never merged into the native Blue Seal rating). The whole feature ships **safe-by-default** — the callables return "Google Business integration isn't configured yet", the scheduled daily sync no-ops, and the profile section stays hidden until everything below is set. Nothing breaks while it's unset.
+
+The code is live (functions `startGoogleBusinessConnect`, `googleOAuthCallback`, `syncGoogleReviews`, `disconnectGoogleBusiness`, `scheduledGoogleReviewsSync`; the public `tradespeople/{uid}.googleReviews` snapshot; the server-only `tradespeople/{uid}/secure/google` credential doc). The setup below is all yours.
+
+> ⚠️ **Start the access request FIRST — it's the long pole.** Google's reviews endpoint is access-gated and approval runs **several days to several weeks** (some applicants report 3+ months or denials). Everything else here is quick, but none of it produces reviews until this clears. Kick it off before doing the rest.
+
+### [ ] Request access to the Business Profile APIs (the long pole — do this first)
+
+- **Why:** Reviews live on the legacy `mybusiness.googleapis.com/v4` endpoint, which a new Google Cloud project has **zero quota** for until Google manually approves an access request.
+- **What:** In the GCP project, request access via Google's [Business Profile APIs access form](https://developers.google.com/my-business/content/prereqs). You'll need a verified Google Business Profile active 60+ days, a valid business website (`https://blueseal.app`), and a description of the use case ("display a connected tradesperson's own Google reviews on their Blue Seal profile, with their consent, via OAuth").
+- **Verify:** In **APIs & Services → Enabled APIs**, the My Business APIs show quota > 0 (not "0 / day"). Until then, `listReviews` returns 403 and the sync records a soft `syncError` on the snapshot.
+
+### [ ] Enable the three Google APIs on the project
+
+- **What:** `gcloud services enable mybusinessaccountmanagement.googleapis.com mybusinessbusinessinformation.googleapis.com mybusiness.googleapis.com --project blueseal-762af` (or Enable each in Cloud Console). The first two (accounts + locations) are open; the third (reviews) needs the access request above to actually return data.
+
+### [ ] Create the OAuth consent screen + OAuth client
+
+- **Why:** Tradespeople grant access via OAuth; we need a client ID/secret and the `business.manage` scope.
+- **What:**
+  1. **APIs & Services → OAuth consent screen** → External. Add the scope `https://www.googleapis.com/auth/business.manage`. Add your support + developer emails. Publish the app (or add test tradespeople while in "testing").
+  2. **APIs & Services → Credentials → Create credentials → OAuth client ID → Web application.**
+  3. Under **Authorized redirect URIs**, add the deployed `googleOAuthCallback` function URL (see next task) — it must match `GOOGLE_OAUTH_REDIRECT_URI` **exactly**.
+  4. Note the **Client ID** and **Client secret**.
+
+### [ ] Deploy the functions + rules, then capture the callback URL
+
+- **Why:** The redirect URI registered on the OAuth client must be the live function URL, and the field-lock + server-only rules must be live before the snapshot writes land (CLAUDE.md rule #8).
+- **What:**
+  1. `firebase deploy --only firestore:rules` (adds the `googleReviews` field lock + the server-only `tradespeople/{uid}/secure/{docId}` rule).
+  2. `firebase deploy --only functions:googleOAuthCallback` and note the printed HTTPS URL (looks like `https://googleoauthcallback-xxxxxx-uc.a.run.app`). That URL is `GOOGLE_OAUTH_REDIRECT_URI`. (Optionally front it with a hosting rewrite to `https://blueseal.app/api/google/callback` for a cleaner URL — if you do, use *that* as the redirect URI instead.)
+  3. Add the URL to the OAuth client's Authorized redirect URIs (previous task).
+  4. Deploy the rest: `firebase deploy --only functions`.
+
+### [ ] Set the secrets + env vars on Cloud Functions
+
+- **Why:** `config.ts` reads these; `isConfigured()` gates the whole feature on all four being present. Secrets appear in the runtime env once bound.
+- **What:**
+  ```
+  firebase functions:secrets:set GOOGLE_OAUTH_CLIENT_SECRET   # the OAuth client secret
+  firebase functions:secrets:set GOOGLE_TOKEN_ENC_KEY         # 32 random bytes, base64 — generate with: openssl rand -base64 32
+  ```
+  And set the two non-secret env vars on the functions runtime (e.g. Cloud Console → each `google*` function → Runtime env vars, or your env file):
+  - `GOOGLE_OAUTH_CLIENT_ID` — the OAuth client ID (public half).
+  - `GOOGLE_OAUTH_REDIRECT_URI` — the exact callback URL from the task above.
+  Then redeploy so the functions pick them up: `firebase deploy --only functions`.
+- **Verify:** As a verified tradesperson, **Account → Tradesperson → Google reviews → Connect Google Business** → Google consent → you land back on the Tradesperson tab with a "Google Business connected" toast, and your Google rating shows on your public profile. Disconnect removes it immediately.
+- **⚠️ Don't rotate `GOOGLE_TOKEN_ENC_KEY` after tradespeople connect** — it decrypts their stored refresh tokens. Rotating it orphans every existing connection (they'd each have to reconnect).
+
+---
+
 ## "Describe what you need" search — AI matcher REMOVED (updated 2026-06-05)
 
 The public "Ask Blue Seal AI" trade-matcher was **removed**. We didn't want a Vertex/Gemini endpoint any signed-in user could trigger on the public search page; the deterministic, offline keyword matcher (`src/data/tradeKeywords.ts`) is now the sole trade-finder and was made substantially more robust to compensate. The `aiSuggestTrades` callable, its client wrapper, and the "Ask Blue Seal AI" button are all gone from the codebase.

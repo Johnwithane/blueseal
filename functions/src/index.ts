@@ -111,6 +111,16 @@ export { scheduledProspectExpiry } from "./prospects/scheduledProspectExpiry";
 // Messaging (WhatsApp Cloud API queue processor)
 export { processWhatsAppMessage } from "./messaging/processWhatsAppMessage";
 
+// Google Business Profile — opt-in OAuth connect for verified tradespeople to
+// surface their Google reviews on their public profile. Degrades gracefully:
+// the callables throw "not configured" and the scheduled sync no-ops until the
+// OAuth client + secrets are set (HUMANTASKS.md → "Google Business reviews").
+export { startGoogleBusinessConnect } from "./google/startGoogleBusinessConnect";
+export { googleOAuthCallback } from "./google/googleOAuthCallback";
+export { syncGoogleReviews } from "./google/syncGoogleReviews";
+export { disconnectGoogleBusiness } from "./google/disconnectGoogleBusiness";
+export { scheduledGoogleReviewsSync } from "./google/scheduledGoogleReviewsSync";
+
 // Vouches — peer endorsements between tradespeople
 export { sendVouchRequest } from "./vouches/sendVouchRequest";
 export { acceptVouchRequest } from "./vouches/acceptVouchRequest";

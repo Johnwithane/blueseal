@@ -117,6 +117,44 @@ export interface PayoutsState {
   lastSyncedAt: Timestamp | null;
 }
 
+// ---------------------------------------------------------------------------
+// Google Business Profile reviews — public snapshot on tradespeople/{uid}
+// ---------------------------------------------------------------------------
+// A tradesperson can opt in to connect their Google Business Profile (OAuth);
+// a Cloud Function then caches their Google rating + a few recent reviews here
+// for display on their public profile. This is SERVER-MANAGED (written only by
+// the google/* functions; locked in firestore.rules). The long-lived refresh
+// token never lands here — it lives encrypted in the server-only
+// tradespeople/{uid}/secure/google doc. These Google reviews are shown in their
+// own clearly-attributed section and are NEVER merged into the native Blue Seal
+// ratingAvg / ratingCount (different provenance, not mutual-blind, not tied to a
+// verified Blue Seal job).
+export interface GoogleReviewItem {
+  reviewId: string;
+  authorName: string;
+  authorPhotoUrl: string | null;
+  rating: number; // 1-5
+  comment: string;
+  createTime: string; // ISO timestamp from Google
+}
+
+export interface GoogleReviewsSnapshot {
+  connected: boolean;
+  // The Google Business location's title + a link out to its Google listing.
+  locationName: string | null;
+  profileUrl: string | null;
+  // Aggregate across ALL Google reviews (not just the cached slice below).
+  rating: number | null;
+  reviewCount: number;
+  // Most-recent handful, cached for display. The profile links out to Google
+  // for the full set.
+  reviews: GoogleReviewItem[];
+  lastSyncedAt: Timestamp | null;
+  // Non-null when the last refresh failed (token revoked, API hiccup) — the UI
+  // shows a soft "couldn't refresh" note while keeping any prior data visible.
+  syncError: string | null;
+}
+
 export interface TradespersonDoc {
   // Denormalized from users/{uid} so the public profile page can show the
   // tradie's name and avatar without needing read access to users (which is
@@ -208,6 +246,11 @@ export interface TradespersonDoc {
   // pre-cutover docs don't have it; readers should treat undefined as 0.
   paidJobsCount?: number;
   paidLifetimeCents?: number;
+  // Cached Google Business reviews when the tradesperson has connected their
+  // Google Business Profile (opt-in). Server-managed; null/absent when not
+  // connected. Shown in a separate, attributed section — never folded into the
+  // native ratingAvg above. See GoogleReviewsSnapshot.
+  googleReviews?: GoogleReviewsSnapshot | null;
 }
 
 // Private tradesperson contact details, stored at

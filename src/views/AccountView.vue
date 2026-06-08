@@ -46,6 +46,7 @@ import PortfolioEditor from "@/components/PortfolioEditor.vue";
 import TradieDocsManager from "@/components/TradieDocsManager.vue";
 import VouchesPanel from "@/components/VouchesPanel.vue";
 import PayoutsPanel from "@/components/PayoutsPanel.vue";
+import GoogleBusinessPanel from "@/components/GoogleBusinessPanel.vue";
 import LocationPicker, { type LocationValue } from "@/components/LocationPicker.vue";
 import TabBar from "@/components/TabBar.vue";
 
@@ -232,8 +233,45 @@ watch(
   { immediate: true },
 );
 
+// Controls which Tradesperson accordion panel is open. Normally undefined
+// (all closed); we open "google-reviews" when returning from the Google OAuth
+// flow so the tradesperson lands right on the freshly-connected panel.
+const openTradiePanel = ref<string | undefined>(undefined);
+
+// Handle the return from the Google Business OAuth round-trip. The callback
+// function redirects to /account?tab=tradesperson&google=<status>. We toast the
+// outcome, open the Google reviews panel, and strip the param so a reload
+// doesn't re-fire. Lives here (not in GoogleBusinessPanel) because the panel may
+// be collapsed/unmounted when Google redirects back — same split as Payouts.
+function handleGoogleReturn() {
+  const raw = route.query.google;
+  const status = Array.isArray(raw) ? raw[0] : raw;
+  if (!status) return;
+  switch (status) {
+    case "connected":
+      toast.success("Google Business connected", "Your Google reviews will appear on your profile.");
+      break;
+    case "denied":
+      toast.info("Connection cancelled", "You didn't grant access to your Google Business Profile.");
+      break;
+    case "nolocation":
+      toast.warn(
+        "No business found",
+        "That Google account doesn't manage a Business Profile. Connect the account that owns your listing.",
+      );
+      break;
+    default:
+      toast.error("Couldn't connect", "Something went wrong connecting Google. Please try again.");
+  }
+  openTradiePanel.value = "google-reviews";
+  const { google: _omit, ...rest } = route.query;
+  void _omit;
+  void router.replace({ query: rest });
+}
+
 onMounted(async () => {
   if (!auth.fbUser) return;
+  handleGoogleReturn();
   const u = await getUser(auth.fbUser.uid);
   if (!u) return;
   displayName.value = u.displayName;
@@ -907,7 +945,7 @@ async function grantAllTrades() {
            (no `value` set) and `:multiple="false"` (default) so only one
            panel opens at a time — reduces visual noise for tradies who
            rarely touch most of these. -->
-      <Accordion>
+      <Accordion v-model:value="openTradiePanel">
         <AccordionPanel value="trade-profile">
           <AccordionHeader>
             <span class="flex items-center gap-2">
@@ -1261,6 +1299,18 @@ async function grantAllTrades() {
               v-if="auth.fbUser"
               :tradie-uid="auth.fbUser.uid"
             />
+          </AccordionContent>
+        </AccordionPanel>
+
+        <AccordionPanel value="google-reviews">
+          <AccordionHeader>
+            <span class="flex items-center gap-2">
+              <i class="pi pi-google"></i>
+              Google reviews
+            </span>
+          </AccordionHeader>
+          <AccordionContent>
+            <GoogleBusinessPanel />
           </AccordionContent>
         </AccordionPanel>
 

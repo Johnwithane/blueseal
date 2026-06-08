@@ -175,6 +175,27 @@ function reviewerInitial(r: WithId<ReviewDoc>): string {
   return reviewerName(r).slice(0, 1).toUpperCase();
 }
 
+// Google reviews snapshot — only shown when the tradesperson has connected
+// their Google Business Profile AND it has at least a rating. Kept entirely
+// separate from the native Blue Seal reviews above (different provenance, not
+// mutual-blind, not tied to a verified Blue Seal job).
+const googleReviews = computed(() => {
+  const g = tradie.value?.googleReviews;
+  return g && g.connected && g.rating != null ? g : null;
+});
+// Google review timestamps come back as ISO strings (not Firestore Timestamps),
+// so format them directly rather than via relativeTime.
+function formatGoogleDate(iso: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? ""
+    : d.toLocaleDateString(undefined, { year: "numeric", month: "short" });
+}
+function googleAuthorInitial(name: string): string {
+  return (name?.trim().slice(0, 1) || "?").toUpperCase();
+}
+
 onMounted(async () => {
   const uid = route.params.uid as string;
   try {
@@ -523,6 +544,86 @@ onMounted(async () => {
           </header>
           <p v-if="r.text" class="text-sm mt-2">{{ r.text }}</p>
         </article>
+      </section>
+
+      <!-- Google reviews — a separate, attributed section. Deliberately NOT
+           merged into the Blue Seal rating above: these come from Google,
+           aren't mutual-blind, and aren't tied to a verified Blue Seal job.
+           Only shown when the tradesperson has connected their Google Business
+           Profile. -->
+      <section v-if="googleReviews" class="bs-card p-5 mt-4">
+        <header class="flex items-start justify-between gap-3 mb-3">
+          <div class="flex items-center gap-2">
+            <i class="pi pi-google text-[color:var(--bs-blue)]" aria-hidden="true"></i>
+            <h2 class="font-semibold m-0">Google reviews</h2>
+          </div>
+          <a
+            v-if="googleReviews.profileUrl"
+            :href="googleReviews.profileUrl"
+            target="_blank"
+            rel="noopener nofollow"
+            class="text-xs text-[color:var(--bs-blue)] flex-none"
+          >
+            View on Google
+            <i class="pi pi-external-link text-[0.65rem]"></i>
+          </a>
+        </header>
+
+        <div class="flex items-center gap-2 mb-3">
+          <span class="text-2xl font-bold tabular-nums">
+            {{ googleReviews.rating!.toFixed(1) }}
+          </span>
+          <Rating
+            :model-value="Math.round(googleReviews.rating!)"
+            readonly
+            :cancel="false"
+            class="review-row__rating"
+          />
+          <span class="text-sm text-[color:var(--bs-muted)]">
+            {{ googleReviews.reviewCount }} review{{ googleReviews.reviewCount === 1 ? "" : "s" }} on Google
+          </span>
+        </div>
+
+        <article
+          v-for="g in googleReviews.reviews"
+          :key="g.reviewId"
+          class="border-t py-3 first:border-t-0 first:pt-0"
+        >
+          <header class="flex items-start justify-between gap-3 mb-1">
+            <div class="flex items-center gap-2 min-w-0">
+              <Avatar
+                v-if="g.authorPhotoUrl"
+                :image="g.authorPhotoUrl"
+                shape="circle"
+                size="small"
+              />
+              <Avatar
+                v-else
+                :label="googleAuthorInitial(g.authorName)"
+                shape="circle"
+                size="small"
+                class="!bg-[color:var(--bs-blue)]/10 !text-[color:var(--bs-blue)] font-semibold"
+              />
+              <div class="min-w-0">
+                <div class="text-sm font-medium truncate">{{ g.authorName }}</div>
+                <Rating
+                  :model-value="g.rating"
+                  readonly
+                  :cancel="false"
+                  class="review-row__rating"
+                />
+              </div>
+            </div>
+            <span class="text-xs text-[color:var(--bs-muted)] flex-none">
+              {{ formatGoogleDate(g.createTime) }}
+            </span>
+          </header>
+          <p v-if="g.comment" class="text-sm mt-2 whitespace-pre-line">{{ g.comment }}</p>
+        </article>
+
+        <p class="mt-3 text-xs text-[color:var(--bs-muted)]">
+          Sourced from this business's Google Business Profile.
+        </p>
       </section>
     </template>
   </section>

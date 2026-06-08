@@ -181,6 +181,11 @@ service cloud.firestore {
              == resource.data.get('paidJobsCount', null)
         && request.resource.data.get('paidLifetimeCents', null)
              == resource.data.get('paidLifetimeCents', null)
+        // Google Business reviews snapshot is server-managed (written only by
+        // the google/* Cloud Functions). Owner can't forge or clear it from
+        // the client. `.get(field, null)` for safe access on docs predating it.
+        && request.resource.data.get('googleReviews', null)
+             == resource.data.get('googleReviews', null)
         && (resource.data.vettingStatus == 'approved'
             ? request.resource.data.vettingStatus == 'approved'
             : request.resource.data.vettingStatus in ['draft','pending','info_requested']);
@@ -196,6 +201,17 @@ service cloud.firestore {
       match /private/{docId} {
         allow read: if isOwner(tradieId) || isAdmin();
         allow write: if isOwner(tradieId) || isAdmin();
+      }
+
+      // ---------- tradespeople/{uid}/secure/{docId} ----------
+      // Server-only credentials — currently the encrypted Google Business
+      // refresh token + connected-location ids (secure/google). Unlike the
+      // owner-readable /private subdoc, NOTHING client-side may read or write
+      // here: even the owner shouldn't be able to pull their own (encrypted)
+      // OAuth token out to the browser. The google/* Cloud Functions reach it
+      // via the Admin SDK, which bypasses these rules.
+      match /secure/{docId} {
+        allow read, write: if false;
       }
     }
 

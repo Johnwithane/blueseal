@@ -315,6 +315,7 @@ onJobPostClosed trigger handles applicant fanout the same way.
 - Pricing display (hourly rate, "Quote on request", or both)
 - Read-only availability calendar
 - Verified-trade badges (one per approved cert) + "ID Verified" badge
+- **Google reviews (opt-in)**: a tradesperson can connect their Google Business Profile (OAuth) to show their Google rating + recent reviews in a separate, clearly-attributed section. Cached on `tradespeople/{uid}.googleReviews` (server-managed; refreshed daily + on-demand). Deliberately **never merged** into the native `ratingAvg`/`ratingCount` — different provenance, not mutual-blind, not tied to a verified Blue Seal job. Connect/disconnect from Account → Tradesperson → Google reviews. The encrypted OAuth refresh token lives in the server-only `tradespeople/{uid}/secure/google` doc (no client read/write). Useful for newer/just-claimed pros who already have a Google reputation. (Setup is human-gated — see HUMANTASKS.md → "Google Business reviews integration".)
 
 ### 5.3 Trade-Specific Intake Forms
 - Each trade has a JSON schema (`intakeFormSchemas/{trade}` collection) defining its custom fields

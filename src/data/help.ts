@@ -336,6 +336,31 @@ If you can't resolve it between yourselves, **contact support** (see the Contact
 For anything involving your immediate safety, contact your local emergency services first.`,
   },
   {
+    slug: "connect-google-reviews",
+    categoryId: "for-tradespeople",
+    title: "Showing your Google reviews on your profile",
+    excerpt: "Connect your Google Business Profile to display your Google reviews on Blue Seal.",
+    audience: "tradesperson",
+    keywords: ["google", "google reviews", "google business", "business profile", "reviews", "reputation", "connect"],
+    body: `If you already have a **Google Business Profile** with reviews, you can show those reviews on your Blue Seal profile too — handy when you're newer to Blue Seal and still building up reviews here.
+
+**How to connect**
+
+1. Go to **Account → Tradesperson → Google reviews**.
+2. Tap **Connect Google Business** and sign in with the Google account that *manages your business listing*.
+3. Grant read access to your reviews. That's it — your Google rating and recent reviews will appear on your public profile shortly after.
+
+We refresh your Google reviews automatically each day, and you can tap **Sync now** anytime to pull your latest ones right away.
+
+**Good to know**
+
+- Your **Google reviews are shown in their own section**, clearly labelled. They're kept separate from your Blue Seal rating — the two never get mixed together, because Blue Seal reviews come from completed, verified Blue Seal jobs.
+- You can only connect a business *you* manage on Google — you'll sign in and approve the access yourself.
+- You can **disconnect anytime** from the same screen. Your Google reviews come off your Blue Seal profile right away.
+
+Don't have a Google Business Profile yet? You don't need one — it's an optional extra. Your Blue Seal reviews stand on their own.`,
+  },
+  {
     slug: "staying-safe",
     categoryId: "safety-disputes",
     title: "Staying safe",
@@ -505,6 +530,13 @@ const faqs: FaqItem[] = [
     question: "Can I track my time and expenses on a job?",
     answer:
       "Yes. You can clock time against a job and add expenses (including receipts), so the invoice reflects the real work — no separate spreadsheet needed.",
+    categoryId: "for-tradespeople",
+    audience: "tradesperson",
+  },
+  {
+    question: "Can I show my Google reviews on Blue Seal?",
+    answer:
+      "Yes. If you have a Google Business Profile, go to **Account → Tradesperson → Google reviews** and connect it. Your Google rating and recent reviews appear in their own section on your profile — kept separate from your Blue Seal rating. You can disconnect anytime.",
     categoryId: "for-tradespeople",
     audience: "tradesperson",
   },
