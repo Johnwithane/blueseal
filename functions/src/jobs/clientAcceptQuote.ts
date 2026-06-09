@@ -7,6 +7,7 @@ import { db } from "../lib/admin";
 import { requireRole } from "../lib/auth";
 import { postSystemMessage } from "../lib/chatSystemMessage";
 import { notify } from "../lib/notify";
+import { resolveBillingType, type QuoteLineKindLike } from "../lib/billing";
 import { SignatureDataUrl, writeQuoteSignature } from "../lib/signature";
 
 const Input = z.object({
@@ -35,6 +36,7 @@ interface QuoteData {
   total: number;
   status: string;
   upfrontFee?: QuoteUpfrontFeeData | null;
+  lineItems?: QuoteLineKindLike[];
 }
 
 /**
@@ -110,9 +112,14 @@ export const clientAcceptQuote = onCall(CALLABLE_OPTS, async (req) => {
     const upfront = quote.upfrontFee ?? null;
     const requiresUpfrontPayment = upfront != null && upfront.amountCents > 0;
 
+    // Lock in how this job is billed from the quote the client just agreed to.
+    // Drives clock-in (fixed jobs track time at $0) for the rest of the job.
+    const billingType = resolveBillingType(quote.lineItems);
+
     if (requiresUpfrontPayment) {
       tx.update(jobRef, {
         status: "awaiting_upfront_payment",
+        billingType,
         upfrontFee: {
           amountCents: upfront!.amountCents,
           source: upfront!.type,
@@ -126,7 +133,7 @@ export const clientAcceptQuote = onCall(CALLABLE_OPTS, async (req) => {
         },
       });
     } else {
-      tx.update(jobRef, { status: "in_progress" });
+      tx.update(jobRef, { status: "in_progress", billingType });
     }
     tx.update(quoteRef, {
       status: "accepted",

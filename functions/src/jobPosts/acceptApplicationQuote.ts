@@ -8,6 +8,7 @@ import { requireRoleOrAdmin } from "../lib/auth";
 import { logAdminAction } from "../lib/audit";
 import { postSystemMessage } from "../lib/chatSystemMessage";
 import { notify } from "../lib/notify";
+import { resolveBillingType, type QuoteLineKindLike } from "../lib/billing";
 import { SignatureDataUrl, writeQuoteSignature } from "../lib/signature";
 
 const Input = z.object({
@@ -181,6 +182,8 @@ export const acceptApplicationQuote = onCall(CALLABLE_OPTS, async (req) => {
       const upfront = quote.upfrontFee ?? null;
       const requiresUpfront = upfront != null && upfront.amountCents > 0;
       const jobStatus = requiresUpfront ? "awaiting_upfront_payment" : "in_progress";
+      // Lock in hourly vs fixed from the accepted quote's line items.
+      const billingType = resolveBillingType(quote.lineItems as QuoteLineKindLike[]);
 
       tx.set(jobRef, {
         clientId: uid,
@@ -193,6 +196,7 @@ export const acceptApplicationQuote = onCall(CALLABLE_OPTS, async (req) => {
           "Tradesperson",
         tradespersonPhotoURL: tradie.photoURL ?? null,
         status: jobStatus,
+        billingType,
         trade: post.trade,
         title: post.title,
         description: post.description,
