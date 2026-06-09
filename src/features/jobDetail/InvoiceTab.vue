@@ -208,9 +208,13 @@ const lockedStatuses = new Set<JobDoc["status"]>([
       </p>
     </div>
 
-    <!-- Tradie's expenses (receipts → reimbursable line items). -->
+    <!-- Tradie's expenses (receipts → reimbursable line items). Only while
+         the invoice is still open: once it's locked (awaiting approval →
+         reviewed, or cancelled) a new receipt can't be billed through, so
+         the upload affordance would be misleading. Same gate as the
+         InvoiceEditor's canEdit above. -->
     <ExpensesCard
-      v-if="isTradie"
+      v-if="isTradie && !lockedStatuses.has(job.status)"
       :job-id="job.id"
       :client-id="job.clientId"
       :tradesperson-id="job.tradespersonId"
