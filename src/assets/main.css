@@ -6,6 +6,18 @@
   --bs-blue-light: #a0d6f1;
   --bs-blue-dark: #1d406a;
   --bs-amber: #f59e0b;
+
+  /* --- Secondary accent: red -------------------------------------------------
+     The brand is mostly blue with red accents. --bs-red is the single knob:
+     change this ONE value to retune the accent everywhere — the light/dark
+     steps derive from it via color-mix, and every accent (kicker eyebrows,
+     .bs-accent-* helpers) routes through these tokens, never raw hex.
+     NOTE: this is a *brand* colour, distinct from the semantic error red
+     (.bs-pill.danger / --bs-status-cancelled #ef4444). Those stay a fixed UI
+     signal — don't swap them for the brand accent. */
+  --bs-red: #df3b35;
+  --bs-red-light: color-mix(in srgb, var(--bs-red) 16%, white);
+  --bs-red-dark: color-mix(in srgb, var(--bs-red) 82%, black);
   --bs-bg: #f5f7fb;
   --bs-text: #111827;
   --bs-muted: #6b7280;
@@ -338,7 +350,9 @@ a { color: var(--bs-blue); }
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--bs-blue);
+  /* Red accent eyebrow on light sections — the brand's pop of red. Dark
+     sections override to --bs-blue-light inline (red on navy clashes). */
+  color: var(--bs-red);
 }
 .bs-kicker::before {
   content: "";

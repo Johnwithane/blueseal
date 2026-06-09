@@ -17,15 +17,25 @@ inline `:style` bindings (including JS colour maps — `var()` resolves there to
 | `--bs-blue` | `#49a1d3` | primary brand |
 | `--bs-blue-light` | `#a0d6f1` | tints, light accents |
 | `--bs-blue-dark` | `#1d406a` | deep brand, logo text |
-| `--bs-amber` | `#f59e0b` | secondary accent |
+| `--bs-red` | `#df3b35` | **secondary red accent** — the single knob; retune this one value |
+| `--bs-red-light` | _derived_ | red tint (backgrounds), `color-mix` off `--bs-red` |
+| `--bs-red-dark` | _derived_ | deep red (text-on-light / hover), `color-mix` off `--bs-red` |
+| `--bs-amber` | `#f59e0b` | secondary accent (ratings/stars) |
 | `--bs-bg` | `#f5f7fb` | app background |
 | `--bs-text` | `#111827` | body text |
 | `--bs-muted` / `--bs-text-muted` | `#6b7280` | secondary text (aliases — same value) |
 | `--bs-border` | `#e5e7eb` | borders, dividers |
 | `--bs-surface-alt` | `#f9fafb` | hover/active rows, zebra, unread tint, column wells |
 
-**Rule:** never write the brand hexes (`#49a1d3`, `#1d406a`, `#a0d6f1`, `#f59e0b`)
-as literals — route them through the tokens so the palette stays swappable.
+**Rule:** never write the brand hexes (`#49a1d3`, `#1d406a`, `#a0d6f1`, `#f59e0b`,
+`#df3b35`) as literals — route them through the tokens so the palette stays
+swappable.
+
+**Red accent vs. error red.** `--bs-red` is a *brand* accent (e.g. the section
+`.bs-kicker` eyebrow on light sections). It is **not** the semantic error red —
+that's the fixed `#ef4444` in `.bs-pill.danger` / `--bs-status-cancelled`, a UI
+signal that must stay constant. Don't collapse the two; changing `--bs-red`
+should never affect error/cancelled styling.
 
 ## Job-status palette
 
