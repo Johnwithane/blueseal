@@ -1386,6 +1386,13 @@ export interface QuoteDoc {
   acceptedAt: Timestamp | null;
   declinedAt: Timestamp | null;
   pdfUrl: string | null;
+  // Storage path of the client's finger-drawn acceptance signature, written
+  // server-side at accept time (clientAcceptQuote / acceptApplicationQuote).
+  // Lives at jobs/{jobId}/signatures/quote-acceptance.png — server-write-only,
+  // readable by both parties + admin. null/undefined only for quotes accepted
+  // before this feature shipped. The signed instant IS acceptedAt (the
+  // signature is the acceptance), so no separate timestamp is stored.
+  clientSignatureStoragePath?: string | null;
 }
 
 // ---------------------------------------------------------------------------

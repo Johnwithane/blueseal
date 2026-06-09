@@ -61,12 +61,13 @@ export async function acceptApplication(
 export async function acceptApplicationQuote(
   postId: string,
   applicationId: string,
+  signatureDataUrl: string,
 ): Promise<{ jobId: string; chatId: string }> {
   const callable = httpsCallable<
-    { postId: string; applicationId: string },
+    { postId: string; applicationId: string; signatureDataUrl: string },
     { jobId: string; chatId: string }
   >(functions, "acceptApplicationQuote");
-  const { data } = await callable({ postId, applicationId });
+  const { data } = await callable({ postId, applicationId, signatureDataUrl });
   return data;
 }
 

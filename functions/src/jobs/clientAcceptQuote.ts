@@ -7,9 +7,14 @@ import { db } from "../lib/admin";
 import { requireRole } from "../lib/auth";
 import { postSystemMessage } from "../lib/chatSystemMessage";
 import { notify } from "../lib/notify";
+import { SignatureDataUrl, writeQuoteSignature } from "../lib/signature";
 
 const Input = z.object({
   jobId: z.string().min(1).max(128),
+  // Soft rollout: optional until the signature-capture frontend is live on
+  // hosting, so the currently-deployed client (which doesn't send one yet)
+  // keeps working. Flip to required once hosting ships the signature UI.
+  signatureDataUrl: SignatureDataUrl.optional(),
 });
 
 interface JobData {
@@ -51,10 +56,26 @@ export const clientAcceptQuote = onCall(CALLABLE_OPTS, async (req) => {
   const uid = requireRole(req, "client");
   const parsed = Input.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);
-  const { jobId } = parsed.data;
+  const { jobId, signatureDataUrl } = parsed.data;
 
   const jobRef = db.doc(`jobs/${jobId}`);
   const quoteRef = db.doc(`quotes/${jobId}`);
+
+  // Record the signature BEFORE the transaction. If the upload fails we abort
+  // (never accept with a signature that didn't land); the inverse order risks
+  // an accepted-without-signature record. An orphan file on a rare precondition
+  // failure is benign — the path is deterministic, so a retry overwrites it.
+  // signaturePath stays null during the soft-rollout window for old clients
+  // that don't send a signature yet.
+  let signaturePath: string | null = null;
+  if (signatureDataUrl) {
+    try {
+      signaturePath = await writeQuoteSignature(jobId, signatureDataUrl);
+    } catch (err) {
+      logger.error("clientAcceptQuote signature upload failed", { jobId, clientId: uid, err });
+      throw new HttpsError("internal", "Couldn't record your signature. Please try again.");
+    }
+  }
 
   const result = await db.runTransaction(async (tx) => {
     const [jobSnap, quoteSnap] = await Promise.all([tx.get(jobRef), tx.get(quoteRef)]);
@@ -110,6 +131,7 @@ export const clientAcceptQuote = onCall(CALLABLE_OPTS, async (req) => {
     tx.update(quoteRef, {
       status: "accepted",
       acceptedAt: FieldValue.serverTimestamp(),
+      clientSignatureStoragePath: signaturePath,
       declinedReason: null,
     });
     return {

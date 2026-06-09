@@ -130,6 +130,16 @@ service firebase.storage {
       allow write: if isSignedIn() && isJobTradie(jobId) && docSizeOk() && isCompressedImageOrPdf();
     }
 
+    // Quote-acceptance signatures — written server-side by the accept callables
+    // (clientAcceptQuote / acceptApplicationQuote) via the admin SDK. Immutable
+    // audit artifact: clients never write here. Both parties of the job + admin
+    // may read it back to view the signature on the quote/job page. Mirrors the
+    // server-written invoices block (write: false).
+    match /jobs/{jobId}/signatures/{file=**} {
+      allow read: if isSignedIn() && (jobParty(jobId) || isAdmin());
+      allow write: if false;
+    }
+
     // Job-post photos — uploaded before the post doc exists (client picks a
     // temp uuid client-side), so we can't gate writes on Firestore parties.
     // Any signed-in user can write WebP; the createJobPost callable is the

@@ -4,6 +4,8 @@ import Button from "primevue/button";
 import Tag from "primevue/tag";
 import { subscribeQuote, getQuoteByJobId, markQuoteViewed } from "@/firebase/services/quotes";
 import { getInvoicePartyInfo } from "@/firebase/services/jobs";
+import { ref as storageRef, getDownloadURL } from "firebase/storage";
+import { storage } from "@/firebase/config";
 import type { QuoteDoc, QuoteStatus, WithId } from "@/firebase/interfaces";
 import { useFormatters } from "@/composables/useFormatters";
 import { useToast } from "@/composables/useToast";
@@ -101,6 +103,26 @@ function detach() {
   unsub = null;
 }
 
+// Resolve the client's acceptance signature (stored as a storage path on the
+// quote) to a download URL so both parties can see the record of agreement.
+// Best-effort: a missing/forbidden object just hides the block.
+const signatureUrl = ref<string | null>(null);
+watch(
+  () => quote.value?.clientSignatureStoragePath ?? null,
+  async (path) => {
+    if (!path) {
+      signatureUrl.value = null;
+      return;
+    }
+    try {
+      signatureUrl.value = await getDownloadURL(storageRef(storage, path));
+    } catch {
+      signatureUrl.value = null;
+    }
+  },
+  { immediate: true },
+);
+
 watch(() => props.jobId, () => {
   detach();
   loading.value = true;
@@ -173,6 +195,16 @@ const STATUS_LABEL: Record<QuoteStatus, string> = {
     >
       <div class="text-xs font-semibold text-amber-900 mb-1">Client asked to discuss</div>
       <p class="text-xs text-amber-900 whitespace-pre-wrap">{{ quote.declinedReason }}</p>
+    </div>
+
+    <div
+      v-if="quote.status === 'accepted' && signatureUrl"
+      class="mt-3 rounded-lg border border-[color:var(--bs-border)] bg-white p-3"
+    >
+      <div class="text-xs font-semibold text-[color:var(--bs-muted)] mb-1">
+        Signed by client<template v-if="quote.acceptedAt"> • {{ date(quote.acceptedAt) }}</template>
+      </div>
+      <img :src="signatureUrl" alt="Client signature" class="h-16 w-auto max-w-[180px]" />
     </div>
 
     <div class="flex items-center gap-2 mt-4 flex-wrap">

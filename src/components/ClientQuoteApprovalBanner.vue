@@ -12,6 +12,7 @@ import { useToast } from "@/composables/useToast";
 import { useFormatters } from "@/composables/useFormatters";
 import { humanizeError } from "@/utils/errors";
 import StatusBanner from "@/components/StatusBanner.vue";
+import QuoteSignatureDialog from "@/components/QuoteSignatureDialog.vue";
 import type { QuoteDoc, WithId } from "@/firebase/interfaces";
 
 const props = defineProps<{
@@ -29,6 +30,7 @@ const declining = ref(false);
 
 const showDeclineDialog = ref(false);
 const reason = ref("");
+const showSignDialog = ref(false);
 
 // Live subscription to the quote doc. The parent renders this banner
 // when job.status === "quoted", but clientDeclineQuote deliberately
@@ -66,15 +68,24 @@ const upfrontFeeCents = computed<number>(() => {
   return fee && fee.amountCents > 0 ? fee.amountCents : 0;
 });
 
-async function onAccept() {
+// Accepting now requires a signature: the button opens the signature pad, and
+// the actual callable fires from onSignedAccept once the client has drawn +
+// confirmed. `accepting` drives the dialog's Confirm spinner.
+function onAccept() {
+  if (accepting.value || declining.value) return;
+  showSignDialog.value = true;
+}
+
+async function onSignedAccept(signatureDataUrl: string) {
   if (accepting.value) return;
   accepting.value = true;
   try {
-    await clientAcceptQuote(props.jobId);
+    await clientAcceptQuote(props.jobId, signatureDataUrl);
     toast.success(
       "Quote accepted",
       "Your tradesperson has been notified — they'll reach out to schedule.",
     );
+    showSignDialog.value = false;
     emit("decided");
   } catch (e) {
     toast.error("Couldn't accept", humanizeError(e));
@@ -221,4 +232,15 @@ async function onSubmitDecline() {
       />
     </template>
   </Dialog>
+
+  <!-- Signature sign-off. Mounted at the root (like the decline dialog) so it's
+       available in both banner states. Drawing + confirming here is what fires
+       clientAcceptQuote. -->
+  <QuoteSignatureDialog
+    v-model:visible="showSignDialog"
+    :quote-total="quote?.total"
+    :upfront-fee-cents="upfrontFeeCents"
+    :busy="accepting"
+    @confirm="onSignedAccept"
+  />
 </template>

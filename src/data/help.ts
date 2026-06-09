@@ -170,7 +170,7 @@ Quotes can include an optional upfront amount for materials or to hold a booking
 
 When you pick a trade, we'll ask a few **trade-specific questions** (for tiling, say, the area, square footage, tile type, and whether materials are on-site). Answering them up front means tradespeople can quote accurately the first time — fewer back-and-forth messages, fewer surprises once work starts. Your answers appear on the posting and carry through to the job.
 
-Your posting is shown to **verified tradespeople** in your trade and region. Each one applies with a **full itemized quote** — line items, taxes, and any upfront fee — so you're comparing real numbers, not vague estimates. On your post you can open each applicant's quote, check their profile, verification, and reviews, then **Accept** the one you want. Accepting starts the job with that pro straight away and lets the others know you've chosen someone.
+Your posting is shown to **verified tradespeople** in your trade and region. Each one applies with a **full itemized quote** — line items, taxes, and any upfront fee — so you're comparing real numbers, not vague estimates. On your post you can open each applicant's quote, check their profile, verification, and reviews, then **Accept** the one you want — you'll sign off with a quick finger signature to confirm. Accepting starts the job with that pro straight away and lets the others know you've chosen someone.
 
 Your exact address stays private until you accept a quote; the public posting only shows your general area.`,
   },
@@ -505,9 +505,16 @@ const faqs: FaqItem[] = [
     audience: "client",
   },
   {
+    question: "Do I need to sign to accept a quote?",
+    answer:
+      "Yes. When you accept a quote, you'll draw a quick signature with your finger (or mouse on a computer) to confirm. It's saved with the quote as your record of agreement before any work starts, and your tradesperson can see it too.",
+    categoryId: "for-clients",
+    audience: "client",
+  },
+  {
     question: "Can I message a tradesperson before I commit?",
     answer:
-      "Yes. Requesting a quote opens a job thread where you can chat, share more photos, and ask questions. Nothing is locked in until you accept a quote.",
+      "Yes. Requesting a quote opens a job thread where you can chat, share more photos, and ask questions. Nothing is locked in until you accept and sign a quote.",
     categoryId: "for-clients",
     audience: "client",
   },

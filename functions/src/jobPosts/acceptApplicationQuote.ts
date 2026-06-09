@@ -8,10 +8,14 @@ import { requireRoleOrAdmin } from "../lib/auth";
 import { logAdminAction } from "../lib/audit";
 import { postSystemMessage } from "../lib/chatSystemMessage";
 import { notify } from "../lib/notify";
+import { SignatureDataUrl, writeQuoteSignature } from "../lib/signature";
 
 const Input = z.object({
   postId: z.string().min(1).max(128),
   applicationId: z.string().min(1).max(128),
+  // Soft rollout: optional until the signature-capture frontend ships on
+  // hosting. Flip to required once the live client always sends a signature.
+  signatureDataUrl: SignatureDataUrl.optional(),
 });
 
 interface PostDoc {
@@ -83,7 +87,7 @@ export const acceptApplicationQuote = onCall(CALLABLE_OPTS, async (req) => {
   const uid = requireRoleOrAdmin(req, "client");
   const parsed = Input.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);
-  const { postId, applicationId } = parsed.data;
+  const { postId, applicationId, signatureDataUrl } = parsed.data;
   const ctx = { fn: "acceptApplicationQuote", uid, postId, applicationId };
 
   const postRef = db.doc(`jobPosts/${postId}`);
@@ -94,6 +98,21 @@ export const acceptApplicationQuote = onCall(CALLABLE_OPTS, async (req) => {
   const jobRef = db.collection("jobs").doc();
   const chatRef = db.collection("chats").doc();
   const quoteRef = db.doc(`quotes/${jobRef.id}`);
+
+  // Record the client's signature BEFORE the transaction, keyed on the
+  // pre-allocated jobId so the path is stable across retries (overwrite, not
+  // accumulate). Fatal on failure — never accept with a signature that didn't
+  // land. Kept separate from the best-effort post-commit photo copy on purpose.
+  // Stays null during the soft-rollout window for old clients.
+  let signaturePath: string | null = null;
+  if (signatureDataUrl) {
+    try {
+      signaturePath = await writeQuoteSignature(jobRef.id, signatureDataUrl);
+    } catch (err) {
+      logger.error("acceptApplicationQuote signature upload failed", { ...ctx, err });
+      throw new HttpsError("internal", "Couldn't record your signature. Please try again.");
+    }
+  }
 
   let txnOut: {
     post: PostDoc;
@@ -250,6 +269,7 @@ export const acceptApplicationQuote = onCall(CALLABLE_OPTS, async (req) => {
         acceptedAt: FieldValue.serverTimestamp(),
         declinedAt: null,
         pdfUrl: null,
+        clientSignatureStoragePath: signaturePath,
         upfrontFee: upfront,
       });
 

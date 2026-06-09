@@ -45,6 +45,7 @@ import LoadingState from "@/components/LoadingState.vue";
 import QuoteComposer from "@/components/QuoteComposer.vue";
 import type { QuoteComposerState } from "@/components/QuoteComposer.vue";
 import QuoteBreakdown from "@/components/QuoteBreakdown.vue";
+import QuoteSignatureDialog from "@/components/QuoteSignatureDialog.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -76,6 +77,12 @@ const submittingAccept = ref(false);
 const submittingAcceptQuote = ref(false);
 const submittingCancel = ref(false);
 const submittingWithdraw = ref(false);
+
+// Accepting a job-board quote requires the client to sign off first. The
+// confirm dialog stashes the chosen applicant here and opens the signature
+// pad; acceptApplicationQuote fires from onSignedAcceptQuote.
+const showSignDialog = ref(false);
+const pendingApp = ref<WithId<ApplicationDoc> | null>(null);
 
 // Quote composer state for the apply form + the tradie's stored hourly rate
 // (passed to the composer so hourly lines default to the profile rate).
@@ -257,18 +264,27 @@ async function onAcceptQuote(app: WithId<ApplicationDoc>) {
     icon: "pi pi-check-circle",
     acceptLabel: "Yes, accept",
     rejectLabel: "Cancel",
-    accept: async () => {
-      submittingAcceptQuote.value = true;
-      try {
-        const { jobId } = await acceptApplicationQuote(postId.value, app.id);
-        router.push({ name: "JobDetail", params: { id: jobId } });
-      } catch (e) {
-        toast.error("Couldn't accept this quote", humanizeError(e));
-      } finally {
-        submittingAcceptQuote.value = false;
-      }
+    accept: () => {
+      // Confirmed — now collect the signature before firing the callable.
+      pendingApp.value = app;
+      showSignDialog.value = true;
     },
   });
+}
+
+async function onSignedAcceptQuote(signatureDataUrl: string) {
+  const app = pendingApp.value;
+  if (!app || submittingAcceptQuote.value) return;
+  submittingAcceptQuote.value = true;
+  try {
+    const { jobId } = await acceptApplicationQuote(postId.value, app.id, signatureDataUrl);
+    showSignDialog.value = false;
+    router.push({ name: "JobDetail", params: { id: jobId } });
+  } catch (e) {
+    toast.error("Couldn't accept this quote", humanizeError(e));
+  } finally {
+    submittingAcceptQuote.value = false;
+  }
 }
 
 // Legacy path for applications that pre-date the quote-on-apply change
@@ -715,5 +731,15 @@ const visibleApplications = computed(() =>
         This job is no longer open for applications.
       </Message>
     </template>
+
+    <!-- Sign-off for accepting a job-board applicant's quote. Driven by
+         pendingApp so a single dialog serves every applicant row. -->
+    <QuoteSignatureDialog
+      v-model:visible="showSignDialog"
+      :quote-total="pendingApp?.quote?.total"
+      :upfront-fee-cents="pendingApp?.quote?.upfrontFee?.amountCents"
+      :busy="submittingAcceptQuote"
+      @confirm="onSignedAcceptQuote"
+    />
   </section>
 </template>

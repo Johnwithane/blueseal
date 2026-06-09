@@ -142,9 +142,15 @@ export async function submitQuote(
   return res.data;
 }
 
-export async function clientAcceptQuote(jobId: string): Promise<{ ok: true }> {
-  const fn = httpsCallable<{ jobId: string }, { ok: true }>(functions, "clientAcceptQuote");
-  const res = await fn({ jobId });
+export async function clientAcceptQuote(
+  jobId: string,
+  signatureDataUrl: string,
+): Promise<{ ok: true }> {
+  const fn = httpsCallable<{ jobId: string; signatureDataUrl: string }, { ok: true }>(
+    functions,
+    "clientAcceptQuote",
+  );
+  const res = await fn({ jobId, signatureDataUrl });
   return res.data;
 }
 
