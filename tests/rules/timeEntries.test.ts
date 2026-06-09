@@ -21,10 +21,13 @@ import {
   CLIENT_CLAIMS,
   CLIENT_UID,
   OTHER_CLIENT_UID,
+  OTHER_TRADIE_UID,
   TRADIE_CLAIMS,
   TRADIE_UID,
   setupTestEnv,
 } from "./setup";
+
+import { collectionGroup } from "firebase/firestore";
 
 let env: RulesTestEnvironment;
 
@@ -92,5 +95,49 @@ describe("jobs/{jobId}/timeEntries — read access for both parties", () => {
   it("a stranger (unrelated client) cannot list time entries", async () => {
     await seed();
     await assertFails(getDocs(entriesQuery(fsAs(OTHER_CLIENT_UID, CLIENT_CLAIMS))));
+  });
+});
+
+// Mirrors useActiveClock: collectionGroup('timeEntries') for the tradie's one
+// running session across ALL jobs. This is authorized by the recursive-wildcard
+// rule (match /{path=**}/timeEntries), NOT the nested per-job rule, so it needs
+// its own coverage. The query filters tradespersonId == <uid> && endedAt == null;
+// the rule enforces resource.data.tradespersonId == uid(), so a query scoped to
+// someone else's id is rejected up-front ("rules are not filters").
+function activeClockQuery(fs: ReturnType<typeof fsAs>, tradieUid: string) {
+  return query(
+    collectionGroup(fs, "timeEntries"),
+    where("tradespersonId", "==", tradieUid),
+    where("endedAt", "==", null),
+  );
+}
+
+describe("timeEntries — collection-group read (the live-clock listener)", () => {
+  it("a tradesperson can list their own running session across all jobs", async () => {
+    await seed();
+    await assertSucceeds(
+      getDocs(activeClockQuery(fsAs(TRADIE_UID, TRADIE_CLAIMS), TRADIE_UID)),
+    );
+  });
+
+  it("an admin can list a tradesperson's running sessions", async () => {
+    await seed();
+    await assertSucceeds(
+      getDocs(activeClockQuery(fsAs(ADMIN_UID, ADMIN_CLAIMS), TRADIE_UID)),
+    );
+  });
+
+  it("another tradesperson cannot list someone else's sessions", async () => {
+    await seed();
+    await assertFails(
+      getDocs(activeClockQuery(fsAs(OTHER_TRADIE_UID, TRADIE_CLAIMS), TRADIE_UID)),
+    );
+  });
+
+  it("a client cannot enumerate a tradesperson's sessions across jobs", async () => {
+    await seed();
+    await assertFails(
+      getDocs(activeClockQuery(fsAs(CLIENT_UID, CLIENT_CLAIMS), TRADIE_UID)),
+    );
   });
 });

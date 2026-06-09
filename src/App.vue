@@ -10,6 +10,7 @@ import TradieStatusBanner from "@/components/TradieStatusBanner.vue";
 import AssistantBubble from "@/components/assistant/AssistantBubble.vue";
 import RoleSwitchOverlay from "@/components/RoleSwitchOverlay.vue";
 import AppShell from "@/components/shell/AppShell.vue";
+import ActiveClockBanner from "@/components/ActiveClockBanner.vue";
 import { useNotificationsStore } from "@/stores/notifications";
 import { useAuthStore } from "@/stores/auth";
 import { useAppUpdate } from "@/composables";
@@ -122,6 +123,11 @@ function openFromToast(notifId: string) {
 
 <template>
   <div class="min-h-full flex flex-col">
+    <!-- Always-on "you're on the clock" bar. Lives above the layout switch so
+         it spans every chrome (public + app) and stays pinned at the top of the
+         viewport — a tradesperson can stop their running clock from anywhere,
+         not just the job's own page. Renders nothing unless a clock is running. -->
+    <ActiveClockBanner />
     <!-- Fade between chrome systems so crossing the public↔app boundary
          (sign-in, or a visitor→member transition on a hybrid route) is a
          smooth crossfade rather than an abrupt swap. Keyed on `layout` so

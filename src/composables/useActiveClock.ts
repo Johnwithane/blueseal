@@ -1,4 +1,4 @@
-import { computed, onScopeDispose, ref } from "vue";
+import { computed, effectScope, onScopeDispose, ref, watch, type EffectScope } from "vue";
 import {
   collectionGroup,
   onSnapshot,
@@ -27,6 +27,7 @@ let refCount = 0;
 let unsubscribe: (() => void) | null = null;
 let ticker: number | null = null;
 let watchedUid: string | null = null;
+let authScope: EffectScope | null = null;
 
 function start(uid: string) {
   stop();
@@ -66,16 +67,35 @@ function stop() {
   activeEntry.value = null;
 }
 
-export function useActiveClock() {
-  const auth = useAuthStore();
+// Detached singleton watcher that (re)attaches the listener to whoever is
+// signed in. Lives in its own effect scope — not the calling component's — so
+// it survives a consumer unmounting while another is still using the singleton.
+// This is what lets a persistently-mounted consumer (the global clock banner,
+// which mounts once at App boot, BEFORE auth resolves) start tracking the
+// moment a tradesperson signs in, rather than only catching a uid that already
+// happened to be present at setup time.
+function ensureAuthWatcher() {
+  if (authScope) return;
+  authScope = effectScope(true);
+  authScope.run(() => {
+    const auth = useAuthStore();
+    watch(
+      () => [auth.fbUser?.uid ?? null, auth.roles.includes("tradesperson")] as const,
+      ([uid, isTradie]) => {
+        if (uid && isTradie) {
+          if (watchedUid !== uid) start(uid);
+        } else {
+          stop();
+        }
+      },
+      { immediate: true },
+    );
+  });
+}
 
+export function useActiveClock() {
   refCount += 1;
-  // (Re)attach when a tradie is signed in. The composable is only mounted in
-  // tradie-facing views, so a quick uid check is enough — no need to watch.
-  const uid = auth.fbUser?.uid ?? null;
-  if (uid && auth.roles.includes("tradesperson") && watchedUid !== uid) {
-    start(uid);
-  }
+  ensureAuthWatcher();
   if (ticker === null) {
     ticker = window.setInterval(() => (nowMs.value = Date.now()), 1000);
   }
@@ -85,6 +105,8 @@ export function useActiveClock() {
     if (refCount <= 0) {
       refCount = 0;
       stop();
+      authScope?.stop();
+      authScope = null;
       if (ticker !== null) {
         window.clearInterval(ticker);
         ticker = null;

@@ -49,10 +49,12 @@ const { sideItems, isActive } = useNavItems();
 <style scoped>
 .side-panel {
   position: sticky;
-  top: 0;
+  /* Sticks below the global clock banner when one is showing; the var is 0px
+     otherwise, so this matches the prior `top: 0` / full-height behaviour. */
+  top: var(--bs-clock-banner-h, 0px);
   display: flex;
   flex-direction: column;
-  height: 100dvh;
+  height: calc(100dvh - var(--bs-clock-banner-h, 0px));
   width: 260px;
   padding: 1rem 0.75rem;
   padding-top: max(1rem, env(safe-area-inset-top));

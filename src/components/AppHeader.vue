@@ -179,7 +179,12 @@ function openMenu(e: Event) {
 </script>
 
 <template>
-  <header class="sticky top-0 z-30 border-b border-[color:var(--bs-border)] bg-white">
+  <!-- top offsets below the global clock banner when one is showing
+       (--bs-clock-banner-h is 0px otherwise, so this is a no-op normally). -->
+  <header
+    class="sticky z-30 border-b border-[color:var(--bs-border)] bg-white"
+    :style="{ top: 'var(--bs-clock-banner-h, 0px)' }"
+  >
     <div class="bs-container flex items-center justify-between gap-3 py-3">
       <router-link to="/" class="flex items-center gap-2 text-inherit no-underline">
         <img src="/icons/blueseal_logo_Character.png" alt="" class="h-12 w-auto" />

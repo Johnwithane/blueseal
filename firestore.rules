@@ -581,6 +581,24 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ---------- timeEntries (collection group: the tradie's single live clock) ----------
+    // useActiveClock runs collectionGroup('timeEntries') filtered by
+    // tradespersonId == uid && endedAt == null to find the one running session
+    // across ALL the tradie's jobs (drives the global clock banner + the
+    // job-list / job-header quick-clock state). The nested
+    // jobs/{jobId}/timeEntries rule does NOT authorize a collection-group query
+    // — only this recursive-wildcard rule does. Scoped to the tradie's own rows
+    // (the query filters tradespersonId == uid and the rule enforces the same
+    // predicate), so a tradie can't enumerate another tradie's sessions. The
+    // client's live-timer read and ALL writes stay on the nested rule;
+    // `write: if false` here is a no-op grant (rules are OR'd across matching
+    // blocks) — it never blocks the nested create / update / delete.
+    match /{path=**}/timeEntries/{entryId} {
+      allow read: if isAdmin()
+        || (resource != null && resource.data.tradespersonId == uid());
+      allow write: if false;
+    }
+
     // ---------- notifications (per-user inbox; writes via Cloud Function) ----------
     // Owner can only flip read/readAt (mark-as-read). Every other field is
     // pinned to its prior value so a compromised client can't rewrite a
