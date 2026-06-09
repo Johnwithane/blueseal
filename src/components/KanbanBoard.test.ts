@@ -31,9 +31,9 @@ function mountBoard(jobs: WithId<JobDoc>[]) {
 }
 
 describe("KanbanBoard", () => {
-  it("renders all 8 pipeline columns", () => {
+  it("renders all 9 pipeline columns", () => {
     const wrapper = mountBoard([]);
-    expect(wrapper.findAll("section")).toHaveLength(8);
+    expect(wrapper.findAll("section")).toHaveLength(9);
   });
 
   it("places each job under its status column and shows empty hints elsewhere", () => {
@@ -44,8 +44,8 @@ describe("KanbanBoard", () => {
     ]);
     // 3 cards total across the board.
     expect(wrapper.findAll('[role="button"]')).toHaveLength(3);
-    // Columns with no jobs show the empty hint; 6 of 8 columns are empty here.
-    expect(wrapper.findAll("p").filter((p) => p.text() === "Nothing here yet.")).toHaveLength(6);
+    // Columns with no jobs show the empty hint; 7 of 9 columns are empty here.
+    expect(wrapper.findAll("p").filter((p) => p.text() === "Nothing here yet.")).toHaveLength(7);
   });
 
   it("drops reviewed/cancelled jobs from the board", () => {

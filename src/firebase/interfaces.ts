@@ -583,17 +583,39 @@ export interface IntakeFormSchemaDoc {
 // When Stripe Connect is enabled the dispatcher resolves it automatically.
 // Pre-existing jobs predate the status entirely; the kanban falls back to the
 // generic status label for unknown values via STATUS_LABEL.
+// "on_hold" is a client-requested pause on a committed job. The client asks
+// (requestJobChange) and the tradesperson accepts (respondJobChange) before the
+// status flips here; `statusBeforeHold` records what to restore. Either party
+// lifts the hold (resumeJob) — no re-acceptance needed.
 export type JobStatus =
   | "accepted"
   | "requested"
   | "quoted"
   | "awaiting_upfront_payment"
   | "in_progress"
+  | "on_hold"
   | "awaiting_client_approval"
   | "awaiting_payment"
   | "complete"
   | "reviewed"
   | "cancelled";
+
+// A client-initiated cancel/postpone request on a committed job, awaiting the
+// tradesperson's accept/decline. Lives on JobDoc.pendingChange (null when none).
+// Written only by the requestJobChange callable; cleared by respond/withdraw.
+export interface JobChangeRequest {
+  type: "cancel" | "postpone";
+  // uid of the party who asked. Client-initiated in the MVP, but stored as a
+  // uid (not a role) so the responder/withdraw logic stays symmetric if
+  // tradesperson-initiated requests are added later.
+  requestedBy: string;
+  requestedAt: Timestamp;
+  reason: string;
+  // postpone only — optional client-proposed resume date (UTC midnight).
+  // Informational: surfaced in the request notification + chat line, not a
+  // scheduling commitment.
+  proposedResumeAt?: Timestamp | null;
+}
 
 export type Urgency = "flexible" | "this_week" | "urgent";
 
@@ -658,6 +680,16 @@ export interface JobDoc {
   // before cancellation, and on pre-existing jobs that were cancelled via
   // the tradesperson status dropdown before this field existed.
   cancelledBy: string | null;
+  // Outstanding client cancel/postpone request awaiting the tradesperson's
+  // response. Null when there's none. Server-managed: only the requestJobChange /
+  // respondJobChange / withdrawJobChange callables (admin SDK) touch it — the
+  // rules block parties from writing it directly. Optional: pre-existing jobs
+  // predate the field; readers treat undefined as null.
+  pendingChange?: JobChangeRequest | null;
+  // The status to restore when a held job resumes. Set alongside
+  // status === "on_hold" by respondJobChange; cleared by resumeJob. Null/absent
+  // at every other point. Server-managed like pendingChange.
+  statusBeforeHold?: JobStatus | null;
   chatId: string;
   // Set when this job was created via the job-board marketplace conversion.
   sourcePostId: string | null;
@@ -1558,7 +1590,18 @@ export type NotificationType =
   | "new_job_posting"
   // Fires to the requesting client when a seeded prospect they asked for signs
   // up and their held lead converts into a real job. Links to /jobs/{id}.
-  | "prospect_claimed";
+  | "prospect_claimed"
+  // Client cancel/postpone request loop on a committed job. `job_change_requested`
+  // → tradesperson (client asked to cancel or hold). `job_change_accepted` /
+  // `job_change_declined` → client (tradesperson's decision). `job_change_withdrawn`
+  // → tradesperson (in-app only) when the client retracts a still-pending request.
+  // `job_resumed` → the opposite party when a held job is taken off hold. All
+  // link to /jobs/{id}.
+  | "job_change_requested"
+  | "job_change_accepted"
+  | "job_change_declined"
+  | "job_change_withdrawn"
+  | "job_resumed";
 
 export interface NotificationDoc {
   userId: string;

@@ -127,28 +127,35 @@ export async function updateJobStatus(id: string, status: JobStatus): Promise<vo
   }
 }
 
-// Statuses where either party can still cancel. Once money is owed
-// ("awaiting_client_approval"/"awaiting_payment"/"complete"/"reviewed"),
-// cancellation has to go through a dispute or admin instead. in_progress
-// stays cancellable because that now covers the window between client
-// quote-accept and the tradesperson actually doing the work — clients
-// need a way out if plans change before the visit.
-// `awaiting_upfront_payment` is cancellable while unpaid; once the fee
-// has been paid the job moves to `in_progress` (still cancellable, with
-// a UI warning that any refund is handled out-of-band).
-export const CANCELLABLE_STATUSES: readonly JobStatus[] = [
+// Pre-commitment statuses where the CLIENT can cancel INSTANTLY (cancelJob,
+// allowed directly by firestore.rules). Nothing is committed yet — no accepted
+// quote, no work — so no tradesperson sign-off is needed.
+export const INSTANT_CANCEL_STATUSES: readonly JobStatus[] = [
   "accepted",
   "requested",
   "quoted",
+] as const;
+
+// Committed statuses where a cancel must be REQUESTED and the tradesperson has
+// to accept it (requestJobChange → respondJobChange). The client has accepted a
+// quote / work is under way, so they can't unilaterally pull the rug. Mirrors
+// CANCEL_REQUEST_STATUSES in functions/src/jobs/requestJobChange.ts.
+export const REQUEST_CANCEL_STATUSES: readonly JobStatus[] = [
   "awaiting_upfront_payment",
   "in_progress",
 ] as const;
 
+// Statuses a client can request a postpone (hold) from — only an actively
+// running job. A quote that hasn't been accepted isn't "started", so there's
+// nothing to pause.
+export const POSTPONABLE_STATUSES: readonly JobStatus[] = ["in_progress"] as const;
+
 /**
- * Cancel a job and record who did it + why. The onJobCancelled Cloud
- * Function trigger notifies the opposite party. `cancelledBy` is read from
- * the current Firebase user; the firestore rules already restrict updates
- * to parties of the job, so a stranger can't set this.
+ * Instantly cancel a PRE-COMMITMENT job and record who did it + why. The
+ * onJobCancelled trigger notifies the opposite party. Only valid from
+ * INSTANT_CANCEL_STATUSES — firestore.rules rejects a direct client cancel of a
+ * committed job, so for those the UI routes through requestJobChange instead
+ * (the rules are the real guard; callers gate the button on the status set).
  */
 export async function cancelJob(id: string, reason: string): Promise<void> {
   const uid = fbAuth.currentUser?.uid;
@@ -159,6 +166,56 @@ export async function cancelJob(id: string, reason: string): Promise<void> {
     cancelledReason: reason.trim().slice(0, 1000),
     cancelledBy: uid,
   });
+}
+
+// ---------------------------------------------------------------------------
+// Cancel / postpone request loop for COMMITTED jobs. The client raises a
+// request (requestJobChange); the tradesperson accepts or declines
+// (respondJobChange); the requester can pull it back (withdrawJobChange); and
+// either party lifts a hold (resumeJob). All state transitions + notifications
+// live server-side in functions/src/jobs/{requestJobChange,respondJobChange,
+// withdrawJobChange,resumeJob}.ts so the "tradesperson must accept" rule can't
+// be bypassed from the client.
+// ---------------------------------------------------------------------------
+
+export async function requestJobChange(
+  jobId: string,
+  type: "cancel" | "postpone",
+  reason: string,
+  proposedResumeAt?: Date | null,
+): Promise<{ ok: true }> {
+  const fn = httpsCallable<
+    { jobId: string; type: "cancel" | "postpone"; reason: string; proposedResumeAt: number | null },
+    { ok: true }
+  >(functions, "requestJobChange");
+  const res = await fn({
+    jobId,
+    type,
+    reason: reason.trim().slice(0, 1000),
+    proposedResumeAt: proposedResumeAt ? proposedResumeAt.getTime() : null,
+  });
+  return res.data;
+}
+
+export async function respondJobChange(jobId: string, accept: boolean): Promise<{ ok: true }> {
+  const fn = httpsCallable<{ jobId: string; accept: boolean }, { ok: true }>(
+    functions,
+    "respondJobChange",
+  );
+  const res = await fn({ jobId, accept });
+  return res.data;
+}
+
+export async function withdrawJobChange(jobId: string): Promise<{ ok: true }> {
+  const fn = httpsCallable<{ jobId: string }, { ok: true }>(functions, "withdrawJobChange");
+  const res = await fn({ jobId });
+  return res.data;
+}
+
+export async function resumeJob(jobId: string): Promise<{ ok: true }> {
+  const fn = httpsCallable<{ jobId: string }, { ok: true }>(functions, "resumeJob");
+  const res = await fn({ jobId });
+  return res.data;
 }
 
 export async function scheduleJob(id: string, start: Date, end: Date): Promise<void> {

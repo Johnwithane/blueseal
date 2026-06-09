@@ -44,6 +44,7 @@ const STATUSES: JobStatus[] = [
   "quoted",
   "awaiting_upfront_payment",
   "in_progress",
+  "on_hold",
   "awaiting_client_approval",
   "awaiting_payment",
   "complete",
@@ -65,6 +66,7 @@ const SECTION_LABEL: Record<JobStatus, { client: string; tradesperson: string }>
     tradesperson: "Awaiting upfront fee",
   },
   in_progress: { client: "In progress", tradesperson: "In progress" },
+  on_hold: { client: "On hold", tradesperson: "On hold" },
   awaiting_client_approval: {
     client: "Awaiting your approval",
     tradesperson: "Awaiting approval",
@@ -86,6 +88,7 @@ const SECTION_COLOR: Record<JobStatus, string> = {
   quoted: "var(--bs-status-quoted)",
   awaiting_upfront_payment: "var(--bs-status-awaiting_upfront_payment)",
   in_progress: "var(--bs-status-in_progress)",
+  on_hold: "var(--bs-status-on_hold)",
   awaiting_client_approval: "var(--bs-status-awaiting_client_approval)",
   awaiting_payment: "var(--bs-status-awaiting_payment)",
   complete: "var(--bs-status-complete)",
@@ -115,6 +118,7 @@ const counts = computed(() => {
     quoted: 0,
     awaiting_upfront_payment: 0,
     in_progress: 0,
+    on_hold: 0,
     awaiting_client_approval: 0,
     awaiting_payment: 0,
     complete: 0,
@@ -197,6 +201,18 @@ function openJob(id: string) {
   router.push({ name: "JobDetail", params: { id } });
 }
 
+// Surface an outstanding cancel/hold request on the card so it's visible from
+// the Jobs tab without opening the job. The tradesperson is the one who must
+// act ("Respond"); the client just sees their request is in flight ("Pending").
+function changeTag(
+  job: WithId<JobDoc>,
+): { label: string; severity: "danger" | "warn" } | null {
+  if (!job.pendingChange) return null;
+  return props.viewerRole === "tradesperson"
+    ? { label: "Respond", severity: "danger" }
+    : { label: "Pending", severity: "warn" };
+}
+
 function counterpartyName(job: WithId<JobDoc>): string | null | undefined {
   return props.viewerRole === "client" ? job.tradespersonName : job.clientName;
 }
@@ -275,6 +291,11 @@ function counterpartyPhoto(job: WithId<JobDoc>): string | null | undefined {
                 </div>
               </div>
               <div class="flex shrink-0 items-center gap-1.5">
+                <Tag
+                  v-if="changeTag(job)"
+                  :value="changeTag(job)!.label"
+                  :severity="changeTag(job)!.severity"
+                />
                 <Tag
                   :value="statusLabel(job.status, props.viewerRole)"
                   :severity="STATUS_SEVERITY[job.status]"

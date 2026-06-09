@@ -10,6 +10,7 @@ interface JobLike {
   scheduledEnd?: Timestamp | null;
   cancelledBy?: string | null;
   cancelledReason?: string | null;
+  pendingChange?: { type?: string } | null;
 }
 
 // User-facing status labels. Mirrors the picker in JobDetailView so the
@@ -20,6 +21,7 @@ const STATUS_LABEL: Record<string, string> = {
   quoted: "Quoted",
   awaiting_upfront_payment: "Awaiting upfront payment",
   in_progress: "In progress",
+  on_hold: "On hold",
   awaiting_client_approval: "Awaiting your approval",
   awaiting_payment: "Awaiting payment",
   complete: "Complete",
@@ -50,7 +52,12 @@ function isApprovalFlowTransition(before: string | undefined, after: string | un
     // clientMarkUpfrontFeePaid). Generic line would just double up.
     pair === "quoted->awaiting_upfront_payment" ||
     pair === "awaiting_upfront_payment->in_progress" ||
-    pair === "awaiting_upfront_payment->cancelled"
+    pair === "awaiting_upfront_payment->cancelled" ||
+    // On-hold flow — respondJobChange (postpone accept) and resumeJob post
+    // their own "on hold" / "resumed" lines, so any transition into or out of
+    // on_hold is callable-owned.
+    before === "on_hold" ||
+    after === "on_hold"
   );
 }
 
@@ -103,6 +110,9 @@ export const onJobUpdated = onDocumentUpdated("jobs/{jobId}", async (event) => {
   // Cancellation gets a richer line that includes the reason.
   if (statusChanged && after.status === "cancelled") {
     if (after.cancelledBy === "system") return;
+    // Accepted cancel-request: respondJobChange posts its own "Job cancelled"
+    // line. Defer so the chat doesn't show it twice.
+    if (before.pendingChange?.type === "cancel" && !after.pendingChange) return;
     const reason = (after.cancelledReason ?? "").trim();
     const tail = reason ? ` — "${reason}"` : "";
     await postSystemMessage(chatId, `Job cancelled${tail}`);

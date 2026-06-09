@@ -471,7 +471,14 @@ const faqs: FaqItem[] = [
   {
     question: "Can I cancel a request or job?",
     answer:
-      "Yes — before work starts you can cancel from the job thread. If a quote has already been accepted or work has begun, talk to your tradesperson in the thread so any costs already incurred are settled fairly.",
+      "Yes. Before you've accepted a quote, you can cancel a request instantly from the job thread. Once a quote is accepted or work is under way, cancelling sends your tradesperson a request to accept first — that way any costs already incurred get settled fairly. You can add a reason, and you can withdraw the request while it's still pending.",
+    categoryId: "for-clients",
+    audience: "client",
+  },
+  {
+    question: "Can I put a job on hold instead of cancelling?",
+    answer:
+      "Yes. On an active job you can ask to **put it on hold** from the Schedule tab — handy if you're waiting on a part, away for a while, or sorting out access. You can suggest a resume date, and your tradesperson accepts the hold. While a job is on hold, either of you can resume it any time and it picks up right where it left off.",
     categoryId: "for-clients",
     audience: "client",
   },
@@ -530,6 +537,13 @@ const faqs: FaqItem[] = [
     question: "Can I track my time and expenses on a job?",
     answer:
       "Yes. You can clock time against a job and add expenses (including receipts), so the invoice reflects the real work — no separate spreadsheet needed.",
+    categoryId: "for-tradespeople",
+    audience: "tradesperson",
+  },
+  {
+    question: "A client asked to cancel or pause a job — what happens?",
+    answer:
+      "Once you're committed to a job (the client has accepted a quote or work is under way), the client can't cancel or pause it on their own — they send you a request instead. You'll get a notification and an **Accept / Decline** banner on the job. Accepting a cancellation closes the job; accepting a hold pauses it, and either of you can resume it later. Declining keeps the job going as normal.",
     categoryId: "for-tradespeople",
     audience: "tradesperson",
   },

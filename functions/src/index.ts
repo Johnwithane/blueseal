@@ -59,6 +59,11 @@ export { clientAcceptQuote } from "./jobs/clientAcceptQuote";
 export { clientDeclineQuote } from "./jobs/clientDeclineQuote";
 export { markUpfrontFeePaid } from "./jobs/markUpfrontFeePaid";
 export { clientMarkUpfrontFeePaid } from "./jobs/clientMarkUpfrontFeePaid";
+// Client cancel/postpone request loop (tradesperson must accept once committed).
+export { requestJobChange } from "./jobs/requestJobChange";
+export { respondJobChange } from "./jobs/respondJobChange";
+export { withdrawJobChange } from "./jobs/withdrawJobChange";
+export { resumeJob } from "./jobs/resumeJob";
 
 // Invoicing
 export { onJobCompleted } from "./invoicing/onJobCompleted";

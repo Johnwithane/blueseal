@@ -50,7 +50,14 @@ export type NotificationType =
   | "new_job_posting"
   // Fires to the requesting client when a seeded prospect they asked for signs
   // up and their held lead converts into a real job.
-  | "prospect_claimed";
+  | "prospect_claimed"
+  // Client cancel/postpone request loop (requestJobChange / respondJobChange /
+  // withdrawJobChange / resumeJob). Kept in sync with src/firebase/interfaces.ts.
+  | "job_change_requested"
+  | "job_change_accepted"
+  | "job_change_declined"
+  | "job_change_withdrawn"
+  | "job_resumed";
 
 /**
  * Channel routing per notification.

@@ -67,6 +67,12 @@ describe("resolveNotificationLink", () => {
   it("leaves job-detail links for non-routed types alone", () => {
     expect(resolveNotificationLink(linkFor("job_cancelled", "/jobs/abc"))).toBe("/jobs/abc");
     expect(resolveNotificationLink(linkFor("job_requested", "/jobs/abc"))).toBe("/jobs/abc");
+    // Cancel/hold request loop: land on the job detail (the banner lives there),
+    // no special tab/modal query.
+    expect(resolveNotificationLink(linkFor("job_change_requested", "/jobs/abc"))).toBe(
+      "/jobs/abc",
+    );
+    expect(resolveNotificationLink(linkFor("job_resumed", "/jobs/abc"))).toBe("/jobs/abc");
   });
 
   it("appends ?tab=invoice&review=1 for mutual-review notifications", () => {

@@ -28,6 +28,7 @@ const columns: Column[] = [
   { key: "quoted", label: "Quoted", color: "var(--bs-status-quoted)" },
   { key: "awaiting_upfront_payment", label: "Awaiting upfront", color: "var(--bs-status-awaiting_upfront_payment)" },
   { key: "in_progress", label: "In progress", color: "var(--bs-status-in_progress)" },
+  { key: "on_hold", label: "On hold", color: "var(--bs-status-on_hold)" },
   { key: "awaiting_client_approval", label: "Awaiting approval", color: "var(--bs-status-awaiting_client_approval)" },
   { key: "awaiting_payment", label: "Awaiting payment", color: "var(--bs-status-awaiting_payment)" },
   { key: "complete", label: "Complete", color: "var(--bs-status-complete)" },

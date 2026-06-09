@@ -60,6 +60,7 @@
   --bs-status-quoted: #f59e0b;
   --bs-status-awaiting_upfront_payment: #d97706;
   --bs-status-in_progress: #0d47a1;
+  --bs-status-on_hold: #b45309;
   --bs-status-awaiting_client_approval: #f97316;
   --bs-status-awaiting_payment: #7c3aed;
   --bs-status-complete: #10b981;

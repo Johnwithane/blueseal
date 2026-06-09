@@ -355,6 +355,32 @@ service cloud.firestore {
           || isAdmin()
           || request.resource.data.get('tradespersonArchivedAt', null)
               == resource.data.get('tradespersonArchivedAt', null)
+        )
+        // pendingChange + statusBeforeHold are server-managed: only the
+        // request/respond/withdraw/resume callables (admin SDK, which bypasses
+        // rules) may write them. A party writing them directly would let the
+        // client fake/self-accept a cancel-or-hold request. `.get(field, null)`
+        // defaults so legacy docs (no field) don't lock every update out.
+        && (isAdmin()
+            || request.resource.data.get('pendingChange', null)
+                == resource.data.get('pendingChange', null))
+        && (isAdmin()
+            || request.resource.data.get('statusBeforeHold', null)
+                == resource.data.get('statusBeforeHold', null))
+        // Direct (non-admin) status writes are limited to the two pre-commitment
+        // client paths: marketplace intake advance (accepted→requested) and the
+        // instant pre-commitment cancel (cancelJob, only from accepted/requested/
+        // quoted). Everything money- or acceptance-gated — cancelling a committed
+        // job, going on_hold, resuming — must go through the callables. This is
+        // the rules-side enforcement of "the tradesperson must accept once work
+        // is committed" and mirrors the QA_SECURITY_AUDIT.md status-table note.
+        && (
+          isAdmin()
+          || request.resource.data.status == resource.data.status
+          || (resource.data.status == 'accepted'
+              && request.resource.data.status == 'requested')
+          || (request.resource.data.status == 'cancelled'
+              && resource.data.status in ['accepted', 'requested', 'quoted'])
         );
       allow delete: if isAdmin();
 

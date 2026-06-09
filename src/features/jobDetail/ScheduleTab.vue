@@ -1,16 +1,23 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import Button from "primevue/button";
 import DatePicker from "primevue/datepicker";
 import TimeTrackerCard from "@/components/TimeTrackerCard.vue";
 import type { JobDoc, WithId } from "@/firebase/interfaces";
 import { useFormatters } from "@/composables/useFormatters";
 
-defineProps<{
+const props = defineProps<{
   job: WithId<JobDoc>;
   isClient: boolean;
   isTradie: boolean;
   savingSchedule: boolean;
-  canClientCancel: boolean;
+  // Pre-commitment instant cancel (cancelJob). Mutually exclusive with the
+  // request flow below — a job is in exactly one of these phases.
+  canInstantCancel: boolean;
+  // Committed-job cancel: sends a request the tradesperson must accept.
+  canRequestCancel: boolean;
+  // Committed-job postpone (put on hold): also a request.
+  canRequestPostpone: boolean;
 }>();
 
 const scheduledStart = defineModel<Date | null>("scheduledStart", { required: true });
@@ -19,7 +26,12 @@ const scheduledEnd = defineModel<Date | null>("scheduledEnd", { required: true }
 const emit = defineEmits<{
   "save-schedule": [];
   "open-cancel-dialog": [];
+  "open-postpone-dialog": [];
 }>();
+
+const showChangeCard = computed(
+  () => props.canInstantCancel || props.canRequestCancel || props.canRequestPostpone,
+);
 
 const { dateTime } = useFormatters();
 </script>
@@ -120,22 +132,42 @@ const { dateTime } = useFormatters();
       :is-tradie="isTradie"
     />
 
-    <!-- Client-side cancel card — only shown while the job is in a
-         cancellable status (pre-work-start). -->
-    <div v-if="canClientCancel" class="bs-card p-3">
+    <!-- Client-side "change of plans" card. Before a quote is accepted the
+         client can cancel instantly; once the tradesperson is committed,
+         cancelling or pausing becomes a request they must accept. -->
+    <div v-if="showChangeCard" class="bs-card p-3">
       <h3 class="font-semibold text-sm mb-2">Change of plans?</h3>
-      <p class="text-xs text-[color:var(--bs-muted)] mb-2">
-        You can cancel until work starts. The tradesperson will be notified.
+      <p class="text-xs text-[color:var(--bs-muted)] mb-3">
+        <template v-if="canRequestCancel || canRequestPostpone">
+          The tradesperson is committed to this job, so cancelling or putting it
+          on hold sends them a request to accept first.
+        </template>
+        <template v-else>
+          You can cancel until work starts. The tradesperson will be notified.
+        </template>
       </p>
-      <Button
-        label="Cancel this job"
-        icon="pi pi-ban"
-        severity="danger"
-        outlined
-        size="small"
-        class="w-full"
-        @click="emit('open-cancel-dialog')"
-      />
+      <div class="flex flex-col gap-2">
+        <Button
+          v-if="canRequestPostpone"
+          label="Put job on hold"
+          icon="pi pi-pause"
+          severity="secondary"
+          outlined
+          size="small"
+          class="w-full"
+          @click="emit('open-postpone-dialog')"
+        />
+        <Button
+          v-if="canInstantCancel || canRequestCancel"
+          :label="canRequestCancel ? 'Request cancellation' : 'Cancel this job'"
+          icon="pi pi-ban"
+          severity="danger"
+          outlined
+          size="small"
+          class="w-full"
+          @click="emit('open-cancel-dialog')"
+        />
+      </div>
     </div>
   </div>
 </template>

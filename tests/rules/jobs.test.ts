@@ -126,3 +126,90 @@ describe("jobs archive — per-party gate", () => {
     );
   });
 });
+
+// Status-transition + change-request gate. The client may only flip status
+// directly via the two pre-commitment paths (intake advance, instant cancel);
+// everything acceptance-gated (committed cancel, on_hold, resume) must go
+// through the callables, which run as admin and bypass rules. pendingChange /
+// statusBeforeHold are server-managed and parties cannot touch them.
+// NB ([[project_firestore_list_rule_pattern]]): these run as a NON-admin
+// client/tradesperson — the dev account is admin and would mask the gate.
+describe("jobs status-transition + change-request gate", () => {
+  const client = () => env.authenticatedContext(CLIENT_UID, CLIENT_CLAIMS).firestore();
+  const tradie = () => env.authenticatedContext(TRADIE_UID, TRADIE_CLAIMS).firestore();
+  const admin = () => env.authenticatedContext(ADMIN_UID, ADMIN_CLAIMS).firestore();
+
+  it("client CAN instant-cancel a pre-commitment job (requested → cancelled)", async () => {
+    await seedJob({ status: "requested" });
+    await assertSucceeds(
+      updateDoc(doc(client(), "jobs", JOB_ID), {
+        status: "cancelled",
+        cancelledAt: serverTimestamp(),
+        cancelledReason: "changed my mind",
+        cancelledBy: CLIENT_UID,
+      }),
+    );
+  });
+
+  it("client CAN advance marketplace intake (accepted → requested)", async () => {
+    await seedJob({ status: "accepted" });
+    await assertSucceeds(
+      updateDoc(doc(client(), "jobs", JOB_ID), { status: "requested", intakeFormData: {} }),
+    );
+  });
+
+  it("client CANNOT directly cancel a committed job (in_progress → cancelled)", async () => {
+    await seedJob({ status: "in_progress" });
+    await assertFails(
+      updateDoc(doc(client(), "jobs", JOB_ID), {
+        status: "cancelled",
+        cancelledAt: serverTimestamp(),
+        cancelledReason: "nope",
+        cancelledBy: CLIENT_UID,
+      }),
+    );
+  });
+
+  it("client CANNOT put a job on hold directly", async () => {
+    await seedJob({ status: "in_progress" });
+    await assertFails(
+      updateDoc(doc(client(), "jobs", JOB_ID), {
+        status: "on_hold",
+        statusBeforeHold: "in_progress",
+      }),
+    );
+  });
+
+  it("client CANNOT write pendingChange directly", async () => {
+    await seedJob({ status: "in_progress" });
+    await assertFails(
+      updateDoc(doc(client(), "jobs", JOB_ID), {
+        pendingChange: { type: "cancel", requestedBy: CLIENT_UID, reason: "x" },
+      }),
+    );
+  });
+
+  it("tradesperson CANNOT set on_hold + statusBeforeHold directly", async () => {
+    await seedJob({ status: "in_progress" });
+    await assertFails(
+      updateDoc(doc(tradie(), "jobs", JOB_ID), {
+        status: "on_hold",
+        statusBeforeHold: "in_progress",
+      }),
+    );
+  });
+
+  it("admin CAN apply a hold (status + statusBeforeHold + clear pendingChange)", async () => {
+    await seedJob({
+      status: "in_progress",
+      pendingChange: { type: "postpone", requestedBy: CLIENT_UID, reason: "vacation" },
+    });
+    await assertSucceeds(
+      updateDoc(doc(admin(), "jobs", JOB_ID), {
+        status: "on_hold",
+        statusBeforeHold: "in_progress",
+        pendingChange: null,
+      }),
+    );
+  });
+});

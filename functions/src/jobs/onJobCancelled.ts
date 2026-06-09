@@ -9,6 +9,7 @@ interface JobLike {
   status?: string;
   cancelledBy?: string | null;
   cancelledReason?: string | null;
+  pendingChange?: { type?: string } | null;
 }
 
 /**
@@ -28,6 +29,11 @@ export const onJobCancelled = onDocumentUpdated("jobs/{jobId}", async (event) =>
     // returnToApplicants already fired application_returned — don't double-notify.
     return;
   }
+  // Cancellation that came from an accepted client request: respondJobChange
+  // already notified the client (the right recipient). This trigger would
+  // notify the opposite party of cancelledBy — i.e. the tradesperson who just
+  // accepted — which is redundant. The cleared pendingChange is the signal.
+  if (before.pendingChange?.type === "cancel" && !after.pendingChange) return;
 
   const jobId = event.params.jobId;
   const { clientId, tradespersonId, title, cancelledBy, cancelledReason } = after;

@@ -5,10 +5,14 @@ import Button from "primevue/button";
 import Tag from "primevue/tag";
 import Textarea from "primevue/textarea";
 import Dialog from "primevue/dialog";
+import DatePicker from "primevue/datepicker";
 import Avatar from "primevue/avatar";
 import {
-  CANCELLABLE_STATUSES,
+  INSTANT_CANCEL_STATUSES,
+  REQUEST_CANCEL_STATUSES,
+  POSTPONABLE_STATUSES,
   cancelJob,
+  requestJobChange,
   subscribeJob,
   getJobPrivateNotes,
   markJobPaid,
@@ -40,6 +44,7 @@ import ClientQuoteApprovalBanner from "@/components/ClientQuoteApprovalBanner.vu
 import UpfrontFeePaymentBanner from "@/components/UpfrontFeePaymentBanner.vue";
 import TradieChangesRequestedBanner from "@/components/TradieChangesRequestedBanner.vue";
 import MutualReviewCard from "@/components/MutualReviewCard.vue";
+import JobChangeBanner from "@/components/JobChangeBanner.vue";
 import { SEED_INTAKE_SCHEMAS } from "@/data/intakeSchemas";
 import { firstMissingRequired } from "@/utils/intake";
 import { getIntakeSchema } from "@/firebase/services/intakeFormSchemas";
@@ -137,6 +142,13 @@ const showCancelDialog = ref(false);
 const cancelReason = ref("");
 const cancelling = ref(false);
 
+// Postpone (put-on-hold) request dialog. Reason is required (so the
+// tradesperson understands why); the resume date is an optional hint.
+const showPostponeDialog = ref(false);
+const postponeReason = ref("");
+const postponeResumeDate = ref<Date | null>(null);
+const postponing = ref(false);
+
 const collisions = ref<Collision[]>([]);
 const showCollisionDialog = ref(false);
 const savingSchedule = ref(false);
@@ -214,12 +226,39 @@ const counterpartyInitials = computed(() => {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 });
 
-const canClientCancel = computed(
+// Client "change of plans" capabilities. Mutually exclusive across the
+// pre-commitment vs committed phases, and all suppressed once a request is
+// already in flight (the JobChangeBanner takes over). `on_hold` is in none of
+// the status sets, so a held job offers only Resume (via the banner).
+const hasPendingChange = computed(() => job.value?.pendingChange != null);
+
+const canInstantCancel = computed(
   () =>
     isClient.value &&
+    !hasPendingChange.value &&
     job.value != null &&
-    (CANCELLABLE_STATUSES as readonly string[]).includes(job.value.status),
+    (INSTANT_CANCEL_STATUSES as readonly string[]).includes(job.value.status),
 );
+
+const canRequestCancel = computed(
+  () =>
+    isClient.value &&
+    !hasPendingChange.value &&
+    job.value != null &&
+    (REQUEST_CANCEL_STATUSES as readonly string[]).includes(job.value.status),
+);
+
+const canRequestPostpone = computed(
+  () =>
+    isClient.value &&
+    !hasPendingChange.value &&
+    job.value != null &&
+    (POSTPONABLE_STATUSES as readonly string[]).includes(job.value.status),
+);
+
+// True when the open cancel dialog is for a committed job — copy + action
+// switch from an instant cancel to a "send a request" flow.
+const cancelNeedsApproval = computed(() => canRequestCancel.value);
 
 const now = Date.now();
 const tradieInsuranceLive = computed(() => {
@@ -712,14 +751,46 @@ async function confirmCancel() {
   }
   cancelling.value = true;
   try {
-    await cancelJob(job.value.id, reason);
-    toast.success("Job cancelled", "The tradesperson has been notified.");
+    if (cancelNeedsApproval.value) {
+      // Committed job — this only stages a request the tradesperson accepts.
+      await requestJobChange(job.value.id, "cancel", reason);
+      toast.success("Cancellation requested", "The tradesperson has to accept it.");
+    } else {
+      await cancelJob(job.value.id, reason);
+      toast.success("Job cancelled", "The tradesperson has been notified.");
+    }
     showCancelDialog.value = false;
     await load();
   } catch (e) {
     toast.error("Couldn't cancel", humanizeError(e));
   } finally {
     cancelling.value = false;
+  }
+}
+
+function openPostponeDialog() {
+  postponeReason.value = "";
+  postponeResumeDate.value = null;
+  showPostponeDialog.value = true;
+}
+
+async function confirmPostpone() {
+  if (!job.value || postponing.value) return;
+  const reason = postponeReason.value.trim();
+  if (!reason) {
+    toast.error("Please add a reason so the tradesperson knows why.");
+    return;
+  }
+  postponing.value = true;
+  try {
+    await requestJobChange(job.value.id, "postpone", reason, postponeResumeDate.value);
+    toast.success("Hold requested", "The tradesperson has to accept it.");
+    showPostponeDialog.value = false;
+    await load();
+  } catch (e) {
+    toast.error("Couldn't request hold", humanizeError(e));
+  } finally {
+    postponing.value = false;
   }
 }
 
@@ -912,6 +983,18 @@ function onReturnToApplicants() {
 
       <!-- Global banners — always above the tabs so the user can't miss them
            while browsing tab content. -->
+
+      <!-- Cancel/postpone request loop: respond (tradie), withdraw (client),
+           or resume a held job (either). Self-renders only when there's a
+           pending request or the job is on hold. -->
+      <JobChangeBanner
+        :job="job"
+        :is-client="isClient"
+        :is-tradie="isTradie"
+        class="mb-4"
+        @decided="load"
+      />
+
       <div
         v-if="job.status === 'accepted' && isClient"
         class="bs-card p-4 mb-4 border-l-4 border-l-[color:var(--bs-blue)]"
@@ -1043,9 +1126,12 @@ function onReturnToApplicants() {
           :is-client="isClient"
           :is-tradie="isTradie"
           :saving-schedule="savingSchedule"
-          :can-client-cancel="canClientCancel"
+          :can-instant-cancel="canInstantCancel"
+          :can-request-cancel="canRequestCancel"
+          :can-request-postpone="canRequestPostpone"
           @save-schedule="saveSchedule"
           @open-cancel-dialog="openCancelDialog"
+          @open-postpone-dialog="openPostponeDialog"
         />
         <InvoiceTab
           v-else-if="activeTab === 'invoice'"
@@ -1210,7 +1296,7 @@ function onReturnToApplicants() {
     <Dialog
       v-model:visible="showCancelDialog"
       modal
-      header="Cancel this job?"
+      :header="cancelNeedsApproval ? 'Request cancellation?' : 'Cancel this job?'"
       :style="{ width: '28rem', maxWidth: '92vw' }"
     >
       <!-- Upfront fee warning. Refunds aren't tracked in the data model
@@ -1228,7 +1314,13 @@ function onReturnToApplicants() {
         coordinate that with the {{ isClient ? "tradesperson" : "client" }} before cancelling.
       </div>
       <p class="text-sm text-[color:var(--bs-text)] mb-3">
-        Tell the tradesperson what changed. They'll see this in their inbox.
+        <template v-if="cancelNeedsApproval">
+          The tradesperson is committed to this job, so this sends them a request
+          to accept. Tell them what changed — they'll see it in their inbox.
+        </template>
+        <template v-else>
+          Tell the tradesperson what changed. They'll see this in their inbox.
+        </template>
       </p>
       <Textarea
         v-model="cancelReason"
@@ -1241,11 +1333,53 @@ function onReturnToApplicants() {
       <template #footer>
         <Button label="Keep job" text @click="showCancelDialog = false" />
         <Button
-          label="Cancel job"
+          :label="cancelNeedsApproval ? 'Send request' : 'Cancel job'"
           icon="pi pi-ban"
           severity="danger"
           :loading="cancelling"
           @click="confirmCancel"
+        />
+      </template>
+    </Dialog>
+
+    <Dialog
+      v-model:visible="showPostponeDialog"
+      modal
+      header="Put this job on hold?"
+      :style="{ width: '28rem', maxWidth: '92vw' }"
+    >
+      <p class="text-sm text-[color:var(--bs-text)] mb-3">
+        This sends the tradesperson a request to pause the job. Once they accept,
+        either of you can resume it any time.
+      </p>
+      <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">Reason</label>
+      <Textarea
+        v-model="postponeReason"
+        rows="3"
+        class="w-full"
+        placeholder="e.g. waiting on a part, away for two weeks, sorting out access…"
+        :maxlength="1000"
+        autofocus
+      />
+      <label class="block text-[11px] text-[color:var(--bs-muted)] mt-3 mb-1">
+        Proposed resume date (optional)
+      </label>
+      <DatePicker
+        v-model="postponeResumeDate"
+        class="w-full"
+        date-format="D, M d, yy"
+        placeholder="Pick a date"
+        show-button-bar
+        :min-date="new Date()"
+      />
+      <template #footer>
+        <Button label="Never mind" text @click="showPostponeDialog = false" />
+        <Button
+          label="Send request"
+          icon="pi pi-pause"
+          severity="warn"
+          :loading="postponing"
+          @click="confirmPostpone"
         />
       </template>
     </Dialog>

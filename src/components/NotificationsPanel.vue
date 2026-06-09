@@ -50,6 +50,11 @@ const ICON: Record<NotificationType, string> = {
   recommendation_accepted: "pi pi-thumbs-up",
   new_job_posting: "pi pi-briefcase",
   prospect_claimed: "pi pi-user-plus",
+  job_change_requested: "pi pi-pause",
+  job_change_accepted: "pi pi-check-circle",
+  job_change_declined: "pi pi-times-circle",
+  job_change_withdrawn: "pi pi-undo",
+  job_resumed: "pi pi-play",
 };
 
 function iconFor(type: NotificationType): string {
