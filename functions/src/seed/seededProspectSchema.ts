@@ -76,6 +76,41 @@ export const TRADE_KEYS = [
   "junk_removal",
   "moving",
   "home_inspection",
+  // Automotive & vehicle (Red Seal)
+  "auto_service",
+  "auto_body",
+  "auto_refinishing",
+  "truck_transport_mechanic",
+  "transport_trailer_tech",
+  "heavy_duty_mechanic",
+  "ag_equipment_tech",
+  "motorcycle_tech",
+  "rv_tech",
+  // Industrial, metal & machining (Red Seal)
+  "millwright",
+  "machinist",
+  "tool_and_die",
+  "metal_fabricator",
+  "sheet_metal",
+  "boilermaker",
+  "ironworker",
+  "instrumentation_tech",
+  "parts_technician",
+  // Industrial mechanical, electrical & process (Red Seal)
+  "industrial_electrician",
+  "powerline_tech",
+  "steamfitter",
+  "sprinkler_fitter",
+  "oil_heat_tech",
+  // Construction & site operations (Red Seal)
+  "heavy_equipment_operator",
+  "crane_operator",
+  "construction_labourer",
+  "lather",
+  // Personal & food services (Red Seal)
+  "baker",
+  "cook",
+  "hairstylist",
 ] as const;
 
 const tradeKey = z.enum(TRADE_KEYS);

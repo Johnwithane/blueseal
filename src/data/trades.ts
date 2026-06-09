@@ -90,6 +90,48 @@ export const TRADES: TradeOption[] = [
   { key: "junk_removal", label: "Junk Removal / Hauling", icon: "pi pi-trash" },
   { key: "moving", label: "Moving Services", icon: "pi pi-truck" },
   { key: "home_inspection", label: "Home Inspector", icon: "pi pi-verified" },
+
+  // ── Automotive & vehicle ────────────────────────────────────────────────
+  // Red Seal trades. Less common on a home job board, but Blue Seal verifies
+  // the certified tradesperson — so they belong in the canonical roster.
+  { key: "auto_service", label: "Automotive Service Tech", icon: "pi pi-car" },
+  { key: "auto_body", label: "Auto Body & Collision", icon: "pi pi-car" },
+  { key: "auto_refinishing", label: "Automotive Refinishing", icon: "pi pi-palette" },
+  { key: "truck_transport_mechanic", label: "Truck & Transport Mechanic", icon: "pi pi-truck" },
+  { key: "transport_trailer_tech", label: "Transport Trailer Tech", icon: "pi pi-truck" },
+  { key: "heavy_duty_mechanic", label: "Heavy Duty Equipment Tech", icon: "pi pi-truck" },
+  { key: "ag_equipment_tech", label: "Agricultural Equipment Tech", icon: "pi pi-truck" },
+  { key: "motorcycle_tech", label: "Motorcycle Tech", icon: "pi pi-cog" },
+  { key: "rv_tech", label: "RV Service Tech", icon: "pi pi-truck" },
+
+  // ── Industrial, metal & machining ───────────────────────────────────────
+  { key: "millwright", label: "Millwright (Industrial Mechanic)", icon: "pi pi-cog" },
+  { key: "machinist", label: "Machinist", icon: "pi pi-cog" },
+  { key: "tool_and_die", label: "Tool & Die Maker", icon: "pi pi-cog" },
+  { key: "metal_fabricator", label: "Metal Fabricator (Fitter)", icon: "pi pi-box" },
+  { key: "sheet_metal", label: "Sheet Metal Worker", icon: "pi pi-clone" },
+  { key: "boilermaker", label: "Boilermaker", icon: "pi pi-box" },
+  { key: "ironworker", label: "Ironworker", icon: "pi pi-th-large" },
+  { key: "instrumentation_tech", label: "Instrumentation & Control Tech", icon: "pi pi-gauge" },
+  { key: "parts_technician", label: "Parts Technician", icon: "pi pi-warehouse" },
+
+  // ── Industrial mechanical, electrical & process ─────────────────────────
+  { key: "industrial_electrician", label: "Industrial Electrician", icon: "pi pi-bolt" },
+  { key: "powerline_tech", label: "Powerline Technician", icon: "pi pi-bolt" },
+  { key: "steamfitter", label: "Steamfitter / Pipefitter", icon: "pi pi-wrench" },
+  { key: "sprinkler_fitter", label: "Fire Sprinkler Fitter", icon: "pi pi-shield" },
+  { key: "oil_heat_tech", label: "Oil Heat System Tech", icon: "pi pi-sun" },
+
+  // ── Construction & site operations ──────────────────────────────────────
+  { key: "heavy_equipment_operator", label: "Heavy Equipment Operator", icon: "pi pi-truck" },
+  { key: "crane_operator", label: "Crane Operator", icon: "pi pi-truck" },
+  { key: "construction_labourer", label: "Construction Craft Worker", icon: "pi pi-users" },
+  { key: "lather", label: "Lather / Interior Systems", icon: "pi pi-th-large" },
+
+  // ── Personal & food services ────────────────────────────────────────────
+  { key: "baker", label: "Baker", icon: "pi pi-shopping-bag" },
+  { key: "cook", label: "Cook / Chef", icon: "pi pi-shopping-cart" },
+  { key: "hairstylist", label: "Hairstylist", icon: "pi pi-user" },
 ];
 
 export function tradeLabel(key: string): string {

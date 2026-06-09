@@ -91,6 +91,115 @@ export const CERT_PRESETS_BY_TRADE: Record<string, CertPreset[]> = {
     { label: "WHMIS 2015 training", name: "WHMIS 2015 training" },
     { label: "Bonded & insured (general liability)", name: "Bonded & insured — general liability" },
   ],
+
+  // ── Automotive & vehicle (Red Seal) ───────────────────────────────────────
+  auto_service: [
+    { label: "Red Seal — Automotive Service Technician", name: "Red Seal — Automotive Service Technician", defaultIssuer: "Red Seal Program" },
+    { label: "Provincial Automotive Service Technician CofQ", name: "Automotive Service Technician — Certificate of Qualification" },
+  ],
+  auto_body: [
+    { label: "Red Seal — Auto Body and Collision Technician", name: "Red Seal — Auto Body and Collision Technician", defaultIssuer: "Red Seal Program" },
+  ],
+  auto_refinishing: [
+    { label: "Red Seal — Automotive Refinishing Technician", name: "Red Seal — Automotive Refinishing Technician", defaultIssuer: "Red Seal Program" },
+  ],
+  truck_transport_mechanic: [
+    { label: "Red Seal — Truck and Transport Mechanic", name: "Red Seal — Truck and Transport Mechanic", defaultIssuer: "Red Seal Program" },
+  ],
+  transport_trailer_tech: [
+    { label: "Red Seal — Transport Trailer Technician", name: "Red Seal — Transport Trailer Technician", defaultIssuer: "Red Seal Program" },
+  ],
+  heavy_duty_mechanic: [
+    { label: "Red Seal — Heavy Duty Equipment Technician", name: "Red Seal — Heavy Duty Equipment Technician", defaultIssuer: "Red Seal Program" },
+  ],
+  ag_equipment_tech: [
+    { label: "Red Seal — Agricultural Equipment Technician", name: "Red Seal — Agricultural Equipment Technician", defaultIssuer: "Red Seal Program" },
+  ],
+  motorcycle_tech: [
+    { label: "Red Seal — Motorcycle Technician", name: "Red Seal — Motorcycle Technician", defaultIssuer: "Red Seal Program" },
+  ],
+  rv_tech: [
+    { label: "Red Seal — Recreation Vehicle Service Technician", name: "Red Seal — Recreation Vehicle Service Technician", defaultIssuer: "Red Seal Program" },
+  ],
+
+  // ── Industrial, metal & machining (Red Seal) ──────────────────────────────
+  millwright: [
+    { label: "Red Seal — Industrial Mechanic (Millwright)", name: "Red Seal — Industrial Mechanic (Millwright)", defaultIssuer: "Red Seal Program" },
+  ],
+  machinist: [
+    { label: "Red Seal — Machinist", name: "Red Seal — Machinist", defaultIssuer: "Red Seal Program" },
+  ],
+  tool_and_die: [
+    { label: "Red Seal — Tool and Die Maker", name: "Red Seal — Tool and Die Maker", defaultIssuer: "Red Seal Program" },
+  ],
+  metal_fabricator: [
+    { label: "Red Seal — Metal Fabricator (Fitter)", name: "Red Seal — Metal Fabricator (Fitter)", defaultIssuer: "Red Seal Program" },
+  ],
+  sheet_metal: [
+    { label: "Red Seal — Sheet Metal Worker", name: "Red Seal — Sheet Metal Worker", defaultIssuer: "Red Seal Program" },
+  ],
+  boilermaker: [
+    { label: "Red Seal — Boilermaker", name: "Red Seal — Boilermaker", defaultIssuer: "Red Seal Program" },
+  ],
+  ironworker: [
+    { label: "Red Seal — Ironworker (Generalist)", name: "Red Seal — Ironworker (Generalist)", defaultIssuer: "Red Seal Program" },
+    { label: "Red Seal — Ironworker (Reinforcing)", name: "Red Seal — Ironworker (Reinforcing)", defaultIssuer: "Red Seal Program" },
+    { label: "Red Seal — Ironworker (Structural/Ornamental)", name: "Red Seal — Ironworker (Structural/Ornamental)", defaultIssuer: "Red Seal Program" },
+  ],
+  instrumentation_tech: [
+    { label: "Red Seal — Instrumentation and Control Technician", name: "Red Seal — Instrumentation and Control Technician", defaultIssuer: "Red Seal Program" },
+  ],
+  parts_technician: [
+    { label: "Red Seal — Parts Technician", name: "Red Seal — Parts Technician", defaultIssuer: "Red Seal Program" },
+  ],
+
+  // ── Industrial mechanical, electrical & process (Red Seal) ────────────────
+  industrial_electrician: [
+    { label: "Red Seal — Industrial Electrician (442A)", name: "Red Seal — Industrial Electrician (442A)", defaultIssuer: "Red Seal Program" },
+    { label: "FSR — Field Safety Representative (BC)", name: "FSR — Field Safety Representative", defaultIssuer: "Technical Safety BC" },
+  ],
+  powerline_tech: [
+    { label: "Red Seal — Powerline Technician", name: "Red Seal — Powerline Technician", defaultIssuer: "Red Seal Program" },
+  ],
+  steamfitter: [
+    { label: "Red Seal — Steamfitter/Pipefitter", name: "Red Seal — Steamfitter/Pipefitter", defaultIssuer: "Red Seal Program" },
+  ],
+  sprinkler_fitter: [
+    { label: "Red Seal — Sprinkler Fitter", name: "Red Seal — Sprinkler Fitter", defaultIssuer: "Red Seal Program" },
+  ],
+  oil_heat_tech: [
+    { label: "Red Seal — Oil Heat System Technician", name: "Red Seal — Oil Heat System Technician", defaultIssuer: "Red Seal Program" },
+  ],
+
+  // ── Construction & site operations (Red Seal) ─────────────────────────────
+  heavy_equipment_operator: [
+    { label: "Red Seal — Heavy Equipment Operator (Excavator)", name: "Red Seal — Heavy Equipment Operator (Excavator)", defaultIssuer: "Red Seal Program" },
+    { label: "Red Seal — Heavy Equipment Operator (Dozer)", name: "Red Seal — Heavy Equipment Operator (Dozer)", defaultIssuer: "Red Seal Program" },
+    { label: "Red Seal — Heavy Equipment Operator (Tractor-Loader-Backhoe)", name: "Red Seal — Heavy Equipment Operator (Tractor-Loader-Backhoe)", defaultIssuer: "Red Seal Program" },
+  ],
+  crane_operator: [
+    { label: "Red Seal — Mobile Crane Operator", name: "Red Seal — Mobile Crane Operator", defaultIssuer: "Red Seal Program" },
+    { label: "Red Seal — Tower Crane Operator", name: "Red Seal — Tower Crane Operator", defaultIssuer: "Red Seal Program" },
+  ],
+  construction_labourer: [
+    { label: "Red Seal — Construction Craft Worker", name: "Red Seal — Construction Craft Worker", defaultIssuer: "Red Seal Program" },
+  ],
+  lather: [
+    { label: "Red Seal — Lather (Interior Systems Mechanic)", name: "Red Seal — Lather (Interior Systems Mechanic)", defaultIssuer: "Red Seal Program" },
+  ],
+
+  // ── Personal & food services (Red Seal) ───────────────────────────────────
+  baker: [
+    { label: "Red Seal — Baker", name: "Red Seal — Baker", defaultIssuer: "Red Seal Program" },
+  ],
+  cook: [
+    { label: "Red Seal — Cook", name: "Red Seal — Cook", defaultIssuer: "Red Seal Program" },
+    { label: "Food Handler Certificate", name: "Food Handler Certificate" },
+  ],
+  hairstylist: [
+    { label: "Red Seal — Hairstylist", name: "Red Seal — Hairstylist", defaultIssuer: "Red Seal Program" },
+    { label: "Provincial Hairstylist licence", name: "Hairstylist — provincial licence / Certificate of Qualification" },
+  ],
 };
 
 /** Common Canadian issuing bodies, used as suggestions in the issuing-body select. */

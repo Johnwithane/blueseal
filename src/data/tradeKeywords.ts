@@ -519,6 +519,173 @@ export const TRADE_KEYWORDS: Record<string, string[]> = {
     "new home inspection", "building inspection", "foundation inspection",
     "thermal inspection", "wett inspection", "mould inspection",
   ],
+
+  // ── Automotive & vehicle ──────────────────────────────────────────────────
+  auto_service: [
+    "automotive", "auto repair", "car repair", "auto mechanic", "mechanic",
+    "car service", "vehicle repair", "brakes", "brake repair", "brake job",
+    "engine", "check engine", "engine light", "transmission", "oil change",
+    "tune up", "muffler", "exhaust", "alternator", "starter", "car wont start",
+    "suspension", "cv axle", "wheel alignment", "no start", "stalling",
+    "timing belt", "spark plugs", "coolant leak",
+  ],
+  auto_body: [
+    "auto body", "body shop", "collision", "collision repair", "car accident",
+    "auto collision", "dent", "dent repair", "car dent", "bodywork", "fender",
+    "bumper repair", "panel beating", "frame straightening", "rust repair car",
+    "hail damage car", "scratch repair car",
+  ],
+  auto_refinishing: [
+    "auto refinishing", "automotive refinishing", "car painting", "auto paint",
+    "automotive paint", "repaint car", "car respray", "respray", "clear coat",
+    "auto body paint", "vehicle paint", "paint correction", "colour match car",
+  ],
+  truck_transport_mechanic: [
+    "truck mechanic", "diesel mechanic", "diesel repair", "semi truck",
+    "transport truck", "big rig", "tractor trailer", "truck repair",
+    "fleet repair", "commercial truck", "truck and transport", "dpf",
+    "diesel engine", "truck brakes", "air brakes",
+  ],
+  transport_trailer_tech: [
+    "transport trailer", "trailer repair", "trailer technician", "trailer brakes",
+    "reefer trailer", "trailer service", "semi trailer", "trailer axle",
+    "trailer lights", "trailer wiring",
+  ],
+  heavy_duty_mechanic: [
+    "heavy duty mechanic", "heavy equipment repair", "heavy duty",
+    "equipment mechanic", "off road equipment", "heavy equipment technician",
+    "construction equipment repair", "hydraulics", "heavy machinery repair",
+    "excavator repair", "loader repair",
+  ],
+  ag_equipment_tech: [
+    "agricultural equipment", "farm equipment", "tractor repair", "farm machinery",
+    "combine", "tractor", "agricultural machinery", "farm equipment repair",
+    "implement repair", "baler repair",
+  ],
+  motorcycle_tech: [
+    "motorcycle", "motorbike", "motorcycle repair", "bike repair", "dirt bike",
+    "atv", "atv repair", "quad", "scooter repair", "motorcycle service",
+    "harley", "snowmobile repair",
+  ],
+  rv_tech: [
+    "rv repair", "rv service", "motorhome", "camper", "camper repair",
+    "travel trailer", "fifth wheel", "rv", "recreational vehicle",
+    "rv plumbing", "rv electrical", "slide out repair",
+  ],
+
+  // ── Industrial, metal & machining ─────────────────────────────────────────
+  millwright: [
+    "millwright", "industrial mechanic", "conveyor", "plant maintenance",
+    "pump repair", "gearbox", "bearing replacement", "shaft alignment",
+    "industrial machinery", "preventive maintenance", "machine install",
+    "vibration analysis",
+  ],
+  machinist: [
+    "machinist", "machine shop", "cnc", "cnc machining", "lathe", "milling",
+    "precision machining", "custom part", "metal part", "tooling",
+    "manual machining", "prototype part",
+  ],
+  tool_and_die: [
+    "tool and die", "die maker", "tooling", "stamping die", "injection mould",
+    "mold maker", "jig", "fixture", "die repair", "press tool", "custom die",
+  ],
+  metal_fabricator: [
+    "metal fabrication", "metal fabricator", "fabricate", "steel fabrication",
+    "custom metal", "metal fitting", "plate work", "structural fabrication",
+    "metal shop", "sheet steel", "fabrication shop",
+  ],
+  sheet_metal: [
+    "sheet metal", "ductwork fabrication", "metal ducting", "custom ductwork",
+    "flashing fabrication", "metal roofing panel", "hvac ductwork",
+    "tin smith", "metal cladding fabrication", "spiral duct",
+  ],
+  boilermaker: [
+    "boilermaker", "pressure vessel", "industrial boiler", "boiler fabrication",
+    "tank fabrication", "boiler tube", "vessel repair", "steam plant",
+    "industrial tank", "welded vessel",
+  ],
+  ironworker: [
+    "ironworker", "iron worker", "rebar", "reinforcing steel", "steel erection",
+    "steel beam", "beam install", "ornamental iron", "structural steel install",
+    "metal decking", "steel structure", "girder",
+  ],
+  instrumentation_tech: [
+    "instrumentation", "instrument technician", "control systems", "calibration",
+    "scada", "process control", "plc programming", "industrial controls",
+    "gauge calibration", "field instruments", "transmitter", "loop check",
+  ],
+  parts_technician: [
+    "parts technician", "auto parts", "parts counter", "parts department",
+    "oem parts", "spare parts", "parts lookup", "partsperson", "parts desk",
+    "inventory parts",
+  ],
+
+  // ── Industrial mechanical, electrical & process ───────────────────────────
+  industrial_electrician: [
+    "industrial electrician", "plant electrician", "3 phase", "three phase",
+    "motor control", "plc", "factory wiring", "industrial wiring",
+    "control panel", "conduit", "cable tray", "vfd", "motor wiring",
+    "switchgear",
+  ],
+  powerline_tech: [
+    "powerline", "power line", "hydro pole", "utility pole", "overhead lines",
+    "power line repair", "line technician", "transmission line",
+    "downed power line", "hydro line", "lineman", "power restoration",
+  ],
+  steamfitter: [
+    "steamfitter", "pipefitter", "pipe fitting", "process piping", "steam line",
+    "mechanical piping", "industrial piping", "hydronic piping", "welded pipe",
+    "boiler piping", "chilled water line", "pipe spool",
+  ],
+  sprinkler_fitter: [
+    "fire sprinkler", "sprinkler fitter", "fire suppression",
+    "fire suppression system", "standpipe", "fire protection", "deluge system",
+    "fire sprinkler system", "sprinkler inspection fire", "backflow fire",
+  ],
+  oil_heat_tech: [
+    "oil heat", "oil furnace", "oil heating", "heating oil", "oil burner",
+    "oil tank", "oil boiler", "furnace oil", "oil fired furnace",
+    "oil nozzle", "oil heat repair",
+  ],
+
+  // ── Construction & site operations ────────────────────────────────────────
+  heavy_equipment_operator: [
+    "heavy equipment operator", "excavator operator", "bulldozer", "dozer",
+    "backhoe", "skid steer", "bobcat operator", "loader operator", "grader",
+    "heavy machinery", "earthmoving operator", "tractor loader backhoe",
+    "equipment operator",
+  ],
+  crane_operator: [
+    "crane", "crane operator", "mobile crane", "tower crane", "crane rental",
+    "crane lift", "hoisting", "rigging", "boom truck", "picker truck",
+    "crane service", "lift plan",
+  ],
+  construction_labourer: [
+    "construction labourer", "general labourer", "construction helper",
+    "site labourer", "construction crew", "skilled labourer", "labour crew",
+    "site prep labour", "concrete labourer", "general labour",
+  ],
+  lather: [
+    "lather", "interior systems", "metal stud framing", "suspended ceiling",
+    "acoustic ceiling", "drop ceiling", "ceiling grid", "t bar ceiling",
+    "steel stud ceiling", "interior systems mechanic", "wall framing metal",
+  ],
+
+  // ── Personal & food services ──────────────────────────────────────────────
+  baker: [
+    "baker", "bakery", "bread", "pastry", "cake", "cakes", "custom cake",
+    "wedding cake", "baking", "dessert", "cupcakes", "pastry chef",
+  ],
+  cook: [
+    "cook", "chef", "private chef", "personal chef", "catering", "caterer",
+    "meal prep", "line cook", "prep cook", "dinner party chef", "menu planning",
+    "in home chef",
+  ],
+  hairstylist: [
+    "hairstylist", "hair stylist", "haircut", "hairdresser", "hair", "barber",
+    "hair colour", "highlights", "blowout", "updo", "mobile hairstylist",
+    "balayage",
+  ],
 };
 
 // ---------------------------------------------------------------------------
