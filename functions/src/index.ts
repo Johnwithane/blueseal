@@ -111,6 +111,7 @@ export { bulkImportProspects } from "./seed/bulkImportProspects";
 // sign-in), not a trigger trusting an attacker-writable email field.
 export { requestProspectOutreach } from "./prospects/requestProspectOutreach";
 export { suppressProspect } from "./prospects/suppressProspect";
+export { selfServeRemoveProspect } from "./prospects/selfServeRemoveProspect";
 export { claimProspect } from "./prospects/claimProspect";
 export { scheduledProspectExpiry } from "./prospects/scheduledProspectExpiry";
 

@@ -2,7 +2,7 @@
 // Search-result card for a seeded prospect. Deliberately the TradieCard layout
 // MINUS every trust element (ID/insurance/WSIB badges, rating, verified-trade
 // pills) — a seeded listing is unclaimed + unvetted, so the only status it
-// shows is a "Pending verification" tag. Prospects also have no photoURL, so
+// shows is an "Unclaimed" tag. Prospects also have no photoURL, so
 // the avatar is always the initial, in a muted (non-brand-blue) colour to read
 // as "not yet a member".
 import { computed } from "vue";
@@ -52,7 +52,7 @@ const avatarInitial = computed(() => {
           <span class="font-semibold truncate min-w-0 max-w-full">
             {{ props.prospect.displayName?.trim() || tradeLabel(props.prospect.trades[0]) }}
           </span>
-          <Tag value="Unverified" severity="warn" />
+          <Tag value="Unclaimed" severity="warn" />
         </div>
         <div class="text-xs text-[color:var(--bs-muted)] mt-0.5 break-words">
           {{ props.prospect.trades.map(tradeLabel).join(" • ") }}

@@ -122,6 +122,24 @@ export async function requestProspectOutreach(
   return data;
 }
 
+/**
+ * Self-serve takedown for a seeded ("Unverified") listing — no account, no email
+ * token. For a business owner who finds themselves listed and wants out. Errs
+ * toward removal (the listing was added without their consent); the server hides
+ * it immediately and tombstones it so it's never re-imported. Idempotent.
+ */
+export async function selfServeRemoveProspect(
+  prospectId: string,
+  reason?: string,
+): Promise<{ status: "removed" }> {
+  const callable = httpsCallable<{ prospectId: string; reason?: string }, { status: "removed" }>(
+    functions,
+    "selfServeRemoveProspect",
+  );
+  const { data } = await callable({ prospectId, reason });
+  return data;
+}
+
 export type ClaimProspectResult =
   | { status: "claimed"; jobsCreated: number; prospectsClaimed: number }
   | { status: "needs_verification" }

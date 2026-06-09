@@ -506,9 +506,9 @@ onMounted(async () => {
              results so they never outrank a vetted tradesperson, and labelled
              "not yet verified" so clients aren't misled. -->
         <section v-if="visibleProspects.length" class="mt-6">
-          <h2 class="text-lg font-semibold">Unverified tradespeople</h2>
+          <h2 class="text-lg font-semibold">Unclaimed listings</h2>
           <p class="mb-3 text-sm text-[color:var(--bs-muted)]">
-            These tradespeople haven't been verified by Blue Seal yet.
+            Blue Seal added these from public business info — they haven't joined or been verified yet.
           </p>
           <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <ProspectCard v-for="p in visibleProspects" :key="p.id" :prospect="p" />

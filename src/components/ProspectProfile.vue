@@ -2,22 +2,49 @@
 // Presentational full-profile body for a seeded prospect. Rendered by
 // TradieProfileView at /tradies/:id when the id resolves to a prospect (not a
 // real tradesperson) — so prospects get the SAME profile URL + shell as real
-// tradies, just flagged "Unverified" with no trust UI (no rating, reviews,
+// tradies, just flagged "Unclaimed" with no trust UI (no rating, reviews,
 // portfolio, availability, or verified badges — a seeded listing has none of
 // that, and showing anything verified-looking would misrepresent them).
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { RouterLink } from "vue-router";
 import Button from "primevue/button";
 import Tag from "primevue/tag";
 import Avatar from "primevue/avatar";
+import Dialog from "primevue/dialog";
+import Textarea from "primevue/textarea";
 import type { ProspectDoc, WithId } from "@/firebase/interfaces";
 import { tradeLabel } from "@/data/trades";
 import { useFormatters } from "@/composables/useFormatters";
 import { useAuthStore } from "@/stores/auth";
+import { selfServeRemoveProspect } from "@/firebase/services/prospects";
 
 const props = defineProps<{ prospect: WithId<ProspectDoc> }>();
 const { money } = useFormatters();
 const auth = useAuthStore();
+
+// Self-serve takedown ("Not you? Remove this listing"). This listing was created
+// from public business info WITHOUT the owner's consent, so anyone who finds
+// their own listing can take it down here — no account, no email link. Errs
+// toward removal; the server hides it immediately and never re-imports it.
+const showRemove = ref(false);
+const removing = ref(false);
+const removed = ref(false);
+const removeReason = ref("");
+const removeError = ref("");
+
+async function confirmRemove() {
+  removing.value = true;
+  removeError.value = "";
+  try {
+    await selfServeRemoveProspect(props.prospect.id, removeReason.value.trim() || undefined);
+    removed.value = true;
+    showRemove.value = false;
+  } catch {
+    removeError.value = "Couldn't remove the listing just now. Please try again, or email support.";
+  } finally {
+    removing.value = false;
+  }
+}
 
 const displayName = computed(() => props.prospect.displayName?.trim() || "");
 const avatarInitial = computed(() => {
@@ -35,16 +62,39 @@ const tradesWithYears = computed(() =>
 
 <template>
   <section class="bs-container py-6">
-    <!-- Status banner. Always shown — this profile isn't verified yet. -->
+    <!-- Removed state — shown after a successful self-serve takedown. -->
     <div
+      v-if="removed"
+      class="mb-4 flex items-start gap-3 rounded-lg border border-green-300 bg-green-50/70 p-3"
+    >
+      <i class="pi pi-check-circle text-lg mt-0.5 text-green-700" aria-hidden="true"></i>
+      <div class="text-sm">
+        <div class="font-semibold text-green-900">Listing removed</div>
+        <p class="text-green-900/80">
+          This listing has been taken down and won't be re-added. If this was a mistake, email support.
+        </p>
+      </div>
+    </div>
+
+    <!-- Status banner. Shown until removed — this profile isn't verified yet. -->
+    <div
+      v-else
       class="mb-4 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50/60 p-3"
     >
       <i class="pi pi-info-circle text-lg mt-0.5 text-amber-700" aria-hidden="true"></i>
-      <div class="text-sm">
-        <div class="font-semibold text-amber-900">Unverified</div>
+      <div class="flex-1 text-sm">
+        <div class="font-semibold text-amber-900">Unclaimed listing</div>
         <p class="text-amber-900/80">
-          This tradesperson hasn't been verified by Blue Seal yet.
+          Blue Seal created this listing from public business information. This business
+          hasn't joined or been verified yet.
         </p>
+        <button
+          type="button"
+          class="mt-1 text-xs text-amber-900/70 underline hover:text-amber-900"
+          @click="showRemove = true"
+        >
+          Not you? Remove this listing
+        </button>
       </div>
     </div>
 
@@ -70,7 +120,7 @@ const tradesWithYears = computed(() =>
             <h1 class="text-2xl font-bold">
               {{ displayName || tradeLabel(prospect.trades[0]) }}
             </h1>
-            <Tag value="Unverified" severity="warn" />
+            <Tag value="Unclaimed" severity="warn" />
           </div>
           <div v-if="prospect.companyName" class="text-sm text-[color:var(--bs-muted)]">
             {{ prospect.companyName }}
@@ -99,7 +149,7 @@ const tradesWithYears = computed(() =>
             Speaks {{ prospect.languages.join(", ") }}
           </div>
         </div>
-        <div class="flex flex-col items-stretch gap-1">
+        <div v-if="!removed" class="flex flex-col items-stretch gap-1">
           <RouterLink
             v-if="auth.isAuthenticated && auth.hasClientRole"
             :to="{ name: 'RequestProspect', params: { id: prospect.id } }"
@@ -153,6 +203,56 @@ const tradesWithYears = computed(() =>
         />
       </div>
     </section>
+
+    <!-- Self-serve takedown confirmation dialog. -->
+    <Dialog
+      v-model:visible="showRemove"
+      modal
+      header="Remove this listing?"
+      :style="{ width: '92vw', maxWidth: '440px' }"
+      :dismissable-mask="true"
+    >
+      <div class="space-y-3 text-sm">
+        <p>
+          Blue Seal created this listing for
+          <strong>{{ displayName || prospect.companyName || "this business" }}</strong>
+          from public business information — it isn't a claimed account. If this is your business
+          and you'd like it taken down, we'll remove it right away and won't re-add it.
+        </p>
+        <p class="text-[color:var(--bs-muted)]">
+          You can always join Blue Seal later to set up a verified profile.
+        </p>
+        <div>
+          <label for="removeReason" class="mb-1 block text-xs text-[color:var(--bs-muted)]">
+            Anything you'd like us to know? (optional)
+          </label>
+          <Textarea
+            id="removeReason"
+            v-model="removeReason"
+            rows="2"
+            class="w-full"
+            :maxlength="500"
+            auto-resize
+          />
+        </div>
+        <p v-if="removeError" class="text-xs text-red-600">{{ removeError }}</p>
+      </div>
+      <template #footer>
+        <Button
+          label="Cancel"
+          text
+          severity="secondary"
+          :disabled="removing"
+          @click="showRemove = false"
+        />
+        <Button
+          label="Remove my listing"
+          severity="danger"
+          :loading="removing"
+          @click="confirmRemove"
+        />
+      </template>
+    </Dialog>
   </section>
 </template>
 

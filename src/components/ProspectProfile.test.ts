@@ -45,10 +45,10 @@ function mountProfile(p = prospect()) {
 }
 
 describe("ProspectProfile", () => {
-  it("renders the unverified banner + badge, bio, and location", () => {
+  it("renders the unclaimed banner + badge, bio, and location", () => {
     const wrapper = mountProfile();
-    expect(wrapper.text()).toContain("Unverified");
-    expect(wrapper.text()).toContain("hasn't been verified by Blue Seal yet");
+    expect(wrapper.text()).toContain("Unclaimed");
+    expect(wrapper.text()).toContain("hasn't joined or been verified yet");
     expect(wrapper.text()).toContain("Family-run since 1990.");
     expect(wrapper.text()).toContain("Vernon, BC");
   });

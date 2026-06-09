@@ -35,3 +35,7 @@ functions/set-admin.mjs
 # Mascot source art — only the optimized .webp ships (run npm run optimize:characters)
 public/characters/png/
 public/characters/raw/
+
+# Prospect audit exports — contain harvested business contact data; never commit
+prospect-audit.json
+prospect-audit.csv
