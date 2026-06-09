@@ -12,10 +12,9 @@ import { SignatureDataUrl, writeQuoteSignature } from "../lib/signature";
 
 const Input = z.object({
   jobId: z.string().min(1).max(128),
-  // Soft rollout: optional until the signature-capture frontend is live on
-  // hosting, so the currently-deployed client (which doesn't send one yet)
-  // keeps working. Flip to required once hosting ships the signature UI.
-  signatureDataUrl: SignatureDataUrl.optional(),
+  // Required: the client signs the quote to accept it (the signature IS the
+  // acceptance). The capture UI is live, so every accept sends one.
+  signatureDataUrl: SignatureDataUrl,
 });
 
 interface JobData {
@@ -67,16 +66,12 @@ export const clientAcceptQuote = onCall(CALLABLE_OPTS, async (req) => {
   // (never accept with a signature that didn't land); the inverse order risks
   // an accepted-without-signature record. An orphan file on a rare precondition
   // failure is benign — the path is deterministic, so a retry overwrites it.
-  // signaturePath stays null during the soft-rollout window for old clients
-  // that don't send a signature yet.
-  let signaturePath: string | null = null;
-  if (signatureDataUrl) {
-    try {
-      signaturePath = await writeQuoteSignature(jobId, signatureDataUrl);
-    } catch (err) {
-      logger.error("clientAcceptQuote signature upload failed", { jobId, clientId: uid, err });
-      throw new HttpsError("internal", "Couldn't record your signature. Please try again.");
-    }
+  let signaturePath: string;
+  try {
+    signaturePath = await writeQuoteSignature(jobId, signatureDataUrl);
+  } catch (err) {
+    logger.error("clientAcceptQuote signature upload failed", { jobId, clientId: uid, err });
+    throw new HttpsError("internal", "Couldn't record your signature. Please try again.");
   }
 
   const result = await db.runTransaction(async (tx) => {

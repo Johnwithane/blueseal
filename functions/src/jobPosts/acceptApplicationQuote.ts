@@ -14,9 +14,9 @@ import { SignatureDataUrl, writeQuoteSignature } from "../lib/signature";
 const Input = z.object({
   postId: z.string().min(1).max(128),
   applicationId: z.string().min(1).max(128),
-  // Soft rollout: optional until the signature-capture frontend ships on
-  // hosting. Flip to required once the live client always sends a signature.
-  signatureDataUrl: SignatureDataUrl.optional(),
+  // Required: the client signs the quote to accept it. The capture UI is live,
+  // so every accept sends one.
+  signatureDataUrl: SignatureDataUrl,
 });
 
 interface PostDoc {
@@ -104,15 +104,12 @@ export const acceptApplicationQuote = onCall(CALLABLE_OPTS, async (req) => {
   // pre-allocated jobId so the path is stable across retries (overwrite, not
   // accumulate). Fatal on failure — never accept with a signature that didn't
   // land. Kept separate from the best-effort post-commit photo copy on purpose.
-  // Stays null during the soft-rollout window for old clients.
-  let signaturePath: string | null = null;
-  if (signatureDataUrl) {
-    try {
-      signaturePath = await writeQuoteSignature(jobRef.id, signatureDataUrl);
-    } catch (err) {
-      logger.error("acceptApplicationQuote signature upload failed", { ...ctx, err });
-      throw new HttpsError("internal", "Couldn't record your signature. Please try again.");
-    }
+  let signaturePath: string;
+  try {
+    signaturePath = await writeQuoteSignature(jobRef.id, signatureDataUrl);
+  } catch (err) {
+    logger.error("acceptApplicationQuote signature upload failed", { ...ctx, err });
+    throw new HttpsError("internal", "Couldn't record your signature. Please try again.");
   }
 
   let txnOut: {
