@@ -134,10 +134,48 @@ export const useAuthStore = defineStore("auth", {
         // leave the user doc null and proceed; subsequent reads from views
         // will succeed once auth has fully propagated.
         let doc: WithId<UserDoc> | null = null;
+        let docReadOk = false;
         try {
           doc = await getUser(fbUser.uid);
+          docReadOk = true;
         } catch {
+          // Transient handshake failure — NOT a "doc is missing" signal. Leave
+          // docReadOk false so the self-heal below can't fire against a doc
+          // that may actually exist but was momentarily unreadable.
           doc = null;
+        }
+        // Self-heal an orphaned account: the read SUCCEEDED but no users/{uid}
+        // doc exists. This strands a user when a signup's client-side doc write
+        // is interrupted *after* the Auth account is already created (network
+        // drop, closed tab) — the Auth record is durable but the profile never
+        // landed, and the user can't recover on their own (re-signup fails with
+        // email-already-in-use; signing in previously did nothing). Re-provision
+        // with the default `client` role (they can add `tradesperson` later);
+        // setRoleOnSignup then mirrors the role claim, and the divergence block
+        // below refreshes the token to surface it. Also (re)send the verification
+        // email the interrupted signup never got to. Guarded on docReadOk so a
+        // transient read failure can never overwrite or race a live doc; bounded
+        // to once per account since the next sign-in finds the doc.
+        if (docReadOk && !doc) {
+          console.warn("[auth] orphaned account (no user doc) — self-healing", {
+            uid: fbUser.uid,
+          });
+          try {
+            await createUser({
+              uid: fbUser.uid,
+              email: fbUser.email ?? "",
+              displayName: fbUser.displayName ?? fbUser.email?.split("@")[0] ?? "there",
+              photoURL: fbUser.photoURL,
+              role: "client",
+              termsAcceptedVersion: LEGAL_VERSION,
+            });
+            await sendEmailVerification(fbUser).catch(() => {});
+            doc = await getUser(fbUser.uid);
+          } catch (e) {
+            // Non-fatal: leave the session profile-less and let the next
+            // sign-in retry rather than wedge init on a write failure.
+            console.warn("[auth] self-heal of orphaned account failed", e);
+          }
         }
         // Doc/claim divergence recovery. Rules read the token's `roles`
         // claim; the UI reads `doc.roles`. If the doc lists a role the

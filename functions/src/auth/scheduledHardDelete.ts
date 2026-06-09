@@ -92,9 +92,21 @@ async function hardDeleteOne(uid: string): Promise<void> {
     storage.bucket().deleteFiles({ prefix: `users/${uid}/` }).catch(() => undefined),
   ]);
 
-  // Firebase Auth user last — once deleted, the uid is gone and any
-  // remaining Firestore writes would fail without an auth context.
-  await adminAuth.deleteUser(uid).catch(() => undefined);
+  // Delete the Firebase Auth user BEFORE the users doc. If this fails for any
+  // reason other than the user already being gone, throw so we DON'T delete
+  // the users doc: deletedAt stays set, the sweep query still matches, and the
+  // next run retries. Deleting the doc while the Auth record survives would
+  // strand a sign-in-able account with no profile — which applyAuthState's
+  // self-heal would resurrect as a fresh user, re-introducing the exact
+  // personal data this sweep must erase. (A swallowed failure here previously
+  // left that orphan silently and the doc-gone state stopped the retry.)
+  try {
+    await adminAuth.deleteUser(uid);
+  } catch (err) {
+    const code = (err as { code?: string }).code;
+    // Already deleted by a prior partial run — fall through to clean up the doc.
+    if (code !== "auth/user-not-found") throw err;
+  }
 
   // User doc last so the scheduled sweep query no longer matches this uid.
   await db.doc(`users/${uid}`).delete();
