@@ -12,7 +12,7 @@ import {
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/firebase/config";
-import type { TimeEntryDoc, WithId } from "@/firebase/interfaces";
+import type { TimeEntryDoc, TimeEntryKind, WithId } from "@/firebase/interfaces";
 import { typedConverter } from "@/firebase/converters";
 
 const entriesCol = (jobId: string) =>
@@ -92,9 +92,17 @@ export interface ClockOutResult {
   billedAmount: number; // cents
 }
 
-export async function clockIn(jobId: string): Promise<ClockInResult> {
-  const fn = httpsCallable<{ jobId: string }, ClockInResult>(functions, "clockIn");
-  const res = await fn({ jobId });
+// `kind` defaults to "labour". For "extra", pass the approved extra's id.
+// Clocking in auto-stops any session still running on another job.
+export async function clockIn(
+  jobId: string,
+  opts?: { kind?: TimeEntryKind; extraId?: string | null },
+): Promise<ClockInResult> {
+  const fn = httpsCallable<
+    { jobId: string; kind?: TimeEntryKind; extraId?: string | null },
+    ClockInResult
+  >(functions, "clockIn");
+  const res = await fn({ jobId, kind: opts?.kind ?? "labour", extraId: opts?.extraId ?? null });
   return res.data;
 }
 

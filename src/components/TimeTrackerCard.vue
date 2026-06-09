@@ -13,7 +13,7 @@ import {
   subscribeJobTimeEntries,
   updateTimeEntryNotes,
 } from "@/firebase/services/timeEntries";
-import type { TimeEntryDoc, WithId } from "@/firebase/interfaces";
+import type { TimeEntryDoc, TimeEntryKind, WithId } from "@/firebase/interfaces";
 import { useFormatters } from "@/composables/useFormatters";
 import { useToast } from "@/composables/useToast";
 import { useConfirmAction } from "@/composables/useConfirmAction";
@@ -23,7 +23,46 @@ const props = defineProps<{
   jobId: string;
   tradespersonId: string;
   isTradie: boolean;
+  // How this job is billed. On a fixed-price job, ordinary labour is tracked
+  // at $0 (a time-only record) and no money is shown for it; travel can't be
+  // clocked directly (only via an approved change order).
+  billingType: "hourly" | "fixed";
+  // Approved HOURLY change orders the tradie can clock time against.
+  approvedHourlyExtras?: { id: string; description: string; hourlyRateCents: number }[];
 }>();
+
+interface ClockOption {
+  kind: TimeEntryKind;
+  extraId?: string;
+  label: string;
+}
+
+// What the tradie can start a session against right now. Labour always; travel
+// only on hourly jobs; one option per approved hourly change order.
+const clockOptions = computed<ClockOption[]>(() => {
+  const opts: ClockOption[] = [{ kind: "labour", label: "Labour" }];
+  if (props.billingType === "hourly") opts.push({ kind: "travel", label: "Travel" });
+  for (const ex of props.approvedHourlyExtras ?? []) {
+    opts.push({ kind: "extra", extraId: ex.id, label: ex.description });
+  }
+  return opts;
+});
+
+// Money is shown per entry only when there's a rate behind it — so fixed-job
+// base labour (rate 0) reads as time-only, while travel / change-order / hourly
+// labour show the dollars.
+function showMoney(e: WithId<TimeEntryDoc>): boolean {
+  return e.hourlyRateSnapshot > 0;
+}
+
+function kindLabel(e: WithId<TimeEntryDoc>): string {
+  if (e.kind === "travel") return "Travel";
+  if (e.kind === "extra") {
+    const ex = props.approvedHourlyExtras?.find((x) => x.id === e.extraId);
+    return ex ? ex.description : "Change order";
+  }
+  return "Labour";
+}
 
 const { dateTime, money } = useFormatters();
 const toast = useToast();
@@ -81,12 +120,12 @@ onBeforeUnmount(() => {
 });
 watch(() => props.jobId, attach);
 
-async function onClockIn() {
+async function onClockIn(opt: ClockOption) {
   if (busy.value) return;
   busy.value = true;
   try {
-    await clockIn(props.jobId);
-    toast.success("Clocked in");
+    await clockIn(props.jobId, { kind: opt.kind, extraId: opt.extraId ?? null });
+    toast.success("Clocked in", opt.kind === "labour" ? undefined : opt.label);
   } catch (e) {
     toast.error("Couldn't clock in", humanizeError(e));
   } finally {
@@ -166,26 +205,49 @@ function rateLabel(e: WithId<TimeEntryDoc>): string {
       />
     </header>
 
-    <!-- Big clock button (tradie only) -->
+    <!-- Clock controls (tradie only) -->
     <div v-if="props.isTradie" class="mt-2">
-      <Button
-        v-if="!runningEntry"
-        label="Clock in"
-        icon="pi pi-play"
-        class="w-full"
-        :loading="busy"
-        :disabled="busy"
-        @click="onClockIn"
-      />
+      <template v-if="!runningEntry">
+        <!-- Single option (fixed job, no change orders) → one full-width button.
+             Multiple → a labelled set so the tradie picks what they're clocking. -->
+        <Button
+          v-if="clockOptions.length === 1"
+          label="Clock in"
+          icon="pi pi-play"
+          class="w-full"
+          :loading="busy"
+          :disabled="busy"
+          @click="onClockIn(clockOptions[0])"
+        />
+        <div v-else>
+          <div class="text-xs text-[color:var(--bs-muted)] mb-1.5">Clock in on…</div>
+          <div class="flex flex-wrap gap-2">
+            <Button
+              v-for="opt in clockOptions"
+              :key="opt.kind + (opt.extraId ?? '')"
+              :label="opt.label"
+              :icon="opt.kind === 'travel' ? 'pi pi-car' : opt.kind === 'extra' ? 'pi pi-plus-circle' : 'pi pi-play'"
+              size="small"
+              :outlined="opt.kind !== 'labour'"
+              :loading="busy"
+              :disabled="busy"
+              @click="onClockIn(opt)"
+            />
+          </div>
+        </div>
+      </template>
       <div v-else class="rounded-lg border border-[color:var(--bs-border)] p-3">
         <div class="flex items-center justify-between gap-3">
           <div class="min-w-0">
-            <div class="text-xs text-[color:var(--bs-muted)]">In progress</div>
+            <div class="text-xs text-[color:var(--bs-muted)]">{{ kindLabel(runningEntry) }}</div>
             <div class="font-mono text-2xl font-bold tabular-nums">
               {{ liveElapsedLabel(runningEntry) }}
             </div>
             <div class="text-xs text-[color:var(--bs-muted)] mt-0.5 truncate">
-              {{ rateLabel(runningEntry) }} • {{ liveBilledLabel(runningEntry) }}
+              <template v-if="showMoney(runningEntry)">
+                {{ rateLabel(runningEntry) }} • {{ liveBilledLabel(runningEntry) }}
+              </template>
+              <template v-else>Time only — no charge</template>
             </div>
           </div>
           <Button
@@ -256,11 +318,17 @@ function rateLabel(e: WithId<TimeEntryDoc>): string {
               <div class="text-[color:var(--bs-muted)] text-xs">to {{ dateTime(e.endedAt) }}</div>
             </div>
             <div class="text-xs text-[color:var(--bs-muted)] mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+              <Tag
+                :value="kindLabel(e)"
+                :severity="e.kind === 'travel' ? 'info' : e.kind === 'extra' ? 'warn' : 'secondary'"
+              />
               <span>{{ formatElapsed(entryBillable(e, nowMs).elapsedMs) }}</span>
-              <span>·</span>
-              <span>{{ rateLabel(e) }}</span>
-              <span>·</span>
-              <span class="font-medium text-[color:var(--bs-text)]">{{ money(entryBillable(e, nowMs).billedAmount) }}</span>
+              <template v-if="showMoney(e)">
+                <span>·</span>
+                <span>{{ rateLabel(e) }}</span>
+                <span>·</span>
+                <span class="font-medium text-[color:var(--bs-text)]">{{ money(entryBillable(e, nowMs).billedAmount) }}</span>
+              </template>
               <Tag
                 v-if="e.invoicedAt"
                 value="Invoiced"

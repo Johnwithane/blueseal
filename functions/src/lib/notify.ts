@@ -57,7 +57,12 @@ export type NotificationType =
   | "job_change_accepted"
   | "job_change_declined"
   | "job_change_withdrawn"
-  | "job_resumed";
+  | "job_resumed"
+  // Mid-job change-order loop (proposeExtra / respondExtra). The tradesperson
+  // proposes an out-of-scope charge; the client approves/declines it up front.
+  | "change_order_proposed"
+  | "change_order_approved"
+  | "change_order_declined";
 
 /**
  * Channel routing per notification.

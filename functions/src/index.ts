@@ -64,6 +64,10 @@ export { requestJobChange } from "./jobs/requestJobChange";
 export { respondJobChange } from "./jobs/respondJobChange";
 export { withdrawJobChange } from "./jobs/withdrawJobChange";
 export { resumeJob } from "./jobs/resumeJob";
+// Mid-job change-order loop (tradesperson proposes, client approves up front).
+export { proposeExtra } from "./jobs/proposeExtra";
+export { respondExtra } from "./jobs/respondExtra";
+export { cancelExtra } from "./jobs/cancelExtra";
 
 // Invoicing
 export { onJobCompleted } from "./invoicing/onJobCompleted";

@@ -2,7 +2,6 @@
 import { computed } from "vue";
 import Button from "primevue/button";
 import DatePicker from "primevue/datepicker";
-import TimeTrackerCard from "@/components/TimeTrackerCard.vue";
 import type { JobDoc, WithId } from "@/firebase/interfaces";
 import { useFormatters } from "@/composables/useFormatters";
 
@@ -124,13 +123,7 @@ const { dateTime } = useFormatters();
       </template>
     </div>
 
-    <!-- Time tracker — visible to both parties so the client sees live
-         clocked time too. -->
-    <TimeTrackerCard
-      :job-id="job.id"
-      :tradesperson-id="job.tradespersonId"
-      :is-tradie="isTradie"
-    />
+    <!-- Time tracking + change orders now live in the Work Order tab. -->
 
     <!-- Client-side "change of plans" card. Before a quote is accepted the
          client can cancel instantly; once the tradesperson is committed,

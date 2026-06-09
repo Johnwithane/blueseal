@@ -16,6 +16,7 @@ import { subscribeJobExpenses } from "@/firebase/services/expenses";
 import type {
   ExpenseDoc,
   InvoiceDiscount,
+  JobExtraDoc,
   LineItem,
   TimeEntryDoc,
   WithId,
@@ -29,6 +30,10 @@ const props = defineProps<{
   jobId: string;
   tradespersonId: string;
   clientId: string;
+  billingType: "hourly" | "fixed";
+  // Change orders on the job — approved flat ones become invoice lines; approved
+  // hourly ones are billed via their clocked time (labelled in the rollup).
+  extras: WithId<JobExtraDoc>[];
 }>();
 
 const emit = defineEmits<{
@@ -196,22 +201,40 @@ interface Rollup {
   ids: string[];
 }
 
-// Un-invoiced time entries grouped by rate. Running entry is included
-// with elapsed up to "now" because the server will auto-close it.
-const timeRollupByRate = computed(() => {
-  const map = new Map<number, Rollup>();
+// id → description for every change order (labels hourly change-order time).
+const extraDescById = computed(() => {
+  const m = new Map<string, string>();
+  for (const ex of props.extras) m.set(ex.id, ex.description?.trim() || "Change order");
+  return m;
+});
+
+// Un-invoiced time entries grouped by (kind, extraId, rate) — mirrors the
+// server roll-up so the preview matches the final invoice. Running entries are
+// included (the server auto-closes them on submit). $0 base labour on a fixed
+// job is dropped (time-only record, not a charge).
+const timeRollup = computed(() => {
+  const map = new Map<string, Rollup & { label: string; rate: number }>();
   for (const e of timeEntries.value) {
     if (e.invoicedAt != null) continue;
     if (e.tradespersonId !== props.tradespersonId) continue;
     const { elapsedMs, billedAmount } = entryBillable(e, nowMs.value);
     if (elapsedMs <= 0) continue;
     const rate = Math.max(0, Math.floor(e.hourlyRateSnapshot));
-    const hours = elapsedMs / 3_600_000;
-    const bucket = map.get(rate) ?? { hours: 0, amount: 0, ids: [] };
-    bucket.hours += hours;
+    const kind = e.kind ?? "labour";
+    if (kind === "labour" && rate === 0 && props.billingType === "fixed") continue;
+    const extraId = kind === "extra" ? (e.extraId ?? "") : "";
+    const label =
+      kind === "travel"
+        ? "Travel"
+        : kind === "extra"
+          ? (extraDescById.value.get(extraId) ?? "Change order")
+          : "Labour";
+    const key = `${kind}|${extraId}|${rate}`;
+    const bucket = map.get(key) ?? { hours: 0, amount: 0, ids: [], label, rate };
+    bucket.hours += elapsedMs / 3_600_000;
     bucket.amount += billedAmount;
     bucket.ids.push(e.id);
-    map.set(rate, bucket);
+    map.set(key, bucket);
   }
   return map;
 });
@@ -233,16 +256,14 @@ const centsFromDollars = (d: number) => Math.round((d ?? 0) * 100);
 // totals preview matches what the client will see after submit.
 const previewLines = computed<LineItem[]>(() => {
   const lines: LineItem[] = [];
-  for (const [rate, { hours }] of timeRollupByRate.value.entries()) {
-    if (hours <= 0) continue;
-    const qty = round2(hours);
+  for (const b of timeRollup.value.values()) {
+    if (b.hours <= 0) continue;
+    const qty = round2(b.hours);
+    const rateTail = b.rate === 0 ? "" : ` @ $${(b.rate / 100).toFixed(2)}/hr`;
     lines.push({
-      description:
-        rate === 0
-          ? `Labour: ${qty}h`
-          : `Labour: ${qty}h @ $${(rate / 100).toFixed(2)}/hr`,
+      description: `${b.label}: ${qty}h${rateTail}`,
       quantity: qty,
-      unitPrice: rate,
+      unitPrice: b.rate,
       taxRate: 0,
     });
   }
@@ -251,6 +272,19 @@ const previewLines = computed<LineItem[]>(() => {
       description: x.description?.trim() || "Materials",
       quantity: 1,
       unitPrice: x.billedAmount,
+      taxRate: 0,
+    });
+  }
+  // Approved flat change orders — the server pulls these in too.
+  for (const ex of props.extras) {
+    if (ex.status !== "approved" || ex.invoicedAt != null) continue;
+    if (ex.billingType !== "flat") continue;
+    const amount = Math.max(0, Math.floor(ex.flatAmountCents ?? 0));
+    if (amount <= 0) continue;
+    lines.push({
+      description: ex.description?.trim() || "Change order",
+      quantity: 1,
+      unitPrice: amount,
       taxRate: 0,
     });
   }
@@ -425,19 +459,20 @@ function close() {
           Your clock is still running — we'll close it when you send.
         </Message>
         <div v-if="loadingTime" class="text-xs text-[color:var(--bs-muted)]">Loading…</div>
-        <div v-else-if="timeRollupByRate.size === 0" class="text-xs text-[color:var(--bs-muted)]">
+        <div v-else-if="timeRollup.size === 0" class="text-xs text-[color:var(--bs-muted)]">
           No billable time on this job.
         </div>
         <ul v-else class="text-sm space-y-1">
           <li
-            v-for="[rate, b] in timeRollupByRate.entries()"
-            :key="rate"
+            v-for="[key, b] in timeRollup.entries()"
+            :key="key"
             class="flex items-center justify-between gap-2"
           >
             <span>
+              <span class="text-[color:var(--bs-muted)]">{{ b.label }}</span>
               {{ round2(b.hours) }}h
-              <span v-if="rate > 0" class="text-[color:var(--bs-muted)] text-xs">
-                @ {{ money(rate) }}/hr
+              <span v-if="b.rate > 0" class="text-[color:var(--bs-muted)] text-xs">
+                @ {{ money(b.rate) }}/hr
               </span>
               <span v-else class="text-[color:var(--bs-muted)] text-xs">(no rate set)</span>
             </span>

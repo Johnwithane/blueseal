@@ -55,6 +55,9 @@ const ICON: Record<NotificationType, string> = {
   job_change_declined: "pi pi-times-circle",
   job_change_withdrawn: "pi pi-undo",
   job_resumed: "pi pi-play",
+  change_order_proposed: "pi pi-plus-circle",
+  change_order_approved: "pi pi-check-circle",
+  change_order_declined: "pi pi-times-circle",
 };
 
 function iconFor(type: NotificationType): string {

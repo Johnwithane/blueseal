@@ -7,6 +7,11 @@ import { db } from "../lib/admin";
 import { requireRole } from "../lib/auth";
 import { postSystemMessage } from "../lib/chatSystemMessage";
 import { notify } from "../lib/notify";
+import {
+  extraDescriptionMap,
+  rollUpApprovedExtras,
+  rollUpTimeEntries,
+} from "../invoicing/rollUpBillables";
 
 const LineItemSchema = z.object({
   description: z.string().min(1).max(200),
@@ -41,6 +46,7 @@ interface JobData {
   status: string;
   chatId: string;
   upfrontFee?: UpfrontFeeOnJob | null;
+  billingType?: "hourly" | "fixed" | null;
 }
 
 interface TimeEntryData {
@@ -71,8 +77,6 @@ interface Discount {
   value: number;
   label: string | null;
 }
-
-const round2 = (n: number) => Math.round(n * 100) / 100;
 
 /**
  * Mirror of src/firebase/services/invoices.ts → recomputeTotals.
@@ -152,14 +156,17 @@ export const submitJobForApproval = onCall(CALLABLE_OPTS, async (req) => {
   const tradieRef = db.doc(`tradespeople/${uid}`);
   const entriesCol = jobRef.collection("timeEntries");
   const expensesCol = jobRef.collection("expenses");
+  const extrasCol = jobRef.collection("extras");
 
-  const [jobSnap, entriesSnap, expensesSnap, invoiceSnap, tradieSnap] = await Promise.all([
-    jobRef.get(),
-    entriesCol.get(),
-    expensesCol.get(),
-    invoiceRef.get(),
-    tradieRef.get(),
-  ]);
+  const [jobSnap, entriesSnap, expensesSnap, extrasSnap, invoiceSnap, tradieSnap] =
+    await Promise.all([
+      jobRef.get(),
+      entriesCol.get(),
+      expensesCol.get(),
+      extrasCol.get(),
+      invoiceRef.get(),
+      tradieRef.get(),
+    ]);
 
   if (!jobSnap.exists) throw new HttpsError("not-found", "Job not found.");
   const job = jobSnap.data() as JobData;
@@ -209,42 +216,19 @@ export const submitJobForApproval = onCall(CALLABLE_OPTS, async (req) => {
   // freeform lines on every revision.
   const preservedLines = existingLines.filter((li) => li.id);
 
-  // ---------- roll up time entries by rate ----------
-  const rollup = new Map<number, { hours: number; ids: string[] }>();
-  for (const d of entriesSnap.docs) {
-    if (existingIds.has(d.id)) continue;
-    const e = d.data() as TimeEntryData;
-    if (e.tradespersonId !== uid) continue;
-    if (e.invoicedAt != null) continue;
-    const isOpen = e.endedAt == null;
-    const endMs = isOpen ? nowMs : (e.endedAt as Timestamp).toMillis();
-    const elapsedMs = endMs - e.startedAt.toMillis();
-    if (elapsedMs <= 0) continue;
-    const hours = elapsedMs / 3_600_000;
-    const rate = Math.max(0, Math.floor(e.hourlyRateSnapshot));
-    const bucket = rollup.get(rate) ?? { hours: 0, ids: [] };
-    bucket.hours += hours;
-    bucket.ids.push(d.id);
-    rollup.set(rate, bucket);
-  }
-
-  const pulledLines: LineItem[] = [];
-  const entryStamps: string[] = [];
-  for (const [rate, { hours, ids }] of rollup.entries()) {
-    if (hours <= 0) continue;
-    const qty = round2(hours);
-    pulledLines.push({
-      id: ids[0],
-      description:
-        rate === 0
-          ? `Labour: ${qty}h`
-          : `Labour: ${qty}h @ $${(rate / 100).toFixed(2)}/hr`,
-      quantity: qty,
-      unitPrice: rate,
-      taxRate: 0,
-    });
-    for (const id of ids) entryStamps.push(id);
-  }
+  // ---------- roll up time entries by (kind, change order, rate) ----------
+  // includeOpen: this is the "I'm done" path, so still-running timers are
+  // billed up to now (they're auto-closed in the batch below).
+  const timeRoll = rollUpTimeEntries(entriesSnap.docs, {
+    nowMs,
+    includeOpen: true,
+    tradespersonId: uid,
+    existingIds,
+    billingType: job.billingType ?? null,
+    extraDescriptions: extraDescriptionMap(extrasSnap.docs),
+  });
+  const pulledLines: LineItem[] = [...timeRoll.lines];
+  const entryStamps: string[] = [...timeRoll.stampIds];
 
   // ---------- expenses → one line each ----------
   const expenseStamps: string[] = [];
@@ -262,6 +246,12 @@ export const submitJobForApproval = onCall(CALLABLE_OPTS, async (req) => {
     });
     expenseStamps.push(d.id);
   }
+
+  // ---------- approved flat change orders → one line each ----------
+  const extrasRoll = rollUpApprovedExtras(extrasSnap.docs, existingIds);
+  pulledLines.push(...extrasRoll.lines);
+  // Flat extras pulled as lines + hourly extras whose time was just billed.
+  const extraStamps = [...extrasRoll.stampIds, ...timeRoll.billedExtraIds];
 
   const mergedLines: LineItem[] = [...preservedLines, ...pulledLines, ...extraLineItems];
   // Upfront fee credit — only honoured when the fee has actually been paid
@@ -316,6 +306,9 @@ export const submitJobForApproval = onCall(CALLABLE_OPTS, async (req) => {
       invoicedAt: FieldValue.serverTimestamp(),
       status: "invoiced",
     });
+  }
+  for (const id of extraStamps) {
+    batch.update(extrasCol.doc(id), { invoicedAt: FieldValue.serverTimestamp() });
   }
 
   // Create or update the invoice.

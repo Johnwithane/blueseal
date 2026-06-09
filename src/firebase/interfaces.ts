@@ -173,6 +173,10 @@ export interface TradespersonDoc {
   yearsExperience: Record<string, number>;
   pricingModel: PricingModel;
   hourlyRate: number | null; // cents
+  // Optional separate rate for billing travel/callout time on hourly jobs.
+  // When null, travel falls back to hourlyRate. Never applies to fixed-price
+  // jobs — there, travel can only enter via a client-approved extra.
+  travelRate: number | null; // cents
   providesFreeQuotes: boolean;
   // PUBLIC, coarse location for discovery. The exact GeoPoint + the home
   // address live in the private subdoc tradespeople/{uid}/private/contact
@@ -711,6 +715,14 @@ export interface JobDoc {
   // is back-linked by onJobCompleted when the auto-drafted invoice consumes
   // the credit, so a second invoice can never double-apply it.
   upfrontFee?: UpfrontFeeState | null;
+  // How this job is billed, stamped server-side at quote-acceptance from the
+  // accepted quote's line items: "hourly" when any line is kind === "hourly",
+  // otherwise "fixed". Drives the clock-in UI (fixed jobs track time but show
+  // no money) and the rate clock-in snapshots (fixed-job base labour = 0).
+  // Optional/null on legacy jobs that predate the field — readers derive it
+  // lazily from the quote and treat unknown as "fixed". Server-managed: the
+  // rules pin it immutable so a party can't flip their own billing basis.
+  billingType?: "hourly" | "fixed" | null;
 }
 
 // Tradesperson-private job log, stored at jobs/{jobId}/private/notes so it is
@@ -748,14 +760,26 @@ export interface UpfrontFeeState {
 // callable enforces "at most one running entry per job per tradie"
 // transactionally; rules can't enforce uniqueness across docs.
 // ---------------------------------------------------------------------------
+// What a session is clocking against. "labour" is ordinary work on the job
+// (billed at the job's hourly rate, or 0 on a fixed-price job — a time-only
+// record). "travel" is travel/callout time billed at the tradie's travelRate
+// (hourly jobs only). "extra" is work against a client-approved hourly extra
+// (jobs/{jobId}/extras/{extraId}); `extraId` points at it. The roll-up groups
+// invoice lines by (kind, extraId, rate). Absent on legacy entries ⇒ "labour".
+export type TimeEntryKind = "labour" | "travel" | "extra";
+
 export interface TimeEntryDoc {
   tradespersonId: string; // duplicated so rules don't need a job lookup
   clientId: string; // duplicated so rules don't need a job lookup
   startedAt: Timestamp;
   endedAt: Timestamp | null;
-  hourlyRateSnapshot: number; // cents
+  hourlyRateSnapshot: number; // cents — the resolved rate for this kind
   notes: string;
   source: "clock" | "manual";
+  // What this session bills against. Optional for back-compat; absent ⇒ "labour".
+  kind?: TimeEntryKind;
+  // Set only when kind === "extra": the approved extra this time bills against.
+  extraId?: string | null;
   invoicedAt: Timestamp | null;
 }
 
@@ -796,6 +820,36 @@ export interface ExpenseDoc {
   createdAt: Timestamp;
   updatedAt: Timestamp;
   invoicedAt: Timestamp | null;
+}
+
+// ---------------------------------------------------------------------------
+// jobs/{jobId}/extras/{extraId}
+// A client-approved out-of-scope charge added AFTER work starts (not part of
+// the original quote). The tradie proposes it (proposeExtra), the client
+// approves/declines it up front (respondExtra) — this is the only way hourly
+// money enters a fixed-price job. An extra is either:
+//   • "flat"   → a one-off amount (flatAmountCents), or
+//   • "hourly" → a rate (hourlyRateCents) the tradie clocks time against
+//                (timeEntries with kind === "extra" and this extra's id).
+// Server-managed: only the proposeExtra / respondExtra / cancelExtra callables
+// (admin SDK) write it — rules block parties from forging approval state.
+// `invoicedAt` is stamped when the charge is pulled into an invoice line.
+// ---------------------------------------------------------------------------
+export type JobExtraStatus = "proposed" | "approved" | "declined" | "cancelled";
+
+export interface JobExtraDoc {
+  tradespersonId: string; // duplicated so rules don't need a job lookup
+  clientId: string; // duplicated so rules don't need a job lookup
+  description: string;
+  billingType: "flat" | "hourly";
+  flatAmountCents: number | null; // set when billingType === "flat"
+  hourlyRateCents: number | null; // set when billingType === "hourly"
+  status: JobExtraStatus;
+  proposedAt: Timestamp;
+  decidedAt: Timestamp | null; // when the client approved/declined
+  declinedReason: string | null;
+  invoicedAt: Timestamp | null;
+  createdAt: Timestamp;
 }
 
 // ---------------------------------------------------------------------------
@@ -1639,7 +1693,13 @@ export type NotificationType =
   | "job_change_accepted"
   | "job_change_declined"
   | "job_change_withdrawn"
-  | "job_resumed";
+  | "job_resumed"
+  // Mid-job change-order loop (proposeExtra / respondExtra). `change_order_proposed`
+  // → client (tradesperson proposes an out-of-scope charge to approve up front);
+  // `change_order_approved` / `change_order_declined` → tradesperson (client's decision).
+  | "change_order_proposed"
+  | "change_order_approved"
+  | "change_order_declined";
 
 export interface NotificationDoc {
   userId: string;

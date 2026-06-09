@@ -5,6 +5,11 @@ import { logger } from "firebase-functions/v2";
 import { z } from "zod";
 import { db } from "../lib/admin";
 import { requireRole } from "../lib/auth";
+import {
+  extraDescriptionMap,
+  rollUpApprovedExtras,
+  rollUpTimeEntries,
+} from "./rollUpBillables";
 
 const Input = z.object({
   invoiceId: z.string().min(1).max(128),
@@ -27,20 +32,11 @@ interface LineItem {
   taxRate: number;
 }
 
-interface TimeEntryLike {
-  startedAt: Timestamp;
-  endedAt: Timestamp | null;
-  hourlyRateSnapshot: number;
-  invoicedAt: Timestamp | null;
-}
-
 interface ExpenseLike {
   description: string;
   billedAmount: number;
   invoicedAt: Timestamp | null;
 }
-
-const round2 = (n: number) => Math.round(n * 100) / 100;
 
 /**
  * Pull all un-invoiced, closed time entries + expenses on a job into the
@@ -76,10 +72,15 @@ export const pullBillablesFromJob = onCall(CALLABLE_OPTS, async (req) => {
   }
 
   const jobRef = db.doc(`jobs/${invoice.jobId}`);
-  const [entriesSnap, expensesSnap] = await Promise.all([
+  const [jobSnap, entriesSnap, expensesSnap, extrasSnap] = await Promise.all([
+    jobRef.get(),
     jobRef.collection("timeEntries").get(),
     jobRef.collection("expenses").get(),
+    jobRef.collection("extras").get(),
   ]);
+  const jobBillingType =
+    (jobSnap.data() as { billingType?: "hourly" | "fixed" | null } | undefined)?.billingType ??
+    null;
 
   // Existing ids on the invoice — skip these on the pull side too, so an
   // accidental partial-write race doesn't double-add when retried.
@@ -87,43 +88,17 @@ export const pullBillablesFromJob = onCall(CALLABLE_OPTS, async (req) => {
     invoice.lineItems.filter((li) => li.id).map((li) => li.id as string),
   );
 
-  // ---------- time entries: group by rate ----------
-  const entryRollup = new Map<number, { hours: number; ids: string[] }>();
-  for (const doc of entriesSnap.docs) {
-    if (existingIds.has(doc.id)) continue;
-    const e = doc.data() as TimeEntryLike;
-    if (e.invoicedAt != null) continue;
-    if (e.endedAt == null) continue; // still running — skip
-    const elapsedMs = e.endedAt.toMillis() - e.startedAt.toMillis();
-    if (elapsedMs <= 0) continue;
-    const hours = elapsedMs / 3_600_000;
-    const rate = Math.max(0, Math.floor(e.hourlyRateSnapshot));
-    const bucket = entryRollup.get(rate) ?? { hours: 0, ids: [] };
-    bucket.hours += hours;
-    bucket.ids.push(doc.id);
-    entryRollup.set(rate, bucket);
-  }
-
-  const newLines: LineItem[] = [];
-  const entryStamps: { id: string }[] = [];
-  for (const [rate, { hours, ids }] of entryRollup.entries()) {
-    if (hours <= 0) continue;
-    const qty = round2(hours);
-    // Use a deterministic id derived from the first contributing entry so
-    // existingIds dedupe works on retry. Concat all ids into description
-    // metadata is overkill — invoicedAt stamps are the source of truth.
-    newLines.push({
-      id: ids[0],
-      description:
-        rate === 0
-          ? `Labour: ${qty}h`
-          : `Labour: ${qty}h @ $${(rate / 100).toFixed(2)}/hr`,
-      quantity: qty,
-      unitPrice: rate,
-      taxRate: 0,
-    });
-    for (const id of ids) entryStamps.push({ id });
-  }
+  // ---------- time entries: group by (kind, extra, rate) ----------
+  const timeRoll = rollUpTimeEntries(entriesSnap.docs, {
+    nowMs: Timestamp.now().toMillis(),
+    includeOpen: false, // pull never closes a running timer
+    tradespersonId: invoice.tradespersonId,
+    existingIds,
+    billingType: jobBillingType,
+    extraDescriptions: extraDescriptionMap(extrasSnap.docs),
+  });
+  const newLines: LineItem[] = [...timeRoll.lines];
+  const entryStamps: { id: string }[] = timeRoll.stampIds.map((id) => ({ id }));
 
   // ---------- expenses: one line each ----------
   const expenseStamps: { id: string }[] = [];
@@ -141,6 +116,12 @@ export const pullBillablesFromJob = onCall(CALLABLE_OPTS, async (req) => {
     });
     expenseStamps.push({ id: doc.id });
   }
+
+  // ---------- approved flat change orders: one line each ----------
+  const extrasRoll = rollUpApprovedExtras(extrasSnap.docs, existingIds);
+  newLines.push(...extrasRoll.lines);
+  // Stamp the flat extras pulled here + the hourly extras whose time was billed.
+  const extraStampIds = [...extrasRoll.stampIds, ...timeRoll.billedExtraIds];
 
   if (newLines.length === 0) {
     return { added: 0, lineItemsCount: invoice.lineItems.length };
@@ -189,6 +170,11 @@ export const pullBillablesFromJob = onCall(CALLABLE_OPTS, async (req) => {
       status: "invoiced",
     });
   }
+  for (const id of extraStampIds) {
+    batch.update(jobRef.collection("extras").doc(id), {
+      invoicedAt: FieldValue.serverTimestamp(),
+    });
+  }
   await batch.commit();
 
   logger.info("pullBillablesFromJob", {
@@ -197,6 +183,7 @@ export const pullBillablesFromJob = onCall(CALLABLE_OPTS, async (req) => {
     added: newLines.length,
     timeEntries: entryStamps.length,
     expenses: expenseStamps.length,
+    extras: extraStampIds.length,
   });
 
   return { added: newLines.length, lineItemsCount: merged.length };

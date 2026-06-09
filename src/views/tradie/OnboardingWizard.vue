@@ -127,6 +127,7 @@ const yearsByTrade = ref<Record<string, number>>({});
 // Pricing
 const pricingModel = ref<PricingModel>("both");
 const hourlyRateDollars = ref<number | null>(null);
+const travelRateDollars = ref<number | null>(null);
 const providesFreeQuotes = ref(true);
 
 // Service area
@@ -312,6 +313,7 @@ onMounted(async () => {
     yearsByTrade.value = { ...t.yearsExperience };
     pricingModel.value = t.pricingModel;
     hourlyRateDollars.value = t.hourlyRate ? t.hourlyRate / 100 : null;
+    travelRateDollars.value = t.travelRate ? t.travelRate / 100 : null;
     providesFreeQuotes.value = t.providesFreeQuotes;
     // Exact pin + address label are private now (contact subdoc).
     const contact = await getTradespersonContact(auth.fbUser.uid);
@@ -404,6 +406,8 @@ async function saveDraft(opts: { silent?: boolean } = {}): Promise<void> {
       pricingModel: pricingModel.value,
       hourlyRate:
         hourlyRateDollars.value != null ? Math.round(hourlyRateDollars.value * 100) : null,
+      travelRate:
+        travelRateDollars.value != null ? Math.round(travelRateDollars.value * 100) : null,
       providesFreeQuotes: providesFreeQuotes.value,
       serviceRadiusKm: location.value.radiusKm,
       weeklyAvailability: availability.value,
@@ -512,6 +516,7 @@ watch(
     yearsByTrade,
     pricingModel,
     hourlyRateDollars,
+    travelRateDollars,
     providesFreeQuotes,
     location,
     availability,
@@ -1035,6 +1040,22 @@ async function withdrawForEdits() {
                   currency="CAD"
                   class="mt-1 w-full"
                 />
+              </div>
+              <div v-if="pricingModel !== 'quote'">
+                <label class="text-sm font-medium">
+                  Travel rate (CAD)
+                  <span class="bs-label-optional">Optional</span>
+                </label>
+                <InputNumber
+                  v-model="travelRateDollars"
+                  mode="currency"
+                  currency="CAD"
+                  class="mt-1 w-full"
+                />
+                <p class="mt-1 text-xs text-[color:var(--bs-muted)]">
+                  Used when you clock travel/callout time separately. Leave blank
+                  to bill travel at your hourly rate.
+                </p>
               </div>
               <div class="flex items-center gap-3">
                 <ToggleSwitch v-model="providesFreeQuotes" />

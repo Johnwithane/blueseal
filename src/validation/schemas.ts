@@ -72,6 +72,8 @@ export const tradiePricingSchema = z
     pricingModel: z.enum(["hourly", "quote", "both"]),
     // Cents. Cap at $10,000/hr to catch unit-mistake typos early.
     hourlyRate: z.number().int().min(0).max(1_000_000).nullable(),
+    // Optional separate travel/callout rate (cents). Null falls back to hourlyRate.
+    travelRate: z.number().int().min(0).max(1_000_000).nullable(),
     providesFreeQuotes: z.boolean(),
   })
   .refine(

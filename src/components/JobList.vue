@@ -6,6 +6,8 @@ import Button from "primevue/button";
 import type { JobDoc, JobStatus, WithId } from "@/firebase/interfaces";
 import { useFormatters } from "@/composables/useFormatters";
 import { useToast } from "@/composables/useToast";
+import { useActiveClock } from "@/composables/useActiveClock";
+import { clockIn, clockOut, formatElapsed } from "@/firebase/services/timeEntries";
 import { humanizeError } from "@/utils/errors";
 import { archiveJob, unarchiveJob } from "@/firebase/services/jobs";
 import { statusLabel, STATUS_SEVERITY } from "@/utils/jobStatus";
@@ -33,6 +35,46 @@ const props = withDefaults(
 const router = useRouter();
 const { relativeTime, dateTime } = useFormatters();
 const toast = useToast();
+
+// The tradie's single live clock session across all jobs — lets a card show
+// "Stop · 00:12:34" on the job they're clocked into and "Clock in" elsewhere.
+// (No-op for client-only viewers; the composable only listens for tradies.)
+const { activeEntry, elapsedMs, isRunningOn } = useActiveClock();
+const clockBusy = ref<Set<string>>(new Set());
+
+function setClockBusy(jobId: string, busy: boolean) {
+  const next = new Set(clockBusy.value);
+  if (busy) next.add(jobId);
+  else next.delete(jobId);
+  clockBusy.value = next;
+}
+
+async function onQuickClockIn(job: WithId<JobDoc>) {
+  if (clockBusy.value.has(job.id)) return;
+  setClockBusy(job.id, true);
+  try {
+    await clockIn(job.id);
+    toast.success("Clocked in");
+  } catch (e) {
+    toast.error("Couldn't clock in", humanizeError(e));
+  } finally {
+    setClockBusy(job.id, false);
+  }
+}
+
+async function onQuickClockOut(job: WithId<JobDoc>) {
+  const entry = activeEntry.value;
+  if (!entry || entry.jobId !== job.id || clockBusy.value.has(job.id)) return;
+  setClockBusy(job.id, true);
+  try {
+    await clockOut(job.id, entry.id);
+    toast.success("Clocked out");
+  } catch (e) {
+    toast.error("Couldn't clock out", humanizeError(e));
+  } finally {
+    setClockBusy(job.id, false);
+  }
+}
 
 // All statuses worth surfacing on the dashboard, in pipeline order.
 // "reviewed" and "cancelled" used to be filtered out — they're now
@@ -315,6 +357,28 @@ function counterpartyPhoto(job: WithId<JobDoc>): string | null | undefined {
                 :photo-url="counterpartyPhoto(job)"
               />
               <div class="flex shrink-0 items-center gap-2 text-xs text-[color:var(--bs-muted)]">
+                <template v-if="props.viewerRole === 'tradesperson' && job.status === 'in_progress'">
+                  <Button
+                    v-if="isRunningOn(job.id)"
+                    :label="formatElapsed(elapsedMs)"
+                    icon="pi pi-stop-circle"
+                    severity="danger"
+                    size="small"
+                    class="shrink-0 font-mono tabular-nums"
+                    :loading="clockBusy.has(job.id)"
+                    @click.stop="onQuickClockOut(job)"
+                  />
+                  <Button
+                    v-else
+                    label="Clock in"
+                    icon="pi pi-play"
+                    size="small"
+                    outlined
+                    class="shrink-0"
+                    :loading="clockBusy.has(job.id)"
+                    @click.stop="onQuickClockIn(job)"
+                  />
+                </template>
                 <span v-if="job.scheduledStart" class="text-[color:var(--bs-blue)]">
                   <i class="pi pi-calendar text-[10px]"></i>
                   {{ dateTime(job.scheduledStart) }}

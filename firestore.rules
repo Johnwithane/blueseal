@@ -367,6 +367,12 @@ service cloud.firestore {
         && (isAdmin()
             || request.resource.data.get('statusBeforeHold', null)
                 == resource.data.get('statusBeforeHold', null))
+        // billingType is stamped server-side at quote acceptance and frozen
+        // thereafter — a party must not be able to flip their own job from
+        // fixed to hourly (or vice-versa) to change how clock-in prices time.
+        && (isAdmin()
+            || request.resource.data.get('billingType', null)
+                == resource.data.get('billingType', null))
         // Direct (non-admin) status writes are limited to the two pre-commitment
         // client paths: marketplace intake advance (accepted→requested) and the
         // instant pre-commitment cancel (cancelJob, only from accepted/requested/
@@ -480,6 +486,24 @@ service cloud.firestore {
         allow delete: if (isOwner(resource.data.tradespersonId)
                          && resource.data.invoicedAt == null)
                       || isAdmin();
+      }
+
+      // ---------- jobs/{jobId}/extras (change orders) ----------
+      // Out-of-scope charges the tradesperson proposes mid-job for the client
+      // to approve up front. BOTH parties read — the client must see + decide,
+      // the tradie tracks status. Reads are authorized via the parent job (the
+      // client's listener isn't tradie-scoped, so a per-doc predicate can't
+      // authorize a LIST — "rules are not filters"). Writes are CALLABLE-ONLY:
+      // proposeExtra / respondExtra / cancelExtra run with the admin SDK (which
+      // bypasses rules), so denying all party writes here means approval state
+      // (proposed → approved/declined) can never be forged by either side.
+      match /extras/{extraId} {
+        allow read: if isSignedIn() && (
+          jobDoc(jobId).data.tradespersonId == uid()
+          || jobDoc(jobId).data.clientId == uid()
+          || isAdmin()
+        );
+        allow create, update, delete: if isAdmin();
       }
     }
 

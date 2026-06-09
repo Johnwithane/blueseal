@@ -294,6 +294,35 @@ Always keep payments and agreements inside the job thread — it's your record i
 You can return to the **Payouts** screen any time to finish setup or open your payouts dashboard. Once it's set up, paid invoices flow through automatically — no chasing cheques.`,
   },
   {
+    slug: "work-order-time-and-change-orders",
+    categoryId: "payments-invoices",
+    title: "Tracking time and change orders (the Work Order tab)",
+    excerpt: "Clock in on a job, track travel, and add client-approved change orders.",
+    audience: "all",
+    popular: true,
+    keywords: [
+      "clock in",
+      "clock out",
+      "time tracking",
+      "timer",
+      "travel",
+      "change order",
+      "extra",
+      "work order",
+      "hourly",
+      "fixed price",
+    ],
+    body: `Every active job has a **Work order** tab — the home for the actual work: time, travel, and any change orders.
+
+**Clocking time.** The tradesperson taps **Clock in** when they start and **Stop** when they finish. The timer runs live and the client sees it too, so the hours are never a surprise. You can clock in straight from the **Jobs** tab as well. Clocking in on a new job automatically stops a session still running on another — only one clock runs at a time.
+
+**Hourly vs fixed-price jobs.** How time is billed depends on the job:
+- On an **hourly** job, clocked time bills at the agreed hourly rate, and **travel** can be clocked separately at the tradesperson's travel rate.
+- On a **fixed-price** job, time is still tracked as a record, but it shows **no charge** — the agreed price stands.
+
+**Change orders.** When a job picks up extra work that wasn't in the original quote, the tradesperson proposes a **change order** — a flat fee, or an hourly rate they then clock against. The client **approves it first**; nothing extra is billed without that sign-off. Approved change orders flow onto the final invoice alongside the agreed price, so the breakdown stays clear and above board.`,
+  },
+  {
     slug: "how-verification-works",
     categoryId: "verification-trust",
     title: "How the verification badges work",
@@ -662,6 +691,34 @@ const faqs: FaqItem[] = [
       "Keeping the quote, invoice, and payment in the job thread gives you a clear record if a question ever comes up — and it's what lets our team help if something goes wrong.",
     categoryId: "payments-invoices",
     audience: "all",
+  },
+  {
+    question: "How do I clock in on a job?",
+    answer:
+      "Open the job's **Work order** tab and tap **Clock in** (you can also clock in straight from the **Jobs** tab). The timer runs live and the client sees it too. Tap **Stop** when you're done. Clocking in on a new job automatically stops any session still running on another — only one clock runs at a time.",
+    categoryId: "payments-invoices",
+    audience: "tradesperson",
+  },
+  {
+    question: "Will I be billed for time on a fixed-price job?",
+    answer:
+      "No. On a fixed-price job the agreed price stands — the tradesperson may still track time as a record, but it shows no charge. Extra hourly work only ever appears if you approve a **change order** for it first.",
+    categoryId: "payments-invoices",
+    audience: "client",
+  },
+  {
+    question: "What is a change order?",
+    answer:
+      "A change order is extra work beyond the original quote — added after the job starts. The tradesperson proposes it as a flat fee or an hourly rate, and **you approve it before it's billed**. Approved change orders appear on the final invoice alongside the agreed price, so the breakdown stays clear.",
+    categoryId: "payments-invoices",
+    audience: "all",
+  },
+  {
+    question: "How do I charge for travel?",
+    answer:
+      "Set a **travel rate** in your pricing (it can differ from your hourly rate). On an hourly job you can clock travel time separately and it bills at that rate. On a fixed-price job, travel can only be billed by proposing a change order the client approves.",
+    categoryId: "payments-invoices",
+    audience: "tradesperson",
   },
 
   // ── Account & app ─────────────────────────────────────────────────────────

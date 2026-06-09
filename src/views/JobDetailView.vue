@@ -28,9 +28,11 @@ import { findCollisions, type Collision } from "@/firebase/services/bookings";
 import { useConfirm } from "primevue/useconfirm";
 import { getInvoiceByJobId } from "@/firebase/services/invoices";
 import { subscribeReviewPair } from "@/firebase/services/reviews";
+import { subscribeJobExtras } from "@/firebase/services/jobExtras";
 import { useAuthStore } from "@/stores/auth";
 import type {
   JobDoc,
+  JobExtraDoc,
   JobStatus,
   ReviewPairDoc,
   TradespersonDoc,
@@ -45,17 +47,22 @@ import UpfrontFeePaymentBanner from "@/components/UpfrontFeePaymentBanner.vue";
 import TradieChangesRequestedBanner from "@/components/TradieChangesRequestedBanner.vue";
 import MutualReviewCard from "@/components/MutualReviewCard.vue";
 import JobChangeBanner from "@/components/JobChangeBanner.vue";
+import ProposedChangeOrderBanner from "@/components/ProposedChangeOrderBanner.vue";
 import { SEED_INTAKE_SCHEMAS } from "@/data/intakeSchemas";
 import { firstMissingRequired } from "@/utils/intake";
 import { getIntakeSchema } from "@/firebase/services/intakeFormSchemas";
 import type { IntakeField } from "@/firebase/interfaces";
 import { tradeLabel } from "@/data/trades";
 import { useToast } from "@/composables/useToast";
+import { useActiveClock } from "@/composables/useActiveClock";
+import { clockIn, clockOut, formatElapsed } from "@/firebase/services/timeEntries";
 import { humanizeError } from "@/utils/errors";
 import { statusLabel, STATUS_SEVERITY } from "@/utils/jobStatus";
+import { jobBillingType } from "@/utils/jobBilling";
 import JobTabBar, { type JobTab } from "@/features/jobDetail/JobTabBar.vue";
 import BriefTab from "@/features/jobDetail/BriefTab.vue";
 import ScheduleTab from "@/features/jobDetail/ScheduleTab.vue";
+import WorkOrderTab from "@/features/jobDetail/WorkOrderTab.vue";
 import InvoiceTab from "@/features/jobDetail/InvoiceTab.vue";
 import JobChatButton from "@/features/jobDetail/JobChatButton.vue";
 import JobChatOverlay from "@/features/jobDetail/JobChatOverlay.vue";
@@ -102,6 +109,11 @@ function formatScheduled(
 const job = ref<WithId<JobDoc> | null>(null);
 const tradieInfo = ref<WithId<TradespersonDoc> | null>(null);
 const reviewPair = ref<WithId<ReviewPairDoc> | null>(null);
+// Live subscription to the job's change orders. Owned here so the Work Order
+// tab badge + the client's approval banner react from any tab.
+const jobExtras = ref<WithId<JobExtraDoc>[]>([]);
+let unsubscribeExtras: (() => void) | null = null;
+const proposedExtras = computed(() => jobExtras.value.filter((e) => e.status === "proposed"));
 // Live subscription handle for the mutual-review pair. Owned at the
 // JobDetailView level (not inside InvoiceTab) so the top-of-page banner
 // can render the right CTA even when the Brief or Schedule tab is
@@ -160,6 +172,42 @@ const showQuoteSheet = ref(false);
 
 const isTradie = computed(() => auth.fbUser?.uid === job.value?.tradespersonId);
 const isClient = computed(() => auth.fbUser?.uid === job.value?.clientId);
+
+// Quick labour clock-in/out from the header. The full Work Order tab handles
+// travel + change-order sessions; the header is the one-tap common case.
+const {
+  activeEntry: clockEntry,
+  elapsedMs: clockElapsedMs,
+  isRunningOn: clockRunningOn,
+} = useActiveClock();
+const clockBtnBusy = ref(false);
+
+async function onHeaderClockIn() {
+  if (clockBtnBusy.value || !job.value) return;
+  clockBtnBusy.value = true;
+  try {
+    await clockIn(job.value.id);
+    toast.success("Clocked in");
+  } catch (e) {
+    toast.error("Couldn't clock in", humanizeError(e));
+  } finally {
+    clockBtnBusy.value = false;
+  }
+}
+
+async function onHeaderClockOut() {
+  const entry = clockEntry.value;
+  if (clockBtnBusy.value || !entry) return;
+  clockBtnBusy.value = true;
+  try {
+    await clockOut(entry.jobId, entry.id);
+    toast.success("Clocked out");
+  } catch (e) {
+    toast.error("Couldn't clock out", humanizeError(e));
+  } finally {
+    clockBtnBusy.value = false;
+  }
+}
 
 // Best-effort name resolution for PDFs + downstream UI. Falls back through
 // the data we have available locally so the PDF "From" / "To" header
@@ -299,6 +347,13 @@ const tabs = computed<JobTab[]>(() => {
         isTradie.value && s === "in_progress" && !job.value.scheduledStart
           ? "dot"
           : undefined,
+    },
+    {
+      key: "workorder",
+      label: "Work order",
+      icon: "pi-wrench",
+      // Nudge the client when a change order is waiting on their approval.
+      badge: isClient.value && proposedExtras.value.length > 0 ? "dot" : undefined,
     },
     {
       key: "invoice",
@@ -518,9 +573,15 @@ watch(
     unsubscribeReviewPair?.();
     unsubscribeReviewPair = null;
     reviewPair.value = null;
+    unsubscribeExtras?.();
+    unsubscribeExtras = null;
+    jobExtras.value = [];
     if (typeof id !== "string" || !id) return;
     unsubscribeReviewPair = subscribeReviewPair(id, (p) => {
       reviewPair.value = p;
+    });
+    unsubscribeExtras = subscribeJobExtras(id, (list) => {
+      jobExtras.value = list;
     });
   },
   { immediate: true },
@@ -529,6 +590,8 @@ watch(
 onUnmounted(() => {
   unsubscribeReviewPair?.();
   unsubscribeReviewPair = null;
+  unsubscribeExtras?.();
+  unsubscribeExtras = null;
   unsubscribeJob?.();
   unsubscribeJob = null;
 });
@@ -890,6 +953,29 @@ function onReturnToApplicants() {
             <span class="font-medium text-[color:var(--bs-text)]">{{ counterpartyName }}</span>
           </span>
         </div>
+
+        <!-- Quick clock for the tradie while the job is active. The full
+             Work Order tab handles travel + change-order sessions. -->
+        <div v-if="isTradie && job.status === 'in_progress'" class="mt-2">
+          <Button
+            v-if="clockRunningOn(job.id)"
+            :label="`Stop · ${formatElapsed(clockElapsedMs)}`"
+            icon="pi pi-stop-circle"
+            severity="danger"
+            size="small"
+            class="font-mono tabular-nums"
+            :loading="clockBtnBusy"
+            @click="onHeaderClockOut"
+          />
+          <Button
+            v-else
+            label="Clock in"
+            icon="pi pi-play"
+            size="small"
+            :loading="clockBtnBusy"
+            @click="onHeaderClockIn"
+          />
+        </div>
       </header>
 
       <!-- Mutual-review banner: top-of-page surface for the review loop.
@@ -993,6 +1079,15 @@ function onReturnToApplicants() {
         :is-tradie="isTradie"
         class="mb-4"
         @decided="load"
+      />
+
+      <!-- Client nudge: change orders awaiting approval. Routes to the Work
+           Order tab where the approve/decline actions live. -->
+      <ProposedChangeOrderBanner
+        v-if="isClient && proposedExtras.length > 0"
+        :proposed="proposedExtras"
+        class="mb-4"
+        @review="onTabChange('workorder')"
       />
 
       <div
@@ -1133,6 +1228,13 @@ function onReturnToApplicants() {
           @open-cancel-dialog="openCancelDialog"
           @open-postpone-dialog="openPostponeDialog"
         />
+        <WorkOrderTab
+          v-else-if="activeTab === 'workorder'"
+          :job="job"
+          :is-client="isClient"
+          :is-tradie="isTradie"
+          :extras="jobExtras"
+        />
         <InvoiceTab
           v-else-if="activeTab === 'invoice'"
           :job="job"
@@ -1233,6 +1335,8 @@ function onReturnToApplicants() {
       :job-id="job.id"
       :tradesperson-id="job.tradespersonId"
       :client-id="job.clientId"
+      :billing-type="jobBillingType(job)"
+      :extras="jobExtras"
       @submitted="load"
     />
 

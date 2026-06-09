@@ -139,6 +139,7 @@ export async function createOrUpdateDraft(
     yearsExperience: {},
     pricingModel: "both",
     hourlyRate: null,
+    travelRate: null,
     providesFreeQuotes: true,
     locationApprox: new GeoPoint(0, 0),
     geohashPublic: "",
