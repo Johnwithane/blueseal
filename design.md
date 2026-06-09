@@ -298,6 +298,16 @@ onJobPostClosed trigger handles applicant fanout the same way.
 
 **Caps and limits (enforced in callables)**: 5 open posts per client; 10 applications per tradie per 24h (via rateLimits/{key} doc); post expiry 30d.
 
+### 4.7 Rebates & Grants panel (added in Phase 5c)
+
+A contextual, **informational** panel shown inside the post-a-job flow when the chosen trade matches a curated government/utility rebate or grant program. Energy-relevant work (heat pumps/HVAC, solar, insulation, windows, heat-pump water heaters) often has rebates a homeowner would otherwise miss — Blue Seal surfaces them at the moment the job is posted.
+
+**Eligibility-safety contract (non-negotiable)**: the product **never asserts a client is eligible**. Programs are surfaced as *"you may qualify"*; each shows its own eligibility conditions, a *verified* date, and links to the **official source** to confirm and apply. We don't administer the programs or guarantee amounts. Closed/paused programs are retained (with `status`) but never surface in the client panel.
+
+**Matching**: a program surfaces for a job when `status == "active"` AND its `trades` include the job's trade AND (`national` OR `provinces` includes the job's `region`). Province-specific programs only appear once the client's region is known, so we never imply availability before location is given. Panel caps at 4.
+
+**Data**: admin-curated Firestore collection `rebatePrograms/{slug}` (see Data Model + Security Rules). World-readable reference data; admin-only writes (no callable — the admin form validates with Zod at the boundary). A code seed (`src/data/rebatePrograms.ts`, web-verified starter set) is the read fallback when the collection is empty, and the source for the admin "Import starter set" action. Admins keep the live copy current without code deploys; the post-a-job panel + the admin screen (`/admin/rebate-programs`) are the only surfaces — there is **no** standalone public rebates page.
+
 ---
 
 ## 5. Core Features
@@ -540,6 +550,20 @@ assistantConversations/{conversationId}/messages/{messageId}  // subcollection
 
 auditLog/{entryId}                // admin actions, immutable
   actorUid, action, targetType, targetId, reason, metadata, createdAt
+
+rebatePrograms/{slug}             // curated rebate/grant reference data (§4.7)
+  slug, name, provider
+  level: "federal" | "provincial" | "municipal" | "utility"
+  national: bool                  // true = Canada-wide (provinces ignored)
+  provinces: string[]             // CA province codes when not national
+  trades: string[]                // trade keys it applies to (matching)
+  summary, amountNote             // qualitative, as the official source states
+  eligibilityNote                 // conditions shown to client — never a promise
+  officialUrl                     // required https source / application link
+  status: "active" | "closed" | "paused"   // only active surfaces to clients
+  lastVerifiedAt, createdAt, updatedAt, updatedBy
+  // World-readable; admin-only writes (no callable). Code seed in
+  // src/data/rebatePrograms.ts is the fallback when the collection is empty.
 ```
 
 ### Denormalization rules

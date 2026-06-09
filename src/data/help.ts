@@ -175,6 +175,34 @@ Your posting is shown to **verified tradespeople** in your trade and region. Eac
 Your exact address stays private until you accept a quote; the public posting only shows your general area.`,
   },
   {
+    slug: "rebates-and-grants",
+    categoryId: "for-clients",
+    title: "Rebates and grants on energy work",
+    excerpt: "Posting energy work? We surface programs that may help — always confirm at the source.",
+    audience: "client",
+    keywords: [
+      "rebate",
+      "rebates",
+      "grant",
+      "grants",
+      "incentive",
+      "heat pump",
+      "solar",
+      "insulation",
+      "windows",
+      "energy",
+    ],
+    body: `When you post a job for energy-related work — like a **heat pump, solar panels, insulation, or new windows** — Blue Seal may show a **"Rebates & grants you may qualify for"** panel as you fill out the form.
+
+These are government and utility programs that *might* help offset the cost of that kind of work in your province. The panel is **informational only**:
+
+- We **don't run these programs and can't confirm whether you qualify** — eligibility, amounts, and deadlines are set by each program and change often.
+- Each listing shows roughly what it offers, the key eligibility conditions, and when we last checked it — then links you to the **official program page**.
+- **Always confirm the current details and apply through that official link.** Many programs require steps like a pre-retrofit energy assessment, specific certified equipment, or a registered contractor *before* work begins — so it's worth checking early.
+
+If you don't see a panel, it just means we don't have an active program on file matching that trade and province. It doesn't mean none exists — it's always worth a quick look at your provincial and utility websites.`,
+  },
+  {
     slug: "the-job-thread",
     categoryId: "getting-started",
     title: "Understanding the job thread",
@@ -430,6 +458,13 @@ const faqs: FaqItem[] = [
     question: "What's the difference between requesting a quote and posting a job?",
     answer:
       "Requesting a quote reaches out to one specific pro you've chosen. Posting a job lists the work so multiple verified pros in your area each apply with a full itemized quote — you compare them side by side and accept one.",
+    categoryId: "for-clients",
+    audience: "client",
+  },
+  {
+    question: "Does Blue Seal offer rebates or grants?",
+    answer:
+      "Blue Seal doesn't fund or administer any rebates. When you post energy-related work (heat pumps, solar, insulation, windows), we may surface **government or utility programs that could apply** so you don't miss them — but we can't confirm your eligibility. Always check the details and apply on the official program page we link to.",
     categoryId: "for-clients",
     audience: "client",
   },

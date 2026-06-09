@@ -1041,5 +1041,14 @@ service cloud.firestore {
       allow read: if true;
       allow create, update, delete: if isAdmin();
     }
+
+    // ---------- rebatePrograms (admin-curated public reference data) ----------
+    // Government/utility rebate & grant programs surfaced (read-only) to clients
+    // in the post-a-job flow. World-readable reference data; only admins curate
+    // it. See src/data/rebatePrograms.ts and AdminRebateProgramsView.vue.
+    match /rebatePrograms/{programId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
   }
 }

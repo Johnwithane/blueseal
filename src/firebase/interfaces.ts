@@ -1486,6 +1486,44 @@ export interface HomeContentDoc {
 }
 
 // ---------------------------------------------------------------------------
+// rebatePrograms/{slug} — curated government / utility rebate & grant programs.
+//
+// Reference data surfaced (read-only) to clients in the post-a-job flow when
+// their trade is energy-relevant. Admin-managed (src/views/admin/
+// AdminRebateProgramsView.vue); a code seed in src/data/rebatePrograms.ts is
+// the launch fallback when the collection is empty. We NEVER assert a client is
+// eligible — programs surface as "may apply", show their own eligibility
+// conditions + a verified date, and link out to the official source to confirm
+// and apply. Closed/paused programs keep their row (with status) for the audit
+// trail but never surface in the client panel.
+// ---------------------------------------------------------------------------
+
+/** Which body administers a rebate program. */
+export type RebateLevel = "federal" | "provincial" | "municipal" | "utility";
+
+/** Lifecycle of a program. Only `active` programs surface to clients. */
+export type RebateStatus = "active" | "closed" | "paused";
+
+export interface RebateProgramDoc {
+  slug: string; // stable kebab-case id; also the Firestore doc id
+  name: string;
+  provider: string; // administering body, e.g. "Natural Resources Canada"
+  level: RebateLevel;
+  national: boolean; // true = Canada-wide (provinces ignored when matching)
+  provinces: string[]; // CA province codes (ON, BC, …) when not national
+  trades: string[]; // trade keys it's relevant to (see src/data/trades.ts)
+  summary: string; // what it offers, plain text
+  amountNote: string; // qualitative amount, as the official source states it
+  eligibilityNote: string; // key conditions (Markdown) — criteria, not a promise
+  officialUrl: string; // REQUIRED https official source / application link
+  status: RebateStatus;
+  lastVerifiedAt: Timestamp; // when an admin last confirmed it against the source
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+  updatedBy: string; // admin uid (or "seed" for the code-seeded fallback)
+}
+
+// ---------------------------------------------------------------------------
 // Help Center / FAQ content types.
 //
 // The content itself is hardcoded in src/data/help.ts (no CMS, no Firestore

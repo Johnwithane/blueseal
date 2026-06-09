@@ -25,6 +25,7 @@ import type { IntakeField, Urgency } from "@/firebase/interfaces";
 import type { TradeSuggestion } from "@/data/tradeKeywords";
 import TradeDescribeBox from "@/components/TradeDescribeBox.vue";
 import IntakeFormRenderer from "@/components/IntakeFormRenderer.vue";
+import RebateMatchPanel from "@/components/RebateMatchPanel.vue";
 import { useSeo } from "@/composables/useSeo";
 
 useSeo({
@@ -449,6 +450,12 @@ async function submit() {
         </p>
         <IntakeFormRenderer v-model="intakeData" :fields="intakeFields" class="mt-3" />
       </fieldset>
+
+      <!-- Government / utility rebates that may apply to this kind of work.
+           Self-hides unless the trade (+ province, once entered) matches an
+           active program. Surfaces "may qualify" only — never asserts
+           eligibility; each program links to its official source. -->
+      <RebateMatchPanel v-if="trade" :trade="trade" :region="region" />
 
       <fieldset>
         <legend class="text-sm font-medium">Budget range (CAD)</legend>
