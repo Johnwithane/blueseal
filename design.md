@@ -661,7 +661,6 @@ Live in `functions/src/`, organized by domain (`auth/`, `vetting/`, `reviews/`, 
 - `returnToApplicants` — client callable; escape hatch while job is still in `accepted` status
 - `cancelJobPost` — client callable
 - `onJobPostClosed` — trigger; pages applications and fans rejection notifications
-- `onApplicationCreated` — trigger; belt-and-suspenders client notification
 - `scheduledJobPostExpiry` — daily 03:00 America/Vancouver; flips open posts past `expiresAt` to `expired`
 
 All callable functions must:

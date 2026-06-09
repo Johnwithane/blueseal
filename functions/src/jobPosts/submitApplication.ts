@@ -154,10 +154,14 @@ export const submitApplication = onCall(CALLABLE_OPTS, async (req) => {
       );
     });
 
-    // Notify the client outside the transaction. onApplicationCreated trigger
-    // also handles this — keeping it here means we don't drop notifications
-    // on a transient trigger failure. Idempotent at the UI layer is fine for
-    // a brief duplicate.
+    // Notify the client outside the transaction. This callable is the single
+    // source of the new_application notification — one application doc = one
+    // notify. Re-applies are blocked above (already-exists throws), so this
+    // fires exactly once per applicant. (Previously an onApplicationCreated
+    // trigger also notified here "belt-and-suspenders"; that produced a
+    // guaranteed duplicate in the client's inbox on every application, so it
+    // was removed. Mirrors submitQuote, which notifies synchronously with no
+    // paired trigger.)
     const postSnap = await postRef.get();
     const post = postSnap.data() as { clientId: string; title: string };
     await notify({

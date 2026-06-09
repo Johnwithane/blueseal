@@ -65,7 +65,7 @@ Keep this table up to date when you add a type.
 | `message_received` | `chats/{chatId}/messages/{msgId}` created | The non-sender party of the chat | `low` | Chat is high-volume; the bell badge is enough |
 | `job_requested` | `jobs/{jobId}` created (non-marketplace) | The assigned tradesperson | `high` | Marketplace conversions are skipped (acceptApplication already paged them) |
 | `job_cancelled` | `jobs/{jobId}.status → "cancelled"` | The opposite party of `cancelledBy` (both if unknown) | `high` | Sentinel `cancelledBy: "system"` from `returnToApplicants` suppresses this trigger to avoid dupe with `application_returned` |
-| `new_application` | Application created (callable + trigger belt-and-suspenders) | The job-post owner (client) | `high` from `submitApplication`, `low` from `onApplicationCreated` (dedup) | |
+| `new_application` | `submitApplication` callable | The job-post owner (client) | `high` | One application doc = one notify (re-applies blocked, so it fires once). A former `onApplicationCreated` trigger also notified here and was removed — it produced a guaranteed duplicate. |
 | `application_accepted` | `acceptApplication` callable | The selected applicant (tradesperson) | `high` | Big moment for the tradie |
 | `application_rejected` | `onJobPostClosed` fan-out | Each still-pending applicant | `normal` | Don't SMS bad news |
 | `application_returned` | `returnToApplicants` callable | The previously-selected applicant | `normal` | Their application is back to pending |
