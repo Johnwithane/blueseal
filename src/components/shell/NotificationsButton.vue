@@ -163,7 +163,8 @@ async function onMarkAllRead() {
   height: 1rem;
   padding: 0 0.25rem;
   border-radius: 9999px;
-  background: var(--bs-blue);
+  /* Unread = red (attention). See design-system.md "Design language". */
+  background: var(--bs-red);
   color: white;
   font-size: 10px;
   font-weight: 600;
@@ -225,7 +226,8 @@ async function onMarkAllRead() {
   height: 1rem;
   padding: 0 0.25rem;
   border-radius: 9999px;
-  background: var(--bs-blue);
+  /* Unread = red (attention). See design-system.md "Design language". */
+  background: var(--bs-red);
   color: white;
   font-size: 10px;
   font-weight: 600;

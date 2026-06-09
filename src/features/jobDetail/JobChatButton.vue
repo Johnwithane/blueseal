@@ -123,7 +123,8 @@ const unreadCount = computed(() => {
   height: 1.25rem;
   padding: 0 0.4rem;
   border-radius: 9999px;
-  background: #ef4444;
+  /* Unread = brand red (attention), shared with the notification badges. */
+  background: var(--bs-red);
   color: white;
   font-size: 0.6875rem;
   font-weight: 700;

@@ -221,7 +221,7 @@ function openMenu(e: Event) {
             <i class="pi pi-bell"></i>
             <span
               v-if="unreadCount > 0"
-              class="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[color:var(--bs-blue)] px-1 text-[10px] font-semibold leading-none text-white"
+              class="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[color:var(--bs-red)] px-1 text-[10px] font-semibold leading-none text-white"
             >
               {{ unreadCount > 9 ? "9+" : unreadCount }}
             </span>

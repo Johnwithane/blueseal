@@ -24,7 +24,7 @@ useSeo(helpCenterSeo());
       <div class="pointer-events-none absolute -top-20 -left-20 h-72 w-72 rounded-full bg-white/15 blur-3xl"></div>
       <div class="relative bs-container py-14 sm:py-20 text-center">
         <SealCharacter name="pose-wave" eager class="mx-auto mb-3 h-36 w-auto drop-shadow-xl sm:h-44" />
-        <span class="bs-kicker justify-center !text-[#a0d6f1]">Help Center</span>
+        <span class="bs-kicker justify-center !text-[color:var(--bs-green-light)]">Help Center</span>
         <h1 class="bs-display mt-3 text-3xl sm:text-5xl">How can we help?</h1>
         <p class="mx-auto mt-3 max-w-xl text-white/85">
           Search our guides and FAQs, or get in touch — we're here for clients and tradespeople alike.
@@ -94,15 +94,15 @@ useSeo(helpCenterSeo());
         <div class="bs-card overflow-hidden">
           <div class="grid md:grid-cols-[0.9fr_1.1fr]">
             <div class="relative overflow-hidden bs-gradient-deep p-8 text-white">
-              <span class="bs-kicker !text-[#a0d6f1]">Still need help?</span>
+              <span class="bs-kicker !text-[color:var(--bs-green-light)]">Still need help?</span>
               <h2 class="mt-3 text-2xl font-bold tracking-tight">Talk to our team</h2>
               <p class="mt-3 text-white/85">
                 Can't find the answer? Send us a message and we'll get back to you by email. If it's
                 about a specific job, include the job link from your dashboard.
               </p>
               <ul class="mt-5 space-y-2 text-sm text-white/85">
-                <li class="flex items-center gap-2"><i class="pi pi-check-circle text-[#a0d6f1]"></i> Real people, real answers</li>
-                <li class="flex items-center gap-2"><i class="pi pi-check-circle text-[#a0d6f1]"></i> We can review the job, chat & invoice</li>
+                <li class="flex items-center gap-2"><i class="pi pi-check-circle text-[color:var(--bs-green-light)]"></i> Real people, real answers</li>
+                <li class="flex items-center gap-2"><i class="pi pi-check-circle text-[color:var(--bs-green-light)]"></i> We can review the job, chat & invoice</li>
               </ul>
               <SealCharacter
                 name="scene-support"

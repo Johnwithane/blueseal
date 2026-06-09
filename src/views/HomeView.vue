@@ -132,7 +132,7 @@ onMounted(async () => {
     <section class="relative overflow-hidden text-white">
       <div class="absolute inset-0 bs-gradient-brand"></div>
       <div class="pointer-events-none absolute -top-20 -left-20 h-80 w-80 rounded-full bg-white/15 blur-3xl"></div>
-      <div class="pointer-events-none absolute -bottom-20 -right-20 h-80 w-80 rounded-full bg-[#1d406a]/40 blur-3xl"></div>
+      <div class="pointer-events-none absolute -bottom-20 -right-20 h-80 w-80 rounded-full bg-[color-mix(in_srgb,var(--bs-blue-dark)_40%,transparent)] blur-3xl"></div>
 
       <div class="relative bs-container py-20 sm:py-24 grid sm:grid-cols-[1.15fr_0.85fr] gap-8 sm:gap-10 lg:gap-12 items-center">
         <!-- Headline + CTAs — left -->
@@ -140,7 +140,7 @@ onMounted(async () => {
           <span
             class="inline-flex items-center gap-2 rounded-full bg-white/10 backdrop-blur px-3 py-1 text-xs font-semibold tracking-wider uppercase ring-1 ring-white/25"
           >
-            <i class="pi pi-verified text-[#a0d6f1]"></i>
+            <i class="pi pi-verified text-[color:var(--bs-green-light)]"></i>
             Verified Canadian tradespeople
           </span>
           <h1 class="bs-display mt-5 text-4xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl leading-[1.02]">
@@ -203,7 +203,7 @@ onMounted(async () => {
         <div class="relative w-full max-w-[18rem] sm:max-w-[18rem] md:max-w-sm lg:max-w-md xl:max-w-lg mx-auto sm:mx-0">
           <div class="relative aspect-square">
             <div
-              class="absolute inset-6 rounded-full bg-gradient-to-br from-[#a0d6f1] via-[#49a1d3] to-[#1d406a] opacity-40 blur-2xl bs-spin-slow"
+              class="absolute inset-6 rounded-full bg-gradient-to-br from-[var(--bs-blue-light)] via-[var(--bs-blue)] to-[var(--bs-blue-dark)] opacity-40 blur-2xl bs-spin-slow"
             ></div>
             <img
               src="/icons/blueseal_logoCircle.png"
@@ -336,7 +336,7 @@ onMounted(async () => {
           <div class="bs-reveal group rounded-2xl overflow-hidden border border-[color:var(--bs-border)] bg-white shadow-sm hover:shadow-xl transition-shadow">
             <div class="relative h-44 overflow-hidden">
               <img :src="chatImg" alt="" class="h-full w-full object-cover group-hover:scale-105 transition-transform duration-700" />
-              <div class="absolute inset-0 bg-gradient-to-t from-[#1d406a]/70 to-transparent"></div>
+              <div class="absolute inset-0 bg-gradient-to-t from-[color-mix(in_srgb,var(--bs-blue-dark)_70%,transparent)] to-transparent"></div>
               <div class="absolute top-3 left-3 h-9 w-9 rounded-full bg-white text-[color:var(--bs-blue-dark)] grid place-items-center font-bold shadow">1</div>
             </div>
             <div class="p-6">
@@ -348,7 +348,7 @@ onMounted(async () => {
           <div class="bs-reveal group rounded-2xl overflow-hidden border border-[color:var(--bs-border)] bg-white shadow-sm hover:shadow-xl transition-shadow" style="transition-delay: 80ms">
             <div class="relative h-44 overflow-hidden">
               <img :src="toolsImg" alt="" class="h-full w-full object-cover group-hover:scale-105 transition-transform duration-700" />
-              <div class="absolute inset-0 bg-gradient-to-t from-[#1d406a]/70 to-transparent"></div>
+              <div class="absolute inset-0 bg-gradient-to-t from-[color-mix(in_srgb,var(--bs-blue-dark)_70%,transparent)] to-transparent"></div>
               <div class="absolute top-3 left-3 h-9 w-9 rounded-full bg-white text-[color:var(--bs-blue-dark)] grid place-items-center font-bold shadow">2</div>
             </div>
             <div class="p-6">
@@ -360,7 +360,7 @@ onMounted(async () => {
           <div class="bs-reveal group rounded-2xl overflow-hidden border border-[color:var(--bs-border)] bg-white shadow-sm hover:shadow-xl transition-shadow" style="transition-delay: 160ms">
             <div class="relative h-44 overflow-hidden">
               <img :src="houseImg" alt="" class="h-full w-full object-cover group-hover:scale-105 transition-transform duration-700" />
-              <div class="absolute inset-0 bg-gradient-to-t from-[#1d406a]/70 to-transparent"></div>
+              <div class="absolute inset-0 bg-gradient-to-t from-[color-mix(in_srgb,var(--bs-blue-dark)_70%,transparent)] to-transparent"></div>
               <div class="absolute top-3 left-3 h-9 w-9 rounded-full bg-white text-[color:var(--bs-blue-dark)] grid place-items-center font-bold shadow">3</div>
             </div>
             <div class="p-6">
@@ -379,11 +379,11 @@ onMounted(async () => {
       <div class="absolute inset-0 bg-[color:var(--bs-blue-dark)]/85"></div>
       <div
         class="absolute inset-0"
-        style="background: linear-gradient(100deg, rgba(29,64,106,0.85) 0%, rgba(29,64,106,0.65) 55%, rgba(29,64,106,0.55) 100%)"
+        style="background: linear-gradient(100deg, color-mix(in srgb, var(--bs-blue-dark) 85%, transparent) 0%, color-mix(in srgb, var(--bs-blue-dark) 65%, transparent) 55%, color-mix(in srgb, var(--bs-blue-dark) 55%, transparent) 100%)"
       ></div>
       <div class="relative bs-container py-20 sm:py-24 text-white grid md:grid-cols-2 gap-10 items-center">
         <div class="bs-reveal">
-          <span class="bs-kicker !text-[#a0d6f1]">For tradespeople</span>
+          <span class="bs-kicker !text-[color:var(--bs-green-light)]">For tradespeople</span>
           <h2 class="mt-3 text-3xl sm:text-4xl font-bold tracking-tight">
             Spend less time chasing leads. Spend more time on tools.
           </h2>
@@ -392,9 +392,9 @@ onMounted(async () => {
             keep every job clean from request to review.
           </p>
           <ul class="mt-6 space-y-3 text-white/90">
-            <li class="flex items-start gap-3"><i class="pi pi-check-circle mt-1 text-[#a0d6f1]"></i><span>Cert + ID badge on your profile from day one.</span></li>
-            <li class="flex items-start gap-3"><i class="pi pi-check-circle mt-1 text-[#a0d6f1]"></i><span>AI-assisted quoting and job summaries.</span></li>
-            <li class="flex items-start gap-3"><i class="pi pi-check-circle mt-1 text-[#a0d6f1]"></i><span>Auto-invoice on job completion.</span></li>
+            <li class="flex items-start gap-3"><i class="pi pi-check-circle mt-1 text-[color:var(--bs-green-light)]"></i><span>Cert + ID badge on your profile from day one.</span></li>
+            <li class="flex items-start gap-3"><i class="pi pi-check-circle mt-1 text-[color:var(--bs-green-light)]"></i><span>AI-assisted quoting and job summaries.</span></li>
+            <li class="flex items-start gap-3"><i class="pi pi-check-circle mt-1 text-[color:var(--bs-green-light)]"></i><span>Auto-invoice on job completion.</span></li>
           </ul>
           <div class="mt-8 flex flex-wrap gap-3">
             <RouterLink to="/sign-up?as=tradesperson">
@@ -519,7 +519,7 @@ onMounted(async () => {
             <i class="pi pi-quote-right absolute top-4 right-4 text-2xl text-[color:var(--bs-blue-light)]"></i>
             <blockquote class="text-[color:var(--bs-text)] leading-relaxed">"{{ t.quote }}"</blockquote>
             <figcaption class="mt-5 flex items-center gap-3">
-              <div class="h-10 w-10 rounded-full bg-gradient-to-br from-[#a0d6f1] to-[#49a1d3] text-white grid place-items-center font-semibold">
+              <div class="h-10 w-10 rounded-full bg-gradient-to-br from-[var(--bs-blue-light)] to-[var(--bs-blue)] text-white grid place-items-center font-semibold">
                 {{ t.name.charAt(0) }}
               </div>
               <div>
@@ -588,7 +588,7 @@ onMounted(async () => {
     <section class="relative overflow-hidden">
       <div class="absolute inset-0 bs-gradient-brand"></div>
       <div class="pointer-events-none absolute -top-20 -left-20 h-80 w-80 rounded-full bg-white/15 blur-3xl"></div>
-      <div class="pointer-events-none absolute -bottom-20 -right-20 h-80 w-80 rounded-full bg-[#1d406a]/40 blur-3xl"></div>
+      <div class="pointer-events-none absolute -bottom-20 -right-20 h-80 w-80 rounded-full bg-[color-mix(in_srgb,var(--bs-blue-dark)_40%,transparent)] blur-3xl"></div>
 
       <div class="relative bs-container py-20 sm:py-24 text-center text-white">
         <img

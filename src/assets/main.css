@@ -2,22 +2,40 @@
 
 /* Blue Seal palette */
 :root {
-  --bs-blue: #49a1d3;
-  --bs-blue-light: #a0d6f1;
-  --bs-blue-dark: #1d406a;
-  --bs-amber: #f59e0b;
+  /* --- Brand ramps ----------------------------------------------------------
+     Blue is primary; red and green are secondary accents. Each ramp is
+     base / light / dark and is the SINGLE source of truth — change a value here
+     and it propagates to every token-driven surface (gradients, the .bs-kicker
+     eyebrow, component arbitrary values like text-[color:var(--bs-blue)]).
+     The blue ramp is mirrored in two non-CSS places that must be retuned with
+     it: the PrimeVue control theme (src/theme/preset.ts) and the PDF renderer
+     (src/utils/pdfRender.ts, as RGB tuples).
+     Rule: never re-hardcode these hexes in a component — reference var(--bs-…).
 
-  /* --- Secondary accent: red -------------------------------------------------
-     The brand is mostly blue with red accents. --bs-red is the single knob:
-     change this ONE value to retune the accent everywhere — the light/dark
-     steps derive from it via color-mix, and every accent (kicker eyebrows,
-     .bs-accent-* helpers) routes through these tokens, never raw hex.
-     NOTE: this is a *brand* colour, distinct from the semantic error red
-     (.bs-pill.danger / --bs-status-cancelled #ef4444). Those stay a fixed UI
-     signal — don't swap them for the brand accent. */
-  --bs-red: #df3b35;
-  --bs-red-light: color-mix(in srgb, var(--bs-red) 16%, white);
-  --bs-red-dark: color-mix(in srgb, var(--bs-red) 82%, black);
+     Design language (see skills/design-system.md):
+       blue  = primary / structure / trust
+       red   = attention / alert  (notification badges, errors)
+       green = positive / success (verified ✓, benefit eyebrows)
+       amber = caution / pending / ratings */
+  --bs-blue: #3291c7;
+  --bs-blue-light: #9ec8e0;
+  --bs-blue-dark: #1e416b;
+
+  /* Secondary accent — red (attention). A *brand* colour, distinct from the
+     semantic error red (.bs-pill.danger / --bs-status-cancelled #ef4444), which
+     stays a fixed UI signal — don't swap one for the other. */
+  --bs-red: #e54d55;
+  --bs-red-light: #e19099;
+  --bs-red-dark: #a72c32;
+
+  /* Secondary accent — green (positive). A *brand* colour, distinct from the
+     semantic success/verified greens (.bs-pill.verified, --bs-status-complete
+     #10b981), which stay fixed UI signals. */
+  --bs-green: #29c765;
+  --bs-green-light: #6be89b;
+  --bs-green-dark: #2f8851;
+
+  --bs-amber: #f59e0b;
   --bs-bg: #f5f7fb;
   --bs-text: #111827;
   --bs-muted: #6b7280;
@@ -268,22 +286,22 @@ a { color: var(--bs-blue); }
 
 /* Brand gradients */
 .bs-gradient-brand {
-  background: linear-gradient(135deg, #1d406a 0%, #49a1d3 60%, #a0d6f1 100%);
+  background: linear-gradient(135deg, var(--bs-blue-dark) 0%, var(--bs-blue) 60%, var(--bs-blue-light) 100%);
 }
 .bs-gradient-deep {
-  background: linear-gradient(180deg, #1d406a 0%, #102844 100%);
+  background: linear-gradient(180deg, var(--bs-blue-dark) 0%, #122740 100%);
 }
 .bs-gradient-soft {
   background: linear-gradient(180deg, #ffffff 0%, #eaf5fc 100%);
 }
 .bs-gradient-overlay {
-  background: linear-gradient(180deg, rgba(29,64,106,0.78) 0%, rgba(29,64,106,0.55) 50%, rgba(29,64,106,0.85) 100%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bs-blue-dark) 78%, transparent) 0%, color-mix(in srgb, var(--bs-blue-dark) 55%, transparent) 50%, color-mix(in srgb, var(--bs-blue-dark) 85%, transparent) 100%);
 }
 .bs-gradient-overlay-r {
-  background: linear-gradient(100deg, rgba(29,64,106,0.92) 0%, rgba(29,64,106,0.65) 55%, rgba(73,161,211,0.25) 100%);
+  background: linear-gradient(100deg, color-mix(in srgb, var(--bs-blue-dark) 92%, transparent) 0%, color-mix(in srgb, var(--bs-blue-dark) 65%, transparent) 55%, color-mix(in srgb, var(--bs-blue) 25%, transparent) 100%);
 }
 .bs-gradient-text {
-  background: linear-gradient(120deg, #a0d6f1, #ffffff 60%, #a0d6f1);
+  background: linear-gradient(120deg, var(--bs-blue-light), #ffffff 60%, var(--bs-blue-light));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -316,7 +334,7 @@ a { color: var(--bs-blue); }
 
 /* Decorative seal glow */
 .bs-glow {
-  filter: drop-shadow(0 10px 30px rgba(73,161,211,0.45)) drop-shadow(0 0 20px rgba(160,214,241,0.35));
+  filter: drop-shadow(0 10px 30px color-mix(in srgb, var(--bs-blue) 45%, transparent)) drop-shadow(0 0 20px color-mix(in srgb, var(--bs-blue-light) 35%, transparent));
 }
 
 /* Trade tile hover */
@@ -350,9 +368,10 @@ a { color: var(--bs-blue); }
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  /* Red accent eyebrow on light sections — the brand's pop of red. Dark
-     sections override to --bs-blue-light inline (red on navy clashes). */
-  color: var(--bs-red);
+  /* Green accent eyebrow (green = positive — "what sets us apart"). Uses the
+     dark step for legibility on light backgrounds; dark sections override the
+     colour inline to --bs-green-light, which reads cleanly on navy. */
+  color: var(--bs-green-dark);
 }
 .bs-kicker::before {
   content: "";

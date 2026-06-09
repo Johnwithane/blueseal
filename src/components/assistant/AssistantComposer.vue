@@ -92,7 +92,7 @@ function onKeydown(e: KeyboardEvent) {
 }
 .bs-assistant-composer :deep(.p-textarea:focus) {
   border-color: var(--bs-blue);
-  box-shadow: 0 0 0 3px rgba(73, 161, 211, 0.18);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--bs-blue) 18%, transparent);
 }
 .bs-assistant-composer :deep(.p-button) {
   border-radius: 9999px;

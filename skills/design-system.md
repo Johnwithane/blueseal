@@ -14,28 +14,53 @@ inline `:style` bindings (including JS colour maps — `var()` resolves there to
 
 | Token | Value | Use |
 |-------|-------|-----|
-| `--bs-blue` | `#49a1d3` | primary brand |
-| `--bs-blue-light` | `#a0d6f1` | tints, light accents |
-| `--bs-blue-dark` | `#1d406a` | deep brand, logo text |
-| `--bs-red` | `#df3b35` | **secondary red accent** — the single knob; retune this one value |
-| `--bs-red-light` | _derived_ | red tint (backgrounds), `color-mix` off `--bs-red` |
-| `--bs-red-dark` | _derived_ | deep red (text-on-light / hover), `color-mix` off `--bs-red` |
-| `--bs-amber` | `#f59e0b` | secondary accent (ratings/stars) |
+| `--bs-blue` | `#3291c7` | primary brand |
+| `--bs-blue-light` | `#9ec8e0` | tints, light accents |
+| `--bs-blue-dark` | `#1e416b` | deep brand, logo text |
+| `--bs-red` | `#e54d55` | accent — **attention/alert** (notification & unread badges) |
+| `--bs-red-light` | `#e19099` | red tint (soft backgrounds) |
+| `--bs-red-dark` | `#a72c32` | deep red (text/icons on light, hover) |
+| `--bs-green` | `#29c765` | accent — **positive/success** (verified ✓, benefit eyebrows) |
+| `--bs-green-light` | `#6be89b` | green accent on dark surfaces; soft green tint |
+| `--bs-green-dark` | `#2f8851` | green text/eyebrows on light (legible contrast) |
+| `--bs-amber` | `#f59e0b` | accent — caution/pending, ratings/stars |
 | `--bs-bg` | `#f5f7fb` | app background |
 | `--bs-text` | `#111827` | body text |
 | `--bs-muted` / `--bs-text-muted` | `#6b7280` | secondary text (aliases — same value) |
 | `--bs-border` | `#e5e7eb` | borders, dividers |
 | `--bs-surface-alt` | `#f9fafb` | hover/active rows, zebra, unread tint, column wells |
 
-**Rule:** never write the brand hexes (`#49a1d3`, `#1d406a`, `#a0d6f1`, `#f59e0b`,
-`#df3b35`) as literals — route them through the tokens so the palette stays
-swappable.
+**Rule:** never write the brand hexes as literals — route every brand colour
+through these tokens so the palette stays swappable. The blue ramp is also
+mirrored in the PrimeVue control preset (`src/theme/preset.ts`, a 50–950 scale)
+and the PDF renderer (`src/utils/pdfRender.ts`, as RGB tuples); if you retune
+blue, update those two in the same change.
 
-**Red accent vs. error red.** `--bs-red` is a *brand* accent (e.g. the section
-`.bs-kicker` eyebrow on light sections). It is **not** the semantic error red —
-that's the fixed `#ef4444` in `.bs-pill.danger` / `--bs-status-cancelled`, a UI
-signal that must stay constant. Don't collapse the two; changing `--bs-red`
-should never affect error/cancelled styling.
+### Design language — when to use each colour
+
+Blue is the **primary**: structure, chrome, primary actions, the bulk of every
+surface. Red and green are **accents** — used sparingly for meaning, never as
+large fills:
+
+- **Red** (`--bs-red`) — *attention / alert*: unread + notification badges
+  (`.shell-*__badge`, the header bell badge, `JobChatButton` badge), and by
+  extension anything urgent.
+- **Green** (`--bs-green`) — *positive / success*: verified ✓ and benefit
+  marketing eyebrows (`.bs-kicker`). On light backgrounds use `--bs-green-dark`
+  for legible contrast; on dark surfaces use `--bs-green-light`.
+- **Amber** (`--bs-amber`) — *caution / pending*, and star ratings.
+
+Each accent ramp is base / light / dark: `light` for soft tinted backgrounds or
+text on dark surfaces, `dark` for text/icons on light or hover states.
+
+**Brand accents vs. semantic signals — keep them separate.** The brand accents
+are decorative and swappable; they are NOT the fixed status colours, and
+changing one must never shift the other:
+
+- error/danger red is the constant `#ef4444` (`.bs-pill.danger`,
+  `--bs-status-cancelled`) — *not* `--bs-red`.
+- success/verified green is `.bs-pill.verified` / `--bs-status-complete`
+  (`#10b981`) — *not* `--bs-green`.
 
 ## Job-status palette
 

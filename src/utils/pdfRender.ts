@@ -65,16 +65,16 @@ interface DocSummary {
 // file is self-contained. Mirrors the CSS custom properties in
 // src/assets/main.css so on-screen and on-paper Blue Seal feel like
 // the same brand.
-//   --bs-blue-dark   #1d406a → header band, table head, accents
-//   --bs-blue        #49a1d3 → secondary band, links
-//   --bs-blue-light  #a0d6f1 → ultra-soft panels
+//   --bs-blue-dark   #1e416b → header band, table head, accents
+//   --bs-blue        #3291c7 → secondary band, links
+//   --bs-blue-light  #9ec8e0 → ultra-soft panels
 //   --bs-amber       #f59e0b → total highlight
 //   --bs-bg          #f5f7fb → paper-alt panels
 const BRAND = {
-  blueDark: [29, 64, 106] as const, // #1d406a
-  blue: [73, 161, 211] as const, // #49a1d3
-  blueLight: [160, 214, 241] as const, // #a0d6f1
-  bluePanel: [231, 242, 250] as const, // computed ~10% mix of blue on white
+  blueDark: [30, 65, 107] as const, // #1e416b
+  blue: [50, 145, 199] as const, // #3291c7
+  blueLight: [158, 200, 224] as const, // #9ec8e0
+  bluePanel: [235, 244, 249] as const, // computed ~10% mix of blue on white
   amber: [245, 158, 11] as const, // #f59e0b
   ink: [17, 24, 39] as const, // #111827
   muted: [107, 114, 128] as const, // #6b7280
