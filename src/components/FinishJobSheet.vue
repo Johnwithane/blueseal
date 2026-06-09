@@ -75,13 +75,12 @@ const EXTRA_PRESETS = [
   "Sourcing fee",
 ] as const;
 
-// Quote line items, hydrated once when the sheet opens. Pre-filled so the
-// invoice picks up where the quote left off — the tradesperson can edit
-// descriptions / amounts / taxes per row, or remove what no longer applies
-// (e.g. a quoted line that didn't end up being needed). Hourly quote rows
-// are flattened into a single line total here because expanded hours/rate
-// already came in via the time tracker — the description preserves the
-// original "Xh × $Y/hr" framing so the client can match it back.
+// Quote line items, hydrated once when the sheet opens. Only the FIXED rows
+// (materials, flat labour) are pre-filled — the tradesperson can edit amounts /
+// taxes per row or remove what no longer applies. HOURLY quote rows are
+// deliberately EXCLUDED: that labour is billed from clocked time via the
+// time-tracker rollup, so pre-filling the quote's estimated hours would bill
+// the estimate instead of the hours actually worked. See hydrateFromQuote.
 const quoteRows = ref<ExtraRow[]>([]);
 const loadingQuote = ref(false);
 const quoteLoaded = ref(false);
@@ -148,21 +147,21 @@ async function hydrateFromQuote() {
       quoteRows.value = [];
       return;
     }
-    quoteRows.value = q.lineItems.map((li) => {
-      const qty = li.quantity ?? 1;
-      const unit = li.unitPrice ?? 0;
-      const total = qty * unit;
-      let desc = li.description ?? "";
-      if (li.kind === "hourly" && qty > 0 && unit > 0) {
-        const rate = (unit / 100).toFixed(2);
-        desc = `${desc} — ${qty}h × $${rate}/hr`;
-      }
-      return {
-        description: desc,
-        unitPriceDollars: total / 100,
-        taxRate: li.taxRate ?? 0,
-      };
-    });
+    // Skip hourly rows — they're billed from clocked time (the Time section
+    // above / the server's time rollup), NOT the quote's estimate. Pulling them
+    // in here was billing quoted hours and ignoring the tracked ones. Fixed rows
+    // (materials, flat labour) are the real agreed charges and stay.
+    quoteRows.value = q.lineItems
+      .filter((li) => li.kind !== "hourly")
+      .map((li) => {
+        const qty = li.quantity ?? 1;
+        const unit = li.unitPrice ?? 0;
+        return {
+          description: li.description ?? "",
+          unitPriceDollars: (qty * unit) / 100,
+          taxRate: li.taxRate ?? 0,
+        };
+      });
   } catch {
     // Quote read can fail (legacy job without a quote, permission edge).
     // Leave quoteRows empty — sheet still works from time + expenses + extras.
