@@ -53,6 +53,17 @@ let initPromise: Promise<void> | null = null;
 // retries next session.
 const impliedRolesAttempted = new Set<string>();
 
+// Uids currently being provisioned by signUp / signInWithGoogle /
+// completeEmailLinkSignIn. While a uid is in this set, applyAuthState's
+// orphaned-account self-heal must NOT fire for it: onAuthStateChanged runs
+// applyAuthState concurrently with the provisioning method, which would
+// otherwise read the not-yet-written doc, declare an orphan, and write a
+// racing `client` doc — clobbering the intended role and tripping the users
+// update rule (duplicate createdAt) into permission-denied. Cleared in a
+// finally so an exception can't strand the guard. A genuine orphan (returning
+// user, empty set) still self-heals normally.
+const provisioningUids = new Set<string>();
+
 /**
  * Normalize a claim value into a Role[] regardless of which shape it arrives in.
  * Accepts the new `roles: string[]` claim and the legacy singular `role: string`.
@@ -156,7 +167,7 @@ export const useAuthStore = defineStore("auth", {
         // email the interrupted signup never got to. Guarded on docReadOk so a
         // transient read failure can never overwrite or race a live doc; bounded
         // to once per account since the next sign-in finds the doc.
-        if (docReadOk && !doc) {
+        if (docReadOk && !doc && !provisioningUids.has(fbUser.uid)) {
           console.warn("[auth] orphaned account (no user doc) — self-healing", {
             uid: fbUser.uid,
           });
@@ -249,8 +260,15 @@ export const useAuthStore = defineStore("auth", {
     }) {
       this.pending = true;
       this.error = null;
+      // Guard applyAuthState's self-heal against racing our own createUser
+      // below (see provisioningUids). Register the uid with no `await` between
+      // the auth call and the add, so the concurrently-queued applyAuthState
+      // sees it set.
+      let provisioningUid: string | null = null;
       try {
         const cred = await createUserWithEmailAndPassword(auth, opts.email, opts.password);
+        provisioningUid = cred.user.uid;
+        provisioningUids.add(provisioningUid);
         await updateProfile(cred.user, { displayName: opts.displayName });
         await createUser({
           uid: cred.user.uid,
@@ -269,6 +287,7 @@ export const useAuthStore = defineStore("auth", {
         this.error = (e as Error).message;
         throw e;
       } finally {
+        if (provisioningUid) provisioningUids.delete(provisioningUid);
         this.pending = false;
       }
     },
@@ -289,8 +308,13 @@ export const useAuthStore = defineStore("auth", {
     async signInWithGoogle(intendedRole: Role = "client") {
       this.pending = true;
       this.error = null;
+      // Guard applyAuthState's self-heal from racing our provisioning below
+      // and overwriting the intended role with `client` (see provisioningUids).
+      let provisioningUid: string | null = null;
       try {
         const cred = await signInWithPopup(auth, new GoogleAuthProvider());
+        provisioningUid = cred.user.uid;
+        provisioningUids.add(provisioningUid);
         const existing = await getUser(cred.user.uid);
         if (!existing) {
           await createUser({
@@ -309,6 +333,7 @@ export const useAuthStore = defineStore("auth", {
         this.error = (e as Error).message;
         throw e;
       } finally {
+        if (provisioningUid) provisioningUids.delete(provisioningUid);
         this.pending = false;
       }
     },
@@ -322,12 +347,17 @@ export const useAuthStore = defineStore("auth", {
     async completeEmailLinkSignIn(email: string): Promise<{ isNew: boolean }> {
       this.pending = true;
       this.error = null;
+      // Guard applyAuthState's self-heal from racing our provisioning below
+      // and overwriting the intended `tradesperson` role (see provisioningUids).
+      let provisioningUid: string | null = null;
       try {
         const href = window.location.href;
         if (!isSignInWithEmailLink(auth, href)) {
           throw new Error("This sign-in link is invalid or has expired.");
         }
         const cred = await signInWithEmailLink(auth, email, href);
+        provisioningUid = cred.user.uid;
+        provisioningUids.add(provisioningUid);
         const existing = await getUser(cred.user.uid);
         let isNew = false;
         if (!existing) {
@@ -353,6 +383,7 @@ export const useAuthStore = defineStore("auth", {
         this.error = (e as Error).message;
         throw e;
       } finally {
+        if (provisioningUid) provisioningUids.delete(provisioningUid);
         this.pending = false;
       }
     },

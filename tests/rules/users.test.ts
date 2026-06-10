@@ -245,6 +245,27 @@ describe("users — server-managed field locks still enforced", () => {
   });
 });
 
+describe("users — create-only / duplicate provisioning guard", () => {
+  // The signup race we fixed: applyAuthState's orphan self-heal could write a
+  // second `users/{uid}` doc concurrently with signUp's own createUser. The
+  // client-side guard (provisioningUids) stops it, but this pins the rules-side
+  // backstop the bug ultimately tripped — a second owner write lands as an
+  // `update` and the createdAt-equality lock rejects it, so a duplicate write
+  // can never silently overwrite a freshly-created doc.
+  it("owner can create their own doc once", async () => {
+    const fs = env.authenticatedContext(CLIENT_UID, CLIENT_CLAIMS).firestore();
+    await assertSucceeds(setDoc(doc(fs, "users", CLIENT_UID), canonicalUser));
+  });
+
+  it("a second owner write (fresh createdAt) is rejected as an update", async () => {
+    const fs = env.authenticatedContext(CLIENT_UID, CLIENT_CLAIMS).firestore();
+    await assertSucceeds(setDoc(doc(fs, "users", CLIENT_UID), canonicalUser));
+    // Re-writing the full doc stamps a new createdAt serverTimestamp, which
+    // violates the update rule's createdAt-equality lock → permission-denied.
+    await assertFails(setDoc(doc(fs, "users", CLIENT_UID), canonicalUser));
+  });
+});
+
 describe("users — cross-account isolation", () => {
   it("a different user cannot edit someone else's doc", async () => {
     await seed(CLIENT_UID, canonicalUser);

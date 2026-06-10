@@ -75,8 +75,13 @@ export async function createUser(opts: {
   termsAcceptedVersion: string;
 }): Promise<void> {
   const ref = usersCol(opts.uid);
-  // Use setDoc with merge:false so a duplicate signup throws — Cloud Function
-  // setRoleOnSignup then mirrors `roles` to the custom claim.
+  // Plain setDoc (no merge): on a brand-new uid this is a Firestore `create`.
+  // It does NOT throw if the doc already exists — it would overwrite — but a
+  // second write is instead an `update` op, and the users update rule locks
+  // `createdAt` equal to the stored value, so a duplicate/racing write (e.g.
+  // applyAuthState's self-heal, now guarded by provisioningUids) is rejected
+  // with permission-denied rather than silently clobbering the doc. Cloud
+  // Function setRoleOnSignup then mirrors `roles` to the custom claim.
   await setDoc(ref, {
     roles: [opts.role],
     activeRole: opts.role,
