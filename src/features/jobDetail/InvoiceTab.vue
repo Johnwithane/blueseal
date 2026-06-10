@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import Button from "primevue/button";
 import { RouterLink } from "vue-router";
 import QuoteCard from "@/components/QuoteCard.vue";
@@ -31,9 +31,27 @@ const emit = defineEmits<{
   "mark-paid": [];
   "revise-quote": [];
   paid: [];
+  done: [];
 }>();
 
 const showPayDialog = ref(false);
+
+// "Mark job as done" — offered once the invoice is paid (status complete /
+// reviewed) and the viewer hasn't already filed their side. Reuses the
+// per-party archive (handled in JobDetailView); the job, invoice, receipt and
+// reviews all stay readable from the dashboard's Completed view afterwards.
+const viewerArchived = computed(() => {
+  const j = props.job;
+  if (props.isClient) return j.clientArchivedAt != null;
+  if (props.isTradie) return j.tradespersonArchivedAt != null;
+  return true;
+});
+const canMarkDone = computed(
+  () =>
+    (props.isClient || props.isTradie) &&
+    (props.job.status === "complete" || props.job.status === "reviewed") &&
+    !viewerArchived.value,
+);
 
 function openPayDialog() {
   showPayDialog.value = true;
@@ -54,6 +72,31 @@ const lockedStatuses = new Set<JobDoc["status"]>([
 
 <template>
   <div class="space-y-4">
+    <!-- Job is paid + wrapped up — offer to file it away. Per-party: archives
+         only the viewer's side (handled in JobDetailView), then drops them back
+         on the dashboard. The job + invoice + receipt + reviews stay intact and
+         reopenable from the Completed view. -->
+    <div
+      v-if="canMarkDone"
+      class="bs-card p-4 border-l-4 border-l-emerald-500"
+    >
+      <h3 class="font-semibold text-sm mb-1 flex items-center gap-2">
+        <i class="pi pi-check-circle text-emerald-600"></i>
+        All wrapped up
+      </h3>
+      <p class="text-xs text-[color:var(--bs-muted)] mb-3">
+        File this job away to move it to your Completed list. The invoice,
+        receipt and reviews stay here — you can reopen it anytime.
+      </p>
+      <Button
+        label="Mark job as done"
+        icon="pi pi-check"
+        severity="success"
+        class="w-full"
+        @click="emit('done')"
+      />
+    </div>
+
     <!-- Tradie: mark-as-paid CTA when client has approved and paid offline.
          markJobPaid atomically flips invoice → paid + job → complete. -->
     <div

@@ -298,8 +298,8 @@ function counterpartyPhoto(job: WithId<JobDoc>): string | null | undefined {
       class="bs-empty mt-4"
     >
       <i class="pi pi-inbox text-3xl mb-2 block"></i>
-      <p v-if="props.showArchived">No archived jobs yet.</p>
-      <p v-else>No active jobs. Archived jobs appear under the archive view.</p>
+      <p v-if="props.showArchived">No completed jobs yet.</p>
+      <p v-else>No active jobs. Finished jobs appear under View completed.</p>
     </div>
 
     <div v-else class="space-y-5 mt-4">

@@ -102,8 +102,8 @@ function formatBudget(min: number, max: number): string {
           class="mb-3 flex items-center justify-end"
         >
           <Button
-            :label="showArchived ? 'Back to active jobs' : 'View archived'"
-            :icon="showArchived ? 'pi pi-arrow-left' : 'pi pi-inbox'"
+            :label="showArchived ? 'Back to active jobs' : 'View completed'"
+            :icon="showArchived ? 'pi pi-arrow-left' : 'pi pi-check-circle'"
             text
             size="small"
             @click="showArchived = !showArchived"
