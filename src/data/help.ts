@@ -311,8 +311,11 @@ You can return to the **Payouts** screen any time to finish setup or open your p
       "work order",
       "hourly",
       "fixed price",
+      "receipt",
+      "expenses",
+      "materials",
     ],
-    body: `Every active job has a **Work order** tab — the home for the actual work: time, travel, and any change orders.
+    body: `Every active job has a **Work order** tab — the home for the actual work: time, travel, receipts, and any change orders.
 
 **Clocking time.** The tradesperson taps **Clock in** when they start and **Stop** when they finish. The timer runs live and the client sees it too, so the hours are never a surprise. You can clock in straight from the **Jobs** tab as well. While the clock is running, a bar pinned to the top of the app shows the live timer and the job name from any screen — tap **Clock out** there to stop and jump back to the job. Clocking in on a new job automatically stops a session still running on another — only one clock runs at a time. Forgot to start the timer? Tap **Add time manually** on the Work order tab to log a past session — set the start and end and it bills just like clocked time.
 
@@ -320,7 +323,9 @@ You can return to the **Payouts** screen any time to finish setup or open your p
 - On an **hourly** job, clocked time bills at the agreed hourly rate, and **travel** can be clocked separately at the tradesperson's travel rate.
 - On a **fixed-price** job, time is still tracked as a record, but it shows **no charge** — the agreed price stands.
 
-**Change orders.** When a job picks up extra work that wasn't in the original quote, the tradesperson proposes a **change order** — a flat fee, or an hourly rate they then clock against. The client **approves it first**; nothing extra is billed without that sign-off. Approved change orders flow onto the final invoice alongside the agreed price, so the breakdown stays clear and above board.`,
+**Change orders.** When a job picks up extra work that wasn't in the original quote, the tradesperson proposes a **change order** — a flat fee, or an hourly rate they then clock against. The client **approves it first**; nothing extra is billed without that sign-off. Approved change orders flow onto the final invoice alongside the agreed price, so the breakdown stays clear and above board.
+
+**Receipts & expenses.** The tradesperson can upload receipts (materials, fuel, disposal) on the Work order tab — we auto-read the total, vendor and date, and the receipt itself stays private to the tradesperson. On an **hourly** job each receipt becomes a billable line with an optional markup. On a **fixed-price** job receipts are **for the tradesperson's records only and aren't billed** — the agreed price already covers materials. To charge for a material that was genuinely outside the original scope, the tradesperson proposes a **change order** the client approves, rather than adding it as a receipt.`,
   },
   {
     slug: "how-verification-works",
@@ -607,7 +612,7 @@ const faqs: FaqItem[] = [
   {
     question: "Can I track my time and expenses on a job?",
     answer:
-      "Yes. You can clock time against a job and add expenses (including receipts), so the invoice reflects the real work — no separate spreadsheet needed.",
+      "Yes — it all lives on the job's **Work order** tab. Clock time, and upload receipts (materials, fuel, disposal) that we auto-read for total, vendor and date. On an **hourly** job each receipt becomes a billable line with an optional markup; on a **fixed-price** job receipts are for your own records and aren't billed (the agreed price already covers materials — charge an out-of-scope material with a change order instead).",
     categoryId: "for-tradespeople",
     audience: "tradesperson",
   },
@@ -726,6 +731,13 @@ const faqs: FaqItem[] = [
       "Set a **travel rate** in your pricing (it can differ from your hourly rate). On an hourly job you can clock travel time separately and it bills at that rate. On a fixed-price job, travel can only be billed by proposing a change order the client approves.",
     categoryId: "payments-invoices",
     audience: "tradesperson",
+  },
+  {
+    question: "How do I close out a finished job?",
+    answer:
+      "Once the invoice is paid, open the job's **Invoice** tab and tap **Mark job as done**. It files the job under **View completed** on your dashboard and clears it from your active list. Nothing is lost — the invoice, receipt and reviews stay on the job, and you can reopen or restore it anytime. Each side files their own copy, so closing yours doesn't change the other person's view.",
+    categoryId: "payments-invoices",
+    audience: "all",
   },
 
   // ── Account & app ─────────────────────────────────────────────────────────
