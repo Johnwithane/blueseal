@@ -65,10 +65,23 @@ const applyStatusSeverity: Record<
   withdrawn: "warn",
 };
 
+const fmtCents = (cents: number) => `$${Math.round(cents / 100).toLocaleString("en-CA")}`;
+
 function priceLabel(p: ApplicationDoc["proposedPrice"]): string {
-  const fmt = (cents: number) => `$${Math.round(cents / 100).toLocaleString("en-CA")}`;
-  return p.type === "fixed" ? fmt(p.amount) : `${fmt(p.amount)}/hr`;
+  return p.type === "fixed" ? fmtCents(p.amount) : `${fmtCents(p.amount)}/hr`;
 }
+
+// A "site visit first" application carries no quote — just a single visit fee
+// ($0 = free). Show that instead of a bare price so the client understands the
+// applicant wants to see the job before pricing.
+const isSiteVisit = computed(() => props.app.kind === "site_visit");
+const priceSummary = computed(() => {
+  if (isSiteVisit.value) {
+    const cents = props.app.siteVisitFee?.feeCents ?? props.app.proposedPrice.amount;
+    return cents > 0 ? `Site visit · ${fmtCents(cents)}` : "Free site visit";
+  }
+  return priceLabel(props.app.proposedPrice);
+});
 </script>
 
 <template>
@@ -135,7 +148,7 @@ function priceLabel(p: ApplicationDoc["proposedPrice"]): string {
       <div class="text-right">
         <div class="flex items-center justify-end gap-1.5">
           <Tag v-if="revised" value="Revised" severity="info" />
-          <span class="font-semibold">{{ priceLabel(app.proposedPrice) }}</span>
+          <span class="font-semibold" :class="isSiteVisit ? 'text-sm' : ''">{{ priceSummary }}</span>
         </div>
         <div class="text-xs text-[color:var(--bs-muted)]">
           {{ revised ? "Updated" : "Applied" }}
@@ -164,6 +177,19 @@ function priceLabel(p: ApplicationDoc["proposedPrice"]): string {
         <QuoteBreakdown :quote="app.quote" />
       </div>
     </template>
+
+    <!-- Site-visit application: no quote yet, just the explanation + visit fee. -->
+    <p
+      v-else-if="isSiteVisit"
+      class="mt-3 text-sm rounded-lg border border-[color:var(--bs-border)] bg-[color:var(--bs-bg)] p-3 text-[color:var(--bs-muted)]"
+    >
+      <i class="pi pi-map-marker mr-1"></i>
+      They'd visit first, then send a full quote.
+      Visit fee:
+      <span class="font-medium text-[color:var(--bs-text)]">
+        {{ (app.siteVisitFee?.feeCents ?? 0) > 0 ? fmtCents(app.siteVisitFee!.feeCents) : "free" }}
+      </span>.
+    </p>
 
     <!-- Action row: message + decline + accept while the post is open. -->
     <div
@@ -203,7 +229,7 @@ function priceLabel(p: ApplicationDoc["proposedPrice"]): string {
       />
       <Button
         v-else
-        label="Pick this tradesperson"
+        :label="isSiteVisit ? 'Agree to site visit' : 'Pick this tradesperson'"
         icon="pi pi-check"
         @click="emit('pick', app)"
       />

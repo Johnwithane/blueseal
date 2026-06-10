@@ -60,6 +60,9 @@ const ICON: Record<NotificationType, string> = {
   change_order_proposed: "pi pi-plus-circle",
   change_order_approved: "pi pi-check-circle",
   change_order_declined: "pi pi-times-circle",
+  site_visit_proposed: "pi pi-map-marker",
+  site_visit_agreed: "pi pi-check-circle",
+  site_visit_declined: "pi pi-times-circle",
 };
 
 function iconFor(type: NotificationType): string {

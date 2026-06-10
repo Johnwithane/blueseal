@@ -43,6 +43,8 @@ import JobCounterparty from "@/components/JobCounterparty.vue";
 import LoadingState from "@/components/LoadingState.vue";
 import QuoteComposer from "@/components/QuoteComposer.vue";
 import type { QuoteComposerState } from "@/components/QuoteComposer.vue";
+import SiteVisitForm from "@/components/SiteVisitForm.vue";
+import type { SiteVisitFormState } from "@/components/SiteVisitForm.vue";
 import QuoteBreakdown from "@/components/QuoteBreakdown.vue";
 import QuoteSignatureDialog from "@/components/QuoteSignatureDialog.vue";
 import ApplicantCard from "@/components/jobPost/ApplicantCard.vue";
@@ -92,6 +94,18 @@ const pendingApp = ref<WithId<ApplicationDoc> | null>(null);
 // (passed to the composer so hourly lines default to the profile rate).
 const applyHourlyRate = ref<number | null>(null);
 const composerState = ref<QuoteComposerState | null>(null);
+// "quote" = apply with a full itemized quote. "site_visit" = apply asking to
+// see the job first, with an optional fee (no quote yet).
+const applyMode = ref<"quote" | "site_visit">("quote");
+const siteVisitState = ref<SiteVisitFormState | null>(null);
+const applySubmitLabel = computed(() => {
+  if (applyMode.value === "site_visit") {
+    const fee = siteVisitState.value?.fee.feeCents ?? 0;
+    return fee > 0 ? `Apply — site visit ${money(fee)}` : "Apply — free site visit";
+  }
+  const total = composerState.value?.totals.total ?? 0;
+  return total > 0 ? `Send quote — ${money(total)}` : "Send quote";
+});
 
 // Pre-acceptance Q&A + decline (client side). One overlay/dialog serves every
 // applicant row, driven by the stashed application.
@@ -226,23 +240,41 @@ async function submitApply() {
   if (!post.value || submittingApply.value) return;
   applyError.value = null;
 
-  const s = composerState.value;
-  if (!s || !s.valid || !s.payload) {
-    applyError.value = s?.hasHourlyLineWithoutRate
-      ? "An hourly line has no rate — set your profile rate, override it on the line, or switch it to Flat rate."
-      : "Add at least one line item with an amount.";
-    return;
+  // Build the payload per mode: a full quote, or a "site visit first" ask.
+  let payload: unknown;
+  if (applyMode.value === "site_visit") {
+    const sv = siteVisitState.value;
+    if (!sv || !sv.valid) {
+      applyError.value = "Tell the client what the site visit is for.";
+      return;
+    }
+    payload = {
+      kind: "site_visit",
+      postId: postId.value,
+      message: applyMessage.value.trim(),
+      siteVisitFee: sv.fee,
+      proposedStartDate: sv.proposedDate,
+    };
+  } else {
+    const s = composerState.value;
+    if (!s || !s.valid || !s.payload) {
+      applyError.value = s?.hasHourlyLineWithoutRate
+        ? "An hourly line has no rate — set your profile rate, override it on the line, or switch it to Flat rate."
+        : "Add at least one line item with an amount.";
+      return;
+    }
+    payload = {
+      kind: "full",
+      postId: postId.value,
+      message: applyMessage.value.trim(),
+      quote: s.payload,
+      // proposedStartDate rides at the top level of the application (it's also
+      // stored on the materialized quote server-side); the composer carries it
+      // inside the payload, so lift it out here.
+      proposedStartDate: s.payload.proposedStartDate,
+    };
   }
 
-  const payload = {
-    postId: postId.value,
-    message: applyMessage.value.trim(),
-    quote: s.payload,
-    // proposedStartDate rides at the top level of the application (it's also
-    // stored on the materialized quote server-side); the composer carries it
-    // inside the payload, so lift it out here.
-    proposedStartDate: s.payload.proposedStartDate,
-  };
   const parsed = submitApplicationSchema.safeParse(payload);
   if (!parsed.success) {
     applyError.value = parsed.error.issues[0]?.message ?? "Check the form.";
@@ -252,7 +284,12 @@ async function submitApply() {
   submittingApply.value = true;
   try {
     await submitApplication(parsed.data);
-    toast.success("Quote sent", "The client can compare and accept it. They typically respond within 24 hours.");
+    toast.success(
+      applyMode.value === "site_visit" ? "Application sent" : "Quote sent",
+      applyMode.value === "site_visit"
+        ? "You asked to visit first. If the client picks you, you'll arrange the visit, then quote."
+        : "The client can compare and accept it. They typically respond within 24 hours.",
+    );
     applyMessage.value = "";
   } catch (e) {
     applyError.value = humanizeError(e);
@@ -302,17 +339,22 @@ async function onSignedAcceptQuote(signatureDataUrl: string) {
   }
 }
 
-// Legacy path for applications that pre-date the quote-on-apply change
-// (app.quote == null): pick the tradesperson, then they send a formal quote.
+// Quote-less accept path: either a legacy application (predates quote-on-apply)
+// or a "site visit first" application (app.quote == null, app.kind ==
+// "site_visit"). Picking the tradesperson starts the job in "requested"; a
+// site-visit pick also records the agreed visit fee to pre-fill their quote.
 async function onAccept(app: WithId<ApplicationDoc>) {
   const tradieLabel = applicantName(app);
+  const isVisit = app.kind === "site_visit";
   confirm.require({
-    message:
-      `Start a job with ${tradieLabel}? Other applicants will be told you've chosen someone. ` +
-      `If it doesn't work out, you can return to your applicants before completing the brief.`,
-    header: "Pick this tradesperson?",
+    message: isVisit
+      ? `Go with ${tradieLabel}? They'll do a site visit first, then send you a full quote. ` +
+        `Other applicants will be told you've chosen someone.`
+      : `Start a job with ${tradieLabel}? Other applicants will be told you've chosen someone. ` +
+        `If it doesn't work out, you can return to your applicants before completing the brief.`,
+    header: isVisit ? "Agree to a site visit?" : "Pick this tradesperson?",
     icon: "pi pi-check-circle",
-    acceptLabel: "Yes, pick them",
+    acceptLabel: isVisit ? "Yes, agree" : "Yes, pick them",
     rejectLabel: "Cancel",
     accept: async () => {
       submittingAccept.value = true;
@@ -555,6 +597,14 @@ const visibleApplications = computed(() =>
           >
             <QuoteBreakdown :quote="myApplication.quote" />
           </div>
+          <div v-else-if="myApplication.kind === 'site_visit'" class="text-xs mt-2">
+            <i class="pi pi-map-marker mr-1"></i>Site visit first —
+            {{
+              (myApplication.siteVisitFee?.feeCents ?? 0) > 0
+                ? money(myApplication.siteVisitFee!.feeCents)
+                : "free"
+            }}. You'll send a full quote after the visit.
+          </div>
           <div v-else class="text-xs mt-2">Proposed: {{ priceLabel(myApplication.proposedPrice) }}</div>
 
           <!-- Client passed with a reason — surfaced so the tradie knows what
@@ -624,11 +674,37 @@ const visibleApplications = computed(() =>
           class="bs-card p-5 mt-6 space-y-4"
           @submit.prevent="submitApply"
         >
-          <h2 class="text-lg font-semibold">Send a quote</h2>
+          <h2 class="text-lg font-semibold">
+            {{ applyMode === "site_visit" ? "Apply with a site visit" : "Send a quote" }}
+          </h2>
           <p class="text-xs text-[color:var(--bs-muted)]">
-            Your quote is what the client compares and accepts — itemize the work
-            so they can say yes with confidence.
+            {{
+              applyMode === "site_visit"
+                ? "Some jobs can't be priced sight-unseen. Ask to see it first — if the client picks you, you'll arrange the visit, then send a full quote."
+                : "Your quote is what the client compares and accepts — itemize the work so they can say yes with confidence."
+            }}
           </p>
+
+          <!-- Mode toggle: full quote vs "site visit first". -->
+          <div class="flex rounded-lg border border-[color:var(--bs-border)] p-1 text-sm">
+            <button
+              type="button"
+              class="flex-1 rounded-md py-2 px-3 font-medium transition-colors"
+              :class="applyMode === 'quote' ? 'bg-[color:var(--bs-brand)] text-white' : 'text-[color:var(--bs-muted)]'"
+              @click="applyMode = 'quote'"
+            >
+              Send a quote
+            </button>
+            <button
+              type="button"
+              class="flex-1 rounded-md py-2 px-3 font-medium transition-colors"
+              :class="applyMode === 'site_visit' ? 'bg-[color:var(--bs-brand)] text-white' : 'text-[color:var(--bs-muted)]'"
+              @click="applyMode = 'site_visit'"
+            >
+              Site visit first
+            </button>
+          </div>
+
           <Message v-if="applyError" severity="error" :closable="false">
             {{ applyError }}
           </Message>
@@ -643,7 +719,12 @@ const visibleApplications = computed(() =>
             />
           </div>
 
+          <SiteVisitForm
+            v-if="applyMode === 'site_visit'"
+            @update:state="(s) => (siteVisitState = s)"
+          />
           <QuoteComposer
+            v-else
             :hourly-rate-cents="applyHourlyRate"
             hide-note
             @update:state="(s) => (composerState = s)"
@@ -651,11 +732,7 @@ const visibleApplications = computed(() =>
 
           <Button
             type="submit"
-            :label="
-              composerState && composerState.totals.total > 0
-                ? `Send quote — ${money(composerState.totals.total)}`
-                : 'Send quote'
-            "
+            :label="applySubmitLabel"
             icon="pi pi-send"
             :loading="submittingApply"
             :disabled="submittingApply"

@@ -66,7 +66,12 @@ export type NotificationType =
   // proposes an out-of-scope charge; the client approves/declines it up front.
   | "change_order_proposed"
   | "change_order_approved"
-  | "change_order_declined";
+  | "change_order_declined"
+  // Pre-quote site-visit loop (proposeSiteVisit / respondSiteVisit). The
+  // tradesperson asks to see the job before quoting; the client agrees/declines.
+  | "site_visit_proposed"
+  | "site_visit_agreed"
+  | "site_visit_declined";
 
 /**
  * Channel routing per notification.

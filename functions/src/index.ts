@@ -69,6 +69,9 @@ export { resumeJob } from "./jobs/resumeJob";
 export { proposeExtra } from "./jobs/proposeExtra";
 export { respondExtra } from "./jobs/respondExtra";
 export { cancelExtra } from "./jobs/cancelExtra";
+// Pre-quote site-visit loop (tradesperson asks to see the job first, client agrees).
+export { proposeSiteVisit } from "./jobs/proposeSiteVisit";
+export { respondSiteVisit } from "./jobs/respondSiteVisit";
 
 // Invoicing
 export { onJobCompleted } from "./invoicing/onJobCompleted";

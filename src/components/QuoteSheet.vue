@@ -7,6 +7,7 @@ import { computed, ref, watch } from "vue";
 import Dialog from "primevue/dialog";
 import Button from "primevue/button";
 import { submitQuote, getQuoteByJobId } from "@/firebase/services/quotes";
+import { getSiteVisit, proposeSiteVisit } from "@/firebase/services/siteVisits";
 import { getTradesperson } from "@/firebase/services/tradespeople";
 import { useAuthStore } from "@/stores/auth";
 import { useFormatters } from "@/composables/useFormatters";
@@ -14,6 +15,8 @@ import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 import QuoteComposer from "@/components/QuoteComposer.vue";
 import type { QuoteComposerInitial, QuoteComposerState } from "@/components/QuoteComposer.vue";
+import SiteVisitForm from "@/components/SiteVisitForm.vue";
+import type { SiteVisitFormState } from "@/components/SiteVisitForm.vue";
 
 const props = defineProps<{
   visible: boolean;
@@ -37,8 +40,23 @@ const hourlyRateCents = ref<number | null>(null);
 const initial = ref<QuoteComposerInitial | null>(null);
 const composer = ref<QuoteComposerState | null>(null);
 
-const canSubmit = computed(() => !submitting.value && !!composer.value?.valid);
+// "quote" = build a full quote (default). "site_visit" = ask to see the job
+// first, with an optional fee. The toggle only shows on a fresh quote with no
+// visit already proposed/agreed.
+const mode = ref<"quote" | "site_visit">("quote");
+const siteVisitForm = ref<SiteVisitFormState | null>(null);
+const existingVisitStatus = ref<string | null>(null);
+const canRequestVisit = computed(() => !isResend.value && existingVisitStatus.value === null);
+
+const canSubmit = computed(() => {
+  if (submitting.value) return false;
+  return mode.value === "site_visit" ? !!siteVisitForm.value?.valid : !!composer.value?.valid;
+});
 const submitLabel = computed(() => {
+  if (mode.value === "site_visit") {
+    const fee = siteVisitForm.value?.fee.feeCents ?? 0;
+    return fee > 0 ? `Request site visit — ${money(fee)}` : "Request a free site visit";
+  }
   const s = composer.value;
   if (s && s.totals.total > 0) {
     return isResend.value
@@ -59,40 +77,64 @@ watch(
     priorDeclinedReason.value = null;
     initial.value = null;
     composer.value = null;
+    mode.value = "quote";
+    siteVisitForm.value = null;
+    existingVisitStatus.value = null;
     try {
       const uid = auth.fbUser?.uid;
       hourlyRateCents.value = uid ? ((await getTradesperson(uid))?.hourlyRate ?? null) : null;
     } catch {
       hourlyRateCents.value = null;
     }
-    try {
-      const existing = await getQuoteByJobId(props.jobId);
-      if (existing) {
-        isResend.value = true;
-        priorDeclinedReason.value = existing.declinedReason ?? null;
-        initial.value = {
-          lineItems: existing.lineItems ?? [],
-          discount: existing.discount ?? null,
-          terms: existing.terms ?? "",
-          noteToClient: existing.noteToClient ?? "",
-          estimatedHours: existing.estimatedHours ?? null,
-          upfrontFee: existing.upfrontFee ?? null,
-          // Stored at UTC midnight — format in UTC to get the original date back.
-          proposedStartDate: existing.proposedStartDate
-            ? existing.proposedStartDate.toDate().toISOString().slice(0, 10)
-            : null,
-          estimatedDuration: existing.estimatedDuration ?? "",
-        };
-      }
-    } catch {
-      /* fresh form */
-    } finally {
-      loading.value = false;
+    // Fetch any existing quote (resend) and any site-visit agreement in parallel.
+    const [existing, visit] = await Promise.all([
+      getQuoteByJobId(props.jobId).catch(() => null),
+      getSiteVisit(props.jobId).catch(() => null),
+    ]);
+    existingVisitStatus.value = visit?.status ?? null;
+    // Pre-fill an AGREED visit fee as a line item, but only on the first quote
+    // (no existing quote) so a resend doesn't double-seed it. The tradesperson
+    // keeps it (charge on top) or deletes it (waive/credit) — no auto-credit.
+    const seededLines: QuoteComposerInitial["lineItems"] =
+      !existing && visit?.status === "agreed"
+        ? [
+            {
+              kind: "labour",
+              description: visit.fee.description,
+              quantity: 1,
+              unitPrice: visit.fee.feeCents,
+              taxRate: visit.fee.taxRate,
+            },
+          ]
+        : undefined;
+    if (existing) {
+      isResend.value = true;
+      priorDeclinedReason.value = existing.declinedReason ?? null;
+      initial.value = {
+        lineItems: existing.lineItems ?? [],
+        discount: existing.discount ?? null,
+        terms: existing.terms ?? "",
+        noteToClient: existing.noteToClient ?? "",
+        estimatedHours: existing.estimatedHours ?? null,
+        upfrontFee: existing.upfrontFee ?? null,
+        // Stored at UTC midnight — format in UTC to get the original date back.
+        proposedStartDate: existing.proposedStartDate
+          ? existing.proposedStartDate.toDate().toISOString().slice(0, 10)
+          : null,
+        estimatedDuration: existing.estimatedDuration ?? "",
+      };
+    } else if (seededLines) {
+      initial.value = { lineItems: seededLines };
     }
+    loading.value = false;
   },
 );
 
 async function onSubmit() {
+  if (mode.value === "site_visit") {
+    await onRequestVisit();
+    return;
+  }
   const s = composer.value;
   if (!s || !s.valid || !s.payload) {
     if (s?.hasHourlyLineWithoutRate) {
@@ -116,6 +158,30 @@ async function onSubmit() {
     emit("update:visible", false);
   } catch (e) {
     toast.error("Couldn't send quote", humanizeError(e));
+  } finally {
+    submitting.value = false;
+  }
+}
+
+async function onRequestVisit() {
+  const sv = siteVisitForm.value;
+  if (!sv || !sv.valid) {
+    toast.error("Add a short label", "Tell the client what the visit is for.");
+    return;
+  }
+  submitting.value = true;
+  try {
+    await proposeSiteVisit({
+      jobId: props.jobId,
+      fee: sv.fee,
+      proposedDate: sv.proposedDate,
+      note: sv.note,
+    });
+    toast.success("Site visit requested", "Your client has been notified to agree.");
+    emit("submitted");
+    emit("update:visible", false);
+  } catch (e) {
+    toast.error("Couldn't request site visit", humanizeError(e));
   } finally {
     submitting.value = false;
   }
@@ -158,7 +224,36 @@ function close() {
         </div>
       </div>
 
+      <!-- Mode toggle: full quote vs "site visit first". Only on a fresh quote
+           with no visit already in flight. -->
+      <div
+        v-if="canRequestVisit"
+        class="flex rounded-lg border border-[color:var(--bs-border)] p-1 mb-4 text-sm"
+      >
+        <button
+          type="button"
+          class="flex-1 rounded-md py-2 px-3 font-medium transition-colors"
+          :class="mode === 'quote' ? 'bg-[color:var(--bs-brand)] text-white' : 'text-[color:var(--bs-muted)]'"
+          @click="mode = 'quote'"
+        >
+          Send a quote
+        </button>
+        <button
+          type="button"
+          class="flex-1 rounded-md py-2 px-3 font-medium transition-colors"
+          :class="mode === 'site_visit' ? 'bg-[color:var(--bs-brand)] text-white' : 'text-[color:var(--bs-muted)]'"
+          @click="mode = 'site_visit'"
+        >
+          Site visit first
+        </button>
+      </div>
+
+      <SiteVisitForm
+        v-if="mode === 'site_visit'"
+        @update:state="(s) => (siteVisitForm = s)"
+      />
       <QuoteComposer
+        v-else
         :hourly-rate-cents="hourlyRateCents"
         :initial="initial"
         @update:state="(s) => (composer = s)"

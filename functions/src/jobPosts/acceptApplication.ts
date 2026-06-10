@@ -37,6 +37,10 @@ interface MetaDoc {
 interface ApplicationDoc {
   tradespersonId: string;
   status: string;
+  // Absent ⇒ "full". A "site_visit" application carries no quote; accepting it
+  // is the client agreeing to a visit first, with this single fee.
+  kind?: "full" | "site_visit";
+  siteVisitFee?: { description: string; feeCents: number; taxRate: number } | null;
 }
 
 interface TradespersonDoc {
@@ -110,6 +114,7 @@ export const acceptApplication = onCall(CALLABLE_OPTS, async (req) => {
   const chatRef = db.collection("chats").doc();
 
   let postSnapshot: PostDoc | null = null;
+  let isSiteVisit = false;
 
   try {
     await db.runTransaction(async (tx) => {
@@ -210,6 +215,26 @@ export const acceptApplication = onCall(CALLABLE_OPTS, async (req) => {
       };
       tx.set(jobRef, jobPayload);
 
+      // A site-visit application carries no quote — accepting it IS the client
+      // agreeing to a visit first (one tap, no signature). Seed
+      // jobs/{jobId}/siteVisit/current as "agreed" so the tradesperson's quote
+      // composer later pre-fills the visit fee line (same seam as the direct flow).
+      isSiteVisit = app.kind === "site_visit" && !!app.siteVisitFee;
+      if (isSiteVisit && app.siteVisitFee) {
+        tx.set(jobRef.collection("siteVisit").doc("current"), {
+          tradespersonId: app.tradespersonId,
+          clientId: uid,
+          fee: app.siteVisitFee,
+          proposedDate: null,
+          note: "",
+          status: "agreed",
+          proposedAt: FieldValue.serverTimestamp(),
+          decidedAt: FieldValue.serverTimestamp(),
+          declinedReason: null,
+          createdAt: FieldValue.serverTimestamp(),
+        });
+      }
+
       const chatPayload: ChatPayload = {
         jobId: jobRef.id,
         clientId: uid,
@@ -272,7 +297,9 @@ export const acceptApplication = onCall(CALLABLE_OPTS, async (req) => {
       userId: (await appRef.get()).get("tradespersonId") as string,
       type: "application_accepted",
       title: "You were selected!",
-      body: `The client chose you for "${post.title}". Open the job to introduce yourself.`,
+      body: isSiteVisit
+        ? `The client chose you for "${post.title}" and agreed to a site visit first. Open the job to arrange the visit, then send your quote.`
+        : `The client chose you for "${post.title}". Open the job to introduce yourself.`,
       link: `/jobs/${jobRef.id}`,
       jobId: jobRef.id,
       actorUid: uid,

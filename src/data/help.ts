@@ -154,7 +154,9 @@ If you described your job in search first, the title, details and urgency come *
 
 That creates a **job thread** between you and the tradesperson. From there you can chat, share more photos, and receive a quote. When the quote looks right, you accept it and the job moves forward — schedule, work, invoice, and review all happen in the same thread.
 
-Quotes can include an optional upfront amount for materials or to hold a booking; you'll always see exactly what you're agreeing to before you accept.`,
+Quotes can include an optional upfront amount for materials or to hold a booking; you'll always see exactly what you're agreeing to before you accept.
+
+Some jobs are hard to price without seeing them. A tradesperson may ask to do a **site visit first** — free, or with a small visit fee you agree to with **one tap** (no signature). After the visit, they send your full quote.`,
   },
   {
     slug: "post-a-job",
@@ -171,6 +173,8 @@ Quotes can include an optional upfront amount for materials or to hold a booking
 When you pick a trade, we'll ask a few **trade-specific questions** (for tiling, say, the area, square footage, tile type, and whether materials are on-site). Answering them up front means tradespeople can quote accurately the first time — fewer back-and-forth messages, fewer surprises once work starts. Your answers appear on the posting and carry through to the job.
 
 Your posting is shown to **verified tradespeople** in your trade and region. Each one applies with a **full itemized quote** — line items, taxes, and any upfront fee — so you're comparing real numbers, not vague estimates. On your post you can open each applicant's quote, check their profile, verification, and reviews, then **Accept** the one you want — you'll sign off with a quick finger signature to confirm. Accepting starts the job with that pro straight away and lets the others know you've chosen someone.
+
+Some applicants may ask to do a **site visit first** instead of quoting blind — shown as "Site visit first" with the visit fee (or "Free site visit"). Agreeing is one tap (no signature); that pro then visits and sends a full quote you accept the usual way.
 
 Your exact address stays private until you accept a quote; the public posting only shows your general area.`,
   },
@@ -251,6 +255,8 @@ If something needs another look, we'll let you know what to re-upload — you wo
 
 1. **Direct requests** — clients find your profile and request a quote. These land as new job threads; respond quickly with a clear quote to win the job.
 2. **Browse jobs** — clients post jobs to the board. Browse postings in your trade and area and **apply with a full itemized quote** (line items, taxes, optional upfront fee). The client compares quotes side by side and accepts one — so a clear, well-priced quote wins the job outright. Track everything you've applied to under **My applications**.
+
+Can't price a job without seeing it? On either path, toggle **Site visit first** instead of quoting blind. Add a single visit fee (or leave it at $0 for a free visit) — the client agrees with one tap, you do the visit, and the fee is **pre-filled into your real quote**, which you can keep to charge on top or delete to waive.
 
 A complete, verified profile with a strong portfolio and good reviews wins more work — clients can see your reputation at a glance.`,
   },
@@ -517,6 +523,13 @@ const faqs: FaqItem[] = [
     audience: "client",
   },
   {
+    question: "Why is a tradesperson asking for a site visit before quoting?",
+    answer:
+      "Some jobs can't be priced accurately without seeing them. Instead of quoting blind, a tradesperson can ask to do a **site visit first** — sometimes free, sometimes with a small visit fee they set. You'll see the fee (or that it's free) before agreeing, and you agree with **one tap — no signature**, since it's just an agreement to a visit, not the job itself. After the visit they send your full quote, which you accept the usual way. The visit fee may appear on that quote, or they may waive it — that's up to the tradesperson.",
+    categoryId: "for-clients",
+    audience: "client",
+  },
+  {
     question: "Can I message a tradesperson before I commit?",
     answer:
       "Yes. Requesting a quote opens a job thread where you can chat, share more photos, and ask questions. And on a **posted job**, you can message any applicant about their quote before accepting — tap **Message** on their card. Nothing is locked in until you accept and sign a quote.",
@@ -627,6 +640,13 @@ const faqs: FaqItem[] = [
     question: "Can I revise my quote after applying?",
     answer:
       "Yes. Open the job post and tap **Revise quote** on your application — it reopens your quote prefilled, so you can adjust line items, pricing, or timing and re-send. The client sees the updated bid right away. If they declined your quote with a reason, that reason is shown so you know what to change, and revising puts you back in the running.",
+    categoryId: "for-tradespeople",
+    audience: "tradesperson",
+  },
+  {
+    question: "Can I require a site visit before I quote?",
+    answer:
+      "Yes. On a direct request, open **Prepare quote** and switch to **Site visit first**; when applying to a posted job, toggle **Site visit first** on the apply form. Add a single visit fee, or leave it at **$0 for a free visit**, plus an optional proposed date and note. The client agrees with one tap (no signature). Once they agree — or, on a posted job, pick you — you do the visit, then send your full quote: the agreed visit fee is **pre-filled as a line item**, so you can keep it to charge on top or delete it to waive or credit it.",
     categoryId: "for-tradespeople",
     audience: "tradesperson",
   },

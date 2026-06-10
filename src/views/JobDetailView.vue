@@ -35,6 +35,7 @@ import { useConfirm } from "primevue/useconfirm";
 import { getInvoiceByJobId } from "@/firebase/services/invoices";
 import { subscribeReviewPair } from "@/firebase/services/reviews";
 import { subscribeJobExtras } from "@/firebase/services/jobExtras";
+import { subscribeSiteVisit } from "@/firebase/services/siteVisits";
 import { useAuthStore } from "@/stores/auth";
 import type {
   JobDoc,
@@ -42,6 +43,7 @@ import type {
   JobStatus,
   ReviewPairDoc,
   SessionDoc,
+  SiteVisitDoc,
   TradespersonDoc,
   WithId,
 } from "@/firebase/interfaces";
@@ -55,6 +57,7 @@ import TradieChangesRequestedBanner from "@/components/TradieChangesRequestedBan
 import MutualReviewCard from "@/components/MutualReviewCard.vue";
 import JobChangeBanner from "@/components/JobChangeBanner.vue";
 import ProposedChangeOrderBanner from "@/components/ProposedChangeOrderBanner.vue";
+import ProposedSiteVisitBanner from "@/components/ProposedSiteVisitBanner.vue";
 import { SEED_INTAKE_SCHEMAS } from "@/data/intakeSchemas";
 import { firstMissingRequired } from "@/utils/intake";
 import { getIntakeSchema } from "@/firebase/services/intakeFormSchemas";
@@ -121,6 +124,13 @@ const reviewPair = ref<WithId<ReviewPairDoc> | null>(null);
 const jobExtras = ref<WithId<JobExtraDoc>[]>([]);
 let unsubscribeExtras: (() => void) | null = null;
 const proposedExtras = computed(() => jobExtras.value.filter((e) => e.status === "proposed"));
+// Live subscription to the pre-quote "site visit first" agreement (one per job).
+// Owned here so the client's agree/decline banner shows from any tab.
+const siteVisit = ref<WithId<SiteVisitDoc> | null>(null);
+let unsubscribeSiteVisit: (() => void) | null = null;
+const proposedSiteVisit = computed(() =>
+  siteVisit.value?.status === "proposed" ? siteVisit.value : null,
+);
 // Live subscription handle for the mutual-review pair. Owned at the
 // JobDetailView level (not inside InvoiceTab) so the top-of-page banner
 // can render the right CTA even when the Brief or Schedule tab is
@@ -591,6 +601,9 @@ watch(
     unsubscribeExtras?.();
     unsubscribeExtras = null;
     jobExtras.value = [];
+    unsubscribeSiteVisit?.();
+    unsubscribeSiteVisit = null;
+    siteVisit.value = null;
     unsubscribeSessions?.();
     unsubscribeSessions = null;
     sessions.value = [];
@@ -600,6 +613,9 @@ watch(
     });
     unsubscribeExtras = subscribeJobExtras(id, (list) => {
       jobExtras.value = list;
+    });
+    unsubscribeSiteVisit = subscribeSiteVisit(id, (v) => {
+      siteVisit.value = v;
     });
     // Sessions are read-authorized via the parent job, so both parties can
     // subscribe with just the id — no tradespersonId filter needed.
@@ -615,6 +631,8 @@ onUnmounted(() => {
   unsubscribeReviewPair = null;
   unsubscribeExtras?.();
   unsubscribeExtras = null;
+  unsubscribeSiteVisit?.();
+  unsubscribeSiteVisit = null;
   unsubscribeSessions?.();
   unsubscribeSessions = null;
   unsubscribeJob?.();
@@ -1166,6 +1184,15 @@ function onReturnToApplicants() {
         @review="onTabChange('workorder')"
       />
 
+      <!-- Client nudge: the tradesperson wants a site visit before quoting.
+           Agree/decline happens right in the banner (one tap, no signature). -->
+      <ProposedSiteVisitBanner
+        v-if="isClient && proposedSiteVisit"
+        :job-id="job.id"
+        :visit="proposedSiteVisit"
+        class="mb-4"
+      />
+
       <div
         v-if="job.status === 'accepted' && isClient"
         class="bs-card p-4 mb-4 border-l-4 border-l-[color:var(--bs-blue)]"
@@ -1358,6 +1385,15 @@ function onReturnToApplicants() {
       style="left: var(--bs-content-left-offset, 0px);"
     >
       <div class="bs-container">
+        <!-- Tradie hint: an agreed site visit will be pre-filled into the quote. -->
+        <p
+          v-if="isTradie && job.status === 'requested' && siteVisit?.status === 'agreed'"
+          class="text-xs text-center text-[color:var(--bs-muted)] mb-2"
+        >
+          <i class="pi pi-map-marker mr-1"></i>Site visit agreed — the
+          {{ siteVisit.fee.feeCents > 0 ? money(siteVisit.fee.feeCents) + " fee" : "free visit" }}
+          will be pre-filled into your quote.
+        </p>
         <Button
           v-if="job.status === 'requested'"
           label="Prepare quote"

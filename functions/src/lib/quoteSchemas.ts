@@ -18,6 +18,14 @@ export const DiscountSchema = z.object({
   label: z.string().max(60).nullable(),
 });
 
+// A single "site visit before quoting" fee line. feeCents 0 = free visit.
+// Mirrors siteVisitFeeSchema in src/validation/schemas.ts (server bounds).
+export const SiteVisitFeeSchema = z.object({
+  description: z.string().trim().min(1).max(200),
+  feeCents: z.number().int().min(0).max(100_000_000), // 0 allowed = free
+  taxRate: z.number().min(0).max(1),
+});
+
 // Upfront fee input — discriminated union so the client can pass either shape
 // unambiguously. amountCents is the dollar value at submit time; bps (basis
 // points, 0–5000 = 0–50%) is only present for "percent". The cents are always

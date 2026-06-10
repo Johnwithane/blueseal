@@ -7,7 +7,12 @@ import { db } from "../lib/admin";
 import { requireRoleOrAdmin } from "../lib/auth";
 import { requireVisibleTradie, rateLimitKey } from "./helpers";
 import { notify } from "../lib/notify";
-import { LineItemSchema, DiscountSchema, UpfrontFeeSchema } from "../lib/quoteSchemas";
+import {
+  LineItemSchema,
+  DiscountSchema,
+  UpfrontFeeSchema,
+  SiteVisitFeeSchema,
+} from "../lib/quoteSchemas";
 import { computeTotals, resolveUpfrontFee } from "../lib/quoteTotals";
 
 // Itemized quote carried on the application — the bid the client compares and
@@ -23,16 +28,27 @@ const QuoteInput = z.object({
   estimatedDuration: z.string().max(80).default(""),
 });
 
-const Input = z.object({
+const baseFields = {
   postId: z.string().min(1).max(128),
   message: z.string().trim().min(20).max(2000),
-  quote: QuoteInput,
   proposedStartDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .nullable()
     .optional(),
-});
+};
+
+// An application is EITHER a full quote (kind "full") OR a "site visit before
+// quoting" ask (kind "site_visit", carrying a single siteVisitFee). preprocess
+// injects kind "full" for any legacy caller that omits it.
+const Input = z.preprocess(
+  (val) =>
+    val && typeof val === "object" && !("kind" in val) ? { ...val, kind: "full" } : val,
+  z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("full"), ...baseFields, quote: QuoteInput }),
+    z.object({ kind: z.literal("site_visit"), ...baseFields, siteVisitFee: SiteVisitFeeSchema }),
+  ]),
+);
 
 const DAILY_APPLICATION_CAP = 10;
 
@@ -46,45 +62,59 @@ export const submitApplication = onCall(CALLABLE_OPTS, async (req) => {
   if (!parsed.success) {
     throw new HttpsError("invalid-argument", parsed.error.issues[0]?.message ?? "Invalid input");
   }
-  const { postId, message, quote, proposedStartDate } = parsed.data;
-  const ctx = { fn: "submitApplication", uid, postId };
+  const data = parsed.data;
+  const { postId, message, proposedStartDate } = data;
+  const ctx = { fn: "submitApplication", uid, postId, kind: data.kind };
 
-  // Recompute every total server-side so a tampered payload can't misstate the
-  // bid the client will accept. Mirrors submitQuote exactly (shared helpers).
-  const totals = computeTotals(quote.lineItems, quote.discount);
-  if (totals.total <= 0) {
-    throw new HttpsError("failed-precondition", "Quote total must be greater than zero.");
-  }
-  const preTaxBase = Math.max(0, totals.subtotal - totals.discountAmount);
-  const upfrontFee = resolveUpfrontFee(quote.upfrontFee, preTaxBase);
-  const validUntil = Timestamp.fromMillis(
-    Date.now() + quote.validUntilDays * 24 * 60 * 60 * 1000,
-  );
   // Calendar date → UTC midnight (a date, not an instant). Reused for the
   // top-level application field and the embedded quote snapshot.
   const proposedStartTs = proposedStartDate
     ? Timestamp.fromDate(new Date(`${proposedStartDate}T00:00:00Z`))
     : null;
 
-  // The stored quote snapshot + a one-line proposedPrice derived from the
-  // total so existing list/notification rendering keeps working.
-  const applicationQuote = {
-    lineItems: quote.lineItems,
-    subtotal: totals.subtotal,
-    discount: quote.discount,
-    discountAmount: totals.discountAmount,
-    taxTotal: totals.taxTotal,
-    total: totals.total,
-    currency: "CAD",
-    upfrontFee,
-    estimatedHours: quote.estimatedHours,
-    proposedStartDate: proposedStartTs,
-    estimatedDuration: quote.estimatedDuration,
-    validUntil,
-    terms: quote.terms,
-    noteToClient: quote.noteToClient,
-  };
-  const proposedPrice = { type: "fixed" as const, amount: totals.total };
+  // Build the application payload per kind. A "full" bid recomputes every total
+  // server-side so a tampered payload can't misstate the price (mirrors
+  // submitQuote). A "site_visit" ask carries no quote — just the single visit fee.
+  let applicationQuote: Record<string, unknown> | null;
+  let siteVisitFee: { description: string; feeCents: number; taxRate: number } | null;
+  let proposedPrice: { type: "fixed"; amount: number };
+
+  if (data.kind === "site_visit") {
+    applicationQuote = null;
+    siteVisitFee = data.siteVisitFee;
+    // The one-line summary = the visit fee (0 = free). The client compare UI
+    // overrides the label so $0 reads as "Free site visit".
+    proposedPrice = { type: "fixed", amount: data.siteVisitFee.feeCents };
+  } else {
+    const quote = data.quote;
+    const totals = computeTotals(quote.lineItems, quote.discount);
+    if (totals.total <= 0) {
+      throw new HttpsError("failed-precondition", "Quote total must be greater than zero.");
+    }
+    const preTaxBase = Math.max(0, totals.subtotal - totals.discountAmount);
+    const upfrontFee = resolveUpfrontFee(quote.upfrontFee, preTaxBase);
+    const validUntil = Timestamp.fromMillis(
+      Date.now() + quote.validUntilDays * 24 * 60 * 60 * 1000,
+    );
+    applicationQuote = {
+      lineItems: quote.lineItems,
+      subtotal: totals.subtotal,
+      discount: quote.discount,
+      discountAmount: totals.discountAmount,
+      taxTotal: totals.taxTotal,
+      total: totals.total,
+      currency: "CAD",
+      upfrontFee,
+      estimatedHours: quote.estimatedHours,
+      proposedStartDate: proposedStartTs,
+      estimatedDuration: quote.estimatedDuration,
+      validUntil,
+      terms: quote.terms,
+      noteToClient: quote.noteToClient,
+    };
+    siteVisitFee = null;
+    proposedPrice = { type: "fixed", amount: totals.total };
+  }
 
   const postRef = db.doc(`jobPosts/${postId}`);
   const appRef = postRef.collection("applications").doc(uid);
@@ -132,7 +162,9 @@ export const submitApplication = onCall(CALLABLE_OPTS, async (req) => {
         status: "pending",
         message,
         proposedPrice,
+        kind: data.kind,
         quote: applicationQuote,
+        siteVisitFee,
         proposedStartDate: proposedStartTs,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),

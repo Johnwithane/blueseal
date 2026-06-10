@@ -538,6 +538,20 @@ service cloud.firestore {
         );
         allow create, update, delete: if isAdmin();
       }
+
+      // The informal "site visit before quoting" agreement (one doc, id "current").
+      // Same contract as extras: BOTH parties read (authorized via the parent job,
+      // since a per-doc predicate can't authorize a LIST), writes are CALLABLE-ONLY
+      // (proposeSiteVisit / respondSiteVisit / acceptApplication run with the admin
+      // SDK), so the "agreed" state can never be forged by either party.
+      match /siteVisit/{docId} {
+        allow read: if isSignedIn() && (
+          jobDoc(jobId).data.tradespersonId == uid()
+          || jobDoc(jobId).data.clientId == uid()
+          || isAdmin()
+        );
+        allow create, update, delete: if isAdmin();
+      }
     }
 
     // ---------- jobPosts (job-board marketplace) ----------

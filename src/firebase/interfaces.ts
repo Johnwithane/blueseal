@@ -879,6 +879,44 @@ export interface JobExtraDoc {
 }
 
 // ---------------------------------------------------------------------------
+// jobs/{jobId}/siteVisit/current  (fixed doc id "current" — at most one per job)
+// An informal "I need to see it first" agreement reached BEFORE any quote. The
+// tradesperson proposes it (proposeSiteVisit) instead of, or before, quoting;
+// the client agrees with one tap — no signature, since it's not a work contract.
+// Deliberately does NOT change the job status: the job stays "requested"/"quoted"
+// and the visit is just an agreement recorded on the side.
+//
+// The agreed `fee` is a SINGLE optional line item (feeCents 0 = free visit). When
+// the tradesperson later opens the quote composer it is PRE-FILLED as a line item
+// they keep (charge on top) or delete (waive/credit) — there is no auto-credit.
+//
+// Server-managed: only the proposeSiteVisit / respondSiteVisit callables (admin
+// SDK) write it, so rules block parties from forging the "agreed" state. On the
+// job-board path the same doc is seeded as "agreed" by acceptApplication when the
+// client accepts a site-visit application (accepting IS the agreement).
+// ---------------------------------------------------------------------------
+export type SiteVisitStatus = "proposed" | "agreed" | "declined";
+
+export interface SiteVisitFee {
+  description: string; // e.g. "Site visit / assessment"
+  feeCents: number; // >= 0; 0 = free visit
+  taxRate: number; // 0-0.5, single rate
+}
+
+export interface SiteVisitDoc {
+  tradespersonId: string; // duplicated so rules don't need a job lookup
+  clientId: string; // duplicated so rules don't need a job lookup
+  fee: SiteVisitFee; // always present; feeCents 0 = free
+  proposedDate: Timestamp | null; // optional tradie-proposed visit date (UTC midnight)
+  note: string; // "" when none
+  status: SiteVisitStatus;
+  proposedAt: Timestamp;
+  decidedAt: Timestamp | null; // when the client agreed/declined
+  declinedReason: string | null;
+  createdAt: Timestamp;
+}
+
+// ---------------------------------------------------------------------------
 // jobPosts/{postId} — public-ish posting on the job-board marketplace.
 // Vetted tradies can read posts where status === "open"; the post owner
 // (client) can always read their own. Exact address, applicationCount, and
@@ -1013,8 +1051,16 @@ export interface ApplicationDoc {
   // so existing list/notification rendering keeps working unchanged.
   proposedPrice: ProposedPrice;
   // Full itemized quote (bid-marketplace flow). Null on legacy applications
-  // that only ever carried the one-line proposedPrice.
+  // that only ever carried the one-line proposedPrice, and on site-visit
+  // applications (kind === "site_visit"), which carry siteVisitFee instead.
   quote?: ApplicationQuote | null;
+  // "full" = an itemized-quote bid (default; absent ⇒ "full" for back-compat).
+  // "site_visit" = the tradesperson asks for a paid/free visit BEFORE quoting;
+  // `quote` is null and `siteVisitFee` carries the single line. The client
+  // accepts it one-tap (acceptApplication), the job is created in "requested",
+  // and the agreed fee seeds jobs/{jobId}/siteVisit/current.
+  kind?: "full" | "site_visit";
+  siteVisitFee?: SiteVisitFee | null; // present only when kind === "site_visit"
   proposedStartDate: Timestamp | null;
   // Set by declineApplication when the client dismisses this applicant with a
   // reason. Surfaced to the tradie so they know what to change before re-applying.
@@ -1784,7 +1830,13 @@ export type NotificationType =
   // `change_order_approved` / `change_order_declined` → tradesperson (client's decision).
   | "change_order_proposed"
   | "change_order_approved"
-  | "change_order_declined";
+  | "change_order_declined"
+  // Pre-quote site-visit loop (proposeSiteVisit / respondSiteVisit). `site_visit_proposed`
+  // → client (tradesperson wants to see the job before quoting, with an optional fee);
+  // `site_visit_agreed` / `site_visit_declined` → tradesperson (client's one-tap decision).
+  | "site_visit_proposed"
+  | "site_visit_agreed"
+  | "site_visit_declined";
 
 export interface NotificationDoc {
   userId: string;

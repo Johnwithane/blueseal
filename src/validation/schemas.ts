@@ -250,6 +250,17 @@ export const quoteUpfrontFeeSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("percent"), bps: z.number().int().min(1).max(5000) }),
 ]);
 
+// A single fee line for a "site visit before quoting" agreement. feeCents >= 0
+// ($0 = free visit), one tax rate. Used by both the direct-request proposeSiteVisit
+// callable and a site-visit job-board application (in place of a full quote).
+// Mirrors SiteVisitFeeSchema in functions/src/lib/quoteSchemas.ts.
+export const siteVisitFeeSchema = z.object({
+  description: z.string().trim().min(1, "Add a short label").max(200),
+  feeCents: z.number().int().nonnegative().max(10_000_000), // 0 allowed = free
+  taxRate: z.number().min(0).max(0.5).default(0),
+});
+export type SiteVisitFeeInput = z.infer<typeof siteVisitFeeSchema>;
+
 // Itemized quote attached to a marketplace application. Mirrors the submitQuote
 // callable input (functions/src/lib/quoteSchemas.ts) so client + server agree
 // on bounds; the server recomputes every total and the upfront-fee cents.
@@ -272,23 +283,67 @@ export const applicationQuoteSchema = z.object({
 });
 export type ApplicationQuoteInput = z.infer<typeof applicationQuoteSchema>;
 
-export const submitApplicationSchema = z.object({
+// Shared across both application kinds.
+const applicationBaseFields = {
   postId: z.string().min(1).max(128),
   message: z
     .string()
     .trim()
     .min(20, "Write at least a couple of sentences")
     .max(2000),
-  // Full itemized quote — the bid the client compares + accepts. The server
-  // derives the one-line proposedPrice summary from this.
-  quote: applicationQuoteSchema,
   proposedStartDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Use a YYYY-MM-DD date")
     .nullable()
     .optional(),
-});
+};
+
+// An application is EITHER a full itemized quote (kind "full") OR a "site visit
+// before quoting" ask (kind "site_visit", carrying a single siteVisitFee instead
+// of a quote). Wrapped in preprocess so legacy callers that omit `kind` resolve
+// to "full" — discriminatedUnion needs the discriminator present to route.
+export const submitApplicationSchema = z.preprocess(
+  (val) =>
+    val && typeof val === "object" && !("kind" in val) ? { ...val, kind: "full" } : val,
+  z.discriminatedUnion("kind", [
+    z.object({
+      kind: z.literal("full"),
+      ...applicationBaseFields,
+      // Full itemized quote — the bid the client compares + accepts. The server
+      // derives the one-line proposedPrice summary from this.
+      quote: applicationQuoteSchema,
+    }),
+    z.object({
+      kind: z.literal("site_visit"),
+      ...applicationBaseFields,
+      // Single visit fee ($0 = free). No full quote yet — the tradesperson quotes
+      // after the visit.
+      siteVisitFee: siteVisitFeeSchema,
+    }),
+  ]),
+);
 export type SubmitApplicationInput = z.infer<typeof submitApplicationSchema>;
+
+// Direct-request flow: tradesperson proposes a site visit before quoting.
+export const proposeSiteVisitSchema = z.object({
+  jobId: z.string().min(1).max(128),
+  fee: siteVisitFeeSchema,
+  proposedDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Use a YYYY-MM-DD date")
+    .nullable()
+    .default(null),
+  note: z.string().trim().max(500).default(""),
+});
+export type ProposeSiteVisitInput = z.infer<typeof proposeSiteVisitSchema>;
+
+// Client agrees to / declines a proposed site visit (one tap, no signature).
+export const respondSiteVisitSchema = z.object({
+  jobId: z.string().min(1).max(128),
+  accept: z.boolean(),
+  declinedReason: z.string().trim().max(1000).default(""),
+});
+export type RespondSiteVisitInput = z.infer<typeof respondSiteVisitSchema>;
 
 export const acceptApplicationSchema = z.object({
   postId: z.string().min(1).max(128),
