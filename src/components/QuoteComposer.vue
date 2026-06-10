@@ -478,6 +478,7 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
                 <span class="font-semibold text-[color:var(--bs-text)]">{{
                   money(Math.round(l.hoursInput * (effectiveRateCents(l) ?? 0)))
                 }}</span>
+                <span class="text-[10px]"> est.</span>
               </span>
             </div>
           </div>
@@ -735,9 +736,13 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
           <dd>{{ money(totals.taxTotal) }}</dd>
         </div>
         <div class="flex items-center justify-between text-base font-bold pt-1 border-t mt-1">
-          <dt>Total</dt>
+          <dt>{{ totalHourlyHours ? "Estimated total" : "Total" }}</dt>
           <dd>{{ money(totals.total) }}</dd>
         </div>
+        <p v-if="totalHourlyHours" class="text-[11px] text-[color:var(--bs-muted)] pt-1">
+          <i class="pi pi-clock text-[10px]"></i>
+          Hourly time is an estimate — the final invoice bills the actual hours worked.
+        </p>
         <div
           v-if="upfrontPreviewCents > 0"
           class="flex items-center justify-between text-xs text-[color:var(--bs-blue-dark)] pt-1"

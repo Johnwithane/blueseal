@@ -3,10 +3,11 @@
 // estimate, validity, terms. Pure presentational — takes an in-memory quote
 // object so it works for both a materialized QuoteDoc (QuoteCard) and an
 // application's embedded ApplicationQuote (marketplace applicant cards).
+import { computed } from "vue";
 import type { InvoiceDiscount, LineItem, LineItemKind, QuoteUpfrontFee } from "@/firebase/interfaces";
 import { useFormatters } from "@/composables/useFormatters";
 
-defineProps<{
+const props = defineProps<{
   quote: {
     lineItems: LineItem[];
     subtotal: number;
@@ -27,6 +28,11 @@ defineProps<{
 }>();
 
 const { money, date } = useFormatters();
+
+// Hourly lines quote a rate × estimated hours — a ballpark, not a firm price.
+// The invoice bills the tradesperson's actual clocked time instead, so when any
+// hourly line is present we frame the line amounts + total as an estimate.
+const hasHourly = computed(() => props.quote.lineItems.some((li) => li.kind === "hourly"));
 
 // proposedStartDate is a calendar date stored at UTC midnight — format it in
 // UTC so it reads as the same day the tradesperson picked, in every timezone.
@@ -97,8 +103,14 @@ const KIND_ICON: Record<LineItemKind, string> = {
                 {{ li.quantity }} × {{ money(li.unitPrice) }}
               </template>
             </td>
-            <td class="py-1.5 text-right">
-              {{ money(Math.round(li.quantity * li.unitPrice * (1 + (li.taxRate ?? 0)))) }}
+            <td class="py-1.5 text-right whitespace-nowrap">
+              <template v-if="li.kind === 'hourly'">
+                ~{{ money(Math.round(li.quantity * li.unitPrice * (1 + (li.taxRate ?? 0)))) }}
+                <span class="text-[10px] text-[color:var(--bs-muted)]">est.</span>
+              </template>
+              <template v-else>
+                {{ money(Math.round(li.quantity * li.unitPrice * (1 + (li.taxRate ?? 0)))) }}
+              </template>
             </td>
           </tr>
         </tbody>
@@ -121,7 +133,9 @@ const KIND_ICON: Record<LineItemKind, string> = {
             <td class="py-1 text-right">{{ money(quote.taxTotal) }}</td>
           </tr>
           <tr>
-            <td colspan="2" class="py-1 text-right font-semibold">Total</td>
+            <td colspan="2" class="py-1 text-right font-semibold">
+              {{ hasHourly ? "Estimated total" : "Total" }}
+            </td>
             <td class="py-1 text-right font-bold">{{ money(quote.total) }}</td>
           </tr>
           <tr
@@ -138,6 +152,11 @@ const KIND_ICON: Record<LineItemKind, string> = {
           </tr>
         </tfoot>
       </table>
+    </div>
+
+    <div v-if="hasHourly" class="text-xs text-[color:var(--bs-muted)] mt-2">
+      <i class="pi pi-clock text-[10px]"></i>
+      Hourly time is an estimate — your invoice bills the actual hours worked.
     </div>
 
     <div v-if="quote.estimatedHours" class="text-xs text-[color:var(--bs-muted)] mt-2">
