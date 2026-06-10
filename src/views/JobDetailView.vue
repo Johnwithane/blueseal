@@ -11,7 +11,6 @@ import {
   INSTANT_CANCEL_STATUSES,
   REQUEST_CANCEL_STATUSES,
   POSTPONABLE_STATUSES,
-  archiveJob,
   cancelJob,
   requestJobChange,
   subscribeJob,
@@ -876,24 +875,6 @@ async function onMarkUpfrontPaid() {
   }
 }
 
-// "Mark job as done" from the Invoice tab. Reuses the per-party archive: it
-// only files the viewer's own side (the counterparty's view is untouched), so
-// each party closes out independently once the invoice is paid. The job stays
-// fully readable under the dashboard's Completed view; we just drop the user
-// back on the dashboard since there's nothing left to do here.
-async function onMarkJobDone() {
-  if (!job.value) return;
-  if (!isClient.value && !isTradie.value) return;
-  const role = isClient.value ? "client" : "tradesperson";
-  try {
-    await archiveJob(job.value.id, role);
-    toast.success("Job filed under Completed", "Reopen it anytime under View completed.");
-    router.push({ name: "Dashboard" });
-  } catch (e) {
-    toast.error("Couldn't file the job", humanizeError(e));
-  }
-}
-
 function openCancelDialog() {
   cancelReason.value = "";
   showCancelDialog.value = true;
@@ -1351,7 +1332,6 @@ function onReturnToApplicants() {
           @mark-paid="onMarkPaid"
           @revise-quote="showQuoteSheet = true"
           @paid="load"
-          @done="onMarkJobDone"
         />
       </div>
 

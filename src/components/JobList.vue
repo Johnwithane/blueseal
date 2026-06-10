@@ -9,7 +9,6 @@ import { useToast } from "@/composables/useToast";
 import { useActiveClock } from "@/composables/useActiveClock";
 import { clockIn, clockOut, formatElapsed } from "@/firebase/services/timeEntries";
 import { humanizeError } from "@/utils/errors";
-import { archiveJob, unarchiveJob } from "@/firebase/services/jobs";
 import { statusLabel, STATUS_SEVERITY } from "@/utils/jobStatus";
 import { tradeLabel } from "@/data/trades";
 import JobCounterparty from "@/components/JobCounterparty.vue";
@@ -20,16 +19,17 @@ const props = withDefaults(
     /**
      * Which side of the job the viewer is on. Drives which counterparty
      * is rendered (client view shows the tradesperson, tradesperson view
-     * shows the client) and which archive field is mutated.
+     * shows the client) and which side's labels are used.
      */
     viewerRole: "client" | "tradesperson";
     /**
-     * When true, only archived jobs are shown (and the archive button
-     * flips to "restore"). Defaults to the non-archived view.
+     * When true, only terminal-status jobs (complete / reviewed /
+     * cancelled) are shown — the dashboard's "View completed" view.
+     * Defaults to the active list.
      */
-    showArchived?: boolean;
+    showCompleted?: boolean;
   }>(),
-  { showArchived: false },
+  { showCompleted: false },
 );
 
 const router = useRouter();
@@ -77,9 +77,9 @@ async function onQuickClockOut(job: WithId<JobDoc>) {
 }
 
 // All statuses worth surfacing on the dashboard, in pipeline order.
-// "reviewed" and "cancelled" used to be filtered out — they're now
-// kept so the dashboard reflects the job's full lifecycle. Archive
-// (per-party, optional) is how a user hides one for good.
+// Terminal statuses are partitioned into the "View completed" view
+// automatically (see TERMINAL below) so the active list only carries
+// live work.
 const STATUSES: JobStatus[] = [
   "requested",
   "accepted",
@@ -140,19 +140,15 @@ const SECTION_COLOR: Record<JobStatus, string> = {
 
 const filter = ref<"all" | JobStatus>("all");
 
-function isArchived(job: WithId<JobDoc>): boolean {
-  const field =
-    props.viewerRole === "client" ? job.clientArchivedAt : job.tradespersonArchivedAt;
-  return field != null;
-}
-
-// Archive partition: default view hides archived; showArchived flips it.
-const archiveFiltered = computed(() =>
-  props.jobs.filter((j) => isArchived(j) === props.showArchived),
+// Terminal statuses live in the "View completed" view; everything else
+// is active. Filing is automatic — driven purely by job status.
+const TERMINAL: ReadonlySet<JobStatus> = new Set(["complete", "reviewed", "cancelled"]);
+const partitioned = computed(() =>
+  props.jobs.filter((j) => TERMINAL.has(j.status) === props.showCompleted),
 );
 
-// Counts per status from the archive-filtered set so chip badges track
-// the current view (e.g. the archived view shows counts of archived jobs).
+// Counts per status from the partitioned set so chip badges track the
+// current view (e.g. the completed view shows counts of finished jobs).
 const counts = computed(() => {
   const m: Record<JobStatus, number> = {
     requested: 0,
@@ -167,11 +163,11 @@ const counts = computed(() => {
     reviewed: 0,
     cancelled: 0,
   };
-  for (const j of archiveFiltered.value) m[j.status] += 1;
+  for (const j of partitioned.value) m[j.status] += 1;
   return m;
 });
 
-const totalCount = computed(() => archiveFiltered.value.length);
+const totalCount = computed(() => partitioned.value.length);
 
 // Chip row: "All" first, then any status with at least one match so the
 // row stays compact on mobile.
@@ -196,7 +192,7 @@ const visibleSections = computed(() => {
   const sections: { key: JobStatus; jobs: WithId<JobDoc>[] }[] = [];
   for (const s of STATUSES) {
     if (filter.value !== "all" && filter.value !== s) continue;
-    const matching = archiveFiltered.value.filter((j) => j.status === s);
+    const matching = partitioned.value.filter((j) => j.status === s);
     if (matching.length === 0) continue;
     sections.push({ key: s, jobs: matching });
   }
@@ -213,30 +209,6 @@ function urgencyLabel(u: string): string {
   if (u === "this_week") return "This week";
   if (u === "urgent") return "Urgent";
   return "Flexible";
-}
-
-// Archive is offered only on terminal-state cards. Rules don't enforce
-// this — at the schema level any-status archive is permitted — but
-// hiding an in-flight job from your own dashboard is a footgun, so the
-// UI keeps the button to states where the job is genuinely done.
-const ARCHIVABLE: ReadonlySet<JobStatus> = new Set([
-  "complete",
-  "reviewed",
-  "cancelled",
-]);
-
-async function toggleArchive(job: WithId<JobDoc>) {
-  try {
-    if (isArchived(job)) {
-      await unarchiveJob(job.id, props.viewerRole);
-      toast.success("Job restored");
-    } else {
-      await archiveJob(job.id, props.viewerRole);
-      toast.success("Job archived");
-    }
-  } catch (e) {
-    toast.error(humanizeError(e));
-  }
 }
 
 function openJob(id: string) {
@@ -298,7 +270,9 @@ function counterpartyPhoto(job: WithId<JobDoc>): string | null | undefined {
       class="bs-empty mt-4"
     >
       <i class="pi pi-inbox text-3xl mb-2 block"></i>
-      <p v-if="props.showArchived">No completed jobs yet.</p>
+      <p v-if="props.showCompleted">
+        No completed jobs yet. Jobs land here automatically when they finish.
+      </p>
       <p v-else>No active jobs. Finished jobs appear under View completed.</p>
     </div>
 
@@ -384,16 +358,6 @@ function counterpartyPhoto(job: WithId<JobDoc>): string | null | undefined {
                   {{ dateTime(job.scheduledStart) }}
                 </span>
                 <span v-else>{{ relativeTime(job.createdAt) }}</span>
-                <Button
-                  v-if="ARCHIVABLE.has(job.status) || isArchived(job)"
-                  :icon="isArchived(job) ? 'pi pi-replay' : 'pi pi-inbox'"
-                  :aria-label="isArchived(job) ? 'Restore job' : 'Archive job'"
-                  text
-                  rounded
-                  size="small"
-                  severity="secondary"
-                  @click.stop="toggleArchive(job)"
-                />
               </div>
             </div>
           </li>

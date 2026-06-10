@@ -22,10 +22,11 @@ const viewOptions = [
   { label: "Posted jobs", value: "posts" },
 ];
 
-// Per-party archive view for "My jobs". Posts have their own status
-// lifecycle (open / closed / cancelled / expired) and aren't archived
-// per-party — kept out of this toggle for now.
-const showArchived = ref(false);
+// Completed view for "My jobs": flips JobList to the terminal-status
+// partition (complete / reviewed / cancelled) — filing is automatic.
+// Posts have their own status lifecycle (open / closed / cancelled /
+// expired) and are kept out of this toggle.
+const showCompleted = ref(false);
 
 let unsubJobs: (() => void) | null = null;
 let unsubPosts: (() => void) | null = null;
@@ -49,12 +50,11 @@ const postStatusSeverity: Record<string, "info" | "success" | "warn" | "danger" 
   expired: "danger",
 };
 
-// Has the client archived anything? Used to hide the "View archived"
-// button on accounts that haven't touched any jobs yet — avoids a dead
-// button on day one.
-const hasArchived = computed(() =>
-  jobs.value.some((j) => j.clientArchivedAt != null),
-);
+// Does the client have any finished jobs? Used to hide the "View
+// completed" button on accounts that haven't finished any jobs yet —
+// avoids a dead button on day one.
+const TERMINAL = new Set<JobDoc["status"]>(["complete", "reviewed", "cancelled"]);
+const hasCompleted = computed(() => jobs.value.some((j) => TERMINAL.has(j.status)));
 
 function formatBudget(min: number, max: number): string {
   const fmt = (cents: number) =>
@@ -98,18 +98,18 @@ function formatBudget(min: number, max: number): string {
 
       <template v-else>
         <div
-          v-if="hasArchived || showArchived"
+          v-if="hasCompleted || showCompleted"
           class="mb-3 flex items-center justify-end"
         >
           <Button
-            :label="showArchived ? 'Back to active jobs' : 'View completed'"
-            :icon="showArchived ? 'pi pi-arrow-left' : 'pi pi-check-circle'"
+            :label="showCompleted ? 'Back to active jobs' : 'View completed'"
+            :icon="showCompleted ? 'pi pi-arrow-left' : 'pi pi-check-circle'"
             text
             size="small"
-            @click="showArchived = !showArchived"
+            @click="showCompleted = !showCompleted"
           />
         </div>
-        <JobList :jobs="jobs" viewer-role="client" :show-archived="showArchived" />
+        <JobList :jobs="jobs" viewer-role="client" :show-completed="showCompleted" />
       </template>
     </template>
 

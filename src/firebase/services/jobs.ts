@@ -263,28 +263,6 @@ export async function backfillJobPrivateNotes(): Promise<BackfillJobPrivateNotes
   return data;
 }
 
-// Per-party archive: each party hides the job from their own dashboard
-// default list. The rules layer enforces that the field name matches the
-// caller's role — passing the wrong field is a permission-denied at the
-// server. We pass `role` here so call sites are explicit about which side
-// they're acting on (and so multi-role accounts in client view can't
-// accidentally write the tradesperson field).
-export async function archiveJob(
-  id: string,
-  role: "client" | "tradesperson",
-): Promise<void> {
-  const field = role === "client" ? "clientArchivedAt" : "tradespersonArchivedAt";
-  await updateDoc(doc(db, "jobs", id), { [field]: serverTimestamp() });
-}
-
-export async function unarchiveJob(
-  id: string,
-  role: "client" | "tradesperson",
-): Promise<void> {
-  const field = role === "client" ? "clientArchivedAt" : "tradespersonArchivedAt";
-  await updateDoc(doc(db, "jobs", id), { [field]: null });
-}
-
 export async function updateJobIntakePhotos(id: string, photos: string[]): Promise<void> {
   await updateDoc(doc(db, "jobs", id), { intakePhotos: photos });
 }

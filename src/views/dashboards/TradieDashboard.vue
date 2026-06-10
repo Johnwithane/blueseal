@@ -65,13 +65,15 @@ const viewHint = computed(() => {
   if (view.value === "board") return "Pipeline overview. Tap a card to open the job.";
   if (view.value === "calendar") return "Tap a free day to block it off.";
   if (view.value === "applied") return "Jobs you've applied to, grouped by status.";
-  if (showArchived.value) return "Completed jobs — restore one to send it back to the active list.";
+  if (showCompleted.value)
+    return "Completed and cancelled jobs — tap one to revisit its invoice, receipt and reviews.";
   return "Tap a job to open it. Filter by status with the chips above.";
 });
 
-// Per-party archive view. Default false = show active jobs only; flipping
-// to true reuses the same JobList component but renders the archived set.
-const showArchived = ref(false);
+// Completed view: flips JobList to the terminal-status partition
+// (complete / reviewed / cancelled). Filing is automatic — driven
+// purely by job status.
+const showCompleted = ref(false);
 
 const availabilityOpen = ref(false);
 const draftAvailability = ref<WeeklyAvailability | null>(null);
@@ -319,18 +321,18 @@ const awaitingVerificationMessage = computed(() => {
       />
     </div>
 
-    <!-- Archive toggle, list-view only. Lives above JobList so it's
+    <!-- Completed-view toggle, list-view only. Lives above JobList so it's
          always visible regardless of which status filter is selected. -->
     <div
       v-if="view === 'list' && tradie?.isVisible"
       class="mb-3 flex items-center justify-end"
     >
       <Button
-        :label="showArchived ? 'Back to active jobs' : 'View completed'"
-        :icon="showArchived ? 'pi pi-arrow-left' : 'pi pi-check-circle'"
+        :label="showCompleted ? 'Back to active jobs' : 'View completed'"
+        :icon="showCompleted ? 'pi pi-arrow-left' : 'pi pi-check-circle'"
         text
         size="small"
-        @click="showArchived = !showArchived"
+        @click="showCompleted = !showCompleted"
       />
     </div>
 
@@ -338,7 +340,7 @@ const awaitingVerificationMessage = computed(() => {
       v-if="view === 'list' && tradie?.isVisible"
       :jobs="jobs"
       viewer-role="tradesperson"
-      :show-archived="showArchived"
+      :show-completed="showCompleted"
     />
     <KanbanBoard v-else-if="view === 'board' && tradie?.isVisible" :jobs="jobs" />
     <CalendarView

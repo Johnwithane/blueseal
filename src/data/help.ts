@@ -804,7 +804,7 @@ const faqs: FaqItem[] = [
   {
     question: "How do I close out a finished job?",
     answer:
-      "Once the invoice is paid, open the job's **Invoice** tab and tap **Mark job as done**. It files the job under **View completed** on your dashboard and clears it from your active list. Nothing is lost — the invoice, receipt and reviews stay on the job, and you can reopen or restore it anytime. Each side files their own copy, so closing yours doesn't change the other person's view.",
+      "Nothing to tap — finished jobs file themselves. When a job reaches **Complete**, **Reviewed** or **Cancelled** it automatically moves off your active list into **View completed** on your dashboard. Nothing is lost: the invoice, receipt and reviews stay on the job, and you can open it from there anytime.",
     categoryId: "payments-invoices",
     audience: "all",
   },
