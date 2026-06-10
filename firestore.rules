@@ -440,6 +440,39 @@ service cloud.firestore {
                       || isAdmin();
       }
 
+      // ---------- jobs/{jobId}/sessions (booked work visits) ----------
+      // One date+start+end per booked visit; a job may have many. BOTH parties
+      // read (the client must SEE when the tradesperson is coming); only the
+      // assigned tradesperson writes. Authorize reads via the PARENT job, not
+      // the row's denormalized ids — same "rules are not filters" reasoning as
+      // the timeEntries block above. The denormalised tradespersonId/clientId
+      // let create/update verify identity without a second job lookup.
+      match /sessions/{sessionId} {
+        function isJobParty() {
+          return isSignedIn() && (
+            jobDoc(jobId).data.tradespersonId == uid()
+            || jobDoc(jobId).data.clientId == uid()
+          );
+        }
+        allow read: if isJobParty() || isAdmin();
+        allow create: if isTradie()
+          && request.resource.data.tradespersonId == uid()
+          && request.resource.data.tradespersonId == jobDoc(jobId).data.tradespersonId
+          && request.resource.data.clientId == jobDoc(jobId).data.clientId
+          && request.resource.data.start is timestamp
+          && request.resource.data.end is timestamp
+          && request.resource.data.end > request.resource.data.start;
+        // Update: tradie can move a session's times / edit its note. Identity
+        // and createdAt are locked; end must stay after start. Admin may fix.
+        allow update: if (isOwner(resource.data.tradespersonId)
+                         && request.resource.data.tradespersonId == resource.data.tradespersonId
+                         && request.resource.data.clientId == resource.data.clientId
+                         && request.resource.data.createdAt == resource.data.createdAt
+                         && request.resource.data.end > request.resource.data.start)
+                      || isAdmin();
+        allow delete: if isOwner(resource.data.tradespersonId) || isAdmin();
+      }
+
       // ---------- jobs/{jobId}/private/{docId} (tradie-only notes) ----------
       // Holds the tradesperson's private job log (free-text notes + the
       // AI auto-log). The parent job doc is client-readable, so these can't

@@ -558,6 +558,13 @@ const faqs: FaqItem[] = [
     categoryId: "for-clients",
     audience: "client",
   },
+  {
+    question: "How do I see when my tradesperson is coming?",
+    answer:
+      "Open the job and check the **Schedule tab** — it shows a calendar with every visit your tradesperson has booked, with the date and time of each. A job can have more than one visit when the work spans a few days. You can't change the visits yourself, but you'll always see the current plan, and the top of the job highlights your next booked visit.",
+    categoryId: "for-clients",
+    audience: "client",
+  },
 
   // ── Working as a tradesperson ─────────────────────────────────────────────
   {
@@ -606,6 +613,13 @@ const faqs: FaqItem[] = [
     question: "What are recommendations / vouches?",
     answer:
       "You can invite people who know your work to vouch for you. These recommendations appear on your profile alongside client reviews and help build trust, especially when you're new.",
+    categoryId: "for-tradespeople",
+    audience: "tradesperson",
+  },
+  {
+    question: "How do I schedule visits for a job?",
+    answer:
+      "Open the job and go to the **Schedule tab** — it's a week/month calendar like your dashboard. Tap any day to book a visit (set a start and end time, plus an optional note like \"first fix\"), and add as many visits as the job needs, so multi-day work is easy to lay out. Tap a visit to edit or remove it. If one clashes with a block-off or another booked job we'll warn you first. Your booked visits show on your dashboard calendar, and the client sees them on their side too.",
     categoryId: "for-tradespeople",
     audience: "tradesperson",
   },

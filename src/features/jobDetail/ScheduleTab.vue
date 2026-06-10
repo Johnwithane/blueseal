@@ -1,15 +1,19 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import Button from "primevue/button";
 import DatePicker from "primevue/datepicker";
-import type { JobDoc, WithId } from "@/firebase/interfaces";
-import { useFormatters } from "@/composables/useFormatters";
+import Dialog from "primevue/dialog";
+import Textarea from "primevue/textarea";
+import type { JobDoc, SessionDoc, WithId } from "@/firebase/interfaces";
+import JobScheduleCalendar from "@/features/jobDetail/JobScheduleCalendar.vue";
 
 const props = defineProps<{
   job: WithId<JobDoc>;
   isClient: boolean;
   isTradie: boolean;
-  savingSchedule: boolean;
+  // Booked work sessions for this job (live-subscribed by the parent).
+  sessions: WithId<SessionDoc>[];
+  savingSession: boolean;
   // Pre-commitment instant cancel (cancelJob). Mutually exclusive with the
   // request flow below — a job is in exactly one of these phases.
   canInstantCancel: boolean;
@@ -19,11 +23,11 @@ const props = defineProps<{
   canRequestPostpone: boolean;
 }>();
 
-const scheduledStart = defineModel<Date | null>("scheduledStart", { required: true });
-const scheduledEnd = defineModel<Date | null>("scheduledEnd", { required: true });
-
 const emit = defineEmits<{
-  "save-schedule": [];
+  // sessionId null ⇒ create, set ⇒ update. Parent runs collision detection
+  // and the actual write (so it can reuse the schedule-conflict dialog).
+  "save-session": [payload: { sessionId: string | null; start: Date; end: Date; note: string }];
+  "delete-session": [sessionId: string];
   "open-cancel-dialog": [];
   "open-postpone-dialog": [];
 }>();
@@ -32,31 +36,98 @@ const showChangeCard = computed(
   () => props.canInstantCancel || props.canRequestCancel || props.canRequestPostpone,
 );
 
-const { dateTime } = useFormatters();
+// --- Add / edit session dialog -------------------------------------------
+const showDialog = ref(false);
+const editingId = ref<string | null>(null);
+const formDate = ref<Date | null>(null);
+const formStart = ref<Date | null>(null);
+const formEnd = ref<Date | null>(null);
+const formNote = ref("");
+const formError = ref("");
+
+function defaultTime(hour: number): Date {
+  const d = new Date();
+  d.setHours(hour, 0, 0, 0);
+  return d;
+}
+
+function openAdd(day: Date) {
+  editingId.value = null;
+  formDate.value = day;
+  formStart.value = defaultTime(9);
+  formEnd.value = defaultTime(17);
+  formNote.value = "";
+  formError.value = "";
+  showDialog.value = true;
+}
+
+function openEdit(session: WithId<SessionDoc>) {
+  editingId.value = session.id;
+  const start = session.start.toDate();
+  formDate.value = start;
+  formStart.value = start;
+  formEnd.value = session.end.toDate();
+  formNote.value = session.note;
+  formError.value = "";
+  showDialog.value = true;
+}
+
+// Fold the chosen day (date part) together with each time picker's clock part
+// into a single instant — the time pickers carry today's date, which we ignore.
+function combine(date: Date, time: Date): Date {
+  const d = new Date(date);
+  d.setHours(time.getHours(), time.getMinutes(), 0, 0);
+  return d;
+}
+
+function save() {
+  if (!formDate.value || !formStart.value || !formEnd.value) {
+    formError.value = "Pick a date, start and end time.";
+    return;
+  }
+  const start = combine(formDate.value, formStart.value);
+  const end = combine(formDate.value, formEnd.value);
+  if (end <= start) {
+    formError.value = "End time must be after the start time.";
+    return;
+  }
+  formError.value = "";
+  emit("save-session", {
+    sessionId: editingId.value,
+    start,
+    end,
+    note: formNote.value.trim(),
+  });
+  showDialog.value = false;
+}
+
+function removeSession() {
+  if (editingId.value) emit("delete-session", editingId.value);
+  showDialog.value = false;
+}
 </script>
 
 <template>
   <div class="space-y-4">
-    <!-- Optional date-picking nudge while the job is active but no date
-         is set yet. Scheduling no longer gates status — it's metadata
-         the tradesperson can fill in (or not) to drive their calendar
-         and the on-the-day time tracker. -->
+    <!-- Tradie nudge while the job is active but nothing's booked yet.
+         Scheduling is metadata that drives the calendar + on-the-day timer;
+         it doesn't gate status. -->
     <div
-      v-if="isTradie && job.status === 'in_progress' && !job.scheduledStart"
+      v-if="isTradie && job.status === 'in_progress' && sessions.length === 0"
       class="bs-card p-3 border-l-4 border-l-emerald-500"
     >
       <h3 class="font-semibold text-sm mb-1 flex items-center gap-2">
         <i class="pi pi-calendar-plus text-emerald-600"></i>
-        Set a visit date (optional)
+        Book your first visit (optional)
       </h3>
       <p class="text-xs text-[color:var(--bs-muted)]">
-        Pick start + end below to put this job on your calendar. Time
-        tracking still works without a date — invoice when you're done.
+        Tap a day on the calendar below to book when you'll be on site — add as
+        many visits as the job needs. Time tracking still works without a date.
       </p>
     </div>
 
     <div
-      v-if="isClient && job.status === 'in_progress' && !job.scheduledStart"
+      v-if="isClient && job.status === 'in_progress' && sessions.length === 0"
       class="bs-card p-3 border-l-4 border-l-emerald-500"
     >
       <h3 class="font-semibold text-sm mb-1 flex items-center gap-2">
@@ -64,66 +135,22 @@ const { dateTime } = useFormatters();
         Quote accepted — job is active
       </h3>
       <p class="text-xs text-[color:var(--bs-muted)]">
-        The tradesperson will reach out to confirm a visit date. You'll see
-        it here once it's set.
+        The tradesperson will reach out to confirm visit dates. You'll see every
+        booked visit here once they're set.
       </p>
     </div>
 
-    <!-- Schedule card: display + (tradie) pickers. -->
+    <!-- The calendar: this job's booked visits. Tradie can add/edit; the
+         client sees it read-only. -->
     <div class="bs-card p-3">
-      <h3 class="font-semibold text-sm mb-2">Schedule</h3>
-      <div v-if="job.scheduledStart" class="text-sm leading-snug">
-        <div>{{ dateTime(job.scheduledStart) }}</div>
-        <div class="text-[color:var(--bs-muted)]">to {{ dateTime(job.scheduledEnd) }}</div>
-      </div>
-      <p
-        v-else-if="!isTradie"
-        class="text-xs text-[color:var(--bs-muted)]"
-      >Not scheduled yet.</p>
-
-      <template v-if="isTradie">
-        <div class="mt-3 space-y-2">
-          <div>
-            <label
-              for="job-schedule-start"
-              class="block text-[11px] text-[color:var(--bs-muted)] mb-1"
-            >Start</label>
-            <DatePicker
-              v-model="scheduledStart"
-              input-id="job-schedule-start"
-              show-time
-              hour-format="24"
-              class="w-full"
-              placeholder="Start"
-            />
-          </div>
-          <div>
-            <label
-              for="job-schedule-end"
-              class="block text-[11px] text-[color:var(--bs-muted)] mb-1"
-            >End</label>
-            <DatePicker
-              v-model="scheduledEnd"
-              input-id="job-schedule-end"
-              show-time
-              hour-format="24"
-              class="w-full"
-              placeholder="End"
-            />
-          </div>
-        </div>
-        <Button
-          label="Save schedule"
-          icon="pi pi-calendar"
-          class="mt-3 w-full"
-          outlined
-          :loading="savingSchedule"
-          @click="emit('save-schedule')"
-        />
-      </template>
+      <h3 class="font-semibold text-sm mb-3">Booked visits</h3>
+      <JobScheduleCalendar
+        :sessions="sessions"
+        :can-edit="isTradie"
+        @add-day="openAdd"
+        @edit-session="openEdit"
+      />
     </div>
-
-    <!-- Time tracking + change orders now live in the Work Order tab. -->
 
     <!-- Client-side "change of plans" card. Before a quote is accepted the
          client can cancel instantly; once the tradesperson is committed,
@@ -162,5 +189,75 @@ const { dateTime } = useFormatters();
         />
       </div>
     </div>
+
+    <!-- Add / edit a booked visit. Tradie only (client never opens it). -->
+    <Dialog
+      v-model:visible="showDialog"
+      modal
+      :header="editingId ? 'Edit visit' : 'Book a visit'"
+      :style="{ width: '90vw', maxWidth: '24rem' }"
+      :draggable="false"
+    >
+      <div class="space-y-3">
+        <div>
+          <label for="session-date" class="block text-[11px] text-[color:var(--bs-muted)] mb-1">Date</label>
+          <DatePicker v-model="formDate" input-id="session-date" class="w-full" placeholder="Date" />
+        </div>
+        <div class="flex gap-2">
+          <div class="flex-1">
+            <label for="session-start" class="block text-[11px] text-[color:var(--bs-muted)] mb-1">Start</label>
+            <DatePicker
+              v-model="formStart"
+              input-id="session-start"
+              time-only
+              hour-format="24"
+              class="w-full"
+              placeholder="Start"
+            />
+          </div>
+          <div class="flex-1">
+            <label for="session-end" class="block text-[11px] text-[color:var(--bs-muted)] mb-1">End</label>
+            <DatePicker
+              v-model="formEnd"
+              input-id="session-end"
+              time-only
+              hour-format="24"
+              class="w-full"
+              placeholder="End"
+            />
+          </div>
+        </div>
+        <div>
+          <label for="session-note" class="block text-[11px] text-[color:var(--bs-muted)] mb-1">Note (optional)</label>
+          <Textarea
+            id="session-note"
+            v-model="formNote"
+            rows="2"
+            auto-resize
+            class="w-full"
+            placeholder="e.g. first fix, snagging"
+          />
+        </div>
+        <p v-if="formError" class="text-xs text-red-600">{{ formError }}</p>
+      </div>
+      <template #footer>
+        <Button
+          v-if="editingId"
+          label="Delete"
+          icon="pi pi-trash"
+          severity="danger"
+          text
+          class="mr-auto"
+          @click="removeSession"
+        />
+        <Button label="Cancel" severity="secondary" text @click="showDialog = false" />
+        <Button
+          :label="editingId ? 'Save' : 'Book visit'"
+          icon="pi pi-calendar-plus"
+          :loading="savingSession"
+          @click="save"
+        />
+      </template>
+    </Dialog>
   </div>
 </template>

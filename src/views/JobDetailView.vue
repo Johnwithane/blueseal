@@ -18,10 +18,15 @@ import {
   getJobPrivateNotes,
   markJobPaid,
   markUpfrontFeePaid,
-  scheduleJob,
   updatePrivateNotes,
   saveJobIntakeAndAdvance,
 } from "@/firebase/services/jobs";
+import {
+  subscribeJobSessions,
+  createSession,
+  updateSession,
+  deleteSession,
+} from "@/firebase/services/sessions";
 import { returnToApplicants } from "@/firebase/services/jobPosts";
 import { updateJobLog } from "@/firebase/services/assistant";
 import { getTradesperson } from "@/firebase/services/tradespeople";
@@ -36,6 +41,7 @@ import type {
   JobExtraDoc,
   JobStatus,
   ReviewPairDoc,
+  SessionDoc,
   TradespersonDoc,
   WithId,
 } from "@/firebase/interfaces";
@@ -141,8 +147,11 @@ const loading = ref(true);
 // useful empty state instead of hanging on "Loading…" forever.
 const loadError = ref<string | null>(null);
 
-const scheduledStart = ref<Date | null>(null);
-const scheduledEnd = ref<Date | null>(null);
+// Booked work sessions for this job (live-subscribed). A job can have many;
+// the job's scheduledStart/End mirror is kept in sync server-path-side by the
+// sessions service, so the banners + dashboard keep reading the single window.
+const sessions = ref<WithId<SessionDoc>[]>([]);
+let unsubscribeSessions: (() => void) | null = null;
 const privateNotes = ref("");
 
 const updatingLog = ref(false);
@@ -164,7 +173,14 @@ const postponing = ref(false);
 
 const collisions = ref<Collision[]>([]);
 const showCollisionDialog = ref(false);
-const savingSchedule = ref(false);
+const savingSession = ref(false);
+// The session waiting on a collision decision. null ⇒ create, set id ⇒ update.
+const pendingSession = ref<{
+  sessionId: string | null;
+  start: Date;
+  end: Date;
+  note: string;
+} | null>(null);
 
 const showFinishSheet = ref(false);
 const markingPaid = ref(false);
@@ -537,8 +553,6 @@ async function loadJobDependents(j: WithId<JobDoc>) {
   invoiceId.value = invoice?.id ?? null;
   invoicePayable.value = !!invoice?.payment?.clientSecret;
 
-  scheduledStart.value = j.scheduledStart?.toDate() ?? null;
-  scheduledEnd.value = j.scheduledEnd?.toDate() ?? null;
   // Private notes live in a tradie-only subdoc; the client can't read it
   // (rules deny it), so only fetch when the viewer is the tradesperson.
   privateNotes.value = isTradie.value ? await getJobPrivateNotes(j.id) : "";
@@ -577,12 +591,20 @@ watch(
     unsubscribeExtras?.();
     unsubscribeExtras = null;
     jobExtras.value = [];
+    unsubscribeSessions?.();
+    unsubscribeSessions = null;
+    sessions.value = [];
     if (typeof id !== "string" || !id) return;
     unsubscribeReviewPair = subscribeReviewPair(id, (p) => {
       reviewPair.value = p;
     });
     unsubscribeExtras = subscribeJobExtras(id, (list) => {
       jobExtras.value = list;
+    });
+    // Sessions are read-authorized via the parent job, so both parties can
+    // subscribe with just the id — no tradespersonId filter needed.
+    unsubscribeSessions = subscribeJobSessions(id, (list) => {
+      sessions.value = list;
     });
   },
   { immediate: true },
@@ -593,6 +615,8 @@ onUnmounted(() => {
   unsubscribeReviewPair = null;
   unsubscribeExtras?.();
   unsubscribeExtras = null;
+  unsubscribeSessions?.();
+  unsubscribeSessions = null;
   unsubscribeJob?.();
   unsubscribeJob = null;
 });
@@ -664,18 +688,25 @@ function openReviewFromBanner() {
 }
 
 
-async function saveSchedule() {
-  if (!job.value || !scheduledStart.value || !scheduledEnd.value) return;
-  if (scheduledEnd.value <= scheduledStart.value) {
-    toast.error("Pick an end time after the start.");
-    return;
-  }
-  savingSchedule.value = true;
+// Add or edit a booked visit. Runs collision detection first; on a clash we
+// surface the existing schedule-conflict dialog and stash the pending session
+// until the tradie decides ("Schedule anyway" → commitPendingSession). The job
+// doc + sessions list are live-subscribed, so no manual reload is needed —
+// the service re-syncs scheduledStart/End and the banners follow.
+async function onSaveSession(payload: {
+  sessionId: string | null;
+  start: Date;
+  end: Date;
+  note: string;
+}) {
+  if (!job.value) return;
+  pendingSession.value = payload;
+  savingSession.value = true;
   try {
     const conflicts = await findCollisions(
       job.value.tradespersonId,
-      scheduledStart.value,
-      scheduledEnd.value,
+      payload.start,
+      payload.end,
       { excludeJobId: job.value.id },
     );
     if (conflicts.length > 0) {
@@ -683,23 +714,49 @@ async function saveSchedule() {
       showCollisionDialog.value = true;
       return;
     }
-    await commitSchedule();
+    await commitPendingSession();
   } catch (e) {
-    toast.error("Couldn't save schedule", humanizeError(e));
+    toast.error("Couldn't save visit", humanizeError(e));
   } finally {
-    savingSchedule.value = false;
+    savingSession.value = false;
   }
 }
 
-async function commitSchedule() {
-  if (!job.value || !scheduledStart.value || !scheduledEnd.value) return;
+async function commitPendingSession() {
+  if (!job.value || !pendingSession.value) return;
+  const p = pendingSession.value;
   try {
-    await scheduleJob(job.value.id, scheduledStart.value, scheduledEnd.value);
+    if (p.sessionId) {
+      await updateSession(job.value.id, p.sessionId, {
+        start: p.start,
+        end: p.end,
+        note: p.note,
+      });
+    } else {
+      await createSession(job.value.id, {
+        tradespersonId: job.value.tradespersonId,
+        clientId: job.value.clientId,
+        start: p.start,
+        end: p.end,
+        note: p.note,
+      });
+    }
     showCollisionDialog.value = false;
     collisions.value = [];
-    await load();
+    pendingSession.value = null;
+    toast.success("Visit booked");
   } catch (e) {
-    toast.error("Couldn't save schedule", humanizeError(e));
+    toast.error("Couldn't save visit", humanizeError(e));
+  }
+}
+
+async function onDeleteSession(sessionId: string) {
+  if (!job.value) return;
+  try {
+    await deleteSession(job.value.id, sessionId);
+    toast.success("Visit removed");
+  } catch (e) {
+    toast.error("Couldn't remove visit", humanizeError(e));
   }
 }
 
@@ -1234,16 +1291,16 @@ function onReturnToApplicants() {
         />
         <ScheduleTab
           v-else-if="activeTab === 'schedule'"
-          v-model:scheduled-start="scheduledStart"
-          v-model:scheduled-end="scheduledEnd"
           :job="job"
           :is-client="isClient"
           :is-tradie="isTradie"
-          :saving-schedule="savingSchedule"
+          :sessions="sessions"
+          :saving-session="savingSession"
           :can-instant-cancel="canInstantCancel"
           :can-request-cancel="canRequestCancel"
           :can-request-postpone="canRequestPostpone"
-          @save-schedule="saveSchedule"
+          @save-session="onSaveSession"
+          @delete-session="onDeleteSession"
           @open-cancel-dialog="openCancelDialog"
           @open-postpone-dialog="openPostponeDialog"
         />
@@ -1412,7 +1469,7 @@ function onReturnToApplicants() {
           label="Schedule anyway"
           icon="pi pi-calendar-plus"
           severity="warn"
-          @click="commitSchedule"
+          @click="commitPendingSession"
         />
       </template>
     </Dialog>

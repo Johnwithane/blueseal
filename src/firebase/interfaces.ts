@@ -784,6 +784,32 @@ export interface TimeEntryDoc {
 }
 
 // ---------------------------------------------------------------------------
+// jobs/{jobId}/sessions/{sessionId}
+// One booked work visit on this job: a date + start time + end time. A job can
+// have MANY sessions (a multi-day job booked across several days). This is the
+// tradesperson's plan for when they'll show up; the client reads it so both
+// sides see the agreed visits. Distinct from timeEntries (which records work
+// that actually happened, for billing) — sessions are future intent.
+//
+// Mirrors the timeEntries subcollection: both parties read via the PARENT job,
+// only the assigned tradesperson writes. The denormalised tradespersonId/
+// clientId let the create/update rules avoid a second job lookup.
+//
+// `start`/`end` are absolute instants (Timestamp), same shape as
+// BookingDoc.start/end and JobDoc.scheduledStart/End, so the calendar and
+// collision detection compare them directly. The job's scheduledStart/End is
+// kept in sync as the "next upcoming" session (see sessions service).
+// ---------------------------------------------------------------------------
+export interface SessionDoc {
+  tradespersonId: string; // duplicated so rules don't need a job lookup
+  clientId: string; // duplicated so rules don't need a job lookup
+  start: Timestamp;
+  end: Timestamp;
+  note: string; // optional free text (e.g. "first fix"); "" when none
+  createdAt: Timestamp;
+}
+
+// ---------------------------------------------------------------------------
 // jobs/{jobId}/expenses/{expenseId}
 // Tradie-uploaded receipt with markup → invoice line. Receipts are
 // considered sensitive (cost-basis, supplier names) — the doc AND the
