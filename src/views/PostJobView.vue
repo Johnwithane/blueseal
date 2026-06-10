@@ -446,7 +446,7 @@ async function submit() {
         <legend class="text-sm font-medium">{{ tradeLabel(trade) }} details</legend>
         <p class="text-xs text-[color:var(--bs-muted)] mt-1">
           Answer these so tradespeople can quote accurately. Required fields are marked
-          <span class="text-red-600">*</span>.
+          <span class="text-[color:var(--bs-danger)]">*</span>.
         </p>
         <IntakeFormRenderer v-model="intakeData" :fields="intakeFields" class="mt-3" />
       </fieldset>

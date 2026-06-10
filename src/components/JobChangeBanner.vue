@@ -59,10 +59,10 @@ const resume = () => run(() => resumeJob(props.job.id), "Job resumed");
   <!-- Tradesperson: respond to the client's request. -->
   <div
     v-if="pending && isTradie"
-    class="bs-card p-4 border-l-4 border-l-amber-500"
+    class="bs-card p-4 border-l-4 border-l-[color:var(--bs-warning)]"
   >
     <div class="flex items-start gap-3">
-      <i class="pi pi-pause text-amber-600 text-lg mt-0.5"></i>
+      <i class="pi pi-pause text-[color:var(--bs-warning)] text-lg mt-0.5"></i>
       <div class="min-w-0 flex-1">
         <div class="font-semibold">
           {{ isCancel ? "Client wants to cancel this job" : "Client wants to put this job on hold" }}
@@ -106,10 +106,10 @@ const resume = () => run(() => resumeJob(props.job.id), "Job resumed");
   <!-- Client: request is awaiting the tradesperson. -->
   <div
     v-else-if="pending && isClient"
-    class="bs-card p-4 border-l-4 border-l-amber-400"
+    class="bs-card p-4 border-l-4 border-l-[color:var(--bs-warning)]"
   >
     <div class="flex items-start gap-3">
-      <i class="pi pi-clock text-amber-600 text-lg mt-0.5"></i>
+      <i class="pi pi-clock text-[color:var(--bs-warning)] text-lg mt-0.5"></i>
       <div class="min-w-0 flex-1">
         <div class="font-semibold">
           {{ isCancel ? "Cancellation requested" : "Hold requested" }}
@@ -135,10 +135,10 @@ const resume = () => run(() => resumeJob(props.job.id), "Job resumed");
   <!-- On hold: either party can resume. -->
   <div
     v-else-if="isOnHold"
-    class="bs-card p-4 border-l-4 border-l-amber-500"
+    class="bs-card p-4 border-l-4 border-l-[color:var(--bs-warning)]"
   >
     <div class="flex items-start gap-3">
-      <i class="pi pi-pause text-amber-600 text-lg mt-0.5"></i>
+      <i class="pi pi-pause text-[color:var(--bs-warning)] text-lg mt-0.5"></i>
       <div class="min-w-0 flex-1">
         <div class="font-semibold">This job is on hold</div>
         <p class="text-sm text-[color:var(--bs-muted)] mt-1">

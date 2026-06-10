@@ -539,10 +539,10 @@ async function markPaid() {
            to fix it. -->
       <div
         v-if="props.canEdit && invoice.status === 'draft' && payoutsLoaded && !payoutsReady"
-        class="bs-card p-3 mt-3 border-l-4 border-l-amber-500"
+        class="bs-card p-3 mt-3 border-l-4 border-l-[color:var(--bs-warning)]"
       >
         <div class="flex items-start gap-2">
-          <i class="pi pi-exclamation-triangle text-amber-600 mt-0.5"></i>
+          <i class="pi pi-exclamation-triangle text-[color:var(--bs-warning)] mt-0.5"></i>
           <div class="min-w-0 flex-1">
             <p class="text-sm font-medium">{{ payoutsBlockerMessage }}</p>
             <RouterLink to="/payouts" class="text-xs text-[color:var(--bs-blue-dark)] underline">

@@ -64,7 +64,7 @@ async function googleSignIn() {
       <div>
         <label class="text-sm font-medium">Email</label>
         <InputText v-model="email" type="email" class="mt-1" autocomplete="email" />
-        <small v-if="fieldErrors.email" class="text-red-600">{{ fieldErrors.email }}</small>
+        <small v-if="fieldErrors.email" class="text-[color:var(--bs-danger)]">{{ fieldErrors.email }}</small>
       </div>
       <div>
         <div class="flex items-baseline justify-between">
@@ -84,7 +84,7 @@ async function googleSignIn() {
           class="mt-1 w-full"
           autocomplete="current-password"
         />
-        <small v-if="fieldErrors.password" class="text-red-600">{{ fieldErrors.password }}</small>
+        <small v-if="fieldErrors.password" class="text-[color:var(--bs-danger)]">{{ fieldErrors.password }}</small>
       </div>
 
       <Message v-if="formError" severity="error" :closable="false">{{ formError }}</Message>

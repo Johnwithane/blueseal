@@ -318,7 +318,7 @@ const approveBlockerHint = computed(() => {
                   :href="registryForIssuingBody(c.issuingBody)?.url"
                   target="_blank"
                   rel="noopener"
-                  class="shrink-0 text-blue-700 underline"
+                  class="shrink-0 text-[color:var(--bs-info)] underline"
                 >
                   Open ↗
                 </a>
@@ -344,7 +344,7 @@ const approveBlockerHint = computed(() => {
               <Button label="Approve" icon="pi pi-check" severity="success" size="small" @click="approveCert(c.id)" />
               <Button label="Reject" icon="pi pi-times" severity="danger" outlined size="small" @click="openRejectCert(c.id)" />
             </div>
-            <div v-else-if="c.rejectionReason" class="text-xs text-red-600 mt-1">
+            <div v-else-if="c.rejectionReason" class="text-xs text-[color:var(--bs-danger)] mt-1">
               {{ c.rejectionReason }}
             </div>
           </article>
@@ -372,7 +372,7 @@ const approveBlockerHint = computed(() => {
               <Button label="Approve ID" icon="pi pi-check" severity="success" size="small" @click="approveIdHere" />
               <Button label="Reject ID" icon="pi pi-times" severity="danger" outlined size="small" @click="openRejectId" />
             </div>
-            <div v-else-if="idDoc.rejectionReason" class="text-xs text-red-600 mt-1">
+            <div v-else-if="idDoc.rejectionReason" class="text-xs text-[color:var(--bs-danger)] mt-1">
               {{ idDoc.rejectionReason }}
             </div>
           </template>
@@ -427,7 +427,7 @@ const approveBlockerHint = computed(() => {
                 @click="openRejectInsurance"
               />
             </div>
-            <div v-else-if="insurance.rejectionReason" class="text-xs text-red-600 mt-1">
+            <div v-else-if="insurance.rejectionReason" class="text-xs text-[color:var(--bs-danger)] mt-1">
               {{ insurance.rejectionReason }}
             </div>
           </template>
@@ -473,7 +473,7 @@ const approveBlockerHint = computed(() => {
                 @click="openRejectWsib"
               />
             </div>
-            <div v-else-if="wsib.rejectionReason" class="text-xs text-red-600 mt-1">
+            <div v-else-if="wsib.rejectionReason" class="text-xs text-[color:var(--bs-danger)] mt-1">
               {{ wsib.rejectionReason }}
             </div>
           </template>

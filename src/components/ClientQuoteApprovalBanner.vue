@@ -137,9 +137,9 @@ async function onSubmitDecline() {
       </p>
       <div
         v-if="upfrontFeeCents > 0"
-        class="mt-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+        class="mt-2 rounded-md border border-[color:var(--bs-warning)] bg-[color:var(--bs-warning-tint)] px-3 py-2 text-xs text-[color:var(--bs-warning-text)]"
       >
-        <i class="pi pi-wallet text-amber-700 mr-1"></i>
+        <i class="pi pi-wallet text-[color:var(--bs-warning-text)] mr-1"></i>
         Accepting commits you to pay
         <span class="font-semibold">{{ money(upfrontFeeCents) }}</span>
         upfront before work begins. It'll be credited against the final invoice.

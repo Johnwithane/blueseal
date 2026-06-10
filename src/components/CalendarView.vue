@@ -252,14 +252,14 @@ function confirmBlock() {
         <div
           v-for="block in props.availability[dayOfWeekKey(d)]"
           :key="block.start + block.end"
-          class="mb-1 rounded bg-blue-50 px-2 py-1 text-xs text-blue-900"
+          class="mb-1 rounded bg-[color:var(--bs-info-tint)] px-2 py-1 text-xs text-[color:var(--bs-info-text)]"
         >
           {{ block.start }} – {{ block.end }}
         </div>
         <article
           v-for="b in blocksForDay(d)"
           :key="b.id"
-          class="mt-1 flex items-center justify-between rounded-md bg-red-50 px-2 py-1 text-xs text-red-800"
+          class="mt-1 flex items-center justify-between rounded-md bg-[color:var(--bs-danger-tint)] px-2 py-1 text-xs text-[color:var(--bs-danger-text)]"
         >
           <span class="flex items-center gap-1">
             <i class="pi pi-ban text-[10px]"></i>
@@ -267,7 +267,7 @@ function confirmBlock() {
           </span>
           <button
             type="button"
-            class="text-red-700 hover:text-red-900"
+            class="text-[color:var(--bs-danger)] hover:text-[color:var(--bs-danger-text)]"
             aria-label="Remove block"
             @click="emit('remove-block', b.id)"
           >
@@ -294,7 +294,7 @@ function confirmBlock() {
         <button
           v-if="canBlock(d)"
           type="button"
-          class="mt-2 flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-[color:var(--bs-border)] py-1 text-xs text-[color:var(--bs-muted)] hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+          class="mt-2 flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-[color:var(--bs-border)] py-1 text-xs text-[color:var(--bs-muted)] hover:border-[color:var(--bs-danger)] hover:bg-[color:var(--bs-danger-tint)] hover:text-[color:var(--bs-danger)]"
           @click="askBlock(d)"
         >
           <i class="pi pi-ban text-[10px]"></i>
@@ -322,8 +322,8 @@ function confirmBlock() {
           :class="{
             'opacity-50': d.getMonth() !== anchor.getMonth(),
             'ring-2 ring-[color:var(--bs-blue)]': isSameDay(d, today),
-            'bg-red-50/50': blocksForDay(d).length > 0,
-            'cursor-pointer hover:bg-red-50/30': canBlock(d, d.getMonth() === anchor.getMonth()),
+            'bg-[color:var(--bs-danger-tint)]': blocksForDay(d).length > 0,
+            'cursor-pointer hover:bg-[color:var(--bs-danger-tint)]': canBlock(d, d.getMonth() === anchor.getMonth()),
           }"
           :role="canBlock(d, d.getMonth() === anchor.getMonth()) ? 'button' : undefined"
           :aria-label="
@@ -340,7 +340,7 @@ function confirmBlock() {
             <div class="flex items-center gap-1">
               <i
                 v-if="blocksForDay(d).length > 0"
-                class="pi pi-ban text-[10px] text-red-600"
+                class="pi pi-ban text-[10px] text-[color:var(--bs-danger)]"
                 title="Blocked"
               ></i>
               <span

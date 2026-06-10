@@ -83,10 +83,10 @@ const KIND_ICON: Record<LineItemKind, string> = {
                   class="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded shrink-0 mt-0.5"
                   :class="
                     li.kind === 'hourly'
-                      ? 'bg-blue-100 text-blue-700'
+                      ? 'bg-[color:var(--bs-info-tint)] text-[color:var(--bs-info-text)]'
                       : li.kind === 'materials'
-                      ? 'bg-amber-100 text-amber-700'
-                      : 'bg-slate-100 text-slate-700'
+                      ? 'bg-[color:var(--bs-warning-tint)] text-[color:var(--bs-warning-text)]'
+                      : 'bg-[color:var(--bs-surface-alt)] text-[color:var(--bs-text)]'
                   "
                 >
                   <i :class="['pi', 'text-[9px]', KIND_ICON[li.kind]]"></i>
@@ -176,7 +176,7 @@ const KIND_ICON: Record<LineItemKind, string> = {
     <div
       v-if="quote.validUntil"
       class="text-xs mt-2"
-      :class="expired ? 'text-red-600' : 'text-[color:var(--bs-muted)]'"
+      :class="expired ? 'text-[color:var(--bs-danger)]' : 'text-[color:var(--bs-muted)]'"
     >
       <i class="pi pi-calendar text-[10px]"></i>
       Valid until {{ date(quote.validUntil) }}

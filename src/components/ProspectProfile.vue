@@ -65,12 +65,12 @@ const tradesWithYears = computed(() =>
     <!-- Removed state — shown after a successful self-serve takedown. -->
     <div
       v-if="removed"
-      class="mb-4 flex items-start gap-3 rounded-lg border border-green-300 bg-green-50/70 p-3"
+      class="mb-4 flex items-start gap-3 rounded-lg border border-[color:var(--bs-success)] bg-[color:var(--bs-success-tint)] p-3"
     >
-      <i class="pi pi-check-circle text-lg mt-0.5 text-green-700" aria-hidden="true"></i>
+      <i class="pi pi-check-circle text-lg mt-0.5 text-[color:var(--bs-success)]" aria-hidden="true"></i>
       <div class="text-sm">
-        <div class="font-semibold text-green-900">Listing removed</div>
-        <p class="text-green-900/80">
+        <div class="font-semibold text-[color:var(--bs-success-text)]">Listing removed</div>
+        <p class="text-[color:var(--bs-success-text)]">
           This listing has been taken down and won't be re-added. If this was a mistake, email support.
         </p>
       </div>
@@ -79,18 +79,18 @@ const tradesWithYears = computed(() =>
     <!-- Status banner. Shown until removed — this profile isn't verified yet. -->
     <div
       v-else
-      class="mb-4 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50/60 p-3"
+      class="mb-4 flex items-start gap-3 rounded-lg border border-[color:var(--bs-warning)] bg-[color:var(--bs-warning-tint)] p-3"
     >
-      <i class="pi pi-info-circle text-lg mt-0.5 text-amber-700" aria-hidden="true"></i>
+      <i class="pi pi-info-circle text-lg mt-0.5 text-[color:var(--bs-warning)]" aria-hidden="true"></i>
       <div class="flex-1 text-sm">
-        <div class="font-semibold text-amber-900">Unclaimed listing</div>
-        <p class="text-amber-900/80">
+        <div class="font-semibold text-[color:var(--bs-warning-text)]">Unclaimed listing</div>
+        <p class="text-[color:var(--bs-warning-text)]">
           Blue Seal created this listing from public business information. This business
           hasn't joined or been verified yet.
         </p>
         <button
           type="button"
-          class="mt-1 text-xs text-amber-900/70 underline hover:text-amber-900"
+          class="mt-1 text-xs text-[color:var(--bs-warning-text)] underline hover:text-[color:var(--bs-warning-text)]"
           @click="showRemove = true"
         >
           Not you? Remove this listing
@@ -235,7 +235,7 @@ const tradesWithYears = computed(() =>
             auto-resize
           />
         </div>
-        <p v-if="removeError" class="text-xs text-red-600">{{ removeError }}</p>
+        <p v-if="removeError" class="text-xs text-[color:var(--bs-danger)]">{{ removeError }}</p>
       </div>
       <template #footer>
         <Button

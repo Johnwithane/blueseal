@@ -1017,7 +1017,7 @@ async function grantAllTrades() {
                 <div>
                   <label class="text-sm font-medium">
                     Business address
-                    <span class="text-xs text-red-600 font-normal ml-1">Required for invoices</span>
+                    <span class="text-xs text-[color:var(--bs-danger)] font-normal ml-1">Required for invoices</span>
                   </label>
                   <!-- Raw <input> (not InputText) so we can attach Google
                        Places Autocomplete to the DOM node — same pattern as
@@ -1160,7 +1160,7 @@ async function grantAllTrades() {
                   />
                   <p
                     v-if="invoicePrefixError"
-                    class="mt-1 text-xs text-red-600"
+                    class="mt-1 text-xs text-[color:var(--bs-danger)]"
                   >
                     {{ invoicePrefixError }}
                   </p>
@@ -1206,7 +1206,7 @@ async function grantAllTrades() {
                   />
                   <p
                     v-if="quotePrefixError"
-                    class="mt-1 text-xs text-red-600"
+                    class="mt-1 text-xs text-[color:var(--bs-danger)]"
                   >
                     {{ quotePrefixError }}
                   </p>
@@ -1575,10 +1575,10 @@ async function grantAllTrades() {
           </a>
         </div>
 
-        <div class="mt-4 rounded-lg border border-red-200 bg-red-50/30 p-4">
+        <div class="mt-4 rounded-lg border border-[color:var(--bs-danger)] bg-[color:var(--bs-danger-tint)] p-4">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h3 class="font-semibold text-red-700">Delete my account</h3>
+              <h3 class="font-semibold text-[color:var(--bs-danger)]">Delete my account</h3>
               <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
                 Marks your account for deletion. You'll be signed out, your
                 profile will be hidden from search immediately, and we'll wipe

@@ -93,7 +93,7 @@ const isParty = computed(
     </div>
 
     <div v-else-if="effectiveStatus === 'failed'" class="bs-card p-6">
-      <i class="pi pi-times-circle text-3xl text-[#b91c1c]"></i>
+      <i class="pi pi-times-circle text-3xl text-[color:var(--bs-danger)]"></i>
       <h1 class="mt-2 text-xl font-semibold">Payment didn't go through</h1>
       <p class="mt-2 text-sm text-[color:var(--bs-muted)]">
         Stripe couldn't confirm your payment. You can try again with the same

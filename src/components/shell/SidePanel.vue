@@ -4,6 +4,7 @@ import { useNavItems } from "@/composables/useNavItems";
 import NotificationsButton from "@/components/shell/NotificationsButton.vue";
 import ProfileMenu from "@/components/shell/ProfileMenu.vue";
 import RoleSwitcher from "@/components/shell/RoleSwitcher.vue";
+import BlueSealLockup from "@/components/brand/BlueSealLockup.vue";
 
 const { sideItems, isActive } = useNavItems();
 </script>
@@ -13,9 +14,8 @@ const { sideItems, isActive } = useNavItems();
     <!-- Logo + brand → the homepage (root), per product convention that the
          logo always goes home. The role "Jobs"/"Dashboard" nav item covers
          the in-app home. -->
-    <RouterLink to="/" class="side-panel__brand">
-      <img src="/icons/blueseal_logo_Character.png" alt="" class="h-12 w-auto" />
-      <span class="side-panel__brand-text">BlueSeal</span>
+    <RouterLink to="/" class="side-panel__brand" aria-label="Blue Seal home">
+      <BlueSealLockup class="side-panel__brand-logo" />
     </RouterLink>
 
     <nav class="side-panel__nav" aria-label="Primary">
@@ -71,11 +71,10 @@ const { sideItems, isActive } = useNavItems();
   color: inherit;
   text-decoration: none;
 }
-.side-panel__brand-text {
-  font-family: var(--bs-font-logo);
-  font-size: 1.5rem;
-  color: var(--bs-blue-dark);
-  letter-spacing: 0.02em;
+.side-panel__brand-logo {
+  height: 2rem;
+  width: auto;
+  display: block;
 }
 
 .side-panel__nav {

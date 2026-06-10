@@ -78,10 +78,10 @@ const lockedStatuses = new Set<JobDoc["status"]>([
          reopenable from the Completed view. -->
     <div
       v-if="canMarkDone"
-      class="bs-card p-4 border-l-4 border-l-emerald-500"
+      class="bs-card p-4 border-l-4 border-l-[color:var(--bs-success)]"
     >
       <h3 class="font-semibold text-sm mb-1 flex items-center gap-2">
-        <i class="pi pi-check-circle text-emerald-600"></i>
+        <i class="pi pi-check-circle text-[color:var(--bs-success)]"></i>
         All wrapped up
       </h3>
       <p class="text-xs text-[color:var(--bs-muted)] mb-3">
@@ -101,10 +101,10 @@ const lockedStatuses = new Set<JobDoc["status"]>([
          markJobPaid atomically flips invoice → paid + job → complete. -->
     <div
       v-if="isTradie && job.status === 'awaiting_payment'"
-      class="bs-card p-3 border-l-4 border-l-emerald-500"
+      class="bs-card p-3 border-l-4 border-l-[color:var(--bs-success)]"
     >
       <h3 class="font-semibold text-sm mb-1 flex items-center gap-2">
-        <i class="pi pi-wallet text-emerald-600"></i>
+        <i class="pi pi-wallet text-[color:var(--bs-success)]"></i>
         Payment received?
       </h3>
       <p class="text-xs text-[color:var(--bs-muted)] mb-3">
@@ -129,10 +129,10 @@ const lockedStatuses = new Set<JobDoc["status"]>([
          without an action. -->
     <div
       v-if="isClient && job.status === 'awaiting_payment' && invoiceId"
-      class="bs-card p-3 border-l-4 border-l-emerald-500"
+      class="bs-card p-3 border-l-4 border-l-[color:var(--bs-success)]"
     >
       <h3 class="font-semibold text-sm mb-1 flex items-center gap-2">
-        <i class="pi pi-wallet text-emerald-600"></i>
+        <i class="pi pi-wallet text-[color:var(--bs-success)]"></i>
         Invoice ready to pay
       </h3>
       <p class="text-xs text-[color:var(--bs-muted)] mb-3">
@@ -195,10 +195,10 @@ const lockedStatuses = new Set<JobDoc["status"]>([
     <!-- Tradie: ball is in the client's court — read-only confirmation. -->
     <div
       v-if="isTradie && job.status === 'awaiting_client_approval'"
-      class="bs-card p-3 border-l-4 border-l-amber-500"
+      class="bs-card p-3 border-l-4 border-l-[color:var(--bs-warning)]"
     >
       <h3 class="font-semibold text-sm mb-1 flex items-center gap-2">
-        <i class="pi pi-hourglass text-amber-600"></i>
+        <i class="pi pi-hourglass text-[color:var(--bs-warning)]"></i>
         Awaiting client approval
       </h3>
       <p class="text-xs text-[color:var(--bs-muted)]">

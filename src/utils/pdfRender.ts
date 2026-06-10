@@ -65,21 +65,21 @@ interface DocSummary {
 // file is self-contained. Mirrors the CSS custom properties in
 // src/assets/main.css so on-screen and on-paper Blue Seal feel like
 // the same brand.
-//   --bs-blue-dark   #1e416b → header band, table head, accents
-//   --bs-blue        #3291c7 → secondary band, links
-//   --bs-blue-light  #9ec8e0 → ultra-soft panels
-//   --bs-amber       #f59e0b → total highlight
-//   --bs-bg          #f5f7fb → paper-alt panels
+//   --bs-blue-dark   #2A3A5C → header band, table head, accents
+//   --bs-blue        #374C76 → secondary band, links
+//   --bs-blue-light  #B3DCFF → ultra-soft panels
+//   --bs-amber       #D49A2E → total highlight (rating gold)
+//   --bs-bg          #FDF8EC → paper-alt panels (soft warm paper)
 const BRAND = {
-  blueDark: [30, 65, 107] as const, // #1e416b
-  blue: [50, 145, 199] as const, // #3291c7
-  blueLight: [158, 200, 224] as const, // #9ec8e0
-  bluePanel: [235, 244, 249] as const, // computed ~10% mix of blue on white
-  amber: [245, 158, 11] as const, // #f59e0b
-  ink: [17, 24, 39] as const, // #111827
-  muted: [107, 114, 128] as const, // #6b7280
-  border: [229, 231, 235] as const, // #e5e7eb
-  paperAlt: [245, 247, 251] as const, // #f5f7fb
+  blueDark: [42, 58, 92] as const, // #2A3A5C
+  blue: [55, 76, 118] as const, // #374C76
+  blueLight: [179, 220, 255] as const, // #B3DCFF
+  bluePanel: [235, 237, 241] as const, // computed ~10% mix of navy on white
+  amber: [212, 154, 46] as const, // #D49A2E
+  ink: [73, 76, 79] as const, // #494C4F
+  muted: [102, 98, 87] as const, // #666257
+  border: [224, 212, 184] as const, // #E0D4B8
+  paperAlt: [253, 248, 236] as const, // #FDF8EC
 };
 
 function fmtMoney(cents: number, currency = "CAD"): string {

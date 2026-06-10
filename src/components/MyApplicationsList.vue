@@ -109,7 +109,7 @@ function unreadFor(a: WithId<ApplicationDoc>): number {
           <p class="text-sm mt-2 line-clamp-2">{{ a.message }}</p>
           <p
             v-if="a.status === 'declined' && a.declinedReason"
-            class="text-xs text-amber-800 mt-2 line-clamp-2"
+            class="text-xs text-[color:var(--bs-warning-text)] mt-2 line-clamp-2"
           >
             Client: “{{ a.declinedReason }}”
           </p>

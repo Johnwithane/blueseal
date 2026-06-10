@@ -4,6 +4,7 @@ import { RouterLink, useRoute } from "vue-router";
 import { useNavItems } from "@/composables/useNavItems";
 import NotificationsButton from "@/components/shell/NotificationsButton.vue";
 import ProfileMenu from "@/components/shell/ProfileMenu.vue";
+import BlueSealMarkTall from "@/components/brand/BlueSealMarkTall.vue";
 
 const { mobileItems, isActive } = useNavItems();
 const route = useRoute();
@@ -41,11 +42,7 @@ const isHomeActive = computed(() => route.path === "/");
       :class="{ 'bottom-tab--active': isHomeActive }"
       aria-label="Home"
     >
-      <img
-        src="/icons/blueseal_logo_Character.png"
-        alt=""
-        class="bottom-tab__brand-icon"
-      />
+      <BlueSealMarkTall decorative class="bottom-tab__brand-icon" />
     </RouterLink>
 
     <NotificationsButton variant="tab" label="Alerts" />

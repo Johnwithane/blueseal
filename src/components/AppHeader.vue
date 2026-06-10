@@ -9,6 +9,7 @@ import { useAuthStore } from "@/stores/auth";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 import NotificationsPanel from "@/components/NotificationsPanel.vue";
+import BlueSealLockup from "@/components/brand/BlueSealLockup.vue";
 import type { NotificationDoc, WithId } from "@/firebase/interfaces";
 import { useNotificationsStore } from "@/stores/notifications";
 
@@ -186,12 +187,9 @@ function openMenu(e: Event) {
     :style="{ top: 'var(--bs-clock-banner-h, 0px)' }"
   >
     <div class="bs-container flex items-center justify-between gap-3 py-3">
-      <router-link to="/" class="flex items-center gap-2 text-inherit no-underline">
-        <img src="/icons/blueseal_logo_Character.png" alt="" class="h-12 w-auto" />
-        <span
-          class="text-2xl tracking-wide text-[color:var(--bs-blue-dark)]"
-          style="font-family: var(--bs-font-logo)"
-        >BlueSeal</span>
+      <router-link to="/" class="flex items-center text-inherit no-underline" aria-label="Blue Seal home">
+        <!-- Official full-colour lockup (keeps its own colours). -->
+        <BlueSealLockup class="h-9 w-auto" />
       </router-link>
 
       <!-- Role-aware primary nav (desktop only). Hidden on mobile; the same

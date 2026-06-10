@@ -384,7 +384,7 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
             </div>
             <button
               type="button"
-              class="text-red-500 hover:text-red-600 p-1"
+              class="text-[color:var(--bs-danger)] hover:text-[color:var(--bs-danger)] p-1"
               aria-label="Remove line"
               @click="removeLine(i)"
             >
@@ -406,7 +406,7 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
             :invalid="isLineIncomplete(l)"
             class="quote-composer-line-description w-full text-sm"
           />
-          <p v-if="isLineIncomplete(l)" class="text-[11px] text-red-600 mt-1">
+          <p v-if="isLineIncomplete(l)" class="text-[11px] text-[color:var(--bs-danger)] mt-1">
             Add a description so this line counts toward the total.
           </p>
 

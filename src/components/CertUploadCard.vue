@@ -333,7 +333,7 @@ const defaultOpen = computed(
         </div>
         <div
           v-if="existing.status === 'rejected' && existing.rejectionReason"
-          class="text-sm text-red-700 mt-2"
+          class="text-sm text-[color:var(--bs-danger-text)] mt-2"
         >
           Reviewer notes: {{ existing.rejectionReason }}
         </div>

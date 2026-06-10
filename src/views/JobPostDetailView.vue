@@ -611,14 +611,14 @@ const visibleApplications = computed(() =>
                to change. Revising puts the quote back in front of the client. -->
           <div
             v-if="myApplication.status === 'declined' && myApplication.declinedReason"
-            class="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3"
+            class="mt-3 rounded-lg border border-[color:var(--bs-warning)] bg-[color:var(--bs-warning-tint)] p-3"
           >
             <div class="flex items-start gap-2">
-              <i class="pi pi-info-circle text-amber-600 mt-0.5"></i>
+              <i class="pi pi-info-circle text-[color:var(--bs-warning)] mt-0.5"></i>
               <div class="min-w-0 flex-1">
-                <div class="font-semibold text-sm text-amber-900">The client passed on this quote</div>
-                <p class="text-sm text-amber-900 mt-1 whitespace-pre-wrap">{{ myApplication.declinedReason }}</p>
-                <p class="text-xs text-amber-800 mt-1">Revise your quote to put it back in front of them.</p>
+                <div class="font-semibold text-sm text-[color:var(--bs-warning-text)]">The client passed on this quote</div>
+                <p class="text-sm text-[color:var(--bs-warning-text)] mt-1 whitespace-pre-wrap">{{ myApplication.declinedReason }}</p>
+                <p class="text-xs text-[color:var(--bs-warning-text)] mt-1">Revise your quote to put it back in front of them.</p>
               </div>
             </div>
           </div>

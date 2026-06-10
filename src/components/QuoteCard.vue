@@ -191,10 +191,10 @@ const STATUS_LABEL: Record<QuoteStatus, string> = {
 
     <div
       v-if="quote.status === 'declined' && quote.declinedReason"
-      class="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3"
+      class="mt-3 rounded-lg border border-[color:var(--bs-warning)] bg-[color:var(--bs-warning-tint)] p-3"
     >
-      <div class="text-xs font-semibold text-amber-900 mb-1">Client asked to discuss</div>
-      <p class="text-xs text-amber-900 whitespace-pre-wrap">{{ quote.declinedReason }}</p>
+      <div class="text-xs font-semibold text-[color:var(--bs-warning-text)] mb-1">Client asked to discuss</div>
+      <p class="text-xs text-[color:var(--bs-warning-text)] whitespace-pre-wrap">{{ quote.declinedReason }}</p>
     </div>
 
     <div

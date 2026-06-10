@@ -55,7 +55,7 @@ async function submit() {
       <div>
         <label class="text-sm font-medium">Email</label>
         <InputText v-model="email" type="email" class="mt-1" autocomplete="email" />
-        <small v-if="fieldError" class="text-red-600">{{ fieldError }}</small>
+        <small v-if="fieldError" class="text-[color:var(--bs-danger)]">{{ fieldError }}</small>
       </div>
 
       <Message v-if="formError" severity="error" :closable="false">{{ formError }}</Message>

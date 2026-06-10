@@ -140,13 +140,13 @@ function close() {
     <template v-else>
       <div
         v-if="declinedReason"
-        class="rounded-lg border border-amber-300 bg-amber-50 p-3 mb-4"
+        class="rounded-lg border border-[color:var(--bs-warning)] bg-[color:var(--bs-warning-tint)] p-3 mb-4"
       >
         <div class="flex items-start gap-2">
-          <i class="pi pi-info-circle text-amber-600 mt-0.5"></i>
+          <i class="pi pi-info-circle text-[color:var(--bs-warning)] mt-0.5"></i>
           <div class="min-w-0 flex-1">
-            <div class="font-semibold text-sm text-amber-900">Client's request</div>
-            <p class="text-sm text-amber-900 mt-1 whitespace-pre-wrap">{{ declinedReason }}</p>
+            <div class="font-semibold text-sm text-[color:var(--bs-warning-text)]">Client's request</div>
+            <p class="text-sm text-[color:var(--bs-warning-text)] mt-1 whitespace-pre-wrap">{{ declinedReason }}</p>
           </div>
         </div>
       </div>

@@ -88,7 +88,7 @@ const openCount = computed(() => open.value.length);
 
     <LoadingState v-if="loading" />
     <div v-else-if="open.length === 0" class="bs-empty">
-      <i class="pi pi-check-circle text-green-600 mr-2" />No open disputes.
+      <i class="pi pi-check-circle text-[color:var(--bs-success)] mr-2" />No open disputes.
     </div>
     <ul v-else class="space-y-2">
       <li v-for="d in open" :key="d.id" class="bs-card p-3">

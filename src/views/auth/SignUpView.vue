@@ -135,12 +135,12 @@ async function google() {
       <div>
         <label class="text-sm font-medium">Your name</label>
         <InputText v-model="displayName" class="mt-1" autocomplete="name" />
-        <small v-if="fieldErrors.displayName" class="text-red-600">{{ fieldErrors.displayName }}</small>
+        <small v-if="fieldErrors.displayName" class="text-[color:var(--bs-danger)]">{{ fieldErrors.displayName }}</small>
       </div>
       <div>
         <label class="text-sm font-medium">Email</label>
         <InputText v-model="email" type="email" class="mt-1" autocomplete="email" />
-        <small v-if="fieldErrors.email" class="text-red-600">{{ fieldErrors.email }}</small>
+        <small v-if="fieldErrors.email" class="text-[color:var(--bs-danger)]">{{ fieldErrors.email }}</small>
       </div>
       <div>
         <label class="text-sm font-medium">Password</label>
@@ -151,7 +151,7 @@ async function google() {
           class="mt-1 w-full"
           autocomplete="new-password"
         />
-        <small v-if="fieldErrors.password" class="text-red-600">{{ fieldErrors.password }}</small>
+        <small v-if="fieldErrors.password" class="text-[color:var(--bs-danger)]">{{ fieldErrors.password }}</small>
       </div>
 
       <div>
@@ -168,7 +168,7 @@ async function google() {
             </template>
           </span>
         </label>
-        <small v-if="fieldErrors.termsAccepted" class="text-red-600 block mt-1">
+        <small v-if="fieldErrors.termsAccepted" class="text-[color:var(--bs-danger)] block mt-1">
           {{ fieldErrors.termsAccepted }}
         </small>
       </div>

@@ -294,13 +294,13 @@ function prettyRequirement(req: string): string {
             :class="[
               'text-xs font-medium rounded-full px-2 py-0.5',
               statusLabel(p.status).severity === 'success' &&
-                'bg-green-100 text-green-800',
+                'bg-[color:var(--bs-success-tint)] text-[color:var(--bs-success-text)]',
               statusLabel(p.status).severity === 'info' &&
-                'bg-blue-100 text-blue-800',
+                'bg-[color:var(--bs-info-tint)] text-[color:var(--bs-info-text)]',
               statusLabel(p.status).severity === 'warn' &&
-                'bg-amber-100 text-amber-800',
+                'bg-[color:var(--bs-warning-tint)] text-[color:var(--bs-warning-text)]',
               statusLabel(p.status).severity === 'error' &&
-                'bg-red-100 text-red-800',
+                'bg-[color:var(--bs-danger-tint)] text-[color:var(--bs-danger-text)]',
             ]"
           >
             {{ statusLabel(p.status).label }}

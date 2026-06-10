@@ -252,12 +252,12 @@ onMounted(async () => {
            so the page renders fine but clients can't reach it yet. -->
       <div
         v-if="isOwnProfile && !tradie.isVisible"
-        class="mb-4 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50/60 p-3"
+        class="mb-4 flex items-start gap-3 rounded-lg border border-[color:var(--bs-warning)] bg-[color:var(--bs-warning-tint)] p-3"
       >
-        <i class="pi pi-eye text-lg mt-0.5 text-amber-700" aria-hidden="true"></i>
+        <i class="pi pi-eye text-lg mt-0.5 text-[color:var(--bs-warning)]" aria-hidden="true"></i>
         <div class="text-sm">
-          <div class="font-semibold text-amber-900">Preview mode</div>
-          <p class="text-amber-900/80">
+          <div class="font-semibold text-[color:var(--bs-warning-text)]">Preview mode</div>
+          <p class="text-[color:var(--bs-warning-text)]">
             This is how your profile will look — it isn't visible to clients
             until your trade certification + ID are approved.
           </p>

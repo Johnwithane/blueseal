@@ -79,7 +79,7 @@ onMounted(run);
     </Message>
 
     <div v-else-if="status === 'done'" class="mt-6">
-      <i class="pi pi-check-circle text-4xl text-green-600 mb-2 block"></i>
+      <i class="pi pi-check-circle text-4xl text-[color:var(--bs-success)] mb-2 block"></i>
       <p class="font-semibold">{{ claimedListing ? "You're in!" : "You're signed in" }}</p>
       <p v-if="jobsCreated" class="text-sm text-[color:var(--bs-muted)]">
         {{ jobsCreated }} customer request{{ jobsCreated === 1 ? "" : "s" }} waiting for you.

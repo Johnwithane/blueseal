@@ -114,10 +114,10 @@ function removeSession() {
          it doesn't gate status. -->
     <div
       v-if="isTradie && job.status === 'in_progress' && sessions.length === 0"
-      class="bs-card p-3 border-l-4 border-l-emerald-500"
+      class="bs-card p-3 border-l-4 border-l-[color:var(--bs-success)]"
     >
       <h3 class="font-semibold text-sm mb-1 flex items-center gap-2">
-        <i class="pi pi-calendar-plus text-emerald-600"></i>
+        <i class="pi pi-calendar-plus text-[color:var(--bs-success)]"></i>
         Book your first visit (optional)
       </h3>
       <p class="text-xs text-[color:var(--bs-muted)]">
@@ -128,10 +128,10 @@ function removeSession() {
 
     <div
       v-if="isClient && job.status === 'in_progress' && sessions.length === 0"
-      class="bs-card p-3 border-l-4 border-l-emerald-500"
+      class="bs-card p-3 border-l-4 border-l-[color:var(--bs-success)]"
     >
       <h3 class="font-semibold text-sm mb-1 flex items-center gap-2">
-        <i class="pi pi-check text-emerald-600"></i>
+        <i class="pi pi-check text-[color:var(--bs-success)]"></i>
         Quote accepted — job is active
       </h3>
       <p class="text-xs text-[color:var(--bs-muted)]">
@@ -238,7 +238,7 @@ function removeSession() {
             placeholder="e.g. first fix, snagging"
           />
         </div>
-        <p v-if="formError" class="text-xs text-red-600">{{ formError }}</p>
+        <p v-if="formError" class="text-xs text-[color:var(--bs-danger)]">{{ formError }}</p>
       </div>
       <template #footer>
         <Button

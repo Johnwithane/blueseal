@@ -524,7 +524,7 @@ function avatarInitial(name: string): string {
           autofocus
         />
 
-        <div v-if="searchError" class="mt-3 text-sm text-red-600">
+        <div v-if="searchError" class="mt-3 text-sm text-[color:var(--bs-danger)]">
           {{ searchError }}
         </div>
 

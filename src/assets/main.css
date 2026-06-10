@@ -2,53 +2,51 @@
 
 /* Blue Seal palette */
 :root {
-  /* --- Brand ramps ----------------------------------------------------------
-     Blue is primary; red and green are secondary accents. Each ramp is
-     base / light / dark and is the SINGLE source of truth — change a value here
-     and it propagates to every token-driven surface (gradients, the .bs-kicker
-     eyebrow, component arbitrary values like text-[color:var(--bs-blue)]).
-     The blue ramp is mirrored in two non-CSS places that must be retuned with
-     it: the PrimeVue control theme (src/theme/preset.ts) and the PDF renderer
-     (src/utils/pdfRender.ts, as RGB tuples).
+  /* --- Brand palette: light & dark families ---------------------------------
+     Duotone system. Any LIGHT-family colour is readable over any DARK-family
+     colour and vice-versa, so the UI is built from light surfaces (dark
+     text/logo) and dark sections (light text/logo). These five are the ONLY
+     brand colours; neutrals + status + success/warn below are derived/functional.
+     Single source of truth — the blue ramp is mirrored in src/theme/preset.ts
+     (PrimeVue) and src/utils/pdfRender.ts (RGB tuples); retune them together.
      Rule: never re-hardcode these hexes in a component — reference var(--bs-…).
+     See skills/design-system.md. */
 
-     Design language (see skills/design-system.md):
-       blue  = primary / structure / trust
-       red   = attention / alert  (notification badges, errors)
-       green = positive / success (verified ✓, benefit eyebrows)
-       amber = caution / pending / ratings */
-  --bs-blue: #3291c7;
-  --bs-blue-light: #9ec8e0;
-  --bs-blue-dark: #1e416b;
+  /* The brand colours */
+  --bs-dark-blue:  #374C76;  /* dark family */
+  --bs-mid-blue:   #5E81C9;  /* mid-blue — between dark-blue and light-blue */
+  --bs-dark-grey:  #494C4F;  /* dark family */
+  --bs-red:        #B2373D;  /* dark family — accent AND error/danger (one red) */
+  --bs-light-blue: #B3DCFF;  /* light family */
+  --bs-beige:      #FCECC9;  /* light family */
 
-  /* Secondary accent — red (attention). A *brand* colour, distinct from the
-     semantic error red (.bs-pill.danger / --bs-status-cancelled #ef4444), which
-     stays a fixed UI signal — don't swap one for the other. */
-  --bs-red: #e54d55;
-  --bs-red-light: #e19099;
-  --bs-red-dark: #a72c32;
+  /* Role tokens (legacy names re-pointed → ~1,100 refs propagate) */
+  --bs-blue:        var(--bs-dark-blue);   /* primary: structure, links, buttons */
+  --bs-blue-light:  var(--bs-light-blue);  /* light-blue accent */
+  --bs-blue-dark:   #2A3A5C;               /* deep navy: gradients, hover, deep bg */
+  --bs-red-light:   #E8C2C4;               /* soft red tint */
+  --bs-red-dark:    #8C2B30;               /* deep red: hover */
+  --bs-amber:       #D49A2E;               /* rating gold (stars) — functional */
+  --bs-on-dark:     var(--bs-beige);       /* warm text/accent on dark sections */
 
-  /* Secondary accent — green (positive). A *brand* colour, distinct from the
-     semantic success/verified greens (.bs-pill.verified, --bs-status-complete
-     #10b981), which stay fixed UI signals. */
-  --bs-green: #29c765;
-  --bs-green-light: #6be89b;
-  --bs-green-dark: #2f8851;
+  /* Neutrals — CLEAN white / off-white base (Airbnb-calm work screens). The
+     beige & light-blue families are reserved as deliberate ACCENT surfaces
+     (hero bands, highlight cards), NOT the everyday app wash. */
+  --bs-bg:          #FAF9F6;  /* clean off-white app background */
+  --bs-surface:     #FFFFFF;  /* cards / raised surfaces */
+  --bs-text:        #494C4F;  /* ink (= DarkGrey) */
+  --bs-muted:       #6B6862;  /* secondary text (AA on bg and white cards) */
+  --bs-border:      #EAE7DF;  /* clean hairline border / divider */
+  --bs-surface-alt: #F4F2EC;  /* subtle well: hover/zebra/unread tint */
+  --bs-text-muted:  var(--bs-muted);
+  --bs-accent-surface: var(--bs-beige);  /* deliberate warm accent block */
 
-  --bs-amber: #f59e0b;
-  --bs-bg: #f5f7fb;
-  --bs-text: #111827;
-  --bs-muted: #6b7280;
-  --bs-border: #e5e7eb;
-  /* Neutral surface for hover/active rows, zebra stripes and unread tints.
-     Referenced in ~14 files (ProfileMenu, NotificationsPanel, JobList, etc.)
-     that previously pointed at an undefined var — without this they rendered
-     transparent. */
-  --bs-surface-alt: #f9fafb;
-  /* Alias for the muted text colour. Several components reference
-     --bs-text-muted (a fork of --bs-muted); converge them here so both
-     resolve identically rather than falling back to inherited colour. */
-  --bs-text-muted: var(--bs-muted);
+  /* Functional semantic set — NOT brand identity. success/warn exist because
+     the palette has no green/amber; danger reuses brand red. base + tint + text. */
+  --bs-success: #3F7D5C; --bs-success-tint: #DAEDE2; --bs-success-text: #254434;
+  --bs-warning: #C28A33; --bs-warning-tint: #F5E9CE; --bs-warning-text: #5C401E;
+  --bs-danger:  #B2373D; --bs-danger-tint:  #F8DCDE; --bs-danger-text:  #68252A;
+  --bs-info:    #374C76; --bs-info-tint:    #DCEBFA; --bs-info-text:    #243049;
 
   /* Typography */
   --bs-font-body: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
@@ -74,28 +72,24 @@
 
   /* Elevation — --bs-shadow-sm matches the current .bs-card shadow exactly. */
   --bs-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
-  --bs-shadow-md: 0 8px 24px -12px rgba(29, 64, 106, 0.25);
+  --bs-shadow-md: 0 8px 24px -12px rgba(55, 76, 118, 0.25);
 
   /* --- Job status palette --------------------------------------------------
-     Single source of truth for the per-status accent used by the kanban
-     column dots (KanbanBoard) and the list section colours (JobList). These
-     were previously duplicated as raw hex in both files and had drifted
-     (complete was green in one, grey in the other — now unified to green).
-     Values mirror the prior hex so this is visually neutral except for that
-     one reconciliation. `accepted` == --bs-blue-light and `quoted` ==
-     --bs-amber by intent; kept as explicit values so status semantics don't
-     shift if the brand ramp is re-tuned. */
-  --bs-status-requested: #0ea5e9;
-  --bs-status-accepted: #a0d6f1;
-  --bs-status-quoted: #f59e0b;
-  --bs-status-awaiting_upfront_payment: #d97706;
-  --bs-status-in_progress: #0d47a1;
-  --bs-status-on_hold: #b45309;
-  --bs-status-awaiting_client_approval: #f97316;
-  --bs-status-awaiting_payment: #7c3aed;
-  --bs-status-complete: #10b981;
-  --bs-status-reviewed: #6b7280;
-  --bs-status-cancelled: #ef4444;
+     Per-status accent for kanban dots (KanbanBoard) and list sections (JobList).
+     Retuned to the duotone system: harmonized, muted, distinguishable on the
+     warm paper bg. Mapped onto the functional families (info-blue / ochre /
+     success-green / red) with hue spread so adjacent statuses stay readable. */
+  --bs-status-requested:                #4470A0;
+  --bs-status-accepted:                 #5E97CB;
+  --bs-status-quoted:                   #C28A33;
+  --bs-status-awaiting_upfront_payment: #A8762B;
+  --bs-status-in_progress:              #3F7D5C;
+  --bs-status-on_hold:                  #875D23;
+  --bs-status-awaiting_client_approval: #C24750;
+  --bs-status-awaiting_payment:         #6E4C20;
+  --bs-status-complete:                 #34664B;
+  --bs-status-reviewed:                 #494C4F;
+  --bs-status-cancelled:                #B2373D;
 }
 
 html, body, #app {
@@ -173,6 +167,9 @@ h1.bs-display,
 }
 
 a { color: var(--bs-blue); }
+/* Primary is a deep navy now, so hue alone is a weak link cue — underline on
+   hover/focus keeps links identifiable. */
+a:hover, a:focus-visible { text-decoration: underline; }
 
 .bs-container {
   max-width: 1200px;
@@ -229,25 +226,26 @@ a { color: var(--bs-blue); }
   gap: 0.35rem;
   padding: 0.2rem 0.6rem;
   border-radius: 999px;
-  background: #e0f2fe;
-  color: #075985;
+  /* Functional tints (see :root). base = info, then success/warn/danger. */
+  background: var(--bs-info-tint);
+  color: var(--bs-info-text);
   font-size: 0.75rem;
   font-weight: 600;
 }
 
 .bs-pill.verified {
-  background: #dcfce7;
-  color: #15803d;
+  background: var(--bs-success-tint);
+  color: var(--bs-success-text);
 }
 
 .bs-pill.warn {
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--bs-warning-tint);
+  color: var(--bs-warning-text);
 }
 
 .bs-pill.danger {
-  background: #fee2e2;
-  color: #991b1b;
+  background: var(--bs-danger-tint);
+  color: var(--bs-danger-text);
 }
 
 .bs-empty {
@@ -284,15 +282,16 @@ a { color: var(--bs-blue); }
   width: 100%;
 }
 
-/* Brand gradients */
+/* Brand gradients — kept within the navy family (the palette has no mid-blue,
+   and LightBlue is too pale to anchor a dark surface). */
 .bs-gradient-brand {
-  background: linear-gradient(135deg, var(--bs-blue-dark) 0%, var(--bs-blue) 60%, var(--bs-blue-light) 100%);
+  background: linear-gradient(135deg, var(--bs-blue-dark) 0%, var(--bs-blue) 55%, #46618F 100%);
 }
 .bs-gradient-deep {
-  background: linear-gradient(180deg, var(--bs-blue-dark) 0%, #122740 100%);
+  background: linear-gradient(180deg, var(--bs-blue-dark) 0%, #161F30 100%);
 }
 .bs-gradient-soft {
-  background: linear-gradient(180deg, #ffffff 0%, #eaf5fc 100%);
+  background: linear-gradient(180deg, #ffffff 0%, var(--bs-bg) 100%);
 }
 .bs-gradient-overlay {
   background: linear-gradient(180deg, color-mix(in srgb, var(--bs-blue-dark) 78%, transparent) 0%, color-mix(in srgb, var(--bs-blue-dark) 55%, transparent) 50%, color-mix(in srgb, var(--bs-blue-dark) 85%, transparent) 100%);
@@ -301,7 +300,7 @@ a { color: var(--bs-blue); }
   background: linear-gradient(100deg, color-mix(in srgb, var(--bs-blue-dark) 92%, transparent) 0%, color-mix(in srgb, var(--bs-blue-dark) 65%, transparent) 55%, color-mix(in srgb, var(--bs-blue) 25%, transparent) 100%);
 }
 .bs-gradient-text {
-  background: linear-gradient(120deg, var(--bs-blue-light), #ffffff 60%, var(--bs-blue-light));
+  background: linear-gradient(120deg, var(--bs-blue-light), var(--bs-beige) 60%, var(--bs-blue-light));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -348,7 +347,7 @@ a { color: var(--bs-blue); }
 }
 .bs-trade-tile:hover {
   transform: translateY(-4px);
-  box-shadow: 0 18px 40px -18px rgba(29,64,106,0.35);
+  box-shadow: 0 18px 40px -18px rgba(55,76,118,0.35);
   border-color: var(--bs-blue);
 }
 .bs-trade-tile:hover .bs-trade-icon {
@@ -368,10 +367,10 @@ a { color: var(--bs-blue); }
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  /* Green accent eyebrow (green = positive — "what sets us apart"). Uses the
-     dark step for legibility on light backgrounds; dark sections override the
-     colour inline to --bs-green-light, which reads cleanly on navy. */
-  color: var(--bs-green-dark);
+  /* Red accent eyebrow on light sections (brand Red, our one accent). Dark
+     sections override the colour inline to a light-family token (Beige/
+     LightBlue), which reads cleanly on navy. */
+  color: var(--bs-red);
 }
 .bs-kicker::before {
   content: "";
@@ -439,4 +438,132 @@ a { color: var(--bs-blue); }
   .bs-layout-leave-active {
     transition: none;
   }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   IDENTITY LAYER — "Sealed Editions". Bold duotone for marketing/home/titles.
+   Strictly OPT-IN: none of this touches the calm white work screens.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* Full-bleed band — escapes .bs-container to the viewport edge. Safe against
+   the body's `overflow-x: clip`; put content back inside .bs-container. */
+.bs-band {
+  width: 100vw;
+  margin-inline: calc(50% - 50vw);
+}
+
+/* Magazine punch: push the display face to its bold cut on the home page only,
+   so work-screen page titles stay calm at weight 400. */
+.bs-home .bs-display { font-weight: 700; }
+
+/* Colour-block knockout for one operative word in a headline. box-decoration
+   so it wraps cleanly across lines. Red is the default "spice"; navy/light for
+   alternate bands. */
+.bs-mark,
+.bs-mark-navy,
+.bs-mark-light {
+  /* Draw the fill as a centred band that hugs the word (≈0.86em tall) rather
+     than the whole line box, so the highlight isn't taller than the text. */
+  padding: 0 0.18em;
+  border-radius: 3px;
+  background-repeat: no-repeat;
+  background-position: 0 center;
+  background-size: 100% 0.86em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+.bs-mark       { background-image: linear-gradient(var(--bs-red), var(--bs-red));             color: var(--bs-beige); }
+.bs-mark-navy  { background-image: linear-gradient(var(--bs-blue-dark), var(--bs-blue-dark)); color: var(--bs-beige); }
+.bs-mark-light { background-image: linear-gradient(var(--bs-beige), var(--bs-beige));         color: var(--bs-blue-dark); }
+
+/* ── Identity buttons. Opt-in via .bs-btn on marketing/CTAs ONLY — never wired
+   through the PrimeVue preset, so every work-screen <Button> stays untouched. */
+.bs-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  padding: 0 1.5rem;
+  border-radius: var(--bs-radius-sm);
+  font-family: var(--bs-font-body);
+  font-weight: 700;
+  font-size: 0.9375rem;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  border: 2px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 150ms ease, color 150ms ease,
+    border-color 150ms ease, transform 120ms ease, box-shadow 150ms ease;
+}
+.bs-btn:active { transform: translateY(1px); }
+.bs-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--bs-blue);
+}
+.bs-btn > [class*="pi-"] { font-size: 0.95em; }
+.bs-btn--lg { min-height: 52px; padding: 0 1.75rem; font-size: 1rem; }
+.bs-btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+
+/* PRIMARY (on light bands): navy fill, white text. */
+.bs-btn--primary {
+  background: var(--bs-blue);
+  color: #fff;
+  border-color: var(--bs-blue);
+  box-shadow: var(--bs-shadow-md);
+}
+.bs-btn--primary:hover { background: var(--bs-blue-dark); border-color: var(--bs-blue-dark); }
+
+/* PRIMARY on dark bands: white fill, navy text — crisp, with a warm beige hover. */
+.bs-btn--primary-on-dark {
+  background: #fff;
+  color: var(--bs-blue-dark);
+  border-color: #fff;
+  box-shadow: var(--bs-shadow-md);
+}
+.bs-btn--primary-on-dark:hover { background: var(--bs-beige); border-color: var(--bs-beige); }
+
+/* SECONDARY outline. */
+.bs-btn--secondary {
+  background: transparent;
+  color: var(--bs-blue);
+  border-color: var(--bs-blue);
+}
+.bs-btn--secondary:hover { background: var(--bs-blue); color: #fff; }
+.bs-btn--secondary-on-dark {
+  background: transparent;
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.6);
+}
+.bs-btn--secondary-on-dark:hover {
+  border-color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* RED accent — the single apply/subscribe moment per page. Spice, not staple. */
+.bs-btn--red {
+  background: var(--bs-red);
+  color: #fff;
+  border-color: var(--bs-red);
+}
+.bs-btn--red:hover { background: var(--bs-red-dark); border-color: var(--bs-red-dark); }
+
+/* TERTIARY text link. */
+.bs-btn--text {
+  min-height: 0;
+  padding: 0.4rem 0.5rem;
+  border: none;
+  background: none;
+  color: var(--bs-blue);
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+.bs-btn--text.on-dark { color: #fff; text-decoration-color: var(--bs-light-blue); }
+
+@media (prefers-reduced-motion: reduce) {
+  .bs-btn { transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease; }
+  .bs-btn:active { transform: none; }
 }

@@ -343,7 +343,7 @@ onMounted(async () => {
 
     <LoadingState v-if="loading" />
     <div v-else-if="pending.length === 0" class="bs-empty">
-      <i class="pi pi-check-circle text-3xl mb-2 block text-green-600"></i>
+      <i class="pi pi-check-circle text-3xl mb-2 block text-[color:var(--bs-success)]"></i>
       <p>Queue clear. Nice work.</p>
     </div>
     <div v-else class="space-y-3">

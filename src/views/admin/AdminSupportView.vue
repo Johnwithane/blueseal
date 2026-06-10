@@ -123,7 +123,7 @@ function replyHref(t: WithId<SupportTicketDoc>): string {
     <LoadingState v-if="loading" />
 
     <div v-else-if="errored" class="bs-empty">
-      <i class="pi pi-exclamation-triangle mb-2 block text-2xl text-amber-500"></i>
+      <i class="pi pi-exclamation-triangle mb-2 block text-2xl text-[color:var(--bs-warning)]"></i>
       <p class="font-medium text-[color:var(--bs-text)]">Couldn't load tickets.</p>
       <p class="mt-1 text-sm">
         If this is the first deploy, the <code>supportTickets</code> security rules may not be live
@@ -132,7 +132,7 @@ function replyHref(t: WithId<SupportTicketDoc>): string {
     </div>
 
     <div v-else-if="visible.length === 0" class="bs-empty">
-      <i class="pi pi-check-circle mr-2 text-green-600"></i>No
+      <i class="pi pi-check-circle mr-2 text-[color:var(--bs-success)]"></i>No
       {{ filter === "all" ? "" : statusLabel(filter as SupportTicketStatus).toLowerCase() + " " }}tickets.
     </div>
 

@@ -29,11 +29,11 @@ const props = withDefaults(
 // Full literal class strings (not interpolated) so Tailwind's scanner keeps
 // them in the build.
 const ACCENT: Record<Severity, { border: string; icon: string }> = {
-  action: { border: "border-l-amber-500", icon: "text-amber-600" },
-  waiting: { border: "border-l-slate-400", icon: "text-slate-500" },
+  action: { border: "border-l-[color:var(--bs-warning)]", icon: "text-[color:var(--bs-warning)]" },
+  waiting: { border: "border-l-[color:var(--bs-muted)]", icon: "text-[color:var(--bs-muted)]" },
   info: { border: "border-l-[color:var(--bs-blue)]", icon: "text-[color:var(--bs-blue)]" },
-  success: { border: "border-l-emerald-500", icon: "text-emerald-600" },
-  danger: { border: "border-l-red-500", icon: "text-red-600" },
+  success: { border: "border-l-[color:var(--bs-success)]", icon: "text-[color:var(--bs-success)]" },
+  danger: { border: "border-l-[color:var(--bs-danger)]", icon: "text-[color:var(--bs-danger)]" },
 };
 
 const accent = computed(() => ACCENT[props.severity]);

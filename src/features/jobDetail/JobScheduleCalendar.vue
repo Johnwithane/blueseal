@@ -197,7 +197,7 @@ function canAdd(d: Date, inCurrentMonth = true): boolean {
         <button
           v-if="canAdd(d)"
           type="button"
-          class="mt-2 flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-[color:var(--bs-border)] py-1 text-xs text-[color:var(--bs-muted)] hover:border-[color:var(--bs-blue)] hover:bg-blue-50 hover:text-[color:var(--bs-blue)]"
+          class="mt-2 flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-[color:var(--bs-border)] py-1 text-xs text-[color:var(--bs-muted)] hover:border-[color:var(--bs-blue)] hover:bg-[color:var(--bs-info-tint)] hover:text-[color:var(--bs-blue)]"
           @click="emit('add-day', d)"
         >
           <i class="pi pi-plus text-[10px]"></i>
@@ -225,7 +225,7 @@ function canAdd(d: Date, inCurrentMonth = true): boolean {
           :class="{
             'opacity-50': d.getMonth() !== anchor.getMonth(),
             'ring-2 ring-[color:var(--bs-blue)]': isSameDay(d, today),
-            'cursor-pointer hover:bg-blue-50/40': canAdd(d, d.getMonth() === anchor.getMonth()),
+            'cursor-pointer hover:bg-[color:var(--bs-info-tint)]': canAdd(d, d.getMonth() === anchor.getMonth()),
           }"
           :role="canAdd(d, d.getMonth() === anchor.getMonth()) ? 'button' : undefined"
           :aria-label="

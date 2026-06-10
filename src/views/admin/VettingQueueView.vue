@@ -47,7 +47,7 @@ onMounted(refresh);
 
     <LoadingState v-if="loading" />
     <div v-else-if="pending.length === 0" class="bs-empty">
-      <i class="pi pi-check-circle text-green-600 mr-2" />Queue clear.
+      <i class="pi pi-check-circle text-[color:var(--bs-success)] mr-2" />Queue clear.
     </div>
     <ul v-else class="space-y-2">
       <li
@@ -87,7 +87,7 @@ onMounted(refresh);
             <div class="text-sm font-medium">{{ tradesLabel(t) }}</div>
             <div class="text-xs text-[color:var(--bs-muted)] mt-0.5">
               Blocked on
-              <span class="text-amber-700 font-medium">
+              <span class="text-[color:var(--bs-warning-text)] font-medium">
                 <template v-if="!t.idVerified && (t.verifiedTrades?.length ?? 0) === 0">
                   ID + cert
                 </template>

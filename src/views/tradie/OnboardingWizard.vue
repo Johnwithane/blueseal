@@ -1347,7 +1347,7 @@ async function withdrawForEdits() {
                     :class="
                       existingCerts.length === tradesToCert.length && tradesToCert.length > 0
                         ? 'pi pi-check-circle text-[color:var(--bs-blue)]'
-                        : 'pi pi-times-circle text-red-500'
+                        : 'pi pi-times-circle text-[color:var(--bs-danger)]'
                     "
                   ></i>
                   Certifications {{ existingCerts.length }} / {{ tradesToCert.length }}
@@ -1357,7 +1357,7 @@ async function withdrawForEdits() {
                     :class="
                       idStatus !== 'none'
                         ? 'pi pi-check-circle text-[color:var(--bs-blue)]'
-                        : 'pi pi-times-circle text-red-500'
+                        : 'pi pi-times-circle text-[color:var(--bs-danger)]'
                     "
                   ></i>
                   Photo ID {{ idStatus === "none" ? "missing" : idStatus }}

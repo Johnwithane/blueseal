@@ -1,27 +1,92 @@
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref } from "vue";
-import { RouterLink } from "vue-router";
-import Button from "primevue/button";
+import { RouterLink, useRouter } from "vue-router";
 import { TRADES } from "@/data/trades";
 import { useAuthStore } from "@/stores/auth";
 import { getHomeContent } from "@/firebase/services/siteContent";
 import type { Testimonial } from "@/firebase/interfaces";
 import { HELP_CONTENT_SEED } from "@/data/help";
 import SealCharacter from "@/components/SealCharacter.vue";
+import BlueSealMark from "@/components/brand/BlueSealMark.vue";
+import { useGoogleMaps } from "@/composables/useGoogleMaps";
 import { useSeo } from "@/composables/useSeo";
 import { homeSeo } from "@/seo/content";
 
 const auth = useAuthStore();
+const router = useRouter();
 
 useSeo(homeSeo());
 
 // Hero CTAs branch on the user's active view-mode so a tradesperson sees
-// "go work" actions and everyone else sees "go hire" actions.
+// "go work" actions and everyone else sees the search-as-hero / "go hire" flow.
 const heroMode = computed<"tradesperson" | "client-or-public">(() =>
   auth.isAuthenticated && auth.activeRole === "tradesperson"
     ? "tradesperson"
     : "client-or-public",
 );
+
+// Search-as-hero (client view). "What" → /search's describe box via ?q.
+// "Where" → the same Google Places autocomplete used in /search, persisted to
+// the shared `searchLocation` key so /search restores it and runs immediately.
+const q = ref("");
+const whereInput = ref<HTMLInputElement | null>(null);
+const pickedLocation = ref<{ lat: number; lng: number; label: string } | null>(null);
+let whereAutocomplete: google.maps.places.Autocomplete | null = null;
+
+// When the Places suggestion list is open, Enter should PICK the suggestion
+// (letting place_changed capture the location), not submit the form early.
+function onWhereEnter(e: KeyboardEvent) {
+  const pac = document.querySelector<HTMLElement>(".pac-container");
+  if (pac && pac.offsetParent !== null && pac.querySelector(".pac-item")) {
+    e.preventDefault();
+  }
+}
+
+function runSearch() {
+  if (pickedLocation.value) {
+    try {
+      localStorage.setItem(
+        "searchLocation",
+        JSON.stringify({
+          lat: pickedLocation.value.lat,
+          lng: pickedLocation.value.lng,
+          radiusKm: 50,
+          label: pickedLocation.value.label || undefined,
+        }),
+      );
+    } catch {
+      /* storage unavailable — /search still loads, just without the prefilled area */
+    }
+  }
+  router.push({ name: "Search", query: { ...(q.value.trim() ? { q: q.value.trim() } : {}) } });
+}
+
+// Attach the Places autocomplete to the hero "where" field (client view only).
+onMounted(async () => {
+  if (heroMode.value === "tradesperson") return;
+  try {
+    await useGoogleMaps().load();
+  } catch {
+    return; // Maps unavailable — the inputs still work as plain text.
+  }
+  if (!whereInput.value) return;
+  const country = (import.meta.env.VITE_DEFAULT_REGION || "").toLowerCase();
+  whereAutocomplete = new google.maps.places.Autocomplete(whereInput.value, {
+    fields: ["geometry", "formatted_address", "name"],
+    types: ["geocode"],
+    ...(country ? { componentRestrictions: { country } } : {}),
+  });
+  whereAutocomplete.addListener("place_changed", () => {
+    const place = whereAutocomplete?.getPlace();
+    const loc = place?.geometry?.location;
+    if (!loc) return;
+    pickedLocation.value = {
+      lat: loc.lat(),
+      lng: loc.lng(),
+      label: place?.formatted_address || place?.name || "",
+    };
+  });
+});
 
 const root = ref<HTMLElement | null>(null);
 let observer: IntersectionObserver | null = null;
@@ -42,23 +107,14 @@ onMounted(() => {
   root.value?.querySelectorAll(".bs-reveal").forEach((el) => observer?.observe(el));
 });
 
-onBeforeUnmount(() => observer?.disconnect());
-
-const tradieImg =
-  "https://images.unsplash.com/photo-1646640381839-02748ae8ddf0?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.1.0";
-const toolsImg =
-  "https://images.unsplash.com/photo-1530124566582-a618bc2615dc?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.1.0";
-const sawImg =
-  "https://images.unsplash.com/photo-1513467535987-fd81bc7d62f8?q=80&w=1632&auto=format&fit=crop&ixlib=rb-4.1.0";
-const houseImg =
-  "https://images.unsplash.com/photo-1732660513320-a6b489f3fece?q=80&w=1471&auto=format&fit=crop&ixlib=rb-4.1.0";
-const chatImg =
-  "https://images.unsplash.com/photo-1645651964715-d200ce0939cc?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.1.0";
+onBeforeUnmount(() => {
+  observer?.disconnect();
+  if (whereAutocomplete) google.maps.event.clearInstanceListeners(whereAutocomplete);
+});
 
 // Trades grid is progressively revealed — start with one batch, "Load more"
 // reveals the next, up to the full canonical list.
 const TRADES_STEP = 12; // divisible by 2/3/4 — even rows at every breakpoint
-// Start small on mobile (one long column); a multi-column grid bumps it on mount.
 const visibleTradeCount = ref(6);
 const visibleTrades = computed(() => TRADES.slice(0, visibleTradeCount.value));
 const hasMoreTrades = computed(() => visibleTradeCount.value < TRADES.length);
@@ -71,23 +127,41 @@ onMounted(() => {
   }
 });
 
-// "What sets us apart" — the standout features showcased mid-page. Kept as
-// data so the markup stays a clean loop. Points are short, concrete proof —
-// no fee figures or SLAs (those aren't live; see MONETIZATION.md).
+// How it works — three steps, rendered as oversized editorial numerals.
+const steps = [
+  {
+    title: "Search & shortlist",
+    blurb:
+      "Filter by trade, distance and rating. You can see who's verified right there on their profile.",
+  },
+  {
+    title: "Quote & schedule",
+    blurb:
+      "Send over a few photos and the details. You'll get a clear quote back, then pick a time that suits you.",
+  },
+  {
+    title: "Done & reviewed",
+    blurb:
+      "Pay, leave a review, and you're done. The whole job stays in one place if you ever need to look back.",
+  },
+];
+
+// "What sets us apart" — standout features. Short, concrete proof — no fee
+// figures or SLAs (those aren't live; see MONETIZATION.md).
 const standoutFeatures = [
   {
     kicker: "AI built in",
     title: "An AI sidekick on every job",
     blurb:
-      "Diagnose a problem from a photo, draft a quote in seconds, and summarize a long thread — without leaving the conversation.",
+      "Snap a photo to work out what's wrong, draft a quote in seconds, or catch up on a long thread. All without leaving the chat.",
     points: ["Photo-based diagnosis", "Faster, clearer quotes", "Instant job summaries"],
     seal: "scene-ai",
   },
   {
     kicker: "One job, one thread",
-    title: "Chat + a status board, together",
+    title: "Chat and a status board, together",
     blurb:
-      "Messages, photos, and a live status board live in one place — from requested to quoted to in progress to done. Nothing scattered across texts and email.",
+      "Messages, photos and a live status board all live in one place, from first request through to done. Nothing gets lost across texts and email.",
     points: ["Job-scoped chat", "Shared photos & files", "Clear status at a glance"],
     seal: "scene-chat",
   },
@@ -95,7 +169,7 @@ const standoutFeatures = [
     kicker: "Real verification",
     title: "Every pro, verified four ways",
     blurb:
-      "Government ID, trade certification, insurance, and WSIB / workers' comp — each manually reviewed by our team before a pro can take work.",
+      "Government ID, trade certification, insurance and WSIB. Our team checks each one by hand before a pro can take any work.",
     points: ["Government ID", "Trade certification", "Insurance + WSIB on file"],
     seal: "scene-verified",
   },
@@ -103,14 +177,13 @@ const standoutFeatures = [
     kicker: "Money, handled",
     title: "Quotes to invoices to paid",
     blurb:
-      "Build a quote, auto-invoice on completion, and pay securely in-app — with receipts saved to the job for both sides.",
+      "Build a quote, send the invoice automatically when the job's done, and pay securely in the app. Receipts are saved for both of you.",
     points: ["Itemised quotes", "Auto-invoicing", "In-app pay & payouts"],
     seal: "scene-invoice",
   },
 ];
 
-// A short FAQ teaser pulled from the curated Help Center baseline. Static
-// import (no fetch) — the full, CMS-editable set lives at /faq and /help.
+// A short FAQ teaser pulled from the curated Help Center baseline.
 const homeFaqs = HELP_CONTENT_SEED.faqs.slice(0, 5);
 const openFaq = ref<number | null>(0);
 function toggleFaq(i: number) {
@@ -127,153 +200,163 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div ref="root">
-    <!-- HERO -->
-    <section class="relative overflow-hidden text-white">
-      <div class="absolute inset-0 bs-gradient-brand"></div>
-      <div class="pointer-events-none absolute -top-20 -left-20 h-80 w-80 rounded-full bg-white/15 blur-3xl"></div>
-      <div class="pointer-events-none absolute -bottom-20 -right-20 h-80 w-80 rounded-full bg-[color-mix(in_srgb,var(--bs-blue-dark)_40%,transparent)] blur-3xl"></div>
+  <div ref="root" class="bs-home">
+    <!-- ══ CHAPTER 1 · HERO — navy→light-blue gradient; red seal on the light end ══ -->
+    <section
+      class="bs-band text-[color:var(--bs-blue-dark)]"
+      style="background: linear-gradient(135deg, var(--bs-light-blue) 0%, var(--bs-mid-blue) 100%)"
+    >
+      <div class="bs-container relative py-16 sm:py-24 lg:py-28">
+        <div class="relative grid items-center gap-12 lg:grid-cols-[1.15fr_0.85fr]">
+          <!-- LEFT: kicker → oversized headline → CTA -->
+          <div>
+            <p class="bs-kicker !text-[color:var(--bs-blue-dark)]">
+              <i class="pi pi-verified" aria-hidden="true"></i>Verified Canadian tradespeople
+            </p>
 
-      <div class="relative bs-container py-20 sm:py-24 grid sm:grid-cols-[1.15fr_0.85fr] gap-8 sm:gap-10 lg:gap-12 items-center">
-        <!-- Headline + CTAs — left -->
-        <div>
-          <span
-            class="inline-flex items-center gap-2 rounded-full bg-white/10 backdrop-blur px-3 py-1 text-xs font-semibold tracking-wider uppercase ring-1 ring-white/25"
-          >
-            <i class="pi pi-verified text-[color:var(--bs-green-light)]"></i>
-            Verified Canadian tradespeople
-          </span>
-          <h1 class="bs-display mt-5 text-4xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl leading-[1.02]">
-            <span class="block">Trusted trades.</span>
-            <span class="block"><span class="bs-gradient-text">Sealed</span> with proof.</span>
-          </h1>
-          <p class="mt-5 text-lg sm:text-xl text-white/85 max-w-2xl leading-relaxed">
-            Every Blue Seal tradesperson is verified by certification and government ID. Find one near you,
-            chat, quote, schedule, and review — all in one professional thread.
-          </p>
-          <div class="mt-8 flex flex-wrap gap-3">
-            <template v-if="heroMode === 'tradesperson'">
-              <RouterLink to="/dashboard">
-                <Button
-                  label="Go to your dashboard"
-                  icon="pi pi-home"
-                  size="large"
-                  class="!bg-white !text-[color:var(--bs-blue-dark)] !border-white hover:!bg-[#eaf5fc]"
-                />
+            <h1
+              class="bs-display mt-5 text-[2.75rem] leading-[1.08] tracking-[-0.02em] sm:text-6xl lg:text-[5.25rem]"
+            >
+              Trusted trades,<br />
+              <span class="bs-mark">Sealed</span> with proof.
+            </h1>
+
+            <p class="mt-6 max-w-xl text-lg leading-relaxed text-[color:var(--bs-blue-dark)]/80 sm:text-xl">
+              We check every tradesperson's government ID, trade ticket, insurance and WSIB before
+              they can take a job. So you always know who's knocking on your door.
+            </p>
+
+            <!-- Tradesperson view: straight to work. -->
+            <div v-if="heroMode === 'tradesperson'" class="mt-8 flex flex-wrap gap-3">
+              <RouterLink to="/dashboard" class="bs-btn bs-btn--primary bs-btn--lg">
+                <i class="pi pi-home" aria-hidden="true"></i>Go to your dashboard
               </RouterLink>
-              <RouterLink to="/jobs/browse">
-                <Button
-                  label="Browse open jobs"
-                  icon="pi pi-megaphone"
-                  size="large"
-                  class="!bg-white/10 hover:!bg-white/20 !text-white !border-white/70 backdrop-blur-sm"
-                />
+              <RouterLink to="/jobs/browse" class="bs-btn bs-btn--secondary bs-btn--lg">
+                <i class="pi pi-megaphone" aria-hidden="true"></i>Browse open jobs
               </RouterLink>
-            </template>
+            </div>
+
+            <!-- Client / public view: the search bar IS the hero. -->
             <template v-else>
-              <RouterLink to="/search">
-                <Button
-                  label="Find a tradesperson"
-                  icon="pi pi-search"
-                  size="large"
-                  class="!bg-white !text-[color:var(--bs-blue-dark)] !border-white hover:!bg-[#eaf5fc]"
-                />
-              </RouterLink>
-              <RouterLink to="/jobs/post">
-                <Button
-                  label="Post a job, get bids"
-                  icon="pi pi-megaphone"
-                  size="large"
-                  class="!bg-white !text-[color:var(--bs-blue-dark)] !border-white hover:!bg-[#eaf5fc]"
-                />
-              </RouterLink>
-              <RouterLink v-if="!auth.isAuthenticated" to="/sign-up?as=tradesperson">
-                <Button
-                  label="I'm a tradesperson"
-                  icon="pi pi-wrench"
-                  size="large"
-                  class="!bg-white/10 hover:!bg-white/20 !text-white !border-white/70 backdrop-blur-sm"
-                />
-              </RouterLink>
+              <form
+                class="mt-8 flex flex-col gap-2 rounded-2xl bg-white p-2 shadow-[0_14px_44px_-14px_rgba(42,58,92,0.55)] sm:flex-row sm:items-center sm:rounded-full"
+                @submit.prevent="runSearch"
+              >
+                <label class="flex flex-1 items-center gap-2 px-3">
+                  <i class="pi pi-wrench text-[color:var(--bs-muted)]" aria-hidden="true"></i>
+                  <input
+                    v-model="q"
+                    type="text"
+                    placeholder="What do you need done?"
+                    aria-label="What do you need done?"
+                    class="w-full bg-transparent py-2.5 text-[color:var(--bs-text)] outline-none placeholder:text-[color:var(--bs-muted)]"
+                  />
+                </label>
+                <span class="mx-1 hidden h-7 w-px bg-[color:var(--bs-border)] sm:block" aria-hidden="true"></span>
+                <label class="flex flex-1 items-center gap-2 px-3">
+                  <i class="pi pi-map-marker text-[color:var(--bs-muted)]" aria-hidden="true"></i>
+                  <input
+                    ref="whereInput"
+                    type="text"
+                    autocomplete="off"
+                    placeholder="Where? (city or address)"
+                    aria-label="Where?"
+                    class="w-full bg-transparent py-2.5 text-[color:var(--bs-text)] outline-none placeholder:text-[color:var(--bs-muted)]"
+                    @keydown.enter="onWhereEnter"
+                  />
+                </label>
+                <button type="submit" class="bs-btn bs-btn--red w-full justify-center sm:w-auto sm:!rounded-full">
+                  <i class="pi pi-search" aria-hidden="true"></i><span>Search</span>
+                </button>
+              </form>
+
+              <div class="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
+                <RouterLink to="/jobs/post" class="bs-btn bs-btn--text">
+                  or post a job and get bids →
+                </RouterLink>
+                <RouterLink
+                  v-if="!auth.isAuthenticated"
+                  to="/sign-up?as=tradesperson"
+                  class="bs-btn bs-btn--text"
+                >
+                  I'm a tradesperson →
+                </RouterLink>
+              </div>
             </template>
+          </div>
+
+          <!-- RIGHT: the official full-colour seal as the hero subject -->
+          <div class="hidden justify-center lg:flex">
+            <BlueSealMark title="Blue Seal — verified" class="h-[24rem]" />
           </div>
         </div>
 
-        <!-- Logo character — right of the title at sm+, below on mobile -->
-        <div class="relative w-full max-w-[18rem] sm:max-w-[18rem] md:max-w-sm lg:max-w-md xl:max-w-lg mx-auto sm:mx-0">
-          <div class="relative aspect-square">
-            <div
-              class="absolute inset-6 rounded-full bg-gradient-to-br from-[var(--bs-blue-light)] via-[var(--bs-blue)] to-[var(--bs-blue-dark)] opacity-40 blur-2xl bs-spin-slow"
-            ></div>
-            <img
-              src="/icons/blueseal_logoCircle_RED.png"
-              alt="Blue Seal"
-              class="relative h-[100%] w-auto mx-auto bs-float bs-glow"
-            />
-            <!-- <div
-              class="hidden sm:block absolute -bottom-2 -right-4 bs-card !bg-white !text-[color:var(--bs-text)] px-4 py-3 shadow-2xl rotate-[4deg] text-left"
-            >
-              <div class="flex items-center gap-3">
-                <div class="h-10 w-10 rounded-full bg-[color:var(--bs-blue-light)] grid place-items-center">
-                  <i class="pi pi-verified text-[color:var(--bs-blue-dark)] text-lg"></i>
-                </div>
-                <div class="text-sm">
-                  <div class="font-semibold leading-tight">ID + Cert verified</div>
-                  <div class="text-[color:var(--bs-muted)] text-xs">Admin-reviewed in 48h</div>
-                </div>
-              </div>
-            </div> -->
-            <!-- <div
-              class="hidden sm:block absolute -top-2 -left-4 bs-card !bg-white !text-[color:var(--bs-text)] px-4 py-3 shadow-2xl rotate-[-5deg] text-left"
-            >
-              <div class="flex items-center gap-2 text-sm font-semibold">
-                <span class="text-[color:var(--bs-blue-dark)]">4.9</span>
-                <span class="text-amber-500 tracking-tight">★★★★★</span>
-              </div>
-              <div class="text-[color:var(--bs-muted)] text-xs">From 1,200+ jobs</div>
-            </div> -->
-          </div>
+        <!-- Mobile seal: below the CTA. -->
+        <div class="mt-12 flex justify-center lg:hidden">
+          <BlueSealMark decorative class="h-44" />
         </div>
       </div>
-
-      <!-- Wave divider -->
-      <svg
-        class="relative block w-full h-12 sm:h-16 text-[color:var(--bs-bg)]"
-        viewBox="0 0 1440 80"
-        preserveAspectRatio="none"
-        aria-hidden="true"
-      >
-        <path
-          fill="currentColor"
-          d="M0,32 C240,80 480,80 720,48 C960,16 1200,16 1440,48 L1440,80 L0,80 Z"
-        />
-      </svg>
     </section>
 
-    <!-- TRUST MARQUEE -->
-    <section class="bg-[color:var(--bs-bg)] py-6 border-y border-[color:var(--bs-border)] overflow-hidden">
-      <div class="bs-marquee-track gap-12 px-6 text-[color:var(--bs-blue-dark)]/70 font-semibold text-sm uppercase tracking-widest">
-        <span v-for="i in 2" :key="i" class="flex items-center gap-12 pr-12">
-          <span class="flex items-center gap-2"><i class="pi pi-verified text-[color:var(--bs-blue)]"></i> Government ID checked</span>
-          <span class="flex items-center gap-2"><i class="pi pi-id-card text-[color:var(--bs-blue)]"></i> Trade certified</span>
-          <span class="flex items-center gap-2"><i class="pi pi-shield text-[color:var(--bs-blue)]"></i> Insurance on file</span>
-          <span class="flex items-center gap-2"><i class="pi pi-star text-[color:var(--bs-blue)]"></i> Mutual reviews</span>
-          <span class="flex items-center gap-2"><i class="pi pi-comments text-[color:var(--bs-blue)]"></i> Job-scoped chat</span>
-          <span class="flex items-center gap-2"><i class="pi pi-bolt text-[color:var(--bs-blue)]"></i> AI quote helper</span>
+    <!-- ══ CHAPTER 2 · TRUST STRIP — clean white rule between chapters ══ -->
+    <section
+      class="bs-band overflow-hidden border-y border-[color:var(--bs-border)] bg-white py-5"
+    >
+      <div
+        class="bs-marquee-track gap-10 px-6 text-sm font-bold uppercase tracking-widest text-[color:var(--bs-blue-dark)]"
+      >
+        <span v-for="i in 2" :key="i" class="flex items-center gap-10 pr-10">
+          <span class="flex items-center gap-2"><i class="pi pi-verified text-[color:var(--bs-red)]"></i> Government ID</span>
+          <span class="flex items-center gap-2"><i class="pi pi-id-card text-[color:var(--bs-red)]"></i> Trade certified</span>
+          <span class="flex items-center gap-2"><i class="pi pi-shield text-[color:var(--bs-red)]"></i> Insured</span>
+          <span class="flex items-center gap-2"><i class="pi pi-briefcase text-[color:var(--bs-red)]"></i> WSIB on file</span>
+          <span class="flex items-center gap-2"><i class="pi pi-star text-[color:var(--bs-red)]"></i> Mutual reviews</span>
+          <span class="flex items-center gap-2"><i class="pi pi-bolt text-[color:var(--bs-red)]"></i> AI quote helper</span>
         </span>
       </div>
     </section>
 
-    <!-- TRADES GRID -->
-    <section class="bs-gradient-soft py-20">
+    <!-- ══ CHAPTER 3 · HOW IT WORKS — white calm breath, oversized numerals ══ -->
+    <section class="bg-white py-20 sm:py-24">
       <div class="bs-container">
         <div class="bs-reveal max-w-2xl">
-          <span class="bs-kicker">Trades on Blue Seal</span>
-          <h2 class="mt-3 text-3xl sm:text-4xl font-bold tracking-tight text-[color:var(--bs-blue-dark)]">
+          <span class="bs-kicker">How it works</span>
+          <h2 class="bs-display mt-3 text-4xl leading-[1.02] tracking-[-0.015em] text-[color:var(--bs-blue-dark)] sm:text-5xl">
+            Three steps. No guesswork.
+          </h2>
+        </div>
+
+        <div class="mt-14 grid gap-12 md:grid-cols-3 md:gap-8">
+          <div
+            v-for="(step, i) in steps"
+            :key="step.title"
+            class="bs-reveal relative pt-10"
+            :style="{ transitionDelay: `${i * 80}ms` }"
+          >
+            <span
+              aria-hidden="true"
+              class="bs-display pointer-events-none absolute -top-2 -left-1 select-none text-[6rem] font-bold leading-none text-[color:var(--bs-light-blue)]/50 sm:text-[7rem]"
+            >0{{ i + 1 }}</span>
+            <div class="relative">
+              <h3 class="text-xl font-semibold text-[color:var(--bs-blue-dark)]">{{ step.title }}</h3>
+              <p class="mt-2 text-[color:var(--bs-muted)] leading-relaxed">{{ step.blurb }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ CHAPTER 4 · TRADES — light-blue field, white tiles pop ══ -->
+    <section class="bs-band bg-[color:var(--bs-light-blue)] py-20 sm:py-24">
+      <div class="bs-container">
+        <div class="bs-reveal max-w-2xl">
+          <span class="bs-kicker !text-[color:var(--bs-blue)]">Trades on Blue Seal</span>
+          <h2 class="bs-display mt-3 text-4xl leading-[1.02] tracking-[-0.015em] text-[color:var(--bs-blue-dark)] sm:text-5xl">
             Find the right pro for the job.
           </h2>
-          <p class="mt-3 text-[color:var(--bs-muted)] text-lg">
-            From a dripping tap to a full reno — every trade on Blue Seal is vetted before they take their first job.
+          <p class="mt-3 text-lg text-[color:var(--bs-blue-dark)]/80">
+            Whether it's a dripping tap or a full reno, every trade on Blue Seal is vetted before they
+            take a single job.
           </p>
         </div>
 
@@ -282,9 +365,8 @@ onMounted(async () => {
             v-for="t in visibleTrades"
             :key="t.key"
             :to="{ name: 'Search', query: { trade: t.key } }"
-            class="bs-trade-tile group flex items-center gap-3 p-4 no-underline text-inherit"
+            class="bs-trade-tile group flex items-center gap-3 p-4 text-inherit no-underline"
           >
-            <!-- Trade mascot, zoomed in & cropped at the waist (fills the card, more dynamic) -->
             <div class="pointer-events-none relative h-24 shrink-0 overflow-hidden sm:h-28">
               <SealCharacter
                 :name="`trade-${t.key}`"
@@ -292,13 +374,12 @@ onMounted(async () => {
                 class="block h-40 w-auto max-w-none origin-top transition-transform duration-300 group-hover:scale-105 sm:h-48"
               />
             </div>
-            <!-- Right-justified so titles + buttons line up across cards despite varied art widths -->
             <div class="flex min-w-0 flex-1 flex-col items-end text-right">
               <div class="text-base font-bold leading-tight text-[color:var(--bs-blue-dark)] sm:text-lg">
                 {{ t.label }}
               </div>
               <span
-                class="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[color:var(--bs-blue-light)]/50 px-3 py-1 text-xs font-semibold text-[color:var(--bs-blue-dark)] transition group-hover:bg-[color:var(--bs-blue)] group-hover:text-white sm:text-sm"
+                class="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[color:var(--bs-surface-alt)] px-3 py-1 text-xs font-semibold text-[color:var(--bs-blue-dark)] transition group-hover:bg-[color:var(--bs-red)] group-hover:text-white sm:text-sm"
               >
                 Browse <i class="pi pi-arrow-right text-[10px] transition-transform group-hover:translate-x-0.5"></i>
               </span>
@@ -306,156 +387,34 @@ onMounted(async () => {
           </RouterLink>
         </div>
 
-        <div class="mt-8 text-center">
-          <Button
+        <div class="mt-10 text-center">
+          <button
             v-if="hasMoreTrades"
-            label="Load more trades"
-            icon="pi pi-arrow-down"
-            icon-pos="right"
-            outlined
+            type="button"
+            class="bs-btn bs-btn--secondary"
             @click="loadMoreTrades"
-          />
-          <RouterLink v-else to="/search">
-            <Button label="Browse all trades in search" icon="pi pi-arrow-right" icon-pos="right" outlined />
+          >
+            Load more trades <i class="pi pi-arrow-down" aria-hidden="true"></i>
+          </button>
+          <RouterLink v-else to="/search" class="bs-btn bs-btn--secondary">
+            Browse all trades in search <i class="pi pi-arrow-right" aria-hidden="true"></i>
           </RouterLink>
         </div>
       </div>
     </section>
 
-    <!-- HOW IT WORKS -->
-    <section class="py-20 bg-white">
-      <div class="bs-container">
-        <div class="bs-reveal text-center max-w-2xl mx-auto">
-          <span class="bs-kicker justify-center">How it works</span>
-          <h2 class="mt-3 text-3xl sm:text-4xl font-bold tracking-tight text-[color:var(--bs-blue-dark)]">
-            Three steps. No guesswork.
-          </h2>
-        </div>
-
-        <div class="mt-12 grid md:grid-cols-3 gap-6">
-          <div class="bs-reveal group rounded-2xl overflow-hidden border border-[color:var(--bs-border)] bg-white shadow-sm hover:shadow-xl transition-shadow">
-            <div class="relative h-44 overflow-hidden">
-              <img :src="chatImg" alt="" class="h-full w-full object-cover group-hover:scale-105 transition-transform duration-700" />
-              <div class="absolute inset-0 bg-gradient-to-t from-[color-mix(in_srgb,var(--bs-blue-dark)_70%,transparent)] to-transparent"></div>
-              <div class="absolute top-3 left-3 h-9 w-9 rounded-full bg-white text-[color:var(--bs-blue-dark)] grid place-items-center font-bold shadow">1</div>
-            </div>
-            <div class="p-6">
-              <h3 class="font-semibold text-lg text-[color:var(--bs-blue-dark)]">Search & shortlist</h3>
-              <p class="mt-2 text-sm text-[color:var(--bs-muted)]">Filter by trade, distance, rating and availability. Every profile shows verification at a glance.</p>
-            </div>
-          </div>
-
-          <div class="bs-reveal group rounded-2xl overflow-hidden border border-[color:var(--bs-border)] bg-white shadow-sm hover:shadow-xl transition-shadow" style="transition-delay: 80ms">
-            <div class="relative h-44 overflow-hidden">
-              <img :src="toolsImg" alt="" class="h-full w-full object-cover group-hover:scale-105 transition-transform duration-700" />
-              <div class="absolute inset-0 bg-gradient-to-t from-[color-mix(in_srgb,var(--bs-blue-dark)_70%,transparent)] to-transparent"></div>
-              <div class="absolute top-3 left-3 h-9 w-9 rounded-full bg-white text-[color:var(--bs-blue-dark)] grid place-items-center font-bold shadow">2</div>
-            </div>
-            <div class="p-6">
-              <h3 class="font-semibold text-lg text-[color:var(--bs-blue-dark)]">Quote & schedule</h3>
-              <p class="mt-2 text-sm text-[color:var(--bs-muted)]">Send photos and trade-specific details. Get a clear quote, and book a time that works.</p>
-            </div>
-          </div>
-
-          <div class="bs-reveal group rounded-2xl overflow-hidden border border-[color:var(--bs-border)] bg-white shadow-sm hover:shadow-xl transition-shadow" style="transition-delay: 160ms">
-            <div class="relative h-44 overflow-hidden">
-              <img :src="houseImg" alt="" class="h-full w-full object-cover group-hover:scale-105 transition-transform duration-700" />
-              <div class="absolute inset-0 bg-gradient-to-t from-[color-mix(in_srgb,var(--bs-blue-dark)_70%,transparent)] to-transparent"></div>
-              <div class="absolute top-3 left-3 h-9 w-9 rounded-full bg-white text-[color:var(--bs-blue-dark)] grid place-items-center font-bold shadow">3</div>
-            </div>
-            <div class="p-6">
-              <h3 class="font-semibold text-lg text-[color:var(--bs-blue-dark)]">Done & reviewed</h3>
-              <p class="mt-2 text-sm text-[color:var(--bs-muted)]">Pay, leave a review, and build reputation on both sides — the job stays in one tidy thread.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- FOR TRADESPEOPLE -->
-    <section class="relative overflow-hidden">
-      <img :src="tradieImg" alt="" class="absolute inset-0 h-full w-full object-cover" />
-      <!-- Heavy brand-tinted scrim, then a gradient on top for depth -->
-      <div class="absolute inset-0 bg-[color:var(--bs-blue-dark)]/85"></div>
-      <div
-        class="absolute inset-0"
-        style="background: linear-gradient(100deg, color-mix(in srgb, var(--bs-blue-dark) 85%, transparent) 0%, color-mix(in srgb, var(--bs-blue-dark) 65%, transparent) 55%, color-mix(in srgb, var(--bs-blue-dark) 55%, transparent) 100%)"
-      ></div>
-      <div class="relative bs-container py-20 sm:py-24 text-white grid md:grid-cols-2 gap-10 items-center">
-        <div class="bs-reveal">
-          <span class="bs-kicker !text-[color:var(--bs-green-light)]">For tradespeople</span>
-          <h2 class="mt-3 text-3xl sm:text-4xl font-bold tracking-tight">
-            Spend less time chasing leads. Spend more time on tools.
-          </h2>
-          <p class="mt-4 text-white/85 text-lg max-w-prose">
-            Verified profiles get more bookings. Built-in chat, AI quote helper, schedule, and auto-invoicing
-            keep every job clean from request to review.
-          </p>
-          <ul class="mt-6 space-y-3 text-white/90">
-            <li class="flex items-start gap-3"><i class="pi pi-check-circle mt-1 text-[color:var(--bs-green-light)]"></i><span>Cert + ID badge on your profile from day one.</span></li>
-            <li class="flex items-start gap-3"><i class="pi pi-check-circle mt-1 text-[color:var(--bs-green-light)]"></i><span>AI-assisted quoting and job summaries.</span></li>
-            <li class="flex items-start gap-3"><i class="pi pi-check-circle mt-1 text-[color:var(--bs-green-light)]"></i><span>Auto-invoice on job completion.</span></li>
-          </ul>
-          <div class="mt-8 flex flex-wrap gap-3">
-            <RouterLink to="/sign-up?as=tradesperson">
-              <Button
-                label="Apply to be verified"
-                icon="pi pi-id-card"
-                size="large"
-                class="!bg-white !text-[color:var(--bs-blue-dark)] !border-white hover:!bg-[#eaf5fc]"
-              />
-            </RouterLink>
-            <RouterLink to="/search">
-              <Button
-                label="See live profiles"
-                icon="pi pi-eye"
-                size="large"
-                class="!bg-white/10 hover:!bg-white/20 !text-white !border-white/70 backdrop-blur-sm"
-              />
-            </RouterLink>
-          </div>
-        </div>
-
-        <!-- Floating phone-ish card + mascot beside it -->
-        <div class="bs-reveal relative hidden items-end justify-end gap-3 md:flex lg:gap-5">
-          <!-- Mascot sits beside the card (flex) so it never overlaps it; shown from lg up -->
-          <SealCharacter
-            name="pose-toolbelt"
-            class="pointer-events-none hidden h-52 w-auto shrink-0 drop-shadow-2xl lg:block"
-          />
-          <div class="relative w-full max-w-sm rounded-3xl bg-white text-[color:var(--bs-text)] p-5 shadow-2xl ring-1 ring-white/30">
-            <div class="flex items-center gap-3">
-              <img src="/icons/blueseal_logoCircle_RED.png" alt="" class="h-9 w-9" />
-              <div>
-                <div class="font-semibold text-sm">New quote request</div>
-                <div class="text-xs text-[color:var(--bs-muted)]">2 mins ago · Sarah M.</div>
-              </div>
-              <span class="bs-pill verified ml-auto">Verified client</span>
-            </div>
-            <div class="mt-4 rounded-xl bg-[color:var(--bs-bg)] p-3 text-sm">
-              <div class="font-medium">Kitchen tap dripping — fast fix needed?</div>
-              <div class="mt-1 text-[color:var(--bs-muted)] text-xs">3 photos · Calgary NW · Any time this week</div>
-            </div>
-            <div class="mt-4 flex gap-2">
-              <Button label="Quote" icon="pi pi-bolt" size="small" class="!bg-[color:var(--bs-blue)] !border-[color:var(--bs-blue)]" />
-              <Button label="Message" icon="pi pi-comments" size="small" outlined />
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- WHAT SETS US APART — standout feature showcase -->
-    <section class="py-20 bg-[color:var(--bs-bg)]">
+    <!-- ══ CHAPTER 5 · WHAT SETS US APART — navy chapter, white cards float ══ -->
+    <section class="bs-band bg-[color:var(--bs-dark-blue)] py-20 text-white sm:py-24">
       <div class="bs-container">
         <div class="bs-reveal max-w-2xl">
-          <span class="bs-kicker">What sets us apart</span>
-          <h2 class="mt-3 text-3xl sm:text-4xl font-bold tracking-tight text-[color:var(--bs-blue-dark)]">
-            More than a directory. A whole job, handled.
+          <span class="bs-kicker !text-[color:var(--bs-light-blue)]">What sets us apart</span>
+          <h2 class="bs-display mt-3 text-4xl leading-[1.02] tracking-[-0.015em] sm:text-5xl">
+            More than a directory.<br class="hidden sm:block" />
+            <span class="text-[color:var(--bs-light-blue)]">A whole job, handled.</span>
           </h2>
-          <p class="mt-3 text-[color:var(--bs-muted)] text-lg">
-            Other sites hand you a phone number and wish you luck. Blue Seal runs the entire job —
-            verified pros, smart tools, and clean paperwork from first message to final review.
+          <p class="mt-3 max-w-prose text-lg text-white/90">
+            Other sites hand you a phone number and wish you luck. We stick with you for the whole
+            job: verified pros, tools that genuinely help, and paperwork that sorts itself out.
           </p>
         </div>
 
@@ -463,26 +422,23 @@ onMounted(async () => {
           <div
             v-for="(f, i) in standoutFeatures"
             :key="f.title"
-            class="bs-reveal bs-card flex flex-col gap-4 p-6 transition-shadow hover:shadow-md sm:flex-row sm:items-stretch sm:gap-5 sm:p-7"
+            class="bs-reveal flex flex-col gap-4 rounded-2xl bg-white p-6 text-[color:var(--bs-text)] transition-shadow hover:shadow-xl sm:flex-row sm:items-stretch sm:gap-5 sm:p-7"
             :style="{ transitionDelay: `${i * 70}ms` }"
           >
             <div class="min-w-0 flex-1">
-              <div class="text-xs font-semibold uppercase tracking-wider text-[color:var(--bs-blue)]">{{ f.kicker }}</div>
+              <div class="text-xs font-bold uppercase tracking-wider text-[color:var(--bs-red)]">{{ f.kicker }}</div>
               <h3 class="mt-0.5 text-lg font-semibold text-[color:var(--bs-blue-dark)]">{{ f.title }}</h3>
               <p class="mt-3 text-sm leading-relaxed text-[color:var(--bs-muted)]">{{ f.blurb }}</p>
               <ul class="mt-4 flex flex-wrap gap-2">
                 <li
                   v-for="p in f.points"
                   :key="p"
-                  class="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--bs-blue-light)]/40 px-3 py-1 text-xs font-medium text-[color:var(--bs-blue-dark)]"
+                  class="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--bs-light-blue)]/40 px-3 py-1 text-xs font-medium text-[color:var(--bs-blue-dark)]"
                 >
                   <i class="pi pi-check text-[10px]"></i>{{ p }}
                 </li>
               </ul>
             </div>
-            <!-- One mascot per card — zoomed in and cropped at the waist for a more dynamic feel.
-                 No fixed width: the box shrinks to the image, so it only crops vertically (never
-                 the sides), while the fixed height makes the waist cut. -->
             <div class="pointer-events-none relative h-28 shrink-0 self-center overflow-hidden sm:self-end lg:h-36">
               <SealCharacter :name="f.seal" class="block h-40 w-auto max-w-none lg:h-56" />
             </div>
@@ -491,39 +447,31 @@ onMounted(async () => {
       </div>
     </section>
 
-    <!-- TESTIMONIALS — hidden until the admin adds real ones in /admin/site-content -->
-    <section v-if="testimonials.length" class="py-20 bg-white relative overflow-hidden">
-      <img
-        :src="sawImg"
-        aria-hidden="true"
-        alt=""
-        class="absolute right-0 top-0 h-full w-1/2 object-cover opacity-10 hidden lg:block"
-      />
-      <div class="absolute inset-y-0 left-0 w-1/2 hidden lg:block bg-gradient-to-r from-white via-white/95 to-white/0"></div>
-
-      <div class="relative bs-container">
+    <!-- ══ TESTIMONIALS — white; hidden until the admin adds real ones ══ -->
+    <section v-if="testimonials.length" class="bg-white py-20 sm:py-24">
+      <div class="bs-container">
         <div class="bs-reveal max-w-2xl">
           <span class="bs-kicker">Loved by both sides</span>
-          <h2 class="mt-3 text-3xl sm:text-4xl tracking-tight text-[color:var(--bs-blue-dark)]">
+          <h2 class="bs-display mt-3 text-4xl tracking-[-0.015em] text-[color:var(--bs-blue-dark)] sm:text-5xl">
             Real stories <span class="bs-hand text-[color:var(--bs-blue)]">from real jobs.</span>
           </h2>
         </div>
 
-        <div class="mt-10 grid md:grid-cols-3 gap-5">
+        <div class="mt-10 grid gap-5 md:grid-cols-3">
           <figure
             v-for="(t, i) in testimonials"
             :key="`${t.name}-${i}`"
-            class="bs-reveal bs-card p-6 relative"
+            class="bs-reveal bs-card relative p-6"
             :style="{ transitionDelay: `${i * 80}ms` }"
           >
-            <i class="pi pi-quote-right absolute top-4 right-4 text-2xl text-[color:var(--bs-blue-light)]"></i>
-            <blockquote class="text-[color:var(--bs-text)] leading-relaxed">"{{ t.quote }}"</blockquote>
+            <i class="pi pi-quote-right absolute right-4 top-4 text-2xl text-[color:var(--bs-light-blue)]"></i>
+            <blockquote class="leading-relaxed text-[color:var(--bs-text)]">"{{ t.quote }}"</blockquote>
             <figcaption class="mt-5 flex items-center gap-3">
-              <div class="h-10 w-10 rounded-full bg-gradient-to-br from-[var(--bs-blue-light)] to-[var(--bs-blue)] text-white grid place-items-center font-semibold">
+              <div class="grid h-10 w-10 place-items-center rounded-full bg-[color:var(--bs-blue)] font-semibold text-white">
                 {{ t.name.charAt(0) }}
               </div>
               <div>
-                <div class="font-semibold text-sm text-[color:var(--bs-blue-dark)]">{{ t.name }}</div>
+                <div class="text-sm font-semibold text-[color:var(--bs-blue-dark)]">{{ t.name }}</div>
                 <div class="text-xs text-[color:var(--bs-muted)]">{{ t.role }}</div>
               </div>
             </figcaption>
@@ -532,38 +480,30 @@ onMounted(async () => {
       </div>
     </section>
 
-    <!-- FAQ TEASER -->
-    <section class="py-20 bg-white">
-      <div class="bs-container grid gap-10 lg:grid-cols-[0.8fr_1.2fr] items-start">
+    <!-- ══ FAQ TEASER — off-white ══ -->
+    <section class="bg-[color:var(--bs-bg)] py-20 sm:py-24">
+      <div class="bs-container grid items-start gap-10 lg:grid-cols-[0.8fr_1.2fr]">
         <div class="bs-reveal">
           <span class="bs-kicker">Good to know</span>
-          <h2 class="mt-3 text-3xl sm:text-4xl font-bold tracking-tight text-[color:var(--bs-blue-dark)]">
+          <h2 class="bs-display mt-3 text-4xl tracking-[-0.015em] text-[color:var(--bs-blue-dark)] sm:text-5xl">
             Questions? <span class="bs-hand text-[color:var(--bs-blue)]">We've got answers.</span>
           </h2>
           <p class="mt-3 text-[color:var(--bs-muted)]">
-            The basics, up front. For everything else, our Help Center is searchable and our team is a
-            message away.
+            The basics, up front. For anything else, search the Help Center or drop us a message.
           </p>
           <div class="mt-6 flex flex-wrap gap-3">
-            <RouterLink to="/help">
-              <Button label="Visit the Help Center" icon="pi pi-compass" />
+            <RouterLink to="/help" class="bs-btn bs-btn--primary">
+              <i class="pi pi-compass" aria-hidden="true"></i>Visit the Help Center
             </RouterLink>
-            <RouterLink to="/faq">
-              <Button label="Browse all FAQs" icon="pi pi-arrow-right" icon-pos="right" outlined />
+            <RouterLink to="/faq" class="bs-btn bs-btn--secondary">
+              Browse all FAQs <i class="pi pi-arrow-right" aria-hidden="true"></i>
             </RouterLink>
           </div>
-          <SealCharacter
-            name="pose-thinking"
-            class="pointer-events-none mt-8 hidden h-56 w-auto lg:block"
-          />
+          <SealCharacter name="pose-thinking" class="pointer-events-none mt-8 hidden h-56 w-auto lg:block" />
         </div>
 
         <div class="bs-reveal space-y-2">
-          <div
-            v-for="(f, i) in homeFaqs"
-            :key="f.question"
-            class="bs-card overflow-hidden"
-          >
+          <div v-for="(f, i) in homeFaqs" :key="f.question" class="bs-card overflow-hidden">
             <button
               type="button"
               class="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
@@ -584,45 +524,63 @@ onMounted(async () => {
       </div>
     </section>
 
-    <!-- FINAL CTA -->
-    <section class="relative overflow-hidden">
-      <div class="absolute inset-0 bs-gradient-brand"></div>
-      <div class="pointer-events-none absolute -top-20 -left-20 h-80 w-80 rounded-full bg-white/15 blur-3xl"></div>
-      <div class="pointer-events-none absolute -bottom-20 -right-20 h-80 w-80 rounded-full bg-[color-mix(in_srgb,var(--bs-blue-dark)_40%,transparent)] blur-3xl"></div>
+    <!-- ══ CHAPTER 6 · FOR TRADESPEOPLE — beige band, red accents, dark text ══ -->
+    <section class="bs-band bg-[color:var(--bs-beige)] py-20 text-[color:var(--bs-blue-dark)] sm:py-24">
+      <div class="bs-container grid items-center gap-10 md:grid-cols-2">
+        <div class="bs-reveal">
+          <span class="bs-kicker">For tradespeople</span>
+          <h2 class="bs-display mt-3 text-4xl leading-[1.02] tracking-[-0.015em] sm:text-5xl">
+            Spend less time chasing leads.<br class="hidden sm:block" /> More time on the tools.
+          </h2>
+          <p class="mt-4 max-w-prose text-lg text-[color:var(--bs-blue-dark)]/80">
+            Verified profiles get more bookings. Chat, an AI quote helper, scheduling and
+            auto-invoicing keep every job tidy, so you can spend your time on the work.
+          </p>
+          <ul class="mt-6 space-y-3">
+            <li class="flex items-start gap-3"><i class="pi pi-check-circle mt-1 text-[color:var(--bs-red)]"></i><span>Cert + ID badge on your profile from day one.</span></li>
+            <li class="flex items-start gap-3"><i class="pi pi-check-circle mt-1 text-[color:var(--bs-red)]"></i><span>AI-assisted quoting and job summaries.</span></li>
+            <li class="flex items-start gap-3"><i class="pi pi-check-circle mt-1 text-[color:var(--bs-red)]"></i><span>Auto-invoice on job completion.</span></li>
+          </ul>
+          <div class="mt-8 flex flex-wrap gap-3">
+            <RouterLink to="/sign-up?as=tradesperson" class="bs-btn bs-btn--red bs-btn--lg">
+              <i class="pi pi-id-card" aria-hidden="true"></i>Apply to be verified
+            </RouterLink>
+            <RouterLink to="/search" class="bs-btn bs-btn--secondary bs-btn--lg">
+              <i class="pi pi-eye" aria-hidden="true"></i>See live profiles
+            </RouterLink>
+          </div>
+        </div>
 
-      <div class="relative bs-container py-20 sm:py-24 text-center text-white">
-        <img
-          src="/icons/blueseal_logoCircle_RED.png"
-          alt=""
-          aria-hidden="true"
-          class="mx-auto h-60 w-auto bs-float bs-glow"
-        />
-        <h2 class="mt-0 text-3xl sm:text-5xl font-bold tracking-tight">
-          Ready to seal the deal?
+        <!-- Just the character. -->
+        <div class="bs-reveal hidden items-end justify-center md:flex">
+          <SealCharacter
+            name="pose-toolbelt"
+            class="pointer-events-none h-80 w-auto drop-shadow-2xl"
+          />
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ CHAPTER 7 · FINAL CTA — mirrors the hero: light gradient + full seal ══ -->
+    <section
+      class="bs-band py-20 text-center text-[color:var(--bs-blue-dark)] sm:py-24"
+      style="background: linear-gradient(135deg, var(--bs-light-blue) 0%, var(--bs-mid-blue) 100%)"
+    >
+      <div class="bs-container">
+        <BlueSealMark decorative class="mx-auto h-44 sm:h-52" />
+        <h2 class="bs-display mt-6 text-4xl leading-[1.02] tracking-[-0.015em] sm:text-6xl">
+          Ready to <span class="bs-mark">seal</span> the deal?
         </h2>
-        <p class="mt-4 text-white/85 text-lg max-w-2xl mx-auto">
-          Whether you need a job done right, or you're a pro ready to be verified — Blue Seal is the new
-          standard for trusted trades in Canada.
+        <p class="mx-auto mt-4 max-w-2xl text-lg text-[color:var(--bs-blue-dark)]/80">
+          Need a job done right? Ready to get verified as a pro? Either way, Blue Seal is built for
+          trusted trades across Canada.
         </p>
         <div class="mt-8 flex flex-wrap justify-center gap-3">
-          <RouterLink to="/search">
-            <Button
-              label="Find a tradesperson"
-              icon="pi pi-search"
-              size="large"
-              class="!bg-white !text-[color:var(--bs-blue-dark)] !border-white hover:!bg-[#eaf5fc]"
-            />
+          <RouterLink to="/search" class="bs-btn bs-btn--primary bs-btn--lg">
+            <i class="pi pi-search" aria-hidden="true"></i>Find a tradesperson
           </RouterLink>
-          <RouterLink to="/jobs/post">
-            <Button
-              label="Post a job, get bids"
-              icon="pi pi-megaphone"
-              size="large"
-              class="!bg-white !text-[color:var(--bs-blue-dark)] !border-white hover:!bg-[#eaf5fc]"
-            />
-          </RouterLink>
-          <RouterLink to="/sign-up?as=tradesperson">
-            <Button label="Apply as a tradesperson" icon="pi pi-id-card" size="large" outlined severity="contrast" />
+          <RouterLink to="/jobs/post" class="bs-btn bs-btn--secondary bs-btn--lg">
+            <i class="pi pi-megaphone" aria-hidden="true"></i>Post a job, get bids
           </RouterLink>
         </div>
       </div>

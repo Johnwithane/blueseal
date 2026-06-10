@@ -45,7 +45,7 @@ const availability = ref<AvailabilityFilter>("any");
 // "Describe what you need" → instant trade suggestions (TradeDescribeBox). Lets
 // a client who knows the symptom or room but not the trade name jump straight to
 // the right filter instead of scrolling a 60-item dropdown.
-const describe = ref("");
+const describe = ref(typeof route.query.q === "string" ? route.query.q : "");
 
 // Tapping a suggestion sets the trade filter and searches — the dropdown below
 // updates in lockstep (shared `trade` ref) so the choice is visible.
@@ -97,7 +97,10 @@ const error = ref<string | null>(null);
 
 // Restore from the in-memory cache (kept live below) so navigating back from a
 // profile shows the same results immediately — no refetch, no lost place.
-if (searchCache.value) {
+// Arriving with ?q (a fresh search from the home hero) ignores the session
+// cache so the newly-picked location actually re-runs the search instead of
+// showing the previous result set.
+if (searchCache.value && !route.query.q) {
   trade.value = searchCache.value.trade;
   results.value = searchCache.value.results;
   prospectResults.value = searchCache.value.prospectResults;

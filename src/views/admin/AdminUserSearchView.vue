@@ -253,7 +253,7 @@ function onTradesUpdated(user: WithId<UserDoc>, trades: string[]) {
               <div class="break-all">
                 <dt class="inline font-medium">Email:</dt>
                 {{ u.email || "—" }}
-                <span v-if="u.emailVerified" class="text-xs text-green-700 ml-1">
+                <span v-if="u.emailVerified" class="text-xs text-[color:var(--bs-success-text)] ml-1">
                   ✓ verified
                 </span>
               </div>
@@ -271,7 +271,7 @@ function onTradesUpdated(user: WithId<UserDoc>, trades: string[]) {
                 {{ relativeTime(u.lastActiveAt) }}
               </div>
               <div v-if="u.deletedAt">
-                <dt class="inline font-medium text-red-700">Deletion requested:</dt>
+                <dt class="inline font-medium text-[color:var(--bs-danger-text)]">Deletion requested:</dt>
                 {{ relativeTime(u.deletedAt) }}
               </div>
             </dl>

@@ -28,8 +28,8 @@ export default defineConfig({
         name: "Blue Seal",
         short_name: "BlueSeal",
         description: "Verified tradespeople, real reviews, AI-powered job tools.",
-        theme_color: "#0d47a1",
-        background_color: "#ffffff",
+        theme_color: "#374C76",
+        background_color: "#FAF9F6",
         display: "standalone",
         start_url: "/",
         // These must point at files that exist in public/ — the previous

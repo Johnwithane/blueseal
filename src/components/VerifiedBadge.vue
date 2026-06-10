@@ -25,7 +25,7 @@ const meta = {
   id: {
     label: "ID",
     icon: "pi pi-id-card",
-    pillClass: "bg-emerald-100 text-emerald-800",
+    pillClass: "bg-[color:var(--bs-success-tint)] text-[color:var(--bs-success-text)]",
     title: "About the ID badge",
     body:
       "The tradesperson's government photo ID was uploaded and checked against their profile name by Blue Seal's admin team before they were allowed to go live.",
@@ -33,7 +33,7 @@ const meta = {
   cert: {
     label: "Cert",
     icon: "pi pi-verified",
-    pillClass: "bg-blue-100 text-blue-800",
+    pillClass: "bg-[color:var(--bs-info-tint)] text-[color:var(--bs-info-text)]",
     title: "About the Cert badge",
     body:
       "A trade certification or licence was uploaded by the tradesperson and reviewed by Blue Seal's admin team. It is not a guarantee the credential is currently in force or covers your specific job.",
@@ -41,7 +41,7 @@ const meta = {
   insurance: {
     label: "Insured",
     icon: "pi pi-verified",
-    pillClass: "bg-violet-100 text-violet-800",
+    pillClass: "bg-[color:var(--bs-surface-alt)] text-[color:var(--bs-text)]",
     title: "About the Insured badge",
     body:
       "A liability-insurance document was uploaded by the tradesperson and reviewed by Blue Seal's admin team. It is not a guarantee that the policy is currently in force, has not been cancelled, or covers your specific job.",
@@ -49,7 +49,7 @@ const meta = {
   wsib: {
     label: "WSIB verified",
     icon: "pi pi-shield",
-    pillClass: "bg-amber-100 text-amber-800",
+    pillClass: "bg-[color:var(--bs-warning-tint)] text-[color:var(--bs-warning-text)]",
     title: "About the WSIB / WCB badge",
     body:
       "A workers'-compensation clearance certificate was uploaded by the tradesperson and reviewed by Blue Seal's admin team. It is not a guarantee that the clearance is currently in force, has not been cancelled, or covers your specific job.",

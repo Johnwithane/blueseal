@@ -1002,7 +1002,7 @@ function onReturnToApplicants() {
 
     <LoadingState v-if="loading" class="mt-4" />
     <div v-else-if="loadError" class="bs-empty mt-4">
-      <i class="pi pi-exclamation-circle text-3xl mb-2 block text-amber-600"></i>
+      <i class="pi pi-exclamation-circle text-3xl mb-2 block text-[color:var(--bs-warning)]"></i>
       <p class="font-medium">We couldn't open this job.</p>
       <p class="text-sm text-[color:var(--bs-muted)] mt-1">
         The link may be stale, or this job belongs to a different account.
@@ -1081,7 +1081,7 @@ function onReturnToApplicants() {
            recognises who they're being asked about at a glance. -->
       <div
         v-if="reviewBannerVariant === 'needsReview'"
-        class="bs-card p-4 mb-4 border-l-4 border-l-amber-500"
+        class="bs-card p-4 mb-4 border-l-4 border-l-[color:var(--bs-warning)]"
       >
         <div class="flex items-start gap-3">
           <Avatar
@@ -1095,7 +1095,7 @@ function onReturnToApplicants() {
             :label="counterpartyInitials"
             shape="circle"
             size="large"
-            class="!bg-amber-100 !text-amber-700 font-semibold"
+            class="!bg-[color:var(--bs-warning-tint)] !text-[color:var(--bs-warning-text)] font-semibold"
           />
           <div class="flex-1 min-w-0">
             <div class="font-semibold">Leave {{ counterpartyName }} a review</div>
@@ -1270,10 +1270,10 @@ function onReturnToApplicants() {
            both roles since it's a shared agreement. -->
       <div
         v-if="job.status === 'in_progress' && job.scheduledStart"
-        class="bs-card p-4 mb-4 border-l-4 border-l-blue-500"
+        class="bs-card p-4 mb-4 border-l-4 border-l-[color:var(--bs-info)]"
       >
         <div class="flex items-start gap-3">
-          <i class="pi pi-calendar text-blue-600 text-xl mt-0.5"></i>
+          <i class="pi pi-calendar text-[color:var(--bs-info)] text-xl mt-0.5"></i>
           <div class="min-w-0 flex-1">
             <div class="font-semibold text-base">
               {{ isClient ? "You're booked in" : "Booked with the client" }}
@@ -1482,7 +1482,7 @@ function onReturnToApplicants() {
               :class="
                 c.type === 'job'
                   ? 'pi pi-briefcase text-[color:var(--bs-blue)] mt-0.5'
-                  : 'pi pi-ban text-amber-600 mt-0.5'
+                  : 'pi pi-ban text-[color:var(--bs-warning)] mt-0.5'
               "
             ></i>
             <div class="flex-1 min-w-0">
@@ -1522,9 +1522,9 @@ function onReturnToApplicants() {
            thinking platform owes them the refund. -->
       <div
         v-if="job?.upfrontFee?.paidAt"
-        class="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 mb-3"
+        class="rounded-md border border-[color:var(--bs-warning)] bg-[color:var(--bs-warning-tint)] px-3 py-2 text-xs text-[color:var(--bs-warning-text)] mb-3"
       >
-        <i class="pi pi-exclamation-triangle text-amber-700 mr-1"></i>
+        <i class="pi pi-exclamation-triangle text-[color:var(--bs-warning)] mr-1"></i>
         This job already has a
         <span class="font-semibold">{{ money(job.upfrontFee.amountCents) }}</span>
         upfront fee paid. Refunds are handled outside Blue Seal —

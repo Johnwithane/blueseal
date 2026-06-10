@@ -40,7 +40,7 @@ function booleanValue(v: unknown): boolean | undefined {
     <div v-for="f in props.fields" :key="f.key">
       <label class="text-sm font-medium">
         {{ f.label }}
-        <span v-if="f.required" class="text-red-600">*</span>
+        <span v-if="f.required" class="text-[color:var(--bs-danger)]">*</span>
       </label>
 
       <template v-if="f.type === 'text'">
