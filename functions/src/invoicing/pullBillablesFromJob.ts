@@ -8,6 +8,7 @@ import { requireRole } from "../lib/auth";
 import {
   extraDescriptionMap,
   rollUpApprovedExtras,
+  rollUpExpenses,
   rollUpTimeEntries,
 } from "./rollUpBillables";
 
@@ -30,12 +31,6 @@ interface LineItem {
   quantity: number;
   unitPrice: number;
   taxRate: number;
-}
-
-interface ExpenseLike {
-  description: string;
-  billedAmount: number;
-  invoicedAt: Timestamp | null;
 }
 
 /**
@@ -100,22 +95,15 @@ export const pullBillablesFromJob = onCall(CALLABLE_OPTS, async (req) => {
   const newLines: LineItem[] = [...timeRoll.lines];
   const entryStamps: { id: string }[] = timeRoll.stampIds.map((id) => ({ id }));
 
-  // ---------- expenses: one line each ----------
-  const expenseStamps: { id: string }[] = [];
-  for (const doc of expensesSnap.docs) {
-    if (existingIds.has(doc.id)) continue;
-    const x = doc.data() as ExpenseLike;
-    if (x.invoicedAt != null) continue;
-    if ((x.billedAmount ?? 0) <= 0) continue;
-    newLines.push({
-      id: doc.id,
-      description: x.description?.trim() || "Materials",
-      quantity: 1,
-      unitPrice: x.billedAmount,
-      taxRate: 0,
-    });
-    expenseStamps.push({ id: doc.id });
-  }
+  // ---------- expenses: one line each (skipped on fixed-price jobs) ----------
+  // Fixed-price receipts are cost-tracking only; the agreed price covers
+  // materials and out-of-scope ones bill via an approved change order.
+  const expensesRoll = rollUpExpenses(expensesSnap.docs, {
+    existingIds,
+    billingType: jobBillingType,
+  });
+  newLines.push(...expensesRoll.lines);
+  const expenseStamps: string[] = [...expensesRoll.stampIds];
 
   // ---------- approved flat change orders: one line each ----------
   const extrasRoll = rollUpApprovedExtras(extrasSnap.docs, existingIds);
@@ -164,7 +152,7 @@ export const pullBillablesFromJob = onCall(CALLABLE_OPTS, async (req) => {
       invoicedAt: FieldValue.serverTimestamp(),
     });
   }
-  for (const { id } of expenseStamps) {
+  for (const id of expenseStamps) {
     batch.update(jobRef.collection("expenses").doc(id), {
       invoicedAt: FieldValue.serverTimestamp(),
       status: "invoiced",

@@ -27,7 +27,14 @@ const props = defineProps<{
   jobId: string;
   clientId: string;
   tradespersonId: string;
+  // On a fixed-price job receipts are cost-tracking only — they never bill the
+  // client (the agreed price covers materials), so the markup / "client pays"
+  // controls are hidden and the copy reframes them as private records.
+  // Defaults to hourly behaviour when omitted.
+  billingType?: "hourly" | "fixed";
 }>();
+
+const costTrackingOnly = computed(() => props.billingType === "fixed");
 
 const { date, money } = useFormatters();
 const toast = useToast();
@@ -183,7 +190,10 @@ function statusTagSeverity(s: ExpenseDoc["status"]): "info" | "warn" | "success"
         <h3 class="font-semibold text-sm">Expenses</h3>
         <div class="text-xs text-[color:var(--bs-muted)] mt-0.5">
           <template v-if="expenses.length">
-            Paid {{ money(totalCost) }} • Billing {{ money(totalBilled) }}
+            Paid {{ money(totalCost) }}<template v-if="!costTrackingOnly"> • Billing {{ money(totalBilled) }}</template>
+          </template>
+          <template v-else-if="costTrackingOnly">
+            Receipts for your records — not billed on a fixed-price job
           </template>
           <template v-else>Upload receipts to bill them through with markup</template>
         </div>
@@ -206,7 +216,14 @@ function statusTagSeverity(s: ExpenseDoc["status"]): "info" | "warn" | "success"
       @click="pickFile"
     />
     <p class="text-[11px] text-[color:var(--bs-muted)] mt-1.5 leading-snug">
-      Photos or PDFs — we'll auto-read the total, vendor and date. Receipts stay private; the client only sees the marked-up line item.
+      Photos or PDFs — we'll auto-read the total, vendor and date.
+      <template v-if="costTrackingOnly">
+        On a fixed-price job these stay on your records — to charge an out-of-scope
+        material, add a change order above.
+      </template>
+      <template v-else>
+        Receipts stay private; the client only sees the marked-up line item.
+      </template>
     </p>
 
     <div v-if="loading" class="bs-empty mt-3">Loading…</div>
@@ -248,7 +265,7 @@ function statusTagSeverity(s: ExpenseDoc["status"]): "info" | "warn" | "success"
           @blur="(ev) => patchField(e, { description: (ev.target as HTMLInputElement).value })"
         />
 
-        <div class="grid grid-cols-2 gap-2 mt-2">
+        <div class="mt-2" :class="costTrackingOnly ? '' : 'grid grid-cols-2 gap-2'">
           <div>
             <label class="block text-[11px] text-[color:var(--bs-muted)]">You paid</label>
             <InputNumber
@@ -262,7 +279,7 @@ function statusTagSeverity(s: ExpenseDoc["status"]): "info" | "warn" | "success"
               @update:model-value="(v) => changeTotalCost(e, v as number | null)"
             />
           </div>
-          <div>
+          <div v-if="!costTrackingOnly">
             <label class="block text-[11px] text-[color:var(--bs-muted)]">Markup %</label>
             <InputNumber
               :model-value="e.markupPercent ?? DEFAULT_MARKUP_PERCENT"
@@ -276,7 +293,7 @@ function statusTagSeverity(s: ExpenseDoc["status"]): "info" | "warn" | "success"
             />
           </div>
         </div>
-        <div class="mt-2">
+        <div v-if="!costTrackingOnly" class="mt-2">
           <label class="block text-[11px] text-[color:var(--bs-muted)]">Client pays</label>
           <InputNumber
             :model-value="(e.billedAmount ?? 0) / 100"

@@ -238,8 +238,13 @@ const timeRollup = computed(() => {
   return map;
 });
 
+// Fixed-price jobs don't bill receipts — they're cost-tracking only, mirroring
+// the server's rollUpExpenses gate. Out-of-scope materials ride a change order.
+const costTrackingOnly = computed(() => props.billingType === "fixed");
 const billableExpenses = computed(() =>
-  expenses.value.filter((x) => !x.invoicedAt && (x.billedAmount ?? 0) > 0),
+  costTrackingOnly.value
+    ? []
+    : expenses.value.filter((x) => !x.invoicedAt && (x.billedAmount ?? 0) > 0),
 );
 
 const hasRunningEntry = computed(() =>
@@ -488,6 +493,12 @@ function close() {
         </header>
         <div v-if="loadingExpenses" class="text-xs text-[color:var(--bs-muted)]">Loading…</div>
         <div
+          v-else-if="costTrackingOnly"
+          class="text-xs text-[color:var(--bs-muted)]"
+        >
+          Receipts aren't billed on a fixed-price job — they stay on your records.
+        </div>
+        <div
           v-else-if="billableExpenses.length === 0"
           class="text-xs text-[color:var(--bs-muted)]"
         >
@@ -504,8 +515,14 @@ function close() {
           </li>
         </ul>
         <p class="text-[11px] text-[color:var(--bs-muted)] mt-2">
-          Markups + categories live in the Expenses card on the Work order tab —
-          edit there before finishing if anything's off.
+          <template v-if="costTrackingOnly">
+            To charge for an out-of-scope material, propose a change order — the
+            client approves it and it rides on this invoice.
+          </template>
+          <template v-else>
+            Markups + categories live in the Expenses card on the Work order tab —
+            edit there before finishing if anything's off.
+          </template>
         </p>
       </section>
 

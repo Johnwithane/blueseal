@@ -10,6 +10,7 @@ import { notify } from "../lib/notify";
 import {
   extraDescriptionMap,
   rollUpApprovedExtras,
+  rollUpExpenses,
   rollUpTimeEntries,
 } from "../invoicing/rollUpBillables";
 
@@ -55,13 +56,6 @@ interface TimeEntryData {
   endedAt: Timestamp | null;
   hourlyRateSnapshot: number;
   invoicedAt: Timestamp | null;
-}
-
-interface ExpenseData {
-  description: string;
-  billedAmount: number;
-  invoicedAt: Timestamp | null;
-  status: string;
 }
 
 interface LineItem {
@@ -230,22 +224,15 @@ export const submitJobForApproval = onCall(CALLABLE_OPTS, async (req) => {
   const pulledLines: LineItem[] = [...timeRoll.lines];
   const entryStamps: string[] = [...timeRoll.stampIds];
 
-  // ---------- expenses → one line each ----------
-  const expenseStamps: string[] = [];
-  for (const d of expensesSnap.docs) {
-    if (existingIds.has(d.id)) continue;
-    const x = d.data() as ExpenseData;
-    if (x.invoicedAt != null) continue;
-    if ((x.billedAmount ?? 0) <= 0) continue;
-    pulledLines.push({
-      id: d.id,
-      description: x.description?.trim() || "Materials",
-      quantity: 1,
-      unitPrice: x.billedAmount,
-      taxRate: 0,
-    });
-    expenseStamps.push(d.id);
-  }
+  // ---------- expenses → one line each (skipped entirely on fixed jobs) ----------
+  // On a fixed-price job receipts are cost-tracking only — the agreed price
+  // already covers materials; out-of-scope materials bill via a change order.
+  const expensesRoll = rollUpExpenses(expensesSnap.docs, {
+    existingIds,
+    billingType: job.billingType ?? null,
+  });
+  pulledLines.push(...expensesRoll.lines);
+  const expenseStamps: string[] = [...expensesRoll.stampIds];
 
   // ---------- approved flat change orders → one line each ----------
   const extrasRoll = rollUpApprovedExtras(extrasSnap.docs, existingIds);

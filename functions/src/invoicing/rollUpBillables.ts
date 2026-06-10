@@ -41,6 +41,12 @@ interface ExtraData {
   invoicedAt: Timestamp | null;
 }
 
+interface ExpenseData {
+  description: string;
+  billedAmount: number;
+  invoicedAt: Timestamp | null;
+}
+
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 /** id → description for every change order on the job (for time-line labels). */
@@ -151,6 +157,41 @@ export function rollUpApprovedExtras(
       description: x.description?.trim() || "Change order",
       quantity: 1,
       unitPrice: amount,
+      taxRate: 0,
+    });
+    stampIds.push(doc.id);
+  }
+  return { lines, stampIds };
+}
+
+/**
+ * Expenses (receipts) → one invoice line each at billedAmount (markup already
+ * applied client-side; the client never sees totalCost or the receipt). Skips
+ * ones already invoiced, already on the invoice, or with no billable amount.
+ *
+ * FIXED-price jobs return nothing: the agreed price already covers materials,
+ * so receipts are the tradesperson's private cost record, not a client charge.
+ * Out-of-scope materials on a fixed job must go through an approved change
+ * order instead. `null`/legacy billingType is treated as NOT fixed, preserving
+ * the prior always-bill behaviour for jobs that predate the stamped field.
+ */
+export function rollUpExpenses(
+  docs: FirebaseFirestore.QueryDocumentSnapshot[],
+  opts: { existingIds: Set<string>; billingType?: "hourly" | "fixed" | null },
+): { lines: RollupLine[]; stampIds: string[] } {
+  const lines: RollupLine[] = [];
+  const stampIds: string[] = [];
+  if (opts.billingType === "fixed") return { lines, stampIds };
+  for (const doc of docs) {
+    if (opts.existingIds.has(doc.id)) continue;
+    const x = doc.data() as ExpenseData;
+    if (x.invoicedAt != null) continue;
+    if ((x.billedAmount ?? 0) <= 0) continue;
+    lines.push({
+      id: doc.id,
+      description: x.description?.trim() || "Materials",
+      quantity: 1,
+      unitPrice: x.billedAmount,
       taxRate: 0,
     });
     stampIds.push(doc.id);

@@ -66,6 +66,7 @@ const approvedHourlyExtras = computed(() =>
       :job-id="job.id"
       :client-id="job.clientId"
       :tradesperson-id="job.tradespersonId"
+      :billing-type="billingType"
     />
   </div>
 </template>
