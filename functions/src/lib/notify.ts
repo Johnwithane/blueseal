@@ -71,7 +71,11 @@ export type NotificationType =
   // tradesperson asks to see the job before quoting; the client agrees/declines.
   | "site_visit_proposed"
   | "site_visit_agreed"
-  | "site_visit_declined";
+  | "site_visit_declined"
+  // Job-board referrals (sendJobReferral / submitApplication conversion hook).
+  // Kept in sync with src/firebase/interfaces.ts.
+  | "job_referred"
+  | "referral_applied";
 
 /**
  * Channel routing per notification.

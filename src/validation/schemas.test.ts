@@ -3,6 +3,7 @@ import {
   siteVisitFeeSchema,
   proposeSiteVisitSchema,
   submitApplicationSchema,
+  sendJobReferralSchema,
 } from "./schemas";
 
 const validLine = { description: "Replace tap", quantity: 1, unitPrice: 12000, taxRate: 0 };
@@ -110,5 +111,28 @@ describe("submitApplicationSchema (discriminated union)", () => {
       quote: { lineItems: [] },
     });
     expect(r.success).toBe(false);
+  });
+});
+
+describe("sendJobReferralSchema", () => {
+  it("parses with an optional trimmed message", () => {
+    const r = sendJobReferralSchema.safeParse({
+      postId: "post1",
+      toUserId: "tradie2",
+      message: "  Right up your alley.  ",
+    });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.message).toBe("Right up your alley.");
+  });
+
+  it("rejects a missing toUserId and an over-long message", () => {
+    expect(sendJobReferralSchema.safeParse({ postId: "post1" }).success).toBe(false);
+    expect(
+      sendJobReferralSchema.safeParse({
+        postId: "post1",
+        toUserId: "tradie2",
+        message: "x".repeat(301),
+      }).success,
+    ).toBe(false);
   });
 });

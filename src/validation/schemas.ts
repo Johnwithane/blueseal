@@ -438,6 +438,18 @@ export const vouchIdSchema = z.object({
 });
 export type VouchIdInput = z.infer<typeof vouchIdSchema>;
 
+// ---------------------------------------------------------------------------
+// Job-board referrals — a tradesperson sends an open post to another verified
+// tradesperson whose trade matches. The sendJobReferral callable re-validates
+// with its own copy of this schema.
+// ---------------------------------------------------------------------------
+export const sendJobReferralSchema = z.object({
+  postId: z.string().min(1).max(128),
+  toUserId: z.string().min(1).max(128),
+  message: z.string().trim().max(300).optional(),
+});
+export type SendJobReferralInput = z.infer<typeof sendJobReferralSchema>;
+
 export const aiChatInputSchema = z
   .object({
     // Omit to auto-resolve by (userId, scope, jobId) — backend creates one

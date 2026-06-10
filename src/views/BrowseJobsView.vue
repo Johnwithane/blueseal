@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
+import Button from "primevue/button";
 import Select from "primevue/select";
 import Slider from "primevue/slider";
 import Tag from "primevue/tag";
@@ -19,6 +20,7 @@ import { TRADES, tradeLabel } from "@/data/trades";
 import { useFormatters } from "@/composables";
 import JobCounterparty from "@/components/JobCounterparty.vue";
 import LoadingState from "@/components/LoadingState.vue";
+import ReferJobDialog from "@/components/jobPost/ReferJobDialog.vue";
 
 const auth = useAuthStore();
 const { relativeTime } = useFormatters();
@@ -109,6 +111,16 @@ function urgencyLabel(u: string): string {
   if (u === "this_week") return "This week";
   if (u === "urgent") return "Urgent";
   return "Flexible";
+}
+
+// One shared refer dialog for the whole feed — the share button on each card
+// just swaps which post it targets.
+const referPost = ref<WithId<JobPostDoc> | null>(null);
+const showRefer = ref(false);
+
+function openRefer(post: WithId<JobPostDoc>) {
+  referPost.value = post;
+  showRefer.value = true;
 }
 </script>
 
@@ -205,12 +217,25 @@ function urgencyLabel(u: string): string {
               <i class="pi pi-map-marker mr-1"></i>
               {{ post.addressPublic.city }}, {{ post.addressPublic.region }}
             </span>
-            <span class="font-medium">
-              {{ formatBudget(post.budget.min, post.budget.max) }}
+            <span class="flex items-center gap-1">
+              <span class="font-medium">
+                {{ formatBudget(post.budget.min, post.budget.max) }}
+              </span>
+              <Button
+                icon="pi pi-share-alt"
+                text
+                rounded
+                size="small"
+                severity="secondary"
+                :aria-label="`Refer ${post.title} to another tradesperson`"
+                @click.stop.prevent="openRefer(post)"
+              />
             </span>
           </div>
         </RouterLink>
       </div>
+
+      <ReferJobDialog v-if="referPost" v-model:visible="showRefer" :post="referPost" />
     </template>
   </section>
 </template>

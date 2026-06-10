@@ -258,6 +258,8 @@ If something needs another look, we'll let you know what to re-upload — you wo
 
 Can't price a job without seeing it? On either path, toggle **Site visit first** instead of quoting blind. Add a single visit fee (or leave it at $0 for a free visit) — the client agrees with one tap, you do the visit, and the fee is **pre-filled into your real quote**, which you can keep to charge on top or delete to waive.
 
+Browsing with the **Any trade** filter and spot a job outside your trade? Use the **share icon** on the card (or **Refer this job** on the post) to send it to a verified tradesperson in that trade — they're notified and can apply directly.
+
 A complete, verified profile with a strong portfolio and good reviews wins more work — clients can see your reputation at a glance.`,
   },
   {
@@ -661,6 +663,13 @@ const faqs: FaqItem[] = [
     question: "What makes a strong profile?",
     answer:
       "Complete verification, a clear bio, a portfolio of past work, your service area and availability, and good reviews. Clients can see all of this at a glance — a complete profile wins more work.",
+    categoryId: "for-tradespeople",
+    audience: "tradesperson",
+  },
+  {
+    question: "Can I refer a job to another tradesperson?",
+    answer:
+      "Yes. When you browse the job board with the **Any trade** filter, you'll see open jobs outside your own trade too. Tap the **share icon** on a job card (or **Refer this job** on the post itself) and pick a verified tradesperson in that trade who covers the job's area — they get a notification with your note and a **Referred to you by** banner on the post, and can apply like any other applicant. If they apply, you're notified too.",
     categoryId: "for-tradespeople",
     audience: "tradesperson",
   },

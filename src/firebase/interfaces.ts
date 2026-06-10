@@ -1836,7 +1836,13 @@ export type NotificationType =
   // `site_visit_agreed` / `site_visit_declined` → tradesperson (client's one-tap decision).
   | "site_visit_proposed"
   | "site_visit_agreed"
-  | "site_visit_declined";
+  | "site_visit_declined"
+  // Job-board referrals (sendJobReferral / submitApplication conversion hook).
+  // `job_referred` → recipient tradesperson (a peer sent them an open post);
+  // `referral_applied` → referrer (their recipient applied to the post). Both
+  // link to /jobs/posted/{postId}.
+  | "job_referred"
+  | "referral_applied";
 
 export interface NotificationDoc {
   userId: string;
@@ -1934,4 +1940,45 @@ export interface VouchDoc {
   // Stamped when status flips to accepted/declined OR when the signup
   // linker converts pending_signup → accepted.
   respondedAt: Timestamp | null;
+}
+
+// ---------------------------------------------------------------------------
+// referrals/{postId}_{fromUserId}_{toUserId}
+// Job-board referral: a tradesperson browsing the board (often with the
+// "Any trade" filter) sends an open job post to another verified tradesperson
+// whose trade matches it. Created only by the sendJobReferral callable; rules
+// deny all client writes.
+//
+// The deterministic doc id makes dedupe a transactional exists-check (one
+// referral per referrer → recipient → post), mirroring the
+// applications/{tradieId} doc-id-as-constraint precedent. Unlike vouches the
+// target identity never mutates (no email-invite path), so a composite id is
+// safe.
+//
+// Post snapshot fields (postTitle/postTrade/postCity) are denormalised so
+// referral rows render even after the post closes or expires, same tradeoff
+// as the vouch display fields. No status enum — the only transition is
+// "recipient applied", carried by appliedAt (stamped by submitApplication).
+// ---------------------------------------------------------------------------
+export interface ReferralDoc {
+  postId: string;
+  postTitle: string;
+  postTrade: string;
+  postCity: string;
+
+  fromUserId: string;
+  fromDisplayName: string;
+  fromPhotoURL: string | null;
+  fromPrimaryTrade: string | null;
+
+  toUserId: string;
+  toDisplayName: string;
+  toPhotoURL: string | null;
+
+  // Optional short note from the referrer ("this one's right up your alley").
+  message: string;
+
+  createdAt: Timestamp;
+  // Conversion marker: set when the recipient applies to the post.
+  appliedAt: Timestamp | null;
 }

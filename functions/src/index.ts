@@ -155,6 +155,7 @@ export { sendApplicationMessage } from "./jobPosts/sendApplicationMessage";
 export { markApplicationThreadRead } from "./jobPosts/markApplicationThreadRead";
 export { returnToApplicants } from "./jobPosts/returnToApplicants";
 export { cancelJobPost } from "./jobPosts/cancelJobPost";
+export { sendJobReferral } from "./jobPosts/sendJobReferral";
 export { onJobPostCreated } from "./jobPosts/onJobPostCreated";
 export { onJobPostClosed } from "./jobPosts/onJobPostClosed";
 export { scheduledJobPostExpiry } from "./jobPosts/scheduledJobPostExpiry";

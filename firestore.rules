@@ -1103,6 +1103,21 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    // ---------- referrals (job-board posts referred between tradespeople) ----------
+    // All writes flow through callables: sendJobReferral creates the doc
+    // (dedupe via the deterministic {postId}_{from}_{to} id) and
+    // submitApplication stamps appliedAt when the recipient applies. Reads
+    // are party-only — never public, since a referral reveals who's eyeing
+    // which job.
+    match /referrals/{referralId} {
+      allow read: if isAdmin()
+                  || (isSignedIn() && (
+                       resource.data.fromUserId == uid()
+                       || resource.data.toUserId == uid()
+                     ));
+      allow create, update, delete: if false;
+    }
+
     // ---------- prospects (seeded, unclaimed tradesperson listings) ----------
     // Seeded from public registries + reviewed research. NOT members: separate
     // collection from tradespeople/ so they can never satisfy the

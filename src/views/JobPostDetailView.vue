@@ -29,6 +29,7 @@ import type {
   IntakeField,
   JobPostDoc,
   JobPostMetaDoc,
+  ReferralDoc,
   TradespersonDoc,
   WithId,
 } from "@/firebase/interfaces";
@@ -52,6 +53,8 @@ import ApplicationThread from "@/components/jobPost/ApplicationThread.vue";
 import ApplicationThreadOverlay from "@/components/jobPost/ApplicationThreadOverlay.vue";
 import DeclineApplicationDialog from "@/components/jobPost/DeclineApplicationDialog.vue";
 import ReviseApplicationDialog from "@/components/jobPost/ReviseApplicationDialog.vue";
+import ReferJobDialog from "@/components/jobPost/ReferJobDialog.vue";
+import { listReferralsToMeForPost } from "@/firebase/services/referrals";
 
 const route = useRoute();
 const router = useRouter();
@@ -118,6 +121,17 @@ const submittingDecline = ref(false);
 // Revise (tradie side) — reopen the apply quote prefilled with the current bid.
 const showRevise = ref(false);
 const showMyThread = ref(false);
+
+// Referrals (tradie side): "Refer this job" dialog + the banner shown when
+// peers referred this post to the viewing tradesperson.
+const showRefer = ref(false);
+const referralsToMe = ref<WithId<ReferralDoc>[]>([]);
+const referrerNames = computed(() =>
+  referralsToMe.value.map((r) => r.fromDisplayName).join(", "),
+);
+const referralNote = computed(
+  () => referralsToMe.value.find((r) => r.message)?.message ?? null,
+);
 
 function openThread(app: WithId<ApplicationDoc>) {
   threadApp.value = app;
@@ -204,6 +218,13 @@ onMounted(async () => {
         applyHourlyRate.value = (await getTradesperson(auth.fbUser.uid))?.hourlyRate ?? null;
       } catch {
         applyHourlyRate.value = null;
+      }
+      // "Referred to you by" banner. Own try/catch — a referral-read failure
+      // must not write the page-level error ref (see comment above).
+      try {
+        referralsToMe.value = await listReferralsToMeForPost(auth.fbUser.uid, postId.value);
+      } catch {
+        referralsToMe.value = [];
       }
     }
   } catch (e) {
@@ -458,6 +479,17 @@ const visibleApplications = computed(() =>
         </div>
       </div>
 
+      <!-- A peer sent this post to the viewing tradesperson. -->
+      <Message
+        v-if="referralsToMe.length"
+        severity="info"
+        :closable="false"
+        class="mt-4"
+      >
+        <strong>Referred to you by {{ referrerNames }}.</strong>
+        <template v-if="referralNote"> "{{ referralNote }}"</template>
+      </Message>
+
       <!-- POST BODY -->
       <article class="bs-card p-5 mt-4 space-y-4">
         <!-- Client identity (hidden from the post owner — they already
@@ -577,6 +609,18 @@ const visibleApplications = computed(() =>
 
       <!-- TRADIE VIEW -->
       <template v-else-if="isTradie && post.status === 'open'">
+        <!-- Know someone better suited? Available whether or not you've applied. -->
+        <div class="mt-4 flex justify-end">
+          <Button
+            label="Refer this job"
+            icon="pi pi-share-alt"
+            outlined
+            size="small"
+            severity="secondary"
+            @click="showRefer = true"
+          />
+        </div>
+
         <div v-if="myApplication" class="bs-card p-5 mt-6">
           <div class="flex items-center justify-between gap-2 flex-wrap">
             <div>
@@ -783,6 +827,9 @@ const visibleApplications = computed(() =>
       :post-id="postId"
       :application="myApplication"
     />
+
+    <!-- Tradesperson: send this post to a matching-trade peer. -->
+    <ReferJobDialog v-if="post" v-model:visible="showRefer" :post="post" />
   </section>
 </template>
 

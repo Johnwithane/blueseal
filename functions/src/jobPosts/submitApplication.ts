@@ -207,6 +207,36 @@ export const submitApplication = onCall(CALLABLE_OPTS, async (req) => {
       priority: "high",
     });
 
+    // Referral conversion: if anyone referred this post to the applicant,
+    // stamp appliedAt and tell each referrer. Own try/catch — a conversion
+    // miss must never fail the application itself. (This lives here rather
+    // than in a trigger for the same reason the client notify above does:
+    // submitApplication is the single place applications are created.)
+    try {
+      const refSnap = await db
+        .collection("referrals")
+        .where("toUserId", "==", uid)
+        .where("postId", "==", postId)
+        .get();
+      const unconverted = refSnap.docs.filter((d) => d.get("appliedAt") == null);
+      for (const doc of unconverted) {
+        const referral = doc.data() as { fromUserId: string; toDisplayName: string };
+        await doc.ref.update({ appliedAt: FieldValue.serverTimestamp() });
+        await notify({
+          userId: referral.fromUserId,
+          type: "referral_applied",
+          title: "Your referral applied",
+          body: `${referral.toDisplayName} applied to "${post.title}" after your referral.`,
+          link: `/jobs/posted/${postId}`,
+          actorUid: uid,
+          recipientRole: "tradesperson",
+          priority: "low",
+        });
+      }
+    } catch (err) {
+      logger.error("submitApplication: referral conversion failed", { ...ctx, err });
+    }
+
     logger.info("submitApplication success", ctx);
     return { ok: true };
   } catch (err) {
