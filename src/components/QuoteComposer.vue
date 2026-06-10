@@ -74,7 +74,8 @@ interface UiLine {
   kind: LineItemKind;
   description: string;
   hoursInput: number;
-  rateOverrideDollars: number | null;
+  // Always present + editable; seeded from the tradesperson's profile rate.
+  rateDollars: number;
   amountDollars: number;
   taxRatePercent: number;
 }
@@ -121,13 +122,8 @@ const centsFromDollars = (d: number) => Math.round((d ?? 0) * 100);
 
 function effectiveRateCents(l: UiLine): number | null {
   if (l.kind !== "hourly") return null;
-  if (l.rateOverrideDollars != null && l.rateOverrideDollars > 0) {
-    return centsFromDollars(l.rateOverrideDollars);
-  }
-  if (props.hourlyRateCents != null && props.hourlyRateCents > 0) {
-    return props.hourlyRateCents;
-  }
-  return null;
+  const cents = centsFromDollars(l.rateDollars);
+  return cents > 0 ? cents : null;
 }
 
 const hasHourlyLineWithoutRate = computed(() =>
@@ -138,7 +134,8 @@ function isLineIncomplete(l: UiLine): boolean {
   const hasDesc = l.description.trim().length > 0;
   if (hasDesc) return false;
   if (l.kind === "hourly") {
-    return (l.hoursInput ?? 0) > 0 || (l.rateOverrideDollars ?? 0) > 0;
+    // The rate is always pre-filled, so only entered hours signal real intent.
+    return (l.hoursInput ?? 0) > 0;
   }
   return (l.amountDollars ?? 0) > 0;
 }
@@ -215,22 +212,12 @@ const totalHourlyHours = computed(() => {
 });
 
 function emptyLine(kind: LineItemKind): UiLine {
-  return { kind, description: "", hoursInput: 0, rateOverrideDollars: null, amountDollars: 0, taxRatePercent: 13 };
+  const rateDollars = props.hourlyRateCents != null ? props.hourlyRateCents / 100 : 0;
+  return { kind, description: "", hoursInput: 0, rateDollars, amountDollars: 0, taxRatePercent: 13 };
 }
 
 function defaultKind(): LineItemKind {
   return props.hourlyRateCents != null && props.hourlyRateCents > 0 ? "hourly" : "labour";
-}
-
-function toggleRateOverride(i: number) {
-  lines.value = lines.value.map((l, idx) => {
-    if (idx !== i || l.kind !== "hourly") return l;
-    if (l.rateOverrideDollars == null) {
-      const seed = props.hourlyRateCents != null ? props.hourlyRateCents / 100 : 0;
-      return { ...l, rateOverrideDollars: seed };
-    }
-    return { ...l, rateOverrideDollars: null };
-  });
 }
 
 function addLine(kind?: LineItemKind) {
@@ -271,14 +258,12 @@ function hydrate(initial: QuoteComposerInitial) {
   lines.value = (initial.lineItems ?? []).map((li): UiLine => {
     const kind: LineItemKind = li.kind ?? "labour";
     if (kind === "hourly") {
-      const storedRate = li.unitPrice ?? 0;
-      const profileRate = props.hourlyRateCents ?? 0;
-      const isOverride = storedRate > 0 && storedRate !== profileRate;
+      const storedRate = li.unitPrice && li.unitPrice > 0 ? li.unitPrice : (props.hourlyRateCents ?? 0);
       return {
         kind: "hourly",
         description: li.description,
         hoursInput: li.quantity,
-        rateOverrideDollars: isOverride ? storedRate / 100 : null,
+        rateDollars: storedRate / 100,
         amountDollars: 0,
         taxRatePercent: Math.round((li.taxRate ?? 0) * 10000) / 100,
       };
@@ -287,7 +272,7 @@ function hydrate(initial: QuoteComposerInitial) {
       kind,
       description: li.description,
       hoursInput: 0,
-      rateOverrideDollars: null,
+      rateDollars: (props.hourlyRateCents ?? 0) / 100,
       amountDollars: (li.unitPrice ?? 0) / 100,
       taxRatePercent: Math.round((li.taxRate ?? 0) * 10000) / 100,
     };
@@ -367,13 +352,14 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
         <h4 class="font-semibold text-sm">Scope of work</h4>
       </header>
       <p class="text-xs text-[color:var(--bs-muted)] mb-2">
-        Mix hourly time, flat-rate fees, and parts/materials. Hourly uses your
-        profile rate ({{ hourlyRateCents ? money(hourlyRateCents) + "/hr" : "not set" }}).
+        Mix hourly time, flat-rate fees, and parts/materials. Hourly lines start
+        from your profile rate ({{ hourlyRateCents ? money(hourlyRateCents) + "/hr" : "not set" }}) —
+        edit the rate per line as needed.
       </p>
 
       <Message v-if="hasHourlyLineWithoutRate" severity="warn" :closable="false" class="mb-3 text-xs">
-        One or more Hourly lines have no rate. Set a profile rate, use
-        "Override rate for this line", or switch the row to Flat rate.
+        One or more Hourly lines have no rate. Enter a rate for the line, or
+        switch the row to Flat rate.
       </Message>
 
       <ul class="space-y-3">
@@ -439,15 +425,9 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
                 />
               </div>
               <div>
-                <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">
-                  Rate
-                  <span class="text-[color:var(--bs-muted)]">
-                    ({{ l.rateOverrideDollars == null ? "from profile" : "custom" }})
-                  </span>
-                </label>
+                <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">Rate</label>
                 <InputNumber
-                  v-if="l.rateOverrideDollars != null"
-                  v-model="l.rateOverrideDollars"
+                  v-model="l.rateDollars"
                   mode="currency"
                   currency="CAD"
                   :min="0"
@@ -456,23 +436,9 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
                   :input-class="'text-sm w-full'"
                   fluid
                 />
-                <div
-                  v-else
-                  class="rounded border border-[color:var(--bs-border)] bg-[#f9fafb] px-3 py-2 text-sm"
-                >
-                  {{ hourlyRateCents ? money(hourlyRateCents) + "/hr" : "Not set" }}
-                </div>
               </div>
             </div>
-            <div class="flex items-center justify-between mt-1.5 text-xs">
-              <button
-                type="button"
-                class="text-[color:var(--bs-blue)] hover:underline"
-                @click="toggleRateOverride(i)"
-              >
-                <i :class="l.rateOverrideDollars == null ? 'pi pi-pencil text-[10px]' : 'pi pi-replay text-[10px]'"></i>
-                {{ l.rateOverrideDollars == null ? "Override rate for this line" : "Use profile rate" }}
-              </button>
+            <div class="flex items-center justify-end mt-1.5 text-xs">
               <span v-if="effectiveRateCents(l) && l.hoursInput > 0" class="text-[color:var(--bs-muted)]">
                 {{ l.hoursInput }} hrs × {{ money(effectiveRateCents(l)!) }}/hr =
                 <span class="font-semibold text-[color:var(--bs-text)]">{{
