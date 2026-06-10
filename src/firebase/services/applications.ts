@@ -11,9 +11,13 @@ import {
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/firebase/config";
-import type { ApplicationDoc, WithId } from "@/firebase/interfaces";
+import type { ApplicationDoc, ApplicationMessageDoc, WithId } from "@/firebase/interfaces";
 import { typedConverter } from "@/firebase/converters";
-import type { SubmitApplicationInput } from "@/validation/schemas";
+import type {
+  SubmitApplicationInput,
+  SendApplicationMessageInput,
+  ReviseApplicationInput,
+} from "@/validation/schemas";
 
 const appsCol = (postId: string) =>
   collection(db, "jobPosts", postId, "applications").withConverter(
@@ -22,6 +26,10 @@ const appsCol = (postId: string) =>
 const appRef = (postId: string, tradieId: string) =>
   doc(db, "jobPosts", postId, "applications", tradieId).withConverter(
     typedConverter<ApplicationDoc>(),
+  );
+const appThreadCol = (postId: string, tradieId: string) =>
+  collection(db, "jobPosts", postId, "applications", tradieId, "messages").withConverter(
+    typedConverter<ApplicationMessageDoc>(),
   );
 
 export async function submitApplication(input: SubmitApplicationInput): Promise<void> {
@@ -112,4 +120,60 @@ export function subscribeMyApplications(
   return onSnapshot(q, (snap) =>
     cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
   );
+}
+
+// ---------------------------------------------------------------------------
+// Pre-acceptance applicant Q&A thread (jobPosts/{postId}/applications/{tradieId}
+// /messages). Application-scoped negotiation — not the job chat. Reads are
+// realtime + rules-gated to the two parties; all writes go through callables.
+// ---------------------------------------------------------------------------
+
+export function subscribeApplicationThread(
+  postId: string,
+  applicationId: string,
+  cb: (messages: WithId<ApplicationMessageDoc>[]) => void,
+): () => void {
+  const q = query(appThreadCol(postId, applicationId), orderBy("createdAt", "asc"), limit(200));
+  return onSnapshot(q, (snap) =>
+    cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+  );
+}
+
+export async function sendApplicationMessage(input: SendApplicationMessageInput): Promise<void> {
+  const callable = httpsCallable<SendApplicationMessageInput, { ok: boolean }>(
+    functions,
+    "sendApplicationMessage",
+  );
+  await callable(input);
+}
+
+export async function markApplicationThreadRead(
+  postId: string,
+  applicationId: string,
+): Promise<void> {
+  const callable = httpsCallable<{ postId: string; applicationId: string }, { ok: boolean }>(
+    functions,
+    "markApplicationThreadRead",
+  );
+  await callable({ postId, applicationId });
+}
+
+export async function reviseApplication(input: ReviseApplicationInput): Promise<void> {
+  const callable = httpsCallable<ReviseApplicationInput, { ok: boolean }>(
+    functions,
+    "reviseApplication",
+  );
+  await callable(input);
+}
+
+export async function declineApplication(
+  postId: string,
+  applicationId: string,
+  reason: string,
+): Promise<void> {
+  const callable = httpsCallable<
+    { postId: string; applicationId: string; reason: string },
+    { ok: boolean }
+  >(functions, "declineApplication");
+  await callable({ postId, applicationId, reason });
 }

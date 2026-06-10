@@ -519,7 +519,28 @@ const faqs: FaqItem[] = [
   {
     question: "Can I message a tradesperson before I commit?",
     answer:
-      "Yes. Requesting a quote opens a job thread where you can chat, share more photos, and ask questions. Nothing is locked in until you accept and sign a quote.",
+      "Yes. Requesting a quote opens a job thread where you can chat, share more photos, and ask questions. And on a **posted job**, you can message any applicant about their quote before accepting — tap **Message** on their card. Nothing is locked in until you accept and sign a quote.",
+    categoryId: "for-clients",
+    audience: "client",
+  },
+  {
+    question: "Can I ask an applicant questions before accepting their quote?",
+    answer:
+      "Yes. On your posted job, each applicant's card has a **Message** button that opens a private conversation with just that tradesperson. Ask whether they're flexible on price, if they can start sooner, or what's driving a line item — they're notified and can reply, and revise their quote if it helps.",
+    categoryId: "for-clients",
+    audience: "client",
+  },
+  {
+    question: "How do I decline an applicant?",
+    answer:
+      "Tap **Decline** on their card and add a short reason. Their card leaves your active applicants list, and the tradesperson is told why — so if it was about the price or scope, they can revise their quote and put it back in front of you.",
+    categoryId: "for-clients",
+    audience: "client",
+  },
+  {
+    question: "An applicant updated their quote — how can I tell?",
+    answer:
+      "Their card shows a **Revised** tag with the new total and an \"Updated\" timestamp. Open the full quote to see exactly what changed before you accept.",
     categoryId: "for-clients",
     audience: "client",
   },
@@ -592,6 +613,20 @@ const faqs: FaqItem[] = [
     question: "How do jobs reach me?",
     answer:
       "Two ways: **direct requests** from clients who find your profile, and the **job board**, where you browse postings in your trade and area and apply. Track everything you've applied to under My applications.",
+    categoryId: "for-tradespeople",
+    audience: "tradesperson",
+  },
+  {
+    question: "A client asked about my quote — where do I answer?",
+    answer:
+      "Open the job post from **My applications**. Your application shows a **Messages** panel with the client's questions and a reply box — answer right there. You'll get a notification whenever they send a new message.",
+    categoryId: "for-tradespeople",
+    audience: "tradesperson",
+  },
+  {
+    question: "Can I revise my quote after applying?",
+    answer:
+      "Yes. Open the job post and tap **Revise quote** on your application — it reopens your quote prefilled, so you can adjust line items, pricing, or timing and re-send. The client sees the updated bid right away. If they declined your quote with a reason, that reason is shown so you know what to change, and revising puts you back in the running.",
     categoryId: "for-tradespeople",
     audience: "tradesperson",
   },

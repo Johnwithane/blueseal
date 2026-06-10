@@ -597,6 +597,26 @@ service cloud.firestore {
           // Applicants view for every non-admin client.
           || isPostOwnerByLookup();
         allow create, update, delete: if false;  // marketplace callables only
+
+        // Pre-acceptance Q&A thread between the post-owning client and this one
+        // applicant. Application-scoped negotiation messaging — NOT the job chat
+        // (chats/ is jobId-keyed and only created at acceptance). Both parties
+        // resolve membership off the PARENT application doc by lookup, mirroring
+        // the chats/messages pattern; the per-tradieId partition keeps threads
+        // bid-blind across applicants (there is no cross-application read path —
+        // never add a collection-group rule for these). Writes are callable-only
+        // (sendApplicationMessage bumps the parent app's unread/preview via the
+        // admin SDK, which clients must not write directly).
+        match /messages/{messageId} {
+          function appParty() {
+            return isSignedIn() && (
+              tradieId == uid()
+              || get(/databases/$(database)/documents/jobPosts/$(postId)/applications/$(tradieId)).data.clientId == uid()
+            );
+          }
+          allow read:                   if appParty() || isAdmin();
+          allow create, update, delete: if false;  // sendApplicationMessage callable only
+        }
       }
     }
 

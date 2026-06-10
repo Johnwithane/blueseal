@@ -322,6 +322,11 @@ export const acceptApplicationQuote = onCall(CALLABLE_OPTS, async (req) => {
   }
 
   // Reject + notify the other pending applicants — the client picked one.
+  // The where("status","==","pending") filter intentionally leaves
+  // `declined`/`withdrawn`/`rejected` applications untouched — a declined
+  // applicant stays declined (with its reason), it doesn't silently become
+  // rejected. If this query ever changes to fetch-all-and-filter, restore an
+  // explicit skip for non-pending statuses here.
   try {
     const pendingSnap = await postRef
       .collection("applications")

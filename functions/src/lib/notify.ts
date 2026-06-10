@@ -22,6 +22,10 @@ export type NotificationType =
   | "application_accepted"
   | "application_rejected"
   | "application_returned"
+  // Pre-acceptance applicant Q&A (sendApplicationMessage / reviseApplication /
+  // declineApplication). Kept in sync with src/firebase/interfaces.ts.
+  | "application_message"
+  | "application_declined"
   | "vetting_approved"
   | "vetting_rejected"
   | "vetting_info_requested"

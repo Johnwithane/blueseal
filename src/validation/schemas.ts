@@ -308,6 +308,39 @@ export const withdrawApplicationSchema = z.object({
   postId: z.string().min(1).max(128),
 });
 
+// Pre-acceptance applicant Q&A. The thread is keyed by (postId, applicationId)
+// where applicationId == the tradesperson uid (the application doc id).
+export const sendApplicationMessageSchema = z.object({
+  postId: z.string().min(1).max(128),
+  applicationId: z.string().min(1).max(128),
+  text: z.string().trim().min(1, "Write a message").max(2000),
+});
+export type SendApplicationMessageInput = z.infer<typeof sendApplicationMessageSchema>;
+
+// Client declines an applicant's quote with a reason — mirrors clientDeclineQuote
+// on the direct-request side (same 1–1000 bounds).
+export const declineApplicationSchema = z.object({
+  postId: z.string().min(1).max(128),
+  applicationId: z.string().min(1).max(128),
+  reason: z.string().trim().min(1, "Give a brief reason").max(1000),
+});
+export type DeclineApplicationInput = z.infer<typeof declineApplicationSchema>;
+
+// Tradesperson resubmits a revised quote on an existing pending application.
+// Same quote shape as submitApplication; the message is an optional refreshed
+// cover note (no min — they may only be tweaking the price).
+export const reviseApplicationSchema = z.object({
+  postId: z.string().min(1).max(128),
+  quote: applicationQuoteSchema,
+  message: z.string().trim().min(20, "Write at least a couple of sentences").max(2000).optional(),
+  proposedStartDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Use a YYYY-MM-DD date")
+    .nullable()
+    .optional(),
+});
+export type ReviseApplicationInput = z.infer<typeof reviseApplicationSchema>;
+
 // ---------------------------------------------------------------------------
 // AI assistant chatbot
 // Input shape for the aiChat callable. The Cloud Function re-validates with

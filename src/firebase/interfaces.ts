@@ -956,7 +956,17 @@ export interface JobPostMetaDoc {
 // Doc id == tradesperson uid → one application per tradie per post (rules-enforced).
 // Bid-blind: only the post owner, the applicant themselves, or admin can read.
 // ---------------------------------------------------------------------------
-export type ApplicationStatus = "pending" | "selected" | "rejected" | "withdrawn";
+// `rejected` is set by the system when the client accepts a *different*
+// applicant (bulk reject in acceptApplicationQuote). `declined` is set when the
+// client explicitly dismisses *this* applicant with a reason (declineApplication)
+// — the card leaves the client's active list and the tradie sees the reason and
+// can revise + re-apply. `withdrawn` is tradie-initiated.
+export type ApplicationStatus =
+  | "pending"
+  | "selected"
+  | "rejected"
+  | "declined"
+  | "withdrawn";
 
 export interface ProposedPrice {
   type: "fixed" | "hourly";
@@ -1006,8 +1016,44 @@ export interface ApplicationDoc {
   // that only ever carried the one-line proposedPrice.
   quote?: ApplicationQuote | null;
   proposedStartDate: Timestamp | null;
+  // Set by declineApplication when the client dismisses this applicant with a
+  // reason. Surfaced to the tradie so they know what to change before re-applying.
+  declinedReason?: string | null;
+  declinedAt?: Timestamp | null;
+  // Set by reviseApplication each time the tradie resubmits a revised quote.
+  // The client's applicant card shows a "Revised" badge off revisedAt.
+  revisedAt?: Timestamp | null;
+  revisionCount?: number;
+  // Denormalized metadata for the pre-acceptance Q&A thread (the messages
+  // subcollection below). Maintained by the application-thread callables (admin
+  // SDK) so clients never write the application doc directly. Both parties
+  // subscribe to this doc already, so the unread badge + preview ride along
+  // with no extra read. Optional — legacy applications predate the thread.
+  threadLastMessageAt?: Timestamp | null;
+  threadLastMessagePreview?: string;
+  threadUnreadCounts?: Record<string, number>; // { [clientId]: n, [tradieId]: n }
   createdAt: Timestamp;
   updatedAt: Timestamp;
+}
+
+// ---------------------------------------------------------------------------
+// jobPosts/{postId}/applications/{tradieId}/messages/{msgId}
+// Pre-acceptance Q&A thread between the post-owning client and one applicant —
+// deliberately NOT the job chat (chats/ is jobId-scoped and only created at
+// acceptance). Application-scoped, text-only, dies with the application. Mirrors
+// MessageDoc minus photoUrl. Writes are callable-only (sendApplicationMessage).
+// ---------------------------------------------------------------------------
+export type ApplicationMessageType = "text" | "system";
+
+export interface ApplicationMessageDoc {
+  senderId: string; // uid of client or tradie; "system" for revise/decline lines
+  text: string;
+  createdAt: Timestamp;
+  type: ApplicationMessageType;
+  // Denormalized at write-time — the parties can't read each other's user docs,
+  // so the recipient renders the avatar + name off these. Null on system lines.
+  senderName: string | null;
+  senderPhotoURL: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -1682,6 +1728,12 @@ export type NotificationType =
   | "application_accepted"
   | "application_rejected"
   | "application_returned"
+  // Pre-acceptance applicant Q&A. `application_message` fires to the other party
+  // when a message (or a revised-quote system line) lands in an application
+  // thread. `application_declined` fires to the tradie when the client dismisses
+  // their quote with a reason. Both link to /jobs/posted/{postId}.
+  | "application_message"
+  | "application_declined"
   | "vetting_approved"
   | "vetting_rejected"
   | "vetting_info_requested"

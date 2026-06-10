@@ -14,6 +14,7 @@ import {
 import {
   collection,
   collectionGroup,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -50,6 +51,8 @@ beforeEach(async () => {
 
 const POST_ID = "post_1";
 const APP_PATH = ["jobPosts", POST_ID, "applications", TRADIE_UID] as const;
+const MSG_ID = "m1";
+const MSG_PATH = ["jobPosts", POST_ID, "applications", TRADIE_UID, "messages", MSG_ID] as const;
 
 const baselineApplication = {
   tradespersonId: TRADIE_UID,
@@ -81,6 +84,15 @@ const baselineApplication = {
   updatedAt: new Date(),
 };
 
+const baselineMessage = {
+  senderId: TRADIE_UID,
+  text: "Can you start sooner?",
+  type: "text",
+  createdAt: new Date(),
+  senderName: "Tradie",
+  senderPhotoURL: null,
+};
+
 async function seedApplication() {
   await env.withSecurityRulesDisabled(async (ctx) => {
     const fs = ctx.firestore();
@@ -88,6 +100,13 @@ async function seedApplication() {
     // by parent lookup (the meta/applications rules key off the post's clientId).
     await setDoc(doc(fs, "jobPosts", POST_ID), { clientId: CLIENT_UID, status: "open" });
     await setDoc(doc(fs, ...APP_PATH), baselineApplication);
+  });
+}
+
+async function seedThreadMessage() {
+  await seedApplication();
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), ...MSG_PATH), baselineMessage);
   });
 }
 
@@ -204,5 +223,81 @@ describe("applications — writes are callable-only", () => {
     await assertFails(
       updateDoc(doc(fsAs(CLIENT_UID, CLIENT_CLAIMS), ...APP_PATH), { status: "selected" }),
     );
+  });
+
+  it("the client cannot decline an application by direct write (callable-only)", async () => {
+    await seedApplication();
+    await assertFails(
+      updateDoc(doc(fsAs(CLIENT_UID, CLIENT_CLAIMS), ...APP_PATH), {
+        status: "declined",
+        declinedReason: "Too expensive",
+      }),
+    );
+  });
+});
+
+describe("applications — Q&A thread read access (pre-acceptance)", () => {
+  it("the post-owning client can read a thread message", async () => {
+    await seedThreadMessage();
+    await assertSucceeds(getDoc(doc(fsAs(CLIENT_UID, CLIENT_CLAIMS), ...MSG_PATH)));
+  });
+
+  it("the applicant can read their own thread message", async () => {
+    await seedThreadMessage();
+    await assertSucceeds(getDoc(doc(fsAs(TRADIE_UID, TRADIE_CLAIMS), ...MSG_PATH)));
+  });
+
+  it("an admin can read a thread message", async () => {
+    await seedThreadMessage();
+    await assertSucceeds(getDoc(doc(fsAs(ADMIN_UID, ADMIN_CLAIMS), ...MSG_PATH)));
+  });
+
+  it("a different tradesperson cannot read the thread (bid-blind)", async () => {
+    await seedThreadMessage();
+    await assertFails(getDoc(doc(fsAs(OTHER_TRADIE_UID, TRADIE_CLAIMS), ...MSG_PATH)));
+  });
+
+  it("a different client cannot read the thread", async () => {
+    await seedThreadMessage();
+    await assertFails(getDoc(doc(fsAs(OTHER_CLIENT_UID, CLIENT_CLAIMS), ...MSG_PATH)));
+  });
+
+  it("a different tradesperson cannot list another applicant's thread", async () => {
+    await seedThreadMessage();
+    await assertFails(
+      getDocs(
+        query(
+          collection(fsAs(OTHER_TRADIE_UID, TRADIE_CLAIMS), "jobPosts", POST_ID, "applications", TRADIE_UID, "messages"),
+          orderBy("createdAt", "asc"),
+        ),
+      ),
+    );
+  });
+});
+
+describe("applications — Q&A thread writes are callable-only", () => {
+  it("the client cannot post a thread message by direct write", async () => {
+    await seedApplication();
+    await assertFails(
+      setDoc(doc(fsAs(CLIENT_UID, CLIENT_CLAIMS), ...MSG_PATH), {
+        ...baselineMessage,
+        senderId: CLIENT_UID,
+      }),
+    );
+  });
+
+  it("the applicant cannot post a thread message by direct write", async () => {
+    await seedApplication();
+    await assertFails(
+      setDoc(doc(fsAs(TRADIE_UID, TRADIE_CLAIMS), ...MSG_PATH), baselineMessage),
+    );
+  });
+
+  it("a party cannot edit or delete an existing thread message", async () => {
+    await seedThreadMessage();
+    await assertFails(
+      updateDoc(doc(fsAs(TRADIE_UID, TRADIE_CLAIMS), ...MSG_PATH), { text: "edited" }),
+    );
+    await assertFails(deleteDoc(doc(fsAs(CLIENT_UID, CLIENT_CLAIMS), ...MSG_PATH)));
   });
 });

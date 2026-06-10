@@ -28,11 +28,18 @@ const statusSeverity: Record<string, "info" | "success" | "warn" | "danger" | "s
   pending: "info",
   selected: "success",
   rejected: "secondary",
+  declined: "secondary",
   withdrawn: "warn",
 };
 
 const grouped = computed(() => {
-  const order: ApplicationDoc["status"][] = ["pending", "selected", "rejected", "withdrawn"];
+  const order: ApplicationDoc["status"][] = [
+    "pending",
+    "selected",
+    "rejected",
+    "declined",
+    "withdrawn",
+  ];
   const buckets = new Map<ApplicationDoc["status"], WithId<ApplicationDoc>[]>();
   for (const o of order) buckets.set(o, []);
   for (const a of apps.value) {
@@ -47,12 +54,18 @@ function statusLabel(s: ApplicationDoc["status"]): string {
   if (s === "pending") return "Pending";
   if (s === "selected") return "Selected";
   if (s === "rejected") return "Not chosen";
+  if (s === "declined") return "Declined";
   return "Withdrawn";
 }
 
 function priceLabel(p: ApplicationDoc["proposedPrice"]): string {
   const fmt = (cents: number) => `$${Math.round(cents / 100).toLocaleString("en-CA")}`;
   return p.type === "fixed" ? fmt(p.amount) : `${fmt(p.amount)}/hr`;
+}
+
+const myUid = computed(() => auth.fbUser?.uid ?? null);
+function unreadFor(a: WithId<ApplicationDoc>): number {
+  return myUid.value ? (a.threadUnreadCounts?.[myUid.value] ?? 0) : 0;
 }
 </script>
 
@@ -74,6 +87,9 @@ function priceLabel(p: ApplicationDoc["proposedPrice"]): string {
       <p v-if="group.status === 'rejected'" class="text-xs text-[color:var(--bs-muted)] mb-2">
         The client chose another tradesperson. Keep applying — your next match is out there.
       </p>
+      <p v-else-if="group.status === 'declined'" class="text-xs text-[color:var(--bs-muted)] mb-2">
+        The client passed on these quotes. Open one to see why and revise it back into the running.
+      </p>
       <div class="grid sm:grid-cols-2 gap-3">
         <RouterLink
           v-for="a in group.items"
@@ -85,9 +101,18 @@ function priceLabel(p: ApplicationDoc["proposedPrice"]): string {
             <div class="text-sm text-[color:var(--bs-muted)]">
               Applied {{ relativeTime(a.createdAt) }}
             </div>
-            <Tag :value="statusLabel(a.status)" :severity="statusSeverity[a.status] ?? 'info'" />
+            <div class="flex items-center gap-1.5">
+              <Tag v-if="unreadFor(a) > 0" value="New message" severity="danger" />
+              <Tag :value="statusLabel(a.status)" :severity="statusSeverity[a.status] ?? 'info'" />
+            </div>
           </div>
           <p class="text-sm mt-2 line-clamp-2">{{ a.message }}</p>
+          <p
+            v-if="a.status === 'declined' && a.declinedReason"
+            class="text-xs text-amber-800 mt-2 line-clamp-2"
+          >
+            Client: “{{ a.declinedReason }}”
+          </p>
           <div class="text-xs text-[color:var(--bs-muted)] mt-2">
             Proposed: {{ priceLabel(a.proposedPrice) }}
           </div>

@@ -28,6 +28,8 @@ const ICON: Record<NotificationType, string> = {
   application_accepted: "pi pi-check-circle",
   application_rejected: "pi pi-times-circle",
   application_returned: "pi pi-refresh",
+  application_message: "pi pi-comments",
+  application_declined: "pi pi-times-circle",
   vetting_approved: "pi pi-shield",
   vetting_rejected: "pi pi-times-circle",
   vetting_info_requested: "pi pi-info-circle",

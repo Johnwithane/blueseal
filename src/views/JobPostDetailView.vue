@@ -4,7 +4,6 @@ import { useRoute, useRouter } from "vue-router";
 import Button from "primevue/button";
 import Textarea from "primevue/textarea";
 import Tag from "primevue/tag";
-import Avatar from "primevue/avatar";
 import Message from "primevue/message";
 import { useConfirm } from "primevue/useconfirm";
 import { useAuthStore } from "@/stores/auth";
@@ -16,6 +15,7 @@ import {
 import {
   acceptApplication,
   acceptApplicationQuote,
+  declineApplication,
   subscribeApplicationsForPost,
   subscribeMyApplicationForPost,
   submitApplication,
@@ -39,13 +39,17 @@ import { submitApplicationSchema } from "@/validation/schemas";
 import { useToast } from "@/composables/useToast";
 import { useFormatters } from "@/composables";
 import { humanizeError } from "@/utils/errors";
-import VerifiedBadge from "@/components/VerifiedBadge.vue";
 import JobCounterparty from "@/components/JobCounterparty.vue";
 import LoadingState from "@/components/LoadingState.vue";
 import QuoteComposer from "@/components/QuoteComposer.vue";
 import type { QuoteComposerState } from "@/components/QuoteComposer.vue";
 import QuoteBreakdown from "@/components/QuoteBreakdown.vue";
 import QuoteSignatureDialog from "@/components/QuoteSignatureDialog.vue";
+import ApplicantCard from "@/components/jobPost/ApplicantCard.vue";
+import ApplicationThread from "@/components/jobPost/ApplicationThread.vue";
+import ApplicationThreadOverlay from "@/components/jobPost/ApplicationThreadOverlay.vue";
+import DeclineApplicationDialog from "@/components/jobPost/DeclineApplicationDialog.vue";
+import ReviseApplicationDialog from "@/components/jobPost/ReviseApplicationDialog.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -89,10 +93,39 @@ const pendingApp = ref<WithId<ApplicationDoc> | null>(null);
 const applyHourlyRate = ref<number | null>(null);
 const composerState = ref<QuoteComposerState | null>(null);
 
-// Which applicant's full quote is expanded in the client's list.
-const expandedAppId = ref<string | null>(null);
-function toggleExpanded(id: string) {
-  expandedAppId.value = expandedAppId.value === id ? null : id;
+// Pre-acceptance Q&A + decline (client side). One overlay/dialog serves every
+// applicant row, driven by the stashed application.
+const threadApp = ref<WithId<ApplicationDoc> | null>(null);
+const showThread = ref(false);
+const declineApp = ref<WithId<ApplicationDoc> | null>(null);
+const showDecline = ref(false);
+const submittingDecline = ref(false);
+
+// Revise (tradie side) — reopen the apply quote prefilled with the current bid.
+const showRevise = ref(false);
+const showMyThread = ref(false);
+
+function openThread(app: WithId<ApplicationDoc>) {
+  threadApp.value = app;
+  showThread.value = true;
+}
+function openDecline(app: WithId<ApplicationDoc>) {
+  declineApp.value = app;
+  showDecline.value = true;
+}
+async function onConfirmDecline(reason: string) {
+  const app = declineApp.value;
+  if (!app || submittingDecline.value) return;
+  submittingDecline.value = true;
+  try {
+    await declineApplication(postId.value, app.id, reason);
+    toast.success("Applicant declined", "They've been told why and can revise if it helps.");
+    showDecline.value = false;
+  } catch (e) {
+    toast.error("Couldn't decline applicant", humanizeError(e));
+  } finally {
+    submittingDecline.value = false;
+  }
 }
 
 let unsubMeta: (() => void) | null = null;
@@ -229,28 +262,10 @@ async function submitApply() {
 }
 
 // Applicant display name — prefer the person/company name; fall back to a
-// generic label. (Used in confirm copy + the card headline.)
+// generic label. (Used in the accept/decline confirm copy.)
 function applicantName(app: WithId<ApplicationDoc>): string {
   const t = applicantTradies.value.get(app.tradespersonId);
   return t?.displayName?.trim() || t?.companyName?.trim() || "This tradesperson";
-}
-
-// Avatar source for an applicant — their profile photo, or null so the card
-// renders an initial-circle instead.
-function applicantPhoto(app: WithId<ApplicationDoc>): string | null {
-  return applicantTradies.value.get(app.tradespersonId)?.photoURL ?? null;
-}
-function applicantInitial(app: WithId<ApplicationDoc>): string {
-  const name = applicantName(app);
-  return (name === "This tradesperson" ? "?" : name).slice(0, 1).toUpperCase();
-}
-// Company name shown as a secondary line — only when it adds information
-// (i.e. it exists and isn't already what we're showing as the headline name).
-function applicantCompany(app: WithId<ApplicationDoc>): string | null {
-  const t = applicantTradies.value.get(app.tradespersonId);
-  const company = t?.companyName?.trim();
-  if (!company) return null;
-  return company === applicantName(app) ? null : company;
 }
 
 // Bid-marketplace accept: the applicant attached a full quote → accept it
@@ -351,6 +366,7 @@ const applyStatusLabel: Record<ApplicationDoc["status"], string> = {
   pending: "Pending",
   selected: "Selected",
   rejected: "Not chosen",
+  declined: "Declined",
   withdrawn: "Withdrawn",
 };
 
@@ -358,11 +374,24 @@ const applyStatusSeverity: Record<ApplicationDoc["status"], "info" | "success" |
   pending: "info",
   selected: "success",
   rejected: "secondary",
+  declined: "secondary",
   withdrawn: "warn",
 };
 
+// Unread messages waiting for the tradesperson on their own application.
+const myUnread = computed(() => {
+  const uid = auth.fbUser?.uid;
+  return uid ? (myApplication.value?.threadUnreadCounts?.[uid] ?? 0) : 0;
+});
+
+// The client's active list: hide withdrawn (tradie left), rejected (auto-set
+// when another applicant was accepted), and declined (the client dismissed
+// them — the card "goes away"). A declined applicant who revises flips back to
+// pending and reappears.
 const visibleApplications = computed(() =>
-  applications.value.filter((a) => a.status !== "withdrawn"),
+  applications.value.filter(
+    (a) => a.status !== "withdrawn" && a.status !== "rejected" && a.status !== "declined",
+  ),
 );
 </script>
 
@@ -488,157 +517,19 @@ const visibleApplications = computed(() =>
         </p>
 
         <div v-else class="space-y-3 mt-3">
-          <div
+          <ApplicantCard
             v-for="app in visibleApplications"
             :key="app.id"
-            class="bs-card p-4"
-          >
-            <div class="flex items-start justify-between gap-3 flex-wrap">
-              <div class="flex items-start gap-3 min-w-0 flex-1">
-                <!-- Profile photo (or initial) so the client recognises who
-                     they're picking — name alone read as "Plumber" / a bare
-                     trade label in testing. -->
-                <Avatar
-                  v-if="applicantPhoto(app)"
-                  :image="applicantPhoto(app)!"
-                  shape="circle"
-                  size="large"
-                  class="shrink-0"
-                />
-                <Avatar
-                  v-else
-                  :label="applicantInitial(app)"
-                  shape="circle"
-                  size="large"
-                  class="shrink-0 !bg-[color:var(--bs-blue)] !text-white font-semibold"
-                />
-                <div class="min-w-0 flex-1">
-                <a
-                  :href="`/tradies/${app.tradespersonId}`"
-                  target="_blank"
-                  rel="noopener"
-                  class="font-semibold text-[color:var(--bs-blue-dark)] hover:underline"
-                >
-                  {{
-                    applicantTradies.get(app.tradespersonId)?.displayName
-                      || applicantTradies.get(app.tradespersonId)?.companyName
-                      || 'Tradesperson'
-                  }}
-                  <i class="pi pi-external-link text-xs"></i>
-                </a>
-                <div
-                  v-if="applicantCompany(app)"
-                  class="text-xs font-medium text-[color:var(--bs-text)] mt-0.5"
-                >
-                  {{ applicantCompany(app) }}
-                </div>
-                <div
-                  v-if="applicantTradies.get(app.tradespersonId)"
-                  class="text-xs text-[color:var(--bs-muted)] mt-0.5"
-                >
-                  {{ tradeLabel(applicantTradies.get(app.tradespersonId)!.trades[0]) }}
-                </div>
-                <div
-                  v-if="applicantTradies.get(app.tradespersonId)"
-                  class="text-xs text-[color:var(--bs-muted)] mt-0.5"
-                >
-                  Rating:
-                  {{
-                    applicantTradies.get(app.tradespersonId)!.ratingCount
-                      ? applicantTradies.get(app.tradespersonId)!.ratingAvg.toFixed(1)
-                      : '—'
-                  }}
-                  ({{ applicantTradies.get(app.tradespersonId)!.ratingCount }})
-                </div>
-                <!-- Verification badges mirror the public profile so the
-                     client choosing between bidders sees the same trust
-                     signals here. Only the badges that are actually
-                     verified render; absence isn't called out (Blue Seal
-                     vets every tradie before they're visible, so the
-                     "missing" state is meaningful — they passed cert+ID
-                     but haven't uploaded insurance/WSIB). -->
-                <div
-                  v-if="applicantTradies.get(app.tradespersonId)"
-                  class="flex flex-wrap gap-1 mt-1.5"
-                >
-                  <VerifiedBadge
-                    v-if="applicantTradies.get(app.tradespersonId)!.idVerified"
-                    kind="id"
-                    variant="pill"
-                  />
-                  <VerifiedBadge
-                    v-if="(applicantTradies.get(app.tradespersonId)!.verifiedTrades?.length ?? 0) > 0"
-                    kind="cert"
-                    variant="pill"
-                  />
-                  <VerifiedBadge
-                    v-if="applicantTradies.get(app.tradespersonId)!.insuranceVerified"
-                    kind="insurance"
-                    variant="pill"
-                    :expires-at="applicantTradies.get(app.tradespersonId)!.insuranceExpiresAt"
-                  />
-                  <VerifiedBadge
-                    v-if="applicantTradies.get(app.tradespersonId)!.wsibVerified"
-                    kind="wsib"
-                    variant="pill"
-                    :expires-at="applicantTradies.get(app.tradespersonId)!.wsibExpiresAt"
-                  />
-                </div>
-                </div>
-              </div>
-              <div class="text-right">
-                <div class="font-semibold">{{ priceLabel(app.proposedPrice) }}</div>
-                <div class="text-xs text-[color:var(--bs-muted)]">
-                  Applied {{ relativeTime(app.createdAt) }}
-                </div>
-              </div>
-            </div>
-            <p class="text-sm mt-3 whitespace-pre-line">{{ app.message }}</p>
-            <div v-if="app.proposedPrice.notes" class="text-xs text-[color:var(--bs-muted)] mt-2">
-              Notes: {{ app.proposedPrice.notes }}
-            </div>
-
-            <!-- Full itemized quote (bid-marketplace). Collapsed by default;
-                 the client expands to compare line items before accepting. -->
-            <template v-if="app.quote">
-              <button
-                type="button"
-                class="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-[color:var(--bs-blue)] hover:underline"
-                :aria-expanded="expandedAppId === app.id"
-                @click="toggleExpanded(app.id)"
-              >
-                <i :class="expandedAppId === app.id ? 'pi pi-chevron-down' : 'pi pi-chevron-right'" class="text-xs"></i>
-                {{ expandedAppId === app.id ? "Hide quote" : "View full quote" }}
-              </button>
-              <div
-                v-if="expandedAppId === app.id"
-                class="mt-2 rounded-lg border border-[color:var(--bs-border)] p-3"
-              >
-                <QuoteBreakdown :quote="app.quote" />
-              </div>
-            </template>
-
-            <div v-if="post.status === 'open' && app.status === 'pending'" class="mt-3">
-              <Button
-                v-if="app.quote"
-                label="Accept quote"
-                icon="pi pi-check"
-                severity="success"
-                :loading="submittingAcceptQuote"
-                @click="onAcceptQuote(app)"
-              />
-              <Button
-                v-else
-                label="Pick this tradesperson"
-                icon="pi pi-check"
-                :loading="submittingAccept"
-                @click="onAccept(app)"
-              />
-            </div>
-            <div v-else-if="app.status !== 'pending'" class="mt-3">
-              <Tag :value="applyStatusLabel[app.status]" :severity="applyStatusSeverity[app.status]" />
-            </div>
-          </div>
+            :app="app"
+            :tradie="applicantTradies.get(app.tradespersonId) ?? null"
+            :post-open="post.status === 'open'"
+            :accepting="submittingAcceptQuote"
+            :client-uid="auth.fbUser?.uid ?? null"
+            @accept-quote="onAcceptQuote"
+            @pick="onAccept"
+            @decline="openDecline"
+            @message="openThread"
+          />
         </div>
       </template>
 
@@ -665,14 +556,65 @@ const visibleApplications = computed(() =>
             <QuoteBreakdown :quote="myApplication.quote" />
           </div>
           <div v-else class="text-xs mt-2">Proposed: {{ priceLabel(myApplication.proposedPrice) }}</div>
-          <div v-if="myApplication.status === 'pending'" class="mt-3">
+
+          <!-- Client passed with a reason — surfaced so the tradie knows what
+               to change. Revising puts the quote back in front of the client. -->
+          <div
+            v-if="myApplication.status === 'declined' && myApplication.declinedReason"
+            class="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3"
+          >
+            <div class="flex items-start gap-2">
+              <i class="pi pi-info-circle text-amber-600 mt-0.5"></i>
+              <div class="min-w-0 flex-1">
+                <div class="font-semibold text-sm text-amber-900">The client passed on this quote</div>
+                <p class="text-sm text-amber-900 mt-1 whitespace-pre-wrap">{{ myApplication.declinedReason }}</p>
+                <p class="text-xs text-amber-800 mt-1">Revise your quote to put it back in front of them.</p>
+              </div>
+            </div>
+          </div>
+
+          <div
+            v-if="myApplication.status === 'pending' || myApplication.status === 'declined'"
+            class="mt-3 flex flex-wrap items-center gap-2"
+          >
             <Button
-              label="Withdraw application"
+              v-if="myApplication.status === 'pending'"
+              :label="showMyThread ? 'Hide messages' : 'Messages'"
+              icon="pi pi-comments"
+              outlined
+              size="small"
+              @click="showMyThread = !showMyThread"
+            />
+            <Tag v-if="myUnread > 0 && !showMyThread" value="New" severity="danger" />
+            <Button
+              label="Revise quote"
+              icon="pi pi-pencil"
+              size="small"
+              @click="showRevise = true"
+            />
+            <span class="flex-1"></span>
+            <Button
+              v-if="myApplication.status === 'pending'"
+              label="Withdraw"
               icon="pi pi-times"
               severity="secondary"
               outlined
+              size="small"
               :loading="submittingWithdraw"
               @click="onWithdraw"
+            />
+          </div>
+
+          <!-- Inline Q&A thread with the client (pending only — once declined,
+               messaging pauses until the tradie revises back into the list). -->
+          <div
+            v-if="myApplication.status === 'pending' && showMyThread"
+            class="mt-3 rounded-lg border border-[color:var(--bs-border)] overflow-hidden bs-myapp-thread"
+          >
+            <ApplicationThread
+              :post-id="postId"
+              :application-id="myApplication.tradespersonId"
+              role="tradesperson"
             />
           </div>
         </div>
@@ -741,5 +683,34 @@ const visibleApplications = computed(() =>
       :busy="submittingAcceptQuote"
       @confirm="onSignedAcceptQuote"
     />
+
+    <!-- Client: per-applicant Q&A overlay + decline-with-reason dialog. -->
+    <ApplicationThreadOverlay
+      v-model:visible="showThread"
+      :post-id="postId"
+      :application-id="threadApp?.id ?? null"
+      :counterparty-name="threadApp ? applicantName(threadApp) : ''"
+      role="client"
+    />
+    <DeclineApplicationDialog
+      v-model:visible="showDecline"
+      :applicant-name="declineApp ? applicantName(declineApp) : 'this applicant'"
+      :busy="submittingDecline"
+      @confirm="onConfirmDecline"
+    />
+
+    <!-- Tradesperson: revise the quote on their own application. -->
+    <ReviseApplicationDialog
+      v-if="myApplication"
+      v-model:visible="showRevise"
+      :post-id="postId"
+      :application="myApplication"
+    />
   </section>
 </template>
+
+<style scoped>
+.bs-myapp-thread {
+  height: 24rem;
+}
+</style>
