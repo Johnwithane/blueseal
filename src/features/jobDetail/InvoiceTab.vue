@@ -4,7 +4,6 @@ import Button from "primevue/button";
 import { RouterLink } from "vue-router";
 import QuoteCard from "@/components/QuoteCard.vue";
 import InvoiceEditor from "@/components/InvoiceEditor.vue";
-import ExpensesCard from "@/components/ExpensesCard.vue";
 import PayInvoiceDialog from "@/components/PayInvoiceDialog.vue";
 import type { JobDoc, WithId } from "@/firebase/interfaces";
 
@@ -208,17 +207,9 @@ const lockedStatuses = new Set<JobDoc["status"]>([
       </p>
     </div>
 
-    <!-- Tradie's expenses (receipts → reimbursable line items). Only while
-         the invoice is still open: once it's locked (awaiting approval →
-         reviewed, or cancelled) a new receipt can't be billed through, so
-         the upload affordance would be misleading. Same gate as the
-         InvoiceEditor's canEdit above. -->
-    <ExpensesCard
-      v-if="isTradie && !lockedStatuses.has(job.status)"
-      :job-id="job.id"
-      :client-id="job.clientId"
-      :tradesperson-id="job.tradespersonId"
-    />
+    <!-- Receipts (the tradesperson's expense uploader) live on the Work
+         Order tab now — alongside time + change orders, where the live work
+         of the job is tracked. They no longer belong on the invoice surface. -->
 
     <!-- Mutual review lives at the JobDetailView level (above the
          tabs) so revealed reviews land at the top of every tab, not

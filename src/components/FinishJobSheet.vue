@@ -504,8 +504,8 @@ function close() {
           </li>
         </ul>
         <p class="text-[11px] text-[color:var(--bs-muted)] mt-2">
-          Markups + categories live in the Expenses card on the job page — edit there
-          before finishing if anything's off.
+          Markups + categories live in the Expenses card on the Work order tab —
+          edit there before finishing if anything's off.
         </p>
       </section>
 
