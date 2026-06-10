@@ -4,6 +4,7 @@ import Button from "primevue/button";
 import Tag from "primevue/tag";
 import Textarea from "primevue/textarea";
 import Message from "primevue/message";
+import ManualTimeEntryDialog from "@/components/ManualTimeEntryDialog.vue";
 import {
   clockIn,
   clockOut,
@@ -72,6 +73,7 @@ const entries = ref<WithId<TimeEntryDoc>[]>([]);
 const loading = ref(true);
 const loadError = ref<string | null>(null);
 const busy = ref(false);
+const showManualDialog = ref(false);
 // Re-render tick so the live timer on the running entry counts up.
 const nowMs = ref(Date.now());
 let ticker: number | null = null;
@@ -261,6 +263,17 @@ function rateLabel(e: WithId<TimeEntryDoc>): string {
           />
         </div>
       </div>
+
+      <!-- Log time worked off the clock (forgot to start the timer, etc.).
+           Independent of the running session. -->
+      <Button
+        label="Add time manually"
+        icon="pi pi-plus"
+        text
+        size="small"
+        class="mt-2"
+        @click="showManualDialog = true"
+      />
     </div>
 
     <!-- Read-only client view of the running session -->
@@ -359,5 +372,13 @@ function rateLabel(e: WithId<TimeEntryDoc>): string {
         <div v-else-if="e.notes" class="text-xs mt-2 whitespace-pre-wrap">{{ e.notes }}</div>
       </li>
     </ul>
+
+    <ManualTimeEntryDialog
+      v-if="props.isTradie"
+      v-model:visible="showManualDialog"
+      :job-id="props.jobId"
+      :billing-type="props.billingType"
+      :approved-hourly-extras="props.approvedHourlyExtras"
+    />
   </div>
 </template>

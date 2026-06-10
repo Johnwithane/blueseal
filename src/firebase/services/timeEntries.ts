@@ -115,6 +115,46 @@ export async function clockOut(jobId: string, entryId: string): Promise<ClockOut
   return res.data;
 }
 
+export interface AddManualTimeEntryResult {
+  entryId: string;
+}
+
+// Log a CLOSED time entry by hand for work that wasn't clocked live.
+// `startedAtMs` / `endedAtMs` are epoch-ms built from the form's local date +
+// time. The rate + the same fixed-job / approved-extra rules as clockIn are
+// resolved server-side; this never touches the running clock.
+export async function addManualTimeEntry(
+  jobId: string,
+  input: {
+    kind: TimeEntryKind;
+    extraId?: string | null;
+    startedAtMs: number;
+    endedAtMs: number;
+    notes?: string;
+  },
+): Promise<AddManualTimeEntryResult> {
+  const fn = httpsCallable<
+    {
+      jobId: string;
+      kind: TimeEntryKind;
+      extraId: string | null;
+      startedAtMs: number;
+      endedAtMs: number;
+      notes: string;
+    },
+    AddManualTimeEntryResult
+  >(functions, "addManualTimeEntry");
+  const res = await fn({
+    jobId,
+    kind: input.kind,
+    extraId: input.extraId ?? null,
+    startedAtMs: input.startedAtMs,
+    endedAtMs: input.endedAtMs,
+    notes: input.notes ?? "",
+  });
+  return res.data;
+}
+
 /** Local (no server round-trip) computation of billable minutes + cents.
  *  Useful for the live ticker on the UI and for the invoice-roll-up. */
 export function entryBillable(entry: TimeEntryDoc, nowMs = Date.now()): {

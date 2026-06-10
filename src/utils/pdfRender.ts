@@ -105,7 +105,7 @@ let logoDataUrlCache: string | null = null;
 async function loadLogoDataUrl(): Promise<string | null> {
   if (logoDataUrlCache) return logoDataUrlCache;
   try {
-    const res = await fetch("/icons/blueseal_logoCircle.png");
+    const res = await fetch("/icons/blueseal_logoCircle_RED.png");
     if (!res.ok) return null;
     const blob = await res.blob();
     const reader = new FileReader();

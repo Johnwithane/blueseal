@@ -35,7 +35,7 @@ export const DEFAULT_DESCRIPTION =
  * crawlers require it.
  */
 export const DEFAULT_OG_IMAGE = `${SITE_URL}/icons/blueseal_logo_LARGE.png`;
-export const LOGO_URL = `${SITE_URL}/icons/blueseal_logoCircle.png`;
+export const LOGO_URL = `${SITE_URL}/icons/blueseal_logoCircle_RED.png`;
 
 export const OG_LOCALE = "en_CA";
 

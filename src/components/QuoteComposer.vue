@@ -428,7 +428,7 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
           <div v-if="l.kind === 'hourly'" class="mt-2">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div>
-                <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">Hours</label>
+                <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">Estimated hours</label>
                 <InputNumber
                   v-model="l.hoursInput"
                   :min="0"

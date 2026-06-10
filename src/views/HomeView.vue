@@ -206,7 +206,7 @@ onMounted(async () => {
               class="absolute inset-6 rounded-full bg-gradient-to-br from-[var(--bs-blue-light)] via-[var(--bs-blue)] to-[var(--bs-blue-dark)] opacity-40 blur-2xl bs-spin-slow"
             ></div>
             <img
-              src="/icons/blueseal_logoCircle.png"
+              src="/icons/blueseal_logoCircle_RED.png"
               alt="Blue Seal"
               class="relative h-[100%] w-auto mx-auto bs-float bs-glow"
             />
@@ -425,7 +425,7 @@ onMounted(async () => {
           />
           <div class="relative w-full max-w-sm rounded-3xl bg-white text-[color:var(--bs-text)] p-5 shadow-2xl ring-1 ring-white/30">
             <div class="flex items-center gap-3">
-              <img src="/icons/blueseal_logoCircle.png" alt="" class="h-9 w-9" />
+              <img src="/icons/blueseal_logoCircle_RED.png" alt="" class="h-9 w-9" />
               <div>
                 <div class="font-semibold text-sm">New quote request</div>
                 <div class="text-xs text-[color:var(--bs-muted)]">2 mins ago · Sarah M.</div>
@@ -592,7 +592,7 @@ onMounted(async () => {
 
       <div class="relative bs-container py-20 sm:py-24 text-center text-white">
         <img
-          src="/icons/blueseal_logoCircle.png"
+          src="/icons/blueseal_logoCircle_RED.png"
           alt=""
           aria-hidden="true"
           class="mx-auto h-60 w-auto bs-float bs-glow"
