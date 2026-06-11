@@ -9,7 +9,7 @@ import { logAdminAction } from "../lib/audit";
 
 const Input = z.object({
   postId: z.string().min(1).max(128),
-  reason: z.string().trim().max(500).optional(),
+  reason: z.string().trim().max(500).nullable().optional(),
 });
 
 export const cancelJobPost = onCall(CALLABLE_OPTS, async (req) => {
@@ -51,6 +51,6 @@ export const cancelJobPost = onCall(CALLABLE_OPTS, async (req) => {
   } catch (err) {
     if (err instanceof HttpsError) throw err;
     logger.error("cancelJobPost failed", { ...ctx, err });
-    throw new HttpsError("internal", "Couldn't cancel post.");
+    throw new HttpsError("internal", "Couldn't cancel job.");
   }
 });

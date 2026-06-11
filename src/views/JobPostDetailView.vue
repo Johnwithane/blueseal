@@ -393,8 +393,8 @@ async function onAccept(app: WithId<ApplicationDoc>) {
 
 async function onCancelPost() {
   confirm.require({
-    message: "Cancel this post? Applicants will be told it's no longer open.",
-    header: "Cancel post?",
+    message: "Cancel this job? Applicants will be told it's no longer open.",
+    header: "Cancel job?",
     icon: "pi pi-trash",
     acceptLabel: "Yes, cancel",
     rejectLabel: "Keep open",
@@ -402,10 +402,10 @@ async function onCancelPost() {
       submittingCancel.value = true;
       try {
         await cancelJobPost(postId.value);
-        toast.success("Post cancelled");
+        toast.success("Job cancelled");
         post.value = await getJobPost(postId.value);
       } catch (e) {
-        toast.error("Couldn't cancel post", humanizeError(e));
+        toast.error("Couldn't cancel job", humanizeError(e));
       } finally {
         submittingCancel.value = false;
       }
@@ -560,7 +560,7 @@ const visibleApplications = computed(() =>
       <template v-if="isClient">
         <div v-if="post.status === 'open'" class="mt-4 flex flex-wrap gap-2">
           <Button
-            label="Cancel post"
+            label="Cancel job"
             icon="pi pi-times"
             severity="secondary"
             outlined

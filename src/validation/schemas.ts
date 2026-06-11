@@ -356,7 +356,7 @@ export const returnToApplicantsSchema = z.object({
 
 export const cancelJobPostSchema = z.object({
   postId: z.string().min(1).max(128),
-  reason: z.string().trim().max(500).optional(),
+  reason: z.string().trim().max(500).nullable().optional(),
 });
 
 export const withdrawApplicationSchema = z.object({
