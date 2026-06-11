@@ -48,10 +48,10 @@ const siteVisitForm = ref<SiteVisitFormState | null>(null);
 const existingVisitStatus = ref<string | null>(null);
 const canRequestVisit = computed(() => !isResend.value && existingVisitStatus.value === null);
 
-const canSubmit = computed(() => {
-  if (submitting.value) return false;
-  return mode.value === "site_visit" ? !!siteVisitForm.value?.valid : !!composer.value?.valid;
-});
+// Deliberately NOT gated on validity — a dead disabled button gives no clue
+// what's missing. Submit stays clickable; an invalid attempt flips `attempted`
+// so the composer renders every blocking issue inline.
+const attempted = ref(false);
 const submitLabel = computed(() => {
   if (mode.value === "site_visit") {
     const fee = siteVisitForm.value?.fee.feeCents ?? 0;
@@ -77,6 +77,7 @@ watch(
     priorDeclinedReason.value = null;
     initial.value = null;
     composer.value = null;
+    attempted.value = false;
     mode.value = "quote";
     siteVisitForm.value = null;
     existingVisitStatus.value = null;
@@ -137,14 +138,11 @@ async function onSubmit() {
   }
   const s = composer.value;
   if (!s || !s.valid || !s.payload) {
-    if (s?.hasHourlyLineWithoutRate) {
-      toast.error(
-        "Hourly line is missing a rate",
-        "Set a profile rate, override the rate on that line, or switch it to Flat rate.",
-      );
-      return;
-    }
-    toast.error("Add at least one line", "A quote needs something to bill.");
+    attempted.value = true;
+    toast.error(
+      "Quote isn't ready to send",
+      s?.issues[0] ?? "Add at least one line item with an amount.",
+    );
     return;
   }
   submitting.value = true;
@@ -256,6 +254,7 @@ function close() {
         v-else
         :hourly-rate-cents="hourlyRateCents"
         :initial="initial"
+        :show-errors="attempted"
         @update:state="(s) => (composer = s)"
       />
     </template>
@@ -268,7 +267,7 @@ function close() {
           :label="submitLabel"
           icon="pi pi-send"
           :loading="submitting"
-          :disabled="!canSubmit"
+          :disabled="submitting"
           class="w-full sm:w-auto"
           @click="onSubmit"
         />

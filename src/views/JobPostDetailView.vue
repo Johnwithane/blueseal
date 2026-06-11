@@ -82,6 +82,9 @@ const error = ref<string | null>(null);
 const applyMessage = ref("");
 const submittingApply = ref(false);
 const applyError = ref<string | null>(null);
+// Set on the first failed submit so the composer surfaces every blocking
+// issue inline (per-field highlights + summary list).
+const applyAttempted = ref(false);
 const submittingAccept = ref(false);
 const submittingAcceptQuote = ref(false);
 const submittingCancel = ref(false);
@@ -279,9 +282,8 @@ async function submitApply() {
   } else {
     const s = composerState.value;
     if (!s || !s.valid || !s.payload) {
-      applyError.value = s?.hasHourlyLineWithoutRate
-        ? "An hourly line has no rate — set your profile rate, override it on the line, or switch it to Flat rate."
-        : "Add at least one line item with an amount.";
+      applyAttempted.value = true;
+      applyError.value = s?.issues[0] ?? "Add at least one line item with an amount.";
       return;
     }
     payload = {
@@ -312,6 +314,7 @@ async function submitApply() {
         : "The client can compare and accept it. They typically respond within 24 hours.",
     );
     applyMessage.value = "";
+    applyAttempted.value = false;
   } catch (e) {
     applyError.value = humanizeError(e);
   } finally {
@@ -750,11 +753,10 @@ const visibleApplications = computed(() =>
             </button>
           </div>
 
-          <Message v-if="applyError" severity="error" :closable="false">
-            {{ applyError }}
-          </Message>
           <div>
-            <label class="text-sm font-medium">Cover message</label>
+            <label class="text-sm font-medium">
+              Cover message <span class="font-normal text-[color:var(--bs-muted)]">(optional)</span>
+            </label>
             <Textarea
               v-model="applyMessage"
               rows="4"
@@ -762,6 +764,9 @@ const visibleApplications = computed(() =>
               placeholder="Why you're a good fit, your approach, when you can start, and what's included…"
               class="mt-1 w-full"
             />
+            <p class="mt-1 text-xs text-[color:var(--bs-muted)]">
+              Tip: a couple of sentences about your fit and approach improves your chances.
+            </p>
           </div>
 
           <SiteVisitForm
@@ -772,9 +777,13 @@ const visibleApplications = computed(() =>
             v-else
             :hourly-rate-cents="applyHourlyRate"
             hide-note
+            :show-errors="applyAttempted"
             @update:state="(s) => (composerState = s)"
           />
 
+          <Message v-if="applyError" severity="error" :closable="false">
+            {{ applyError }}
+          </Message>
           <Button
             type="submit"
             :label="applySubmitLabel"

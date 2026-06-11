@@ -30,7 +30,8 @@ const QuoteInput = z.object({
 
 const baseFields = {
   postId: z.string().min(1).max(128),
-  message: z.string().trim().min(20).max(2000),
+  // No minimum — the cover message is a suggestion, never a gate on applying.
+  message: z.string().trim().max(2000).default(""),
   proposedStartDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)

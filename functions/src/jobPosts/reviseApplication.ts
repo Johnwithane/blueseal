@@ -30,7 +30,7 @@ const QuoteInput = z.object({
 
 const Input = z.object({
   postId: z.string().min(1).max(128),
-  message: z.string().trim().min(20).max(2000).optional(),
+  message: z.string().trim().max(2000).optional(),
   quote: QuoteInput,
   proposedStartDate: z
     .string()

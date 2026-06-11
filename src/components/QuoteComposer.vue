@@ -55,6 +55,8 @@ export interface QuoteComposerState {
   upfrontPreviewCents: number;
   hasHourlyLineWithoutRate: boolean;
   hasIncompleteLine: boolean;
+  /** Everything currently blocking a valid quote, in display order. */
+  issues: string[];
 }
 
 // Hydration seed for resend/edit (QuoteSheet) — pass null for a fresh form.
@@ -78,6 +80,9 @@ const props = defineProps<{
   /** Hide the note-to-client field (the marketplace apply form has its own
    *  cover message, so the quote note would be redundant there). */
   hideNote?: boolean;
+  /** Flip on after a failed submit attempt: every blocking issue renders
+   *  inline (per field + summary list) instead of the gentle nudges only. */
+  showErrors?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -158,6 +163,43 @@ function isLineIncomplete(l: UiLine): boolean {
   return (l.amountDollars ?? 0) > 0;
 }
 const hasIncompleteLine = computed(() => lines.value.some(isLineIncomplete));
+
+// What (if anything) keeps this line from counting toward the total. A fully
+// blank row is not an issue — buildLineItems just skips it.
+function lineIssue(l: UiLine): string | null {
+  const hasDesc = l.description.trim().length > 0;
+  if (!hasDesc) {
+    return isLineIncomplete(l) ? "Add a description so this line counts toward the total." : null;
+  }
+  if (l.kind === "hourly") {
+    if (effectiveRateCents(l) == null) return "Enter an hourly rate, or switch this line to Flat rate.";
+    if ((l.hoursInput ?? 0) <= 0) return "Enter the estimated hours.";
+    return null;
+  }
+  return (l.amountDollars ?? 0) > 0 ? null : "Enter an amount.";
+}
+
+// Inline display: gentle nudge (numbers without a description) always shows;
+// everything else waits for showErrors so a half-typed form isn't shouting.
+function displayedLineIssue(l: UiLine): string | null {
+  if (props.showErrors) return lineIssue(l);
+  return isLineIncomplete(l) ? lineIssue(l) : null;
+}
+
+const issues = computed<string[]>(() => {
+  const out: string[] = [];
+  lines.value.forEach((l, i) => {
+    const issue = lineIssue(l);
+    if (issue) out.push(lines.value.length > 1 ? `Line ${i + 1}: ${issue}` : issue);
+  });
+  if (out.length === 0 && previewLines.value.length === 0) {
+    out.push("Add at least one line item with an amount.");
+  }
+  if (previewLines.value.length > 0 && totals.value.total <= 0) {
+    out.push("The discount brings the total to $0 — reduce it before sending.");
+  }
+  return out;
+});
 
 function buildLineItems(): LineItem[] {
   const out: LineItem[] = [];
@@ -428,6 +470,7 @@ const state = computed<QuoteComposerState>(() => {
     upfrontPreviewCents: upfrontPreviewCents.value,
     hasHourlyLineWithoutRate: hasHourlyLineWithoutRate.value,
     hasIncompleteLine: hasIncompleteLine.value,
+    issues: issues.value,
   };
 });
 watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
@@ -493,11 +536,11 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
                 : 'e.g. Install new shower mixer'
             "
             maxlength="200"
-            :invalid="isLineIncomplete(l)"
+            :invalid="!!displayedLineIssue(l) && !l.description.trim()"
             class="quote-composer-line-description w-full text-sm"
           />
-          <p v-if="isLineIncomplete(l)" class="text-[11px] text-[color:var(--bs-danger)] mt-1">
-            Add a description so this line counts toward the total.
+          <p v-if="displayedLineIssue(l)" class="text-[11px] text-[color:var(--bs-danger)] mt-1">
+            {{ displayedLineIssue(l) }}
           </p>
 
           <!-- Hourly -->
@@ -510,6 +553,7 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
                   :min="0"
                   :max-fraction-digits="2"
                   suffix=" hrs"
+                  :invalid="showErrors && !!l.description.trim() && (l.hoursInput ?? 0) <= 0"
                   :input-class="'text-sm w-full'"
                   fluid
                 />
@@ -523,6 +567,7 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
                   :min="0"
                   :max-fraction-digits="2"
                   suffix="/hr"
+                  :invalid="showErrors && !!l.description.trim() && effectiveRateCents(l) == null"
                   :input-class="'text-sm w-full'"
                   fluid
                 />
@@ -550,6 +595,7 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
               currency="CAD"
               :min="0"
               :max-fraction-digits="2"
+              :invalid="showErrors && !!l.description.trim() && (l.amountDollars ?? 0) <= 0"
               :input-class="'text-sm w-full font-semibold'"
               fluid
             />
@@ -856,6 +902,20 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
         </div>
       </dl>
     </section>
+
+    <!-- Everything blocking the send, in one place next to the submit button.
+         Only after a failed attempt — the per-field highlights match this list. -->
+    <Message
+      v-if="showErrors && issues.length"
+      severity="error"
+      :closable="false"
+      class="text-xs"
+    >
+      <p class="font-semibold mb-1">Before this quote can go out:</p>
+      <ul class="list-disc ms-4 space-y-0.5">
+        <li v-for="(msg, i) in issues" :key="i">{{ msg }}</li>
+      </ul>
+    </Message>
 
     <Dialog
       v-model:visible="showSaveTemplate"

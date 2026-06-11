@@ -40,7 +40,9 @@ const composer = ref<QuoteComposerState | null>(null);
 
 const declinedReason = computed(() => props.application.declinedReason ?? null);
 
-const canSubmit = computed(() => !submitting.value && !!composer.value?.valid);
+// Submit stays clickable when invalid — a failed attempt flips `attempted` so
+// the composer renders every blocking issue inline (mirrors QuoteSheet).
+const attempted = ref(false);
 const submitLabel = computed(() => {
   const s = composer.value;
   if (s && s.totals.total > 0) return `Re-send quote — ${money(s.totals.total)}`;
@@ -54,6 +56,7 @@ watch(
     loading.value = true;
     initial.value = null;
     composer.value = null;
+    attempted.value = false;
     try {
       const uid = auth.fbUser?.uid;
       hourlyRateCents.value = uid ? ((await getTradesperson(uid))?.hourlyRate ?? null) : null;
@@ -83,14 +86,11 @@ watch(
 async function onSubmit() {
   const s = composer.value;
   if (!s || !s.valid || !s.payload) {
-    if (s?.hasHourlyLineWithoutRate) {
-      toast.error(
-        "Hourly line is missing a rate",
-        "Set a profile rate, override the rate on that line, or switch it to Flat rate.",
-      );
-      return;
-    }
-    toast.error("Add at least one line", "A quote needs something to bill.");
+    attempted.value = true;
+    toast.error(
+      "Quote isn't ready to send",
+      s?.issues[0] ?? "Add at least one line item with an amount.",
+    );
     return;
   }
   const parsed = reviseApplicationSchema.safeParse({
@@ -155,6 +155,7 @@ function close() {
         :hourly-rate-cents="hourlyRateCents"
         :initial="initial"
         hide-note
+        :show-errors="attempted"
         @update:state="(s) => (composer = s)"
       />
     </template>
@@ -167,7 +168,7 @@ function close() {
           :label="submitLabel"
           icon="pi pi-send"
           :loading="submitting"
-          :disabled="!canSubmit"
+          :disabled="submitting"
           class="w-full sm:w-auto"
           @click="onSubmit"
         />

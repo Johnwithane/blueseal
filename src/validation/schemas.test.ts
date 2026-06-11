@@ -112,6 +112,26 @@ describe("submitApplicationSchema (discriminated union)", () => {
     });
     expect(r.success).toBe(false);
   });
+
+  // The cover message is a suggestion, never a gate — an empty or missing
+  // message must not block a quote (2026-06-11).
+  it("accepts an empty or missing cover message", () => {
+    expect(
+      submitApplicationSchema.safeParse({
+        kind: "full",
+        postId: "post1",
+        message: "",
+        quote: { lineItems: [validLine] },
+      }).success,
+    ).toBe(true);
+    const r = submitApplicationSchema.safeParse({
+      kind: "full",
+      postId: "post1",
+      quote: { lineItems: [validLine] },
+    });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.message).toBe("");
+  });
 });
 
 describe("sendJobReferralSchema", () => {

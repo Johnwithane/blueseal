@@ -290,14 +290,12 @@ export const applicationQuoteSchema = z.object({
 });
 export type ApplicationQuoteInput = z.infer<typeof applicationQuoteSchema>;
 
-// Shared across both application kinds.
+// Shared across both application kinds. The cover message is a suggestion,
+// not a gate — an empty message must never block a quote (per Johnny,
+// 2026-06-11; the UI nudges with a tip instead).
 const applicationBaseFields = {
   postId: z.string().min(1).max(128),
-  message: z
-    .string()
-    .trim()
-    .min(20, "Write at least a couple of sentences")
-    .max(2000),
+  message: z.string().trim().max(2000).default(""),
   proposedStartDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Use a YYYY-MM-DD date")
