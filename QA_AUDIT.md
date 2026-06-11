@@ -66,11 +66,11 @@ Verified absent in code. Ranked by impact-for-effort for a trust-first trades ma
 
 | # | Feature | Benchmark | Impact | Effort | Notes |
 | --- | --- | --- | --- | --- | --- |
-| 1 | **Job status timeline/stepper** on job detail | Uber trip tracker, Domino's | High | Low-Med | Clients constantly ask "what happens next?" — a 6-step visual (posted → quoted → accepted → in progress → invoiced → done) removes most of that. Pure UI over existing statuses. |
-| 2 | **Saved / favourite tradespeople** | Airbnb wishlists | High | Med | `favourites: string[]` on the user doc + heart on TradieCard/profile + a "Saved" shelf on search. Directly drives repeat hires. |
-| 3 | **Web push notifications (FCM)** | Every marketplace | High | Med-High | In-app + email/WhatsApp exist, but the PWA can't reach a closed tab. Biggest lever on quote-response latency, which is the marketplace's core loop. |
-| 4 | **Quote templates** | Jobber, Joist | High (tradie retention) | Med | "Save as template / start from template" in QuoteSheet. Pairs naturally with fixing quote-draft loss (backlog #1). |
-| 5 | **Post preview before publish** | TaskRabbit | Med | Low | Render the post exactly as tradies will see it (public fields only) before submit. |
+| 1 | ✅ **Job status timeline/stepper** — SHIPPED 2026-06-10 (`7990891`) | Uber trip tracker, Domino's | High | Low-Med | Five-milestone tracker under the job header; on_hold tints amber, cancelled hides it. |
+| 2 | ✅ **Saved / favourite tradespeople** — SHIPPED 2026-06-10 (`fddef02`) | Airbnb wishlists | High | Med | Heart on TradieCard/profile + Saved shelf on search; private `users/{uid}/savedTradies` subcollection. |
+| 3 | ✅ **Web push notifications (FCM)** — SHIPPED 2026-06-10 (`feec152`), pending VAPID key (HUMANTASKS.md) | Every marketplace | High | Med-High | Per-device opt-in toggle in Account; notify() fans out with dead-token pruning. Hidden until the key is set. |
+| 4 | ✅ **Quote templates** — SHIPPED 2026-06-10 (`a5c46a0`) | Jobber, Joist | High (tradie retention) | Med | Save/load in the shared QuoteComposer (both quote flows); owner-only subcollection. |
+| 5 | ✅ **Post preview before publish** — SHIPPED 2026-06-10 (`d353b26`) | TaskRabbit | Med | Low | Board-card-shaped preview incl. the address-privacy note. |
 | 6 | **Input masking** (postal `A1A 1A1`, phone `(613) 555-0199`) | table stakes | Med | Low | PrimeVue InputMask; pairs with postal normalization (backlog #13). |
 | 7 | **Recently viewed tradespeople** | Airbnb/Amazon | Med | Low | localStorage list + carousel on search. |
 | 8 | **Photos on quotes** | Jobber | Med | Low-Med | "Here's the fixture I'd install" — quotes are currently text-only. |
