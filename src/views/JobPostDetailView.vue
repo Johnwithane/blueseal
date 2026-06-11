@@ -352,6 +352,7 @@ async function onSignedAcceptQuote(signatureDataUrl: string) {
   try {
     const { jobId } = await acceptApplicationQuote(postId.value, app.id, signatureDataUrl);
     showSignDialog.value = false;
+    pendingApp.value = null;
     router.push({ name: "JobDetail", params: { id: jobId } });
   } catch (e) {
     toast.error("Couldn't accept this quote", humanizeError(e));
