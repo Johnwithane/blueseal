@@ -866,7 +866,8 @@ Setup is fully covered in `TECH_STACK_SETUP.md`. Below is the product build sequ
 ### Platform / Infra
 - ✅ MVP — PWA install
 - 🟡 v1.1 — FCM push, multi-region (BC → Alberta → national), Sentry, analytics
-- 🔵 Backlog — Native iOS/Android shells (Capacitor), i18n (French for Quebec)
+- 🟢 In progress (2026-06-11) — App Store + Google Play distribution. The PWA stays the single core; the stores wrap the **same** `dist/` build — iOS via a Capacitor shell (App Store Guideline 4.2 forbids thin webview-only apps), Android via a Trusted Web Activity (TWA). Setup + runbook: `store/README.md` and HUMANTASKS.md.
+- 🔵 Backlog — i18n (French for Quebec)
 
 ---
 
@@ -879,7 +880,7 @@ Setup is fully covered in `TECH_STACK_SETUP.md`. Below is the product build sequ
 - Editing a posted job after applications exist (v1.1)
 - Re-opening a closed/expired post (v1.1; for now the client reposts)
 - Multi-language
-- Native iOS/Android shells (PWA only)
+- ~~Native iOS/Android shells (PWA only)~~ → **Resolved 2026-06-11:** store distribution moved to in-progress (§12). Still no separate native codebase — a Capacitor shell (iOS) and a TWA (Android) wrap the same PWA build. See `store/README.md`.
 - Background checks beyond cert + ID
 - Multi-currency
 

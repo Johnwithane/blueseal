@@ -6,6 +6,55 @@ Tasks are grouped by the phase that introduced them so you can see why each one 
 
 ---
 
+## App Store + Google Play distribution (added 2026-06-11)
+
+We're putting Blue Seal on both stores **without forking into a native codebase**. Both wrappers ship the same `dist/` PWA build:
+
+- **Google Play** → a **Trusted Web Activity (TWA)**, built with Bubblewrap. Config: `store/twa-manifest.json` + `public/.well-known/assetlinks.json`. Mechanics: `store/README.md`.
+- **Apple App Store** → a **Capacitor** native shell (Apple rejects thin webview-only apps under Guideline 4.2). Config: `capacitor.config.ts`.
+
+The repo side is done: manifest is store-ready (maskable icon, `id`/`scope`/categories), Capacitor + Bubblewrap config in place, asset-links file + its `Content-Type` header deployed via hosting. Everything below needs **your** access — paid accounts, signing keys, a Mac, and the store listings. Nothing here is wired to break the live site if left undone.
+
+> ⚠️ **Apple is the risk, not the work.** A wrapper that's "just the website" gets rejected (Guideline 4.2 — minimum functionality). We mitigate by shipping a real Capacitor container and leaning on genuinely app-like behaviour (offline, push, home-screen identity). Budget for a possible first-pass rejection and a reply explaining the native value. **Google Play is low-risk** — TWAs are officially supported.
+
+### [ ] Enrol in the Apple Developer Program ($99/yr) — long pole
+
+- **Why:** Required to sign, run on real devices, use TestFlight, and submit to the App Store. Enrolment (esp. for an org with D-U-N-S) can take days.
+- **What:** developer.apple.com → enrol as the legal entity that owns Blue Seal. An **organization** account (needs a D-U-N-S number) is better than Individual for a company app — start the D-U-N-S lookup early, it's the slow part.
+
+### [ ] Create the Google Play Console account ($25 one-time)
+
+- **What:** play.google.com/console → pay the one-time fee → complete identity/“D-U-N-S or org” verification (Google now verifies developer identity; can take a couple of days).
+
+### [ ] Build the Android TWA and wire up Digital Asset Links
+
+- **Why:** This is what gets us on Play and removes the browser URL bar.
+- **What:** on any machine with JDK 17 + Android SDK, follow `store/README.md` → “Google Play (TWA)”: `bubblewrap init --manifest store/twa-manifest.json` → `bubblewrap build` → upload the `.aab` to Play.
+- **Then (critical):** enrol in **Play App Signing**, copy the **SHA-256** from Play Console → Setup → App integrity → *App signing key certificate*, paste it into `public/.well-known/assetlinks.json` (replacing `REPLACE_WITH_SHA256_FROM_PLAY_APP_SIGNING`), and `npm run deploy:hosting`.
+- **Verify:** `curl -i https://blueseal.app/.well-known/assetlinks.json` returns the JSON with `Content-Type: application/json`, and the installed app opens full-screen with **no URL bar**. (URL bar still showing = fingerprint/package mismatch.)
+
+### [ ] Build + submit the iOS app (needs a Mac + Xcode)
+
+- **Why:** iOS binaries can only be produced on macOS. This container can't do it.
+- **What:** on a Mac with Xcode + CocoaPods, follow `store/README.md` → “Apple App Store”: `npm install && npm run build && npx cap add ios && npm run cap:ios`. In Xcode set Team + bundle id `app.blueseal`, version, signing → Archive → App Store Connect → TestFlight → submit.
+
+### [ ] Authorize the Capacitor/TWA origins in Firebase Auth
+
+- **Why:** bundled assets run on `capacitor://localhost` (iOS) / `https://localhost` (Android), not `blueseal.app`. Firebase Auth will reject sign-in from an unlisted domain, so login silently fails in the shell.
+- **What:** Firebase Console → Authentication → Settings → **Authorized domains** → add `localhost` (and any custom scheme Capacitor reports). For Google sign-in, add the same to the OAuth client’s authorized origins/redirects in GCP. Test sign-in inside both built apps before submitting.
+
+### [ ] Prepare the store listings (assets + disclosures)
+
+- **What:** 1024×1024 store icon, phone + tablet screenshots, Play feature graphic (1024×500), short/long descriptions, **privacy policy URL** (`https://blueseal.app/privacy` — already live) and support URL.
+- **Disclosures (don't skip — both stores block release without them):** Play **Data safety** form and Apple **privacy “nutrition” labels**. Declare what we actually collect: account email/identity, **precise location** (job matching), **photos** (job uploads, ID/cert verification), messages. Plus Play **content rating** questionnaire and Apple age rating.
+
+### [ ] Launch follow-ups (after the apps are live — not before)
+
+- **Why “after”:** per CLAUDE.md help-content rule, don't tell users about an app that isn't downloadable yet.
+- **What:** (1) add an "Is there an app?" FAQ to `src/data/help.ts`; (2) add App Store / Play badges + (optional) a PWA install/`smartbanner` prompt to the marketing site, pointing at the live store URLs.
+
+---
+
 ## Web push notifications (added 2026-06-10)
 
 Push notifications (FCM) ship **safe-by-default**: until the key below is set, the

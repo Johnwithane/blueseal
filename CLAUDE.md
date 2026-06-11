@@ -399,7 +399,7 @@ When a feature is big enough to warrant its own walkthrough, add a full **articl
 
 - Not Stripe-based payments between clients and tradies at MVP (offline; v1.1 brings Stripe Connect).
 - Not a chat app — chat is scoped to jobs.
-- Not a native app — PWA only.
+- Not a native app — PWA core. (As of 2026-06-11 we also distribute that PWA through the stores: a Capacitor shell for iOS, a TWA for Google Play — same web build, thin wrappers, no second codebase. See `store/README.md` + design.md §12.)
 - Not multilingual at launch.
 - Not a self-serve marketplace — every tradie passes manual cert + ID vetting before going live.
 - Not a lowest-bid race. The job board (`design.md` § 4.6) now lets verified tradies apply to an open post with a **full itemized quote**, and the client compares quotes and accepts one (`acceptApplicationQuote`). It's a curated compare-and-choose between vetted pros — not an anonymous reverse auction on price alone. Coexists with the direct-request flow; both converge on the same `jobs/{jobId}` pipeline.
