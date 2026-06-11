@@ -333,7 +333,7 @@ You can return to the **Payouts** screen any time to finish setup or open your p
 
 **Change orders.** When a job picks up extra work that wasn't in the original quote, the tradesperson proposes a **change order** — a flat fee, or an hourly rate they then clock against. The client **approves it first**; nothing extra is billed without that sign-off. Approved change orders flow onto the final invoice alongside the agreed price, so the breakdown stays clear and above board.
 
-**Receipts & expenses.** The tradesperson can upload receipts (materials, fuel, disposal) on the Work order tab — we auto-read the total, vendor and date, and the receipt itself stays private to the tradesperson. On an **hourly** job each receipt becomes a billable line with an optional markup. On a **fixed-price** job receipts are **for the tradesperson's records only and aren't billed** — the agreed price already covers materials. To charge for a material that was genuinely outside the original scope, the tradesperson proposes a **change order** the client approves, rather than adding it as a receipt.`,
+**Receipts & expenses.** The tradesperson can upload receipts (materials, fuel, disposal) on the Work order tab — we auto-read the total, vendor and date, and the receipt itself stays private to the tradesperson. Materials supplied from the tradesperson's own stock can be **added manually too — no receipt needed** — and bill the same way. On an **hourly** job each expense becomes a billable line with an optional markup. On a **fixed-price** job expenses are **for the tradesperson's records only and aren't billed** — the agreed price already covers materials. To charge for a material that was genuinely outside the original scope, the tradesperson proposes a **change order** the client approves, rather than adding it as an expense.`,
   },
   {
     slug: "how-verification-works",
@@ -690,7 +690,7 @@ const faqs: FaqItem[] = [
   {
     question: "Can I track my time and expenses on a job?",
     answer:
-      "Yes — it all lives on the job's **Work order** tab. Clock time, and upload receipts (materials, fuel, disposal) that we auto-read for total, vendor and date. On an **hourly** job each receipt becomes a billable line with an optional markup; on a **fixed-price** job receipts are for your own records and aren't billed (the agreed price already covers materials — charge an out-of-scope material with a change order instead).",
+      "Yes — it all lives on the job's **Work order** tab. Clock time, and upload receipts (materials, fuel, disposal) that we auto-read for total, vendor and date — or tap **Add material** to log a material you supplied yourself, no receipt needed. On an **hourly** job each expense becomes a billable line with an optional markup; on a **fixed-price** job expenses are for your own records and aren't billed (the agreed price already covers materials — charge an out-of-scope material with a change order instead).",
     categoryId: "for-tradespeople",
     audience: "tradesperson",
   },

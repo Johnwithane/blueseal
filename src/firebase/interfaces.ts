@@ -840,7 +840,7 @@ export interface ExpenseDoc {
   markupPercent: number; // 0-200; UI default 15
   billedAmount: number; // cents, line-item amount the client will see
   category: ExpenseCategory | null;
-  receiptStoragePath: string; // jobs/{jobId}/receipts/{uuid}.{ext}
+  receiptStoragePath: string | null; // jobs/{jobId}/receipts/{uuid}.{ext}; null = added manually (no receipt)
   status: ExpenseStatus;
   aiParsed: boolean;
   createdAt: Timestamp;

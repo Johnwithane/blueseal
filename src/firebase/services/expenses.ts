@@ -110,6 +110,38 @@ export async function uploadReceiptAndCreateExpense(
   return { expenseId: docRef.id, storagePath: path };
 }
 
+/**
+ * Create a receiptless expense the tradie fills in inline — e.g. materials
+ * supplied from van stock. Born "ready" (no OCR pass) with a null storage
+ * path; rollUpExpenses skips it until billedAmount > 0, so a blank row can
+ * never bill the client.
+ */
+export async function createManualExpense(
+  jobId: string,
+  clientId: string,
+): Promise<{ expenseId: string }> {
+  const uid = fbAuth.currentUser?.uid;
+  if (!uid) throw new Error("Sign in required to add an expense.");
+  const docRef = await addDoc(expensesCol(jobId), {
+    tradespersonId: uid,
+    clientId,
+    description: "",
+    vendor: null,
+    spentAt: null,
+    totalCost: 0,
+    markupPercent: DEFAULT_MARKUP_PERCENT,
+    billedAmount: 0,
+    category: "materials",
+    receiptStoragePath: null,
+    status: "ready",
+    aiParsed: false,
+    createdAt: serverTimestamp() as never,
+    updatedAt: serverTimestamp() as never,
+    invoicedAt: null,
+  });
+  return { expenseId: docRef.id };
+}
+
 export interface ExpensePatch {
   description?: string;
   totalCost?: number;

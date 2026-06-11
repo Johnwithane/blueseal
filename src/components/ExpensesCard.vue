@@ -9,6 +9,7 @@ import Message from "primevue/message";
 import {
   DEFAULT_MARKUP_PERCENT,
   computeBilledAmount,
+  createManualExpense,
   deleteExpense,
   getReceiptDownloadUrl,
   parseReceiptCallable,
@@ -44,6 +45,7 @@ const expenses = ref<WithId<ExpenseDoc>[]>([]);
 const loading = ref(true);
 const loadError = ref<string | null>(null);
 const uploading = ref(false);
+const adding = ref(false);
 const fileInput = ref<HTMLInputElement | null>(null);
 
 const CATEGORY_OPTIONS: { label: string; value: ExpenseCategory }[] = [
@@ -121,6 +123,19 @@ async function handleUpload(file: File) {
   }
 }
 
+async function addManual() {
+  if (adding.value) return;
+  adding.value = true;
+  try {
+    await createManualExpense(props.jobId, props.clientId);
+    toast.info("Material added", "Fill in the description and cost below");
+  } catch (e) {
+    toast.error("Couldn't add", humanizeError(e));
+  } finally {
+    adding.value = false;
+  }
+}
+
 async function patchField(
   entry: WithId<ExpenseDoc>,
   patch: Parameters<typeof updateExpense>[2],
@@ -152,7 +167,9 @@ async function changeBilled(entry: WithId<ExpenseDoc>, dollars: number | null) {
 function remove(entry: WithId<ExpenseDoc>) {
   confirmDestructive(
     {
-      message: "Delete this expense and its receipt?",
+      message: entry.receiptStoragePath
+        ? "Delete this expense and its receipt?"
+        : "Delete this expense?",
       header: "Delete expense",
       acceptLabel: "Delete",
     },
@@ -168,6 +185,7 @@ function remove(entry: WithId<ExpenseDoc>) {
 }
 
 async function viewReceipt(entry: WithId<ExpenseDoc>) {
+  if (!entry.receiptStoragePath) return;
   try {
     const url = await getReceiptDownloadUrl(entry.receiptStoragePath);
     window.open(url, "_blank", "noopener");
@@ -195,7 +213,7 @@ function statusTagSeverity(s: ExpenseDoc["status"]): "info" | "warn" | "success"
           <template v-else-if="costTrackingOnly">
             Receipts for your records — not billed on a fixed-price job
           </template>
-          <template v-else>Upload receipts to bill them through with markup</template>
+          <template v-else>Upload receipts or add materials to bill them through with markup</template>
         </div>
       </div>
     </header>
@@ -207,16 +225,28 @@ function statusTagSeverity(s: ExpenseDoc["status"]): "info" | "warn" | "success"
       class="hidden"
       @change="onFileChange"
     />
-    <Button
-      label="Upload receipt"
-      icon="pi pi-camera"
-      class="w-full"
-      :loading="uploading"
-      :disabled="uploading"
-      @click="pickFile"
-    />
+    <div class="grid grid-cols-2 gap-2">
+      <Button
+        label="Upload receipt"
+        icon="pi pi-camera"
+        class="w-full"
+        :loading="uploading"
+        :disabled="uploading"
+        @click="pickFile"
+      />
+      <Button
+        label="Add material"
+        icon="pi pi-plus"
+        outlined
+        class="w-full"
+        :loading="adding"
+        :disabled="adding"
+        @click="addManual"
+      />
+    </div>
     <p class="text-[11px] text-[color:var(--bs-muted)] mt-1.5 leading-snug">
-      Photos or PDFs — we'll auto-read the total, vendor and date.
+      Receipts are auto-read for total, vendor and date — or add a material
+      you supplied yourself, no receipt needed.
       <template v-if="costTrackingOnly">
         On a fixed-price job these stay on your records — to charge an out-of-scope
         material, add a change order above.
@@ -246,6 +276,7 @@ function statusTagSeverity(s: ExpenseDoc["status"]): "info" | "warn" | "success"
           <div class="min-w-0 flex-1">
             <div class="text-xs text-[color:var(--bs-muted)]">
               <template v-if="e.vendor">{{ e.vendor }}</template>
+              <template v-else-if="e.receiptStoragePath === null">Added manually</template>
               <template v-else>Unknown vendor</template>
               <template v-if="e.spentAt"> • {{ date(e.spentAt) }}</template>
             </div>
@@ -318,6 +349,7 @@ function statusTagSeverity(s: ExpenseDoc["status"]): "info" | "warn" | "success"
             @update:model-value="(v) => patchField(e, { category: v as ExpenseCategory | null })"
           />
           <Button
+            v-if="e.receiptStoragePath"
             label="Receipt"
             icon="pi pi-external-link"
             text
