@@ -305,18 +305,26 @@ export const useAuthStore = defineStore("auth", {
       }
     },
 
-    async signInWithGoogle(intendedRole: Role = "client") {
+    /**
+     * Returns `isNew: true` when the popup belonged to a brand-new account we
+     * just provisioned with `intendedRole` — callers on the SIGN-IN page use
+     * this to offer a role correction (a new tradesperson tapping "Continue
+     * with Google" there would otherwise be silently created as a client).
+     */
+    async signInWithGoogle(intendedRole: Role = "client"): Promise<{ isNew: boolean }> {
       this.pending = true;
       this.error = null;
       // Guard applyAuthState's self-heal from racing our provisioning below
       // and overwriting the intended role with `client` (see provisioningUids).
       let provisioningUid: string | null = null;
+      let isNew = false;
       try {
         const cred = await signInWithPopup(auth, new GoogleAuthProvider());
         provisioningUid = cred.user.uid;
         provisioningUids.add(provisioningUid);
         const existing = await getUser(cred.user.uid);
         if (!existing) {
+          isNew = true;
           await createUser({
             uid: cred.user.uid,
             email: cred.user.email ?? "",
@@ -336,6 +344,7 @@ export const useAuthStore = defineStore("auth", {
         if (provisioningUid) provisioningUids.delete(provisioningUid);
         this.pending = false;
       }
+      return { isNew };
     },
 
     /**

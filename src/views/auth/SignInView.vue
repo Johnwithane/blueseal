@@ -6,6 +6,7 @@ import InputText from "primevue/inputtext";
 import Password from "primevue/password";
 import Message from "primevue/message";
 import Divider from "primevue/divider";
+import Dialog from "primevue/dialog";
 import { useAuthStore } from "@/stores/auth";
 import { signInSchema } from "@/validation/schemas";
 import { useToast } from "@/composables/useToast";
@@ -45,13 +46,54 @@ async function submit() {
   }
 }
 
+// Google on the SIGN-IN page can belong to someone with no account yet. They
+// get provisioned as a client (the safe default), then asked which side of
+// the marketplace they're on — a new tradesperson would otherwise be stranded
+// in the client view with no hint that onboarding exists.
+const showRoleChoice = ref(false);
+const addingTradieRole = ref(false);
+// Set once either button resolves the choice, so the dialog's @hide (X / Esc)
+// can fall back to the client default without clobbering an explicit pick.
+const roleResolved = ref(false);
+
 async function googleSignIn() {
   try {
-    await auth.signInWithGoogle("client");
-    router.replace("/dashboard");
+    const { isNew } = await auth.signInWithGoogle("client");
+    if (isNew) {
+      roleResolved.value = false;
+      showRoleChoice.value = true;
+      return;
+    }
+    const redirect = (route.query.redirect as string) || "/dashboard";
+    router.replace(redirect);
   } catch (e) {
     formError.value = humanizeError(e);
   }
+}
+
+function continueAsClient() {
+  roleResolved.value = true;
+  showRoleChoice.value = false;
+  const redirect = (route.query.redirect as string) || "/dashboard";
+  router.replace(redirect);
+}
+
+async function continueAsTradesperson() {
+  addingTradieRole.value = true;
+  try {
+    await auth.addRole("tradesperson");
+    roleResolved.value = true;
+    showRoleChoice.value = false;
+    router.replace("/onboarding");
+  } catch (e) {
+    toast.error("Couldn't set up your tradesperson profile", humanizeError(e));
+  } finally {
+    addingTradieRole.value = false;
+  }
+}
+
+function onRoleDialogHide() {
+  if (!roleResolved.value) continueAsClient();
 }
 </script>
 
@@ -106,5 +148,38 @@ async function googleSignIn() {
         <router-link to="/sign-up" class="font-medium">Sign up</router-link>
       </p>
     </form>
+
+    <!-- New-account role choice: closing the dialog (X / mask) keeps the safe
+         client default, same as "I'm hiring". -->
+    <Dialog
+      v-model:visible="showRoleChoice"
+      modal
+      header="Welcome to Blue Seal!"
+      class="w-[95vw] max-w-sm"
+      :dismissable-mask="false"
+      :closable="true"
+      @hide="onRoleDialogHide"
+    >
+      <p class="text-sm text-[color:var(--bs-muted)]">
+        Your account is ready. How will you use Blue Seal?
+      </p>
+      <div class="mt-4 space-y-2">
+        <Button
+          label="I'm hiring a tradesperson"
+          icon="pi pi-search"
+          class="w-full"
+          :disabled="addingTradieRole"
+          @click="continueAsClient"
+        />
+        <Button
+          label="I'm a tradesperson"
+          icon="pi pi-wrench"
+          outlined
+          class="w-full"
+          :loading="addingTradieRole"
+          @click="continueAsTradesperson"
+        />
+      </div>
+    </Dialog>
   </section>
 </template>
