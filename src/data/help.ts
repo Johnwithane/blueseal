@@ -660,6 +660,13 @@ const faqs: FaqItem[] = [
     audience: "tradesperson",
   },
   {
+    question: "Can I reuse a quote instead of rebuilding it every time?",
+    answer:
+      "Yes — quote templates. In the quote composer, build your line items once and tap **Save as template** (e.g. \"Full bathroom reno\"). Next time, pick it from **Load a template…** under the line items and it fills the scope of work in, rates included. Give the rates a quick once-over before sending — templates keep the prices from when you saved them. Templates are private to you; delete one any time from the same dropdown.",
+    categoryId: "for-tradespeople",
+    audience: "tradesperson",
+  },
+  {
     question: "How many trades can I list?",
     answer:
       "You can list a primary trade plus a few secondary trades you're qualified for. List the ones you actually hold certification for — they affect which jobs you're matched to.",

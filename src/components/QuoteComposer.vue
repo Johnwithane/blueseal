@@ -10,10 +10,28 @@ import InputText from "primevue/inputtext";
 import InputNumber from "primevue/inputnumber";
 import Textarea from "primevue/textarea";
 import SelectButton from "primevue/selectbutton";
+import Select from "primevue/select";
 import Message from "primevue/message";
+import Dialog from "primevue/dialog";
+import Button from "primevue/button";
 import { recomputeTotals } from "@/firebase/services/invoices";
-import type { InvoiceDiscount, LineItem, LineItemKind, QuoteUpfrontFee } from "@/firebase/interfaces";
+import type {
+  InvoiceDiscount,
+  LineItem,
+  LineItemKind,
+  QuoteTemplateDoc,
+  QuoteUpfrontFee,
+  WithId,
+} from "@/firebase/interfaces";
 import type { SubmitQuoteUpfrontFee } from "@/firebase/services/quotes";
+import {
+  deleteQuoteTemplate,
+  listQuoteTemplates,
+  saveQuoteTemplate,
+} from "@/firebase/services/quoteTemplates";
+import { useAuthStore } from "@/stores/auth";
+import { useToast } from "@/composables/useToast";
+import { humanizeError } from "@/utils/errors";
 import { useFormatters } from "@/composables/useFormatters";
 
 export interface QuoteComposerPayload {
@@ -252,10 +270,11 @@ function reset() {
   upfrontDollars.value = 0;
 }
 
-// Seed from an existing quote (resend/edit). Maps legacy lines without `kind`
-// to a sensible fallback so re-sending an older quote doesn't lose data.
-function hydrate(initial: QuoteComposerInitial) {
-  lines.value = (initial.lineItems ?? []).map((li): UiLine => {
+// Map stored LineItems back into editable rows. Legacy lines without `kind`
+// fall back to "labour" so older data doesn't lose anything. Shared by quote
+// hydration (resend/edit) and template loading.
+function uiLinesFromLineItems(items: LineItem[]): UiLine[] {
+  const mapped = items.map((li): UiLine => {
     const kind: LineItemKind = li.kind ?? "labour";
     if (kind === "hourly") {
       const storedRate = li.unitPrice && li.unitPrice > 0 ? li.unitPrice : (props.hourlyRateCents ?? 0);
@@ -277,7 +296,12 @@ function hydrate(initial: QuoteComposerInitial) {
       taxRatePercent: Math.round((li.taxRate ?? 0) * 10000) / 100,
     };
   });
-  if (lines.value.length === 0) lines.value = [emptyLine(defaultKind())];
+  return mapped.length ? mapped : [emptyLine(defaultKind())];
+}
+
+// Seed from an existing quote (resend/edit).
+function hydrate(initial: QuoteComposerInitial) {
+  lines.value = uiLinesFromLineItems(initial.lineItems ?? []);
   const d = initial.discount ?? null;
   if (d) {
     discountMode.value = d.type;
@@ -313,6 +337,72 @@ watch(
   },
   { immediate: true },
 );
+
+// --- Quote templates ---------------------------------------------------------
+// Reusable scope-of-work blueprints (tradespeople/{uid}/quoteTemplates).
+// Loaded lazily when the dropdown opens; applying replaces the current rows.
+const auth = useAuthStore();
+const toast = useToast();
+const templates = ref<WithId<QuoteTemplateDoc>[]>([]);
+const templatesLoaded = ref(false);
+const selectedTemplateId = ref<string | null>(null);
+const showSaveTemplate = ref(false);
+const templateName = ref("");
+const savingTemplate = ref(false);
+
+async function loadTemplates() {
+  const uid = auth.fbUser?.uid;
+  if (!uid) return;
+  try {
+    templates.value = await listQuoteTemplates(uid);
+  } catch {
+    /* dropdown just stays empty — templates are a convenience, never a blocker */
+  } finally {
+    templatesLoaded.value = true;
+  }
+}
+
+function applyTemplate(id: unknown) {
+  if (typeof id !== "string") return;
+  const t = templates.value.find((x) => x.id === id);
+  if (!t) return;
+  lines.value = uiLinesFromLineItems(t.lineItems);
+  // Reset the selection so re-picking the same template later still fires.
+  void nextTick(() => (selectedTemplateId.value = null));
+  toast.success("Template loaded", `"${t.name}" — give the rates a quick once-over.`);
+}
+
+function openSaveTemplate() {
+  templateName.value = "";
+  showSaveTemplate.value = true;
+}
+
+async function onSaveTemplate() {
+  const uid = auth.fbUser?.uid;
+  if (!uid || savingTemplate.value || !templateName.value.trim()) return;
+  savingTemplate.value = true;
+  try {
+    await saveQuoteTemplate(uid, templateName.value, previewLines.value);
+    showSaveTemplate.value = false;
+    toast.success("Template saved", `"${templateName.value.trim()}" is ready for future quotes.`);
+    await loadTemplates();
+  } catch (e) {
+    toast.error("Couldn't save template", humanizeError(e));
+  } finally {
+    savingTemplate.value = false;
+  }
+}
+
+async function onDeleteTemplate(id: string) {
+  const uid = auth.fbUser?.uid;
+  if (!uid) return;
+  try {
+    await deleteQuoteTemplate(uid, id);
+    templates.value = templates.value.filter((t) => t.id !== id);
+  } catch (e) {
+    toast.error("Couldn't delete template", humanizeError(e));
+  }
+}
 
 // Emit the normalized state on every relevant change so the host can drive the
 // submit button label + payload reactively.
@@ -494,6 +584,51 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
         <button type="button" class="quote-add-btn" @click="addLine('materials')">
           <i class="pi pi-plus text-xs"></i> Materials
         </button>
+      </div>
+
+      <!-- Templates: load a saved scope of work, or save the current one.
+           Loading replaces the rows above (rates ride along). -->
+      <div
+        v-if="auth.fbUser"
+        class="mt-3 flex flex-wrap items-center gap-2 border-t border-[color:var(--bs-border)] pt-3"
+      >
+        <Select
+          v-model="selectedTemplateId"
+          :options="templates"
+          option-label="name"
+          option-value="id"
+          placeholder="Load a template…"
+          class="min-w-44 flex-1 text-sm"
+          @before-show="loadTemplates"
+          @update:model-value="applyTemplate"
+        >
+          <template #option="{ option }">
+            <div class="flex w-full items-center justify-between gap-2">
+              <span class="truncate">{{ option.name }}</span>
+              <button
+                type="button"
+                class="p-1 text-[color:var(--bs-muted)] hover:text-[color:var(--bs-danger)]"
+                :aria-label="`Delete template ${option.name}`"
+                @click.stop="onDeleteTemplate(option.id)"
+              >
+                <i class="pi pi-trash text-xs"></i>
+              </button>
+            </div>
+          </template>
+          <template #empty>
+            <span class="px-2 text-xs text-[color:var(--bs-muted)]">
+              {{ templatesLoaded ? "No templates yet — build a quote and save it." : "Loading…" }}
+            </span>
+          </template>
+        </Select>
+        <Button
+          label="Save as template"
+          icon="pi pi-bookmark"
+          text
+          size="small"
+          :disabled="previewLines.length === 0"
+          @click="openSaveTemplate"
+        />
       </div>
     </section>
 
@@ -721,6 +856,36 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
         </div>
       </dl>
     </section>
+
+    <Dialog
+      v-model:visible="showSaveTemplate"
+      modal
+      header="Save as template"
+      class="w-[95vw] max-w-sm"
+    >
+      <label class="text-sm font-medium">Template name</label>
+      <InputText
+        v-model="templateName"
+        class="mt-1 w-full"
+        maxlength="60"
+        placeholder="e.g. Bathroom reno — full"
+        @keyup.enter="onSaveTemplate"
+      />
+      <p class="mt-2 text-xs text-[color:var(--bs-muted)]">
+        Saves the {{ previewLines.length }} current line item{{ previewLines.length === 1 ? "" : "s" }}
+        (with rates) so future quotes can start from them.
+      </p>
+      <template #footer>
+        <Button label="Cancel" text @click="showSaveTemplate = false" />
+        <Button
+          label="Save"
+          icon="pi pi-check"
+          :loading="savingTemplate"
+          :disabled="!templateName.trim()"
+          @click="onSaveTemplate"
+        />
+      </template>
+    </Dialog>
   </div>
 </template>
 

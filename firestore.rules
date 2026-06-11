@@ -225,6 +225,22 @@ service cloud.firestore {
       match /secure/{docId} {
         allow read, write: if false;
       }
+
+      // ---------- tradespeople/{uid}/quoteTemplates/{templateId} ----------
+      // Reusable scope-of-work blueprints for the quote composer. Owner-only
+      // working data; bounds keep a runaway client from bloating docs (the
+      // zod schema validates line-item shape — rules just cap sizes).
+      match /quoteTemplates/{templateId} {
+        allow read: if isOwner(tradieId) || isAdmin();
+        allow create, update: if isOwner(tradieId)
+          && request.resource.data.name is string
+          && request.resource.data.name.size() >= 1
+          && request.resource.data.name.size() <= 60
+          && request.resource.data.lineItems is list
+          && request.resource.data.lineItems.size() >= 1
+          && request.resource.data.lineItems.size() <= 50;
+        allow delete: if isOwner(tradieId) || isAdmin();
+      }
     }
 
     // ---------- certifications ----------

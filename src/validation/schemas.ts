@@ -176,6 +176,13 @@ export const lineItemSchema = z.object({
   taxRate: z.number().min(0).max(0.5),
 });
 
+// Reusable scope-of-work blueprint saved from the quote composer
+// (tradespeople/{uid}/quoteTemplates). Bounds mirror the Firestore rules.
+export const quoteTemplateSchema = z.object({
+  name: z.string().trim().min(1, "Give the template a name").max(60),
+  lineItems: z.array(lineItemSchema).min(1, "Add at least one line item").max(50),
+});
+
 // ---------------------------------------------------------------------------
 // Job-board marketplace
 // ---------------------------------------------------------------------------

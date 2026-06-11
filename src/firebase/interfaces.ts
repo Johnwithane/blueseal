@@ -1299,6 +1299,20 @@ export interface LineItem {
   taxRate: number; // 0-1
 }
 
+// ---------------------------------------------------------------------------
+// tradespeople/{uid}/quoteTemplates/{templateId}
+// A reusable scope-of-work blueprint ("Full bathroom reno") the tradesperson
+// loads into the quote composer instead of rebuilding similar quotes from
+// scratch. Owner-only. Rates are snapshotted at save time — the composer
+// nudges a review on load since profile rates may have moved on.
+// ---------------------------------------------------------------------------
+export interface QuoteTemplateDoc {
+  name: string;
+  lineItems: LineItem[];
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
 // One refund event on a paid invoice. Appended to InvoicePaymentState.refunds
 // when Stripe delivers a `charge.refunded` webhook; refundedAmount on the
 // parent is the running total. `reason` is the Stripe-provided string
