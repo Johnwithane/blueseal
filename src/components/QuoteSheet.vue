@@ -9,9 +9,11 @@ import Button from "primevue/button";
 import { submitQuote, getQuoteByJobId } from "@/firebase/services/quotes";
 import { getSiteVisit, proposeSiteVisit } from "@/firebase/services/siteVisits";
 import { getTradesperson } from "@/firebase/services/tradespeople";
+import { draftQuoteWithAi } from "@/firebase/services/aiDrafts";
 import { useAuthStore } from "@/stores/auth";
 import { useFormatters } from "@/composables/useFormatters";
 import { useToast } from "@/composables/useToast";
+import { useConfirmAction } from "@/composables/useConfirmAction";
 import { humanizeError } from "@/utils/errors";
 import QuoteComposer from "@/components/QuoteComposer.vue";
 import type {
@@ -109,6 +111,47 @@ function wizardBack() {
 }
 function wizardSkip() {
   wizardStep.value = null;
+}
+
+// AI draft: builds a starting quote from the job details + chat. Replaces the
+// current rows (after a confirm when something's already typed) — the
+// tradesperson reviews every line before sending. Free today; routed through
+// the server-side entitlement seam slated for Blue Seal Pro.
+const { confirmDestructive } = useConfirmAction();
+const drafting = ref(false);
+
+function onDraftWithAi() {
+  if (drafting.value) return;
+  if ((composer.value?.totals.subtotal ?? 0) > 0) {
+    confirmDestructive(
+      {
+        message: "Replace your current line items with an AI draft? What you've typed will be overwritten.",
+        header: "Draft with AI",
+        acceptLabel: "Replace",
+      },
+      runDraft,
+    );
+  } else {
+    void runDraft();
+  }
+}
+
+async function runDraft() {
+  drafting.value = true;
+  try {
+    const draft = await draftQuoteWithAi({ jobId: props.jobId });
+    initial.value = {
+      lineItems: draft.lineItems,
+      terms: draft.terms,
+      noteToClient: draft.noteToClient,
+      estimatedDuration: draft.estimatedDuration,
+    };
+    toast.success("Draft ready", "Prices are AI estimates — review every line before sending.");
+  } catch (e) {
+    toast.error("Couldn't draft the quote", humanizeError(e));
+  } finally {
+    drafting.value = false;
+  }
 }
 const submitLabel = computed(() => {
   if (mode.value === "site_visit") {
@@ -333,6 +376,25 @@ function close() {
             :class="i - 1 <= wizardStep! ? 'bg-[color:var(--bs-blue)]' : 'bg-[color:var(--bs-border)]'"
           ></span>
         </div>
+      </div>
+
+      <!-- AI draft — on the scope step (or the full form), where the rows land. -->
+      <div
+        v-if="mode === 'quote' && (!inWizard || wizardStep === 0)"
+        class="mb-4 flex items-center gap-2"
+      >
+        <Button
+          label="Draft with AI"
+          icon="pi pi-sparkles"
+          outlined
+          size="small"
+          :loading="drafting"
+          :disabled="drafting"
+          @click="onDraftWithAi"
+        />
+        <span class="text-[11px] leading-snug text-[color:var(--bs-muted)]">
+          Builds a starting quote from the job details and chat — you review every line.
+        </span>
       </div>
 
       <SiteVisitForm

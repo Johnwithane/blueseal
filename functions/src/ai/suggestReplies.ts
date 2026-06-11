@@ -7,6 +7,7 @@ import { VertexAI } from "@google-cloud/vertexai";
 import { db } from "../lib/admin";
 import { requireRole } from "../lib/auth";
 import { enforceRateLimit, AI_DAILY_CAP } from "../lib/rateLimit";
+import { requireAiEntitlement } from "../lib/entitlements";
 
 /**
  * aiSuggestReplies — given a job's recent chat, returns 2-3 short reply
@@ -53,6 +54,7 @@ export const aiSuggestReplies = onCall(CALLABLE_OPTS, async (req) => {
   const parsed = Input.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);
 
+  await requireAiEntitlement(uid, "suggestReplies");
   await enforceRateLimit(uid, "ai", AI_DAILY_CAP);
   const { jobId } = parsed.data;
   const jobSnap = await db.doc(`jobs/${jobId}`).get();

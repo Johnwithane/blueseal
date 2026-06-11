@@ -7,6 +7,7 @@ import { VertexAI, type Content, type Part } from "@google-cloud/vertexai";
 import { db } from "../lib/admin";
 import { requireAuth } from "../lib/auth";
 import { enforceRateLimit, AI_DAILY_CAP } from "../lib/rateLimit";
+import { requireAiEntitlement } from "../lib/entitlements";
 import { JOB_TOOLS, executeTool, type ToolContext } from "./chatTools";
 
 /**
@@ -30,10 +31,11 @@ import { JOB_TOOLS, executeTool, type ToolContext } from "./chatTools";
  *     to the messages collection sees them appear together — no
  *     "in-flight" partial state.
  *
- *   - Subscription gate removed with the Stripe Connect monetization
- *     pivot — AI tools are now bundled into the platform offering
- *     (revenue comes from the per-payment commission). See design.md
- *     §5.9.
+ *   - Entitlement: routed through requireAiEntitlement (a no-op until
+ *     Blue Seal Pro ships — see functions/src/lib/entitlements.ts). The
+ *     earlier hard subscription gate was removed with the Stripe Connect
+ *     pivot; the plan of record is to bring AI back under a subscription,
+ *     so the seam stays wired. See design.md §5.9 + MONETIZATION.md.
  */
 
 const PROJECT_ID = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || "blueseal-762af";
@@ -233,6 +235,7 @@ export const aiChat = onCall(CALLABLE_OPTS, async (req) => {
   // endpoint — but it's also the one any signed-in tradesperson can reach.
   // Admins (a small, trusted set) are exempt so support work isn't throttled.
   if (!isAdmin) {
+    await requireAiEntitlement(uid, "chat");
     await enforceRateLimit(uid, "ai", AI_DAILY_CAP);
   }
 

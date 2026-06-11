@@ -90,6 +90,8 @@ export { aiChat } from "./ai/chat";
 export { aiSuggestReplies } from "./ai/suggestReplies";
 export { aiUpdateJobLog } from "./ai/updateJobLog";
 export { parseReceipt } from "./ai/parseReceipt";
+export { aiDraftQuote } from "./ai/draftQuote";
+export { aiDraftInvoiceNote } from "./ai/draftInvoiceNote";
 
 // Payments — Stripe Connect Express (commission model). The subscription
 // stub was deleted in the Phase C cutover; the platform earns from a 12%

@@ -11,6 +11,7 @@ import Tag from "primevue/tag";
 import { submitJobForApproval } from "@/firebase/services/jobs";
 import { recomputeTotals } from "@/firebase/services/invoices";
 import { getQuoteByJobId } from "@/firebase/services/quotes";
+import { draftInvoiceNoteWithAi } from "@/firebase/services/aiDrafts";
 import { subscribeJobTimeEntries, entryBillable } from "@/firebase/services/timeEntries";
 import { subscribeJobExpenses } from "@/firebase/services/expenses";
 import type {
@@ -479,6 +480,24 @@ function removeQuoteRow(i: number) {
   quoteRows.value = quoteRows.value.filter((_, idx) => idx !== i);
 }
 
+// AI-drafts the wrap-up note from the job's tracked work (time notes,
+// expenses, change orders). The numbers self-populate; the note is the one
+// authored part. Free today; behind the server-side entitlement seam slated
+// for Blue Seal Pro.
+const draftingNote = ref(false);
+async function onDraftNote() {
+  if (draftingNote.value) return;
+  draftingNote.value = true;
+  try {
+    noteToClient.value = await draftInvoiceNoteWithAi(props.jobId);
+    toast.success("Note drafted", "Give it a quick read before sending.");
+  } catch (e) {
+    toast.error("Couldn't draft the note", humanizeError(e));
+  } finally {
+    draftingNote.value = false;
+  }
+}
+
 async function onSubmit() {
   if (!canSubmit.value) return;
   submitting.value = true;
@@ -819,13 +838,24 @@ function close() {
 
       <!-- Note to client -->
       <section v-show="stepShown('wrapup')" class="rounded-lg border border-[color:var(--bs-border)] p-3">
-        <label
-          for="finish-note"
-          class="font-semibold text-sm flex items-center gap-2 mb-2"
-        >
-          <i class="pi pi-comment text-[color:var(--bs-blue)]"></i>
-          Note to client (optional)
-        </label>
+        <div class="flex items-center justify-between gap-2 mb-2">
+          <label
+            for="finish-note"
+            class="font-semibold text-sm flex items-center gap-2"
+          >
+            <i class="pi pi-comment text-[color:var(--bs-blue)]"></i>
+            Note to client (optional)
+          </label>
+          <Button
+            label="Draft with AI"
+            icon="pi pi-sparkles"
+            text
+            size="small"
+            :loading="draftingNote"
+            :disabled="draftingNote"
+            @click="onDraftNote"
+          />
+        </div>
         <Textarea
           id="finish-note"
           v-model="noteToClient"

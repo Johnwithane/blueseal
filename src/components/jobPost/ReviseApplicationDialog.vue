@@ -8,9 +8,11 @@ import Dialog from "primevue/dialog";
 import Button from "primevue/button";
 import { reviseApplication } from "@/firebase/services/applications";
 import { getTradesperson } from "@/firebase/services/tradespeople";
+import { draftQuoteWithAi } from "@/firebase/services/aiDrafts";
 import { useAuthStore } from "@/stores/auth";
 import { useFormatters } from "@/composables/useFormatters";
 import { useToast } from "@/composables/useToast";
+import { useConfirmAction } from "@/composables/useConfirmAction";
 import { humanizeError } from "@/utils/errors";
 import { reviseApplicationSchema } from "@/validation/schemas";
 import QuoteComposer from "@/components/QuoteComposer.vue";
@@ -130,6 +132,47 @@ function close() {
   if (submitting.value) return;
   emit("update:visible", false);
 }
+
+// AI draft from the post + this application's Q&A thread — the payoff of a
+// chat-first application is that those answers feed the draft. Replaces the
+// current rows after a confirm. Free today; behind the server-side
+// entitlement seam slated for Blue Seal Pro.
+const { confirmDestructive } = useConfirmAction();
+const drafting = ref(false);
+
+function onDraftWithAi() {
+  if (drafting.value) return;
+  if ((composer.value?.totals.subtotal ?? 0) > 0) {
+    confirmDestructive(
+      {
+        message: "Replace the current line items with an AI draft? What's there will be overwritten.",
+        header: "Draft with AI",
+        acceptLabel: "Replace",
+      },
+      runDraft,
+    );
+  } else {
+    void runDraft();
+  }
+}
+
+async function runDraft() {
+  drafting.value = true;
+  try {
+    const draft = await draftQuoteWithAi({ postId: props.postId });
+    initial.value = {
+      lineItems: draft.lineItems,
+      terms: draft.terms,
+      noteToClient: draft.noteToClient,
+      estimatedDuration: draft.estimatedDuration,
+    };
+    toast.success("Draft ready", "Prices are AI estimates — review every line before sending.");
+  } catch (e) {
+    toast.error("Couldn't draft the quote", humanizeError(e));
+  } finally {
+    drafting.value = false;
+  }
+}
 </script>
 
 <template>
@@ -160,6 +203,21 @@ function close() {
             <p class="text-sm text-[color:var(--bs-warning-text)] mt-1 whitespace-pre-wrap">{{ declinedReason }}</p>
           </div>
         </div>
+      </div>
+
+      <div class="mb-4 flex items-center gap-2">
+        <Button
+          label="Draft with AI"
+          icon="pi pi-sparkles"
+          outlined
+          size="small"
+          :loading="drafting"
+          :disabled="drafting"
+          @click="onDraftWithAi"
+        />
+        <span class="text-[11px] leading-snug text-[color:var(--bs-muted)]">
+          Builds a quote from the post and your messages with the client.
+        </span>
       </div>
 
       <QuoteComposer

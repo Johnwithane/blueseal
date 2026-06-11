@@ -43,7 +43,8 @@ import { humanizeError } from "@/utils/errors";
 import JobCounterparty from "@/components/JobCounterparty.vue";
 import LoadingState from "@/components/LoadingState.vue";
 import QuoteComposer from "@/components/QuoteComposer.vue";
-import type { QuoteComposerState } from "@/components/QuoteComposer.vue";
+import type { QuoteComposerInitial, QuoteComposerState } from "@/components/QuoteComposer.vue";
+import { draftQuoteWithAi } from "@/firebase/services/aiDrafts";
 import SiteVisitForm from "@/components/SiteVisitForm.vue";
 import type { SiteVisitFormState } from "@/components/SiteVisitForm.vue";
 import QuoteBreakdown from "@/components/QuoteBreakdown.vue";
@@ -100,6 +101,9 @@ const pendingApp = ref<WithId<ApplicationDoc> | null>(null);
 // (passed to the composer so hourly lines default to the profile rate).
 const applyHourlyRate = ref<number | null>(null);
 const composerState = ref<QuoteComposerState | null>(null);
+// AI-drafted seed for the apply composer (set by Draft with AI below).
+const applyInitial = ref<QuoteComposerInitial | null>(null);
+const draftingApply = ref(false);
 // "quote" = apply with a full itemized quote. "site_visit" = apply asking to
 // see the job first, with an optional fee (no quote yet). "chat" = open a
 // conversation first — no quote until the tradie has the answers they need.
@@ -260,6 +264,46 @@ function formatBudget(min: number, max: number): string {
 function priceLabel(p: ApplicationDoc["proposedPrice"]): string {
   const fmt = (cents: number) => `$${Math.round(cents / 100).toLocaleString("en-CA")}`;
   return p.type === "fixed" ? fmt(p.amount) : `${fmt(p.amount)}/hr`;
+}
+
+// AI draft for the apply quote: built from the post details + this tradie's
+// application Q&A thread (when one exists). Replaces typed rows after a
+// confirm; the cover message picks up the drafted note only if still empty.
+// Free today; routed through the server-side entitlement seam (Blue Seal Pro).
+function onDraftApply() {
+  if (draftingApply.value) return;
+  if ((composerState.value?.totals.subtotal ?? 0) > 0) {
+    confirm.require({
+      message: "Replace your current line items with an AI draft? What you've typed will be overwritten.",
+      header: "Draft with AI",
+      icon: "pi pi-sparkles",
+      acceptLabel: "Replace",
+      rejectLabel: "Cancel",
+      accept: () => void runApplyDraft(),
+    });
+  } else {
+    void runApplyDraft();
+  }
+}
+
+async function runApplyDraft() {
+  draftingApply.value = true;
+  try {
+    const draft = await draftQuoteWithAi({ postId: postId.value });
+    applyInitial.value = {
+      lineItems: draft.lineItems,
+      terms: draft.terms,
+      estimatedDuration: draft.estimatedDuration,
+    };
+    if (!applyMessage.value.trim() && draft.noteToClient) {
+      applyMessage.value = draft.noteToClient;
+    }
+    toast.success("Draft ready", "Prices are AI estimates — review every line before sending.");
+  } catch (e) {
+    toast.error("Couldn't draft the quote", humanizeError(e));
+  } finally {
+    draftingApply.value = false;
+  }
 }
 
 async function submitApply() {
@@ -821,6 +865,22 @@ const visibleApplications = computed(() =>
             </p>
           </div>
 
+          <!-- AI draft: post details + your Q&A thread → a starting quote. -->
+          <div v-if="applyMode === 'quote'" class="flex items-center gap-2">
+            <Button
+              label="Draft with AI"
+              icon="pi pi-sparkles"
+              outlined
+              size="small"
+              :loading="draftingApply"
+              :disabled="draftingApply"
+              @click="onDraftApply"
+            />
+            <span class="text-[11px] leading-snug text-[color:var(--bs-muted)]">
+              Builds a starting quote from the post and your messages — review every line.
+            </span>
+          </div>
+
           <SiteVisitForm
             v-if="applyMode === 'site_visit'"
             @update:state="(s) => (siteVisitState = s)"
@@ -829,6 +889,7 @@ const visibleApplications = computed(() =>
             v-else-if="applyMode === 'quote'"
             :hourly-rate-cents="applyHourlyRate"
             hide-note
+            :initial="applyInitial"
             :show-errors="applyAttempted"
             @update:state="(s) => (composerState = s)"
           />
