@@ -10,7 +10,15 @@ import VerifiedBadge from "@/components/VerifiedBadge.vue";
 
 const props = defineProps<{
   tradie: WithId<TradespersonDoc> & { distanceKm?: number };
+  // Tri-state: leave undefined to hide the heart entirely (e.g. signed-out
+  // visitors); boolean renders it in the matching state.
+  saved?: boolean;
 }>();
+
+const emit = defineEmits<{
+  "toggle-save": [];
+}>();
+
 const { money } = useFormatters();
 
 const avatarInitial = computed(() => {
@@ -75,6 +83,19 @@ const wsibLive = computed(() => {
           {{ props.tradie.trades.map(tradeLabel).join(" • ") }}
         </div>
       </div>
+      <!-- Heart sits inside the RouterLink card, so stop/prevent keeps a tap
+           from navigating. Padded to a finger-sized target. -->
+      <button
+        v-if="props.saved !== undefined"
+        type="button"
+        class="bs-save-heart -m-2 shrink-0"
+        :class="{ 'bs-save-heart--on': props.saved }"
+        :aria-label="props.saved ? 'Remove from saved' : 'Save tradesperson'"
+        :aria-pressed="props.saved"
+        @click.stop.prevent="emit('toggle-save')"
+      >
+        <i :class="props.saved ? 'pi pi-heart-fill' : 'pi pi-heart'" aria-hidden="true"></i>
+      </button>
     </div>
 
     <div class="grid grid-cols-3 gap-2 mt-3 text-sm">
@@ -104,3 +125,26 @@ const wsibLive = computed(() => {
     </div>
   </RouterLink>
 </template>
+
+<style scoped>
+.bs-save-heart {
+  padding: 0.5rem;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: var(--bs-muted);
+  font-size: 1rem;
+  line-height: 1;
+  border-radius: 9999px;
+  transition: color 120ms ease, transform 120ms ease;
+}
+.bs-save-heart:hover {
+  color: var(--bs-red, var(--bs-danger));
+}
+.bs-save-heart--on {
+  color: var(--bs-red, var(--bs-danger));
+}
+.bs-save-heart:active {
+  transform: scale(1.15);
+}
+</style>

@@ -28,6 +28,14 @@ import type { ProspectDoc, TradespersonDoc, WithId } from "@/firebase/interfaces
 import LoadingState from "@/components/LoadingState.vue";
 import { useSeo } from "@/composables/useSeo";
 import { searchSeo, tradePageSeo } from "@/seo/content";
+import {
+  hydrateSavedTradies,
+  saveTradie,
+  subscribeSavedTradieIds,
+  unsaveTradie,
+} from "@/firebase/services/savedTradies";
+import { useToast } from "@/composables/useToast";
+import { humanizeError } from "@/utils/errors";
 
 const route = useRoute();
 const router = useRouter();
@@ -370,6 +378,47 @@ async function seedFromGeolocationIfGranted(): Promise<void> {
   }
 }
 
+// --- Saved tradespeople ------------------------------------------------------
+// Signed-in users get a heart on every card plus a "Saved" shelf above the
+// results. The id-set subscription keeps hearts live across devices; the shelf
+// hydrates profiles lazily and silently drops tradies who went invisible.
+const toast = useToast();
+const savedIds = ref<Set<string>>(new Set());
+const savedTradies = ref<WithId<TradespersonDoc>[]>([]);
+let unsubSaved: (() => void) | null = null;
+
+watch(
+  () => auth.fbUser?.uid,
+  (uid) => {
+    unsubSaved?.();
+    unsubSaved = null;
+    savedIds.value = new Set();
+    savedTradies.value = [];
+    if (!uid) return;
+    unsubSaved = subscribeSavedTradieIds(uid, (ids) => {
+      savedIds.value = ids;
+      hydrateSavedTradies([...ids])
+        .then((docs) => (savedTradies.value = docs))
+        .catch(() => {
+          /* shelf is best-effort; hearts still work off savedIds */
+        });
+    });
+  },
+  { immediate: true },
+);
+onUnmounted(() => unsubSaved?.());
+
+async function onToggleSave(tradieId: string) {
+  const uid = auth.fbUser?.uid;
+  if (!uid) return;
+  try {
+    if (savedIds.value.has(tradieId)) await unsaveTradie(uid, tradieId);
+    else await saveTradie(uid, tradieId);
+  } catch (e) {
+    toast.error("Couldn't update your saved list", humanizeError(e));
+  }
+}
+
 onMounted(async () => {
   // localStorage already hydrated `location` at setup and the immediate
   // auto-search watcher has it covered — nothing left to resolve.
@@ -491,6 +540,24 @@ onMounted(async () => {
       {{ error }}
     </Message>
 
+    <!-- Saved shelf: the user's shortlist, always above search results so a
+         returning client can jump straight back to "that one I liked". -->
+    <section v-if="savedTradies.length" class="mb-5">
+      <h2 class="text-base font-semibold">
+        <i class="pi pi-heart-fill mr-1 text-[color:var(--bs-red)]"></i>
+        Saved tradespeople
+      </h2>
+      <div class="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <TradieCard
+          v-for="t in savedTradies"
+          :key="t.id"
+          :tradie="t"
+          :saved="true"
+          @toggle-save="onToggleSave(t.id)"
+        />
+      </div>
+    </section>
+
     <LoadingState v-if="loading" label="Searching…" />
     <template v-else>
       <div
@@ -502,7 +569,13 @@ onMounted(async () => {
       </div>
       <template v-else>
         <div v-if="visibleResults.length" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <TradieCard v-for="t in visibleResults" :key="t.id" :tradie="t" />
+          <TradieCard
+            v-for="t in visibleResults"
+            :key="t.id"
+            :tradie="t"
+            :saved="auth.fbUser ? savedIds.has(t.id) : undefined"
+            @toggle-save="onToggleSave(t.id)"
+          />
         </div>
 
         <!-- Seeded, unclaimed listings — clearly separated below the verified

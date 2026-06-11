@@ -116,6 +116,18 @@ service cloud.firestore {
         && request.resource.data.get('deletedAt', null) == resource.data.get('deletedAt', null);
       allow update: if isAdmin();
       allow delete: if isAdmin();
+
+      // ---------- users/{userId}/savedTradies (private shortlist) ----------
+      // The doc id IS the saved tradesperson's uid, so save/unsave is a direct
+      // doc write with no query, and the payload is just the save time.
+      // Private to the owner — a tradesperson never learns who saved them.
+      match /savedTradies/{tradieId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create, update: if isOwner(userId)
+          && request.resource.data.keys().hasOnly(['createdAt'])
+          && request.resource.data.createdAt is timestamp;
+        allow delete: if isOwner(userId) || isAdmin();
+      }
     }
 
     // ---------- tradespeople (public profile, owner-editable while vetting) ----------

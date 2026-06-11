@@ -504,6 +504,13 @@ const faqs: FaqItem[] = [
     audience: "client",
   },
   {
+    question: "Can I save tradespeople I like for later?",
+    answer:
+      "Yes — tap the **heart** on any search result or on a tradesperson's profile to add them to your saved list. Your saved tradespeople appear at the top of the **Find a tradesperson** page so you can jump straight back to them when the next job comes up. Your list is private — tradespeople can't see who saved them.",
+    categoryId: "for-clients",
+    audience: "client",
+  },
+  {
     question: "Does Blue Seal offer rebates or grants?",
     answer:
       "Blue Seal doesn't fund or administer any rebates. When you post energy-related work (heat pumps, solar, insulation, windows), we may surface **government or utility programs that could apply** so you don't miss them — but we can't confirm your eligibility. Always check the details and apply on the official program page we link to.",

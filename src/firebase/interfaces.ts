@@ -56,6 +56,16 @@ export interface NotificationPrefs {
 }
 
 // ---------------------------------------------------------------------------
+// users/{uid}/savedTradies/{tradieId}
+// The client's private shortlist ("saved tradespeople"). Doc id is the saved
+// tradesperson's uid; the payload is only the save time. Owner-only — a
+// tradesperson never learns who saved them.
+// ---------------------------------------------------------------------------
+export interface SavedTradieDoc {
+  createdAt: Timestamp;
+}
+
+// ---------------------------------------------------------------------------
 // tradespeople/{uid}
 // ---------------------------------------------------------------------------
 export type PricingModel = "hourly" | "quote" | "both";

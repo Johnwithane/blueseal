@@ -6,6 +6,8 @@ import Tag from "primevue/tag";
 import Rating from "primevue/rating";
 import Avatar from "primevue/avatar";
 import { getTradesperson } from "@/firebase/services/tradespeople";
+import { isTradieSaved, saveTradie, unsaveTradie } from "@/firebase/services/savedTradies";
+import { humanizeError } from "@/utils/errors";
 import { getProspect } from "@/firebase/services/prospects";
 import { listReviewsFor } from "@/firebase/services/reviews";
 import {
@@ -196,6 +198,36 @@ function googleAuthorInitial(name: string): string {
   return (name?.trim().slice(0, 1) || "?").toUpperCase();
 }
 
+// --- Saved (shortlist) state -------------------------------------------------
+// Signed-in users (other than the tradie themselves) can heart this profile;
+// the saved list surfaces on the search page.
+const saved = ref(false);
+const savingToggle = ref(false);
+const canSave = computed(
+  () => !!auth.fbUser && !!tradie.value && auth.fbUser.uid !== tradie.value.id,
+);
+
+async function toggleSave() {
+  const uid = auth.fbUser?.uid;
+  const tradieId = tradie.value?.id;
+  if (!uid || !tradieId || savingToggle.value) return;
+  savingToggle.value = true;
+  try {
+    if (saved.value) {
+      await unsaveTradie(uid, tradieId);
+      saved.value = false;
+    } else {
+      await saveTradie(uid, tradieId);
+      saved.value = true;
+      toast.success("Saved", "Find them under Saved tradespeople on the search page.");
+    }
+  } catch (e) {
+    toast.error("Couldn't update your saved list", humanizeError(e));
+  } finally {
+    savingToggle.value = false;
+  }
+}
+
 onMounted(async () => {
   const uid = route.params.uid as string;
   try {
@@ -208,6 +240,12 @@ onMounted(async () => {
     const t = await getTradesperson(uid).catch(() => null);
     if (t) {
       tradie.value = t;
+      // Best-effort: heart state for signed-in viewers. Never blocks the page.
+      if (auth.fbUser && auth.fbUser.uid !== uid) {
+        isTradieSaved(auth.fbUser.uid, uid)
+          .then((s) => (saved.value = s))
+          .catch(() => {});
+      }
       // Reviews + vouches only apply to real tradies; fetch them in parallel.
       const [r, vFrom, vFor] = await Promise.all([
         listReviewsFor(uid),
@@ -326,6 +364,16 @@ onMounted(async () => {
             </div>
           </div>
           <div class="flex flex-wrap gap-2">
+            <Button
+              v-if="canSave"
+              :label="saved ? 'Saved' : 'Save'"
+              :icon="saved ? 'pi pi-heart-fill' : 'pi pi-heart'"
+              severity="secondary"
+              outlined
+              :loading="savingToggle"
+              :class="{ 'bs-saved-btn': saved }"
+              @click="toggleSave"
+            />
             <Button
               label="Share"
               icon="pi pi-share-alt"
@@ -663,5 +711,8 @@ onMounted(async () => {
   width: 0.875rem;
   height: 0.875rem;
   font-size: 0.875rem;
+}
+.bs-saved-btn :deep(.p-button-icon) {
+  color: var(--bs-red);
 }
 </style>
