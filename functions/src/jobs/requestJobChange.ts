@@ -29,9 +29,10 @@ interface JobData {
 // Committed statuses where the client must ASK rather than act unilaterally.
 // Pre-commitment statuses (accepted/requested/quoted) still cancel instantly
 // via the cancelJob client write. Kept in sync with REQUEST_CANCEL_STATUSES /
-// POSTPONABLE_STATUSES in src/firebase/services/jobs.ts.
-const CANCEL_REQUEST_STATUSES = ["awaiting_upfront_payment", "in_progress"];
-const POSTPONE_STATUSES = ["in_progress"];
+// POSTPONABLE_STATUSES in src/firebase/services/jobs.ts. Exported so
+// respondJobChange can re-check eligibility at accept time.
+export const CANCEL_REQUEST_STATUSES = ["awaiting_upfront_payment", "in_progress"];
+export const POSTPONE_STATUSES = ["in_progress"];
 
 /**
  * Client asks to cancel or put a committed job on hold. We only stage the

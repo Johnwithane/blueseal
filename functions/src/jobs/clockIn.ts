@@ -84,6 +84,14 @@ export const clockIn = onCall(CALLABLE_OPTS, async (req) => {
     if (job.status === "cancelled") {
       throw new HttpsError("failed-precondition", "Can't clock in on a cancelled job.");
     }
+    // Once the invoice is out (or the job is done), new time entries would
+    // never be billed — they'd just orphan silently. Block at the source.
+    if (["awaiting_payment", "complete", "reviewed"].includes(job.status ?? "")) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Work is wrapped up on this job — time can no longer be logged.",
+      );
+    }
     if (!job.clientId) {
       throw new HttpsError("failed-precondition", "Job is missing a client.");
     }
@@ -148,6 +156,17 @@ export const clockIn = onCall(CALLABLE_OPTS, async (req) => {
       // labour: 0 on fixed jobs (time-only record), else profile rate.
       rate = isFixed ? 0 : profileHourly;
       label = "clocked in";
+    }
+
+    // On an hourly job a $0 rate means the session would bill nothing — almost
+    // always a profile gap, not intent. Extras are exempt: their rate was
+    // explicitly client-approved, even at $0. Fixed-price labour is exempt by
+    // design (time-only record).
+    if (!isFixed && kind !== "extra" && rate <= 0) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Your hourly rate isn't set, so this time would bill at $0. Set your rate in Account → Tradesperson profile first.",
+      );
     }
 
     // ----- writes -----

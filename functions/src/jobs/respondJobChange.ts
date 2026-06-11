@@ -7,6 +7,7 @@ import { db } from "../lib/admin";
 import { requireRole } from "../lib/auth";
 import { postSystemMessage } from "../lib/chatSystemMessage";
 import { notify } from "../lib/notify";
+import { CANCEL_REQUEST_STATUSES, POSTPONE_STATUSES } from "./requestJobChange";
 
 const Input = z.object({
   jobId: z.string().min(1).max(128),
@@ -76,6 +77,17 @@ export const respondJobChange = onCall(CALLABLE_OPTS, async (req) => {
       tx.update(jobRef, { pendingChange: null });
       return { ...base, outcome: "declined" as const };
     }
+    // The job may have moved on between the client's request and this accept
+    // (e.g. the tradie invoiced and the client paid). Accepting now would
+    // cancel or hold a finished job — clear the stale request instead.
+    const stillEligible =
+      pc.type === "cancel"
+        ? CANCEL_REQUEST_STATUSES.includes(job.status)
+        : POSTPONE_STATUSES.includes(job.status);
+    if (!stillEligible) {
+      tx.update(jobRef, { pendingChange: null });
+      return { ...base, outcome: "stale" as const };
+    }
     if (pc.type === "cancel") {
       tx.update(jobRef, {
         status: "cancelled",
@@ -96,6 +108,17 @@ export const respondJobChange = onCall(CALLABLE_OPTS, async (req) => {
   });
 
   const isCancel = result.type === "cancel";
+
+  // Stale request resolved silently — nothing changed for either party beyond
+  // the banner disappearing, so no chat line or notification.
+  if (result.outcome === "stale") {
+    logger.info("respondJobChange stale request cleared", {
+      jobId,
+      tradespersonId: uid,
+      type: result.type,
+    });
+    return { ok: true, stale: true };
+  }
 
   // Chat line + client notification, fully owned here.
   if (result.outcome === "declined") {
