@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from "vue";
+import { nextTick, onMounted, onUnmounted, ref } from "vue";
 import { useRoute, useRouter, RouterLink } from "vue-router";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
@@ -61,6 +61,11 @@ const addressAutocompleteEl = ref<HTMLInputElement | null>(null);
 const submitting = ref(false);
 const error = ref<string | null>(null);
 
+// Page-level load state: the tradie doc + intake schema must arrive before the
+// form is usable. Failures here used to be unhandled (blank form, no clue why).
+const pageLoading = ref(true);
+const loadError = ref<string | null>(null);
+
 // True when we seeded the form from the search-box description, so we can show
 // a "review this" note. Dismissible — the note, not the values.
 const prefilledFromSearch = ref(false);
@@ -77,13 +82,42 @@ function applySearchPrefill() {
   prefilledFromSearch.value = true;
 }
 
+async function loadPage() {
+  pageLoading.value = true;
+  loadError.value = null;
+  try {
+    tradie.value = await getTradesperson(tradieUid);
+    if (!tradie.value) {
+      loadError.value = "This tradesperson's profile is unavailable.";
+      return;
+    }
+    selectedTrade.value = tradie.value.trades[0] ?? "";
+    await loadIntake();
+  } catch (e) {
+    loadError.value = humanizeError(e);
+  } finally {
+    pageLoading.value = false;
+  }
+}
+
+async function retry() {
+  await loadPage();
+  if (!loadError.value) {
+    // The form just re-rendered — re-wire the address autocomplete.
+    await nextTick();
+    await wireAddressAutocomplete();
+  }
+}
+
 onMounted(async () => {
   applySearchPrefill();
-  tradie.value = await getTradesperson(tradieUid);
-  selectedTrade.value = tradie.value?.trades[0] ?? "";
-  await loadIntake();
+  await loadPage();
+  await nextTick();
+  await wireAddressAutocomplete();
+});
 
-  // Wire Google Places autocomplete on the address line (mirrors PostJobView).
+// Wire Google Places autocomplete on the address line (mirrors PostJobView).
+async function wireAddressAutocomplete() {
   try {
     await useGoogleMaps().load();
     if (addressAutocompleteEl.value) {
@@ -113,7 +147,7 @@ onMounted(async () => {
   } catch {
     /* maps failed to load — fall back to manual fields */
   }
-});
+}
 
 onUnmounted(() => {
   for (const p of photos.value) URL.revokeObjectURL(p.previewUrl);
@@ -305,7 +339,16 @@ async function submit() {
 
     <Message v-if="error" severity="error" :closable="false" class="mt-4">{{ error }}</Message>
 
-    <form class="bs-form bs-card p-5 mt-4 space-y-4" @submit.prevent="submit">
+    <div v-if="pageLoading" class="bs-card p-5 mt-4 text-sm text-[color:var(--bs-muted)]">
+      <i class="pi pi-spinner pi-spin mr-2"></i>Loading tradesperson…
+    </div>
+
+    <div v-else-if="loadError" class="mt-4">
+      <Message severity="error" :closable="false">{{ loadError }}</Message>
+      <Button label="Try again" icon="pi pi-refresh" outlined size="small" class="mt-3" @click="retry" />
+    </div>
+
+    <form v-else class="bs-form bs-card p-5 mt-4 space-y-4" @submit.prevent="submit">
       <div v-if="tradie && tradie.trades.length > 1">
         <label class="text-sm font-medium">Which trade?</label>
         <Select
