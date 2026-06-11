@@ -25,18 +25,36 @@ function rolesFromUnknown(value: unknown, legacy: unknown): string[] {
   return [];
 }
 
+// Roles a user doc can legitimately carry from self-service flows. Claims are
+// only ever mirrored from this set — `admin` is preserved from existing claims
+// but never sourced from the doc (defense in depth alongside the /users rules,
+// mirrors setRoleOnSignup's VALID_ROLES discipline).
+const PUBLIC_ROLES = ["client", "tradesperson"] as const;
+
 /**
- * Reconciles the caller's own roles to satisfy implied-role invariants
- * (currently: tradesperson ⇒ client). Idempotent — returns `{ changed: false }`
- * when nothing needs adding, so it's cheap to call defensively on session init.
+ * Reconciles the caller's own roles in two directions:
+ *
+ * 1. Implied-role invariants on the doc (currently: tradesperson ⇒ client).
+ * 2. Doc → claims: if the auth token's custom claims are missing roles the
+ *    doc holds, mirror them synchronously.
+ *
+ * (2) is what makes signup deterministic: setRoleOnSignup mirrors claims via
+ * an async Firestore trigger, which RACES the client's post-signup token
+ * refresh — when the refresh wins, the session caches a role-less token for
+ * ~1h and every role-gated callable rejects ("Role client required") until
+ * the next refresh. signUp/signInWithGoogle await this callable before
+ * refreshing, so the refreshed token is guaranteed to carry the role.
+ *
+ * Idempotent — returns `{ changed: false }` when doc and claims are already
+ * consistent, so it's cheap to call defensively on session init.
  *
  * Deliberately does NOT touch `activeRole`: a tradesperson who gets the client
  * role silently added stays in their working view rather than being yanked into
  * the client view (which is what addRoleToSelf does for a user-initiated add).
  *
- * Auth-only (no role gate): the only role it can grant is `client`, which is
- * already self-grantable via addRoleToSelf, so this opens no new privilege. It
- * never adds `admin` or `tradesperson`.
+ * Auth-only (no role gate): it only grants `client` (already self-grantable
+ * via addRoleToSelf) and only mirrors PUBLIC_ROLES the rules-gated doc already
+ * holds, so this opens no new privilege. It never adds `admin`.
  */
 export const ensureSelfRoles = onCall(CALLABLE_OPTS, async (req) => {
   const uid = requireAuth(req);
@@ -49,30 +67,45 @@ export const ensureSelfRoles = onCall(CALLABLE_OPTS, async (req) => {
 
   const currentRoles = rolesFromUnknown(userData?.roles, userData?.role);
   const nextRoles = withImpliedRoles(currentRoles);
+  const docChanged = nextRoles.length !== currentRoles.length;
 
-  if (nextRoles.length === currentRoles.length) {
-    return { changed: false, roles: currentRoles };
+  if (docChanged) {
+    // Merge so activeRole + everything else is preserved.
+    await userRef.set({ roles: nextRoles }, { merge: true });
   }
-
-  // Doc first (merge so activeRole + everything else is preserved), then claims.
-  await userRef.set({ roles: nextRoles }, { merge: true });
 
   // Claims: derive from the doc's target shape but preserve an out-of-band
   // admin grant + any other existing claims (tenant, etc.). Keep the legacy
   // singular `role` claim pointing at whatever it already was.
+  const targetRoles = nextRoles.filter((r) =>
+    (PUBLIC_ROLES as readonly string[]).includes(r),
+  );
   const authUser = await adminAuth.getUser(uid);
   const existing = (authUser.customClaims ?? {}) as Record<string, unknown>;
   const existingClaimRoles = rolesFromUnknown(existing.roles, existing.role);
-  const claimRoles = [...nextRoles];
+  const claimRoles = [...targetRoles];
   if (existingClaimRoles.includes("admin") && !claimRoles.includes("admin")) {
     claimRoles.push("admin");
   }
-  await adminAuth.setCustomUserClaims(uid, {
-    ...existing,
-    roles: claimRoles,
-    role: typeof existing.role === "string" ? existing.role : claimRoles[0],
-  });
+  const claimsChanged =
+    claimRoles.length !== existingClaimRoles.length ||
+    claimRoles.some((r) => !existingClaimRoles.includes(r));
+  if (claimsChanged) {
+    await adminAuth.setCustomUserClaims(uid, {
+      ...existing,
+      roles: claimRoles,
+      role: typeof existing.role === "string" ? existing.role : claimRoles[0],
+    });
+  }
 
-  logger.info("ensureSelfRoles added implied roles", { ...ctx, from: currentRoles, to: nextRoles });
-  return { changed: true, roles: nextRoles };
+  if (docChanged || claimsChanged) {
+    logger.info("ensureSelfRoles reconciled", {
+      ...ctx,
+      docChanged,
+      claimsChanged,
+      from: { docRoles: currentRoles, claimRoles: existingClaimRoles },
+      to: nextRoles,
+    });
+  }
+  return { changed: docChanged || claimsChanged, roles: nextRoles };
 });

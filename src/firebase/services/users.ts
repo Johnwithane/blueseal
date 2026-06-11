@@ -281,11 +281,14 @@ export async function addRoleToSelf(
 }
 
 /**
- * Reconciles the signed-in user's roles to satisfy implied-role invariants
- * (currently: tradesperson ⇒ client, so a pro can hire without manually adding
- * the client role). Idempotent and `activeRole`-preserving; returns whether
- * anything changed plus the resulting roles. Called defensively on session
- * init — see useAuthStore.applyAuthState.
+ * Reconciles the signed-in user's roles: applies implied-role invariants on
+ * the doc (currently: tradesperson ⇒ client) AND mirrors doc roles into the
+ * auth custom claims when they've diverged. Awaiting this before a token
+ * refresh guarantees the refreshed token carries the doc's roles — the
+ * signup paths rely on that to beat the async setRoleOnSignup trigger.
+ * Idempotent and `activeRole`-preserving; returns whether anything changed
+ * plus the resulting roles. Also called defensively on session init — see
+ * useAuthStore.applyAuthState.
  */
 export async function ensureSelfRoles(): Promise<{ changed: boolean; roles: Role[] }> {
   const callable = httpsCallable<unknown, { changed: boolean; roles: Role[] }>(

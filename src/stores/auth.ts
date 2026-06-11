@@ -196,8 +196,8 @@ export const useAuthStore = defineStore("auth", {
         // Force a refresh so subsequent Firestore writes go in against the
         // up-to-date claim. If the claim STILL doesn't match the doc after
         // the refresh, the server-side claim is genuinely missing (e.g.
-        // setRoleOnSignup failed historically) — log so we can spot it and
-        // resync server-side instead of looping forever.
+        // setRoleOnSignup failed historically) — repair it via the
+        // ensureSelfRoles reconciler, bounded to one attempt.
         const docRoles: Role[] = Array.isArray(doc?.roles)
           ? (doc.roles as unknown[]).filter(
               (r): r is Role => r === "client" || r === "tradesperson" || r === "admin",
@@ -211,10 +211,25 @@ export const useAuthStore = defineStore("auth", {
           );
           const stillMissing = docRoles.some((r) => !claimRoles.includes(r));
           if (stillMissing) {
-            console.warn(
-              "[auth] doc/claim role mismatch persists after token refresh — server-side claim resync needed",
-              { uid: fbUser.uid, docRoles, claimRoles },
-            );
+            // Server-side claim is genuinely missing (e.g. setRoleOnSignup
+            // failed historically). ensureSelfRoles reconciles doc → claims;
+            // refresh once more to surface the repaired claim. Bounded to one
+            // attempt per applyAuthState — on failure, log and move on rather
+            // than wedge session init.
+            try {
+              await callEnsureSelfRoles();
+              tokenResult = await fbUser.getIdTokenResult(true);
+              claimRoles = rolesFromClaims(
+                tokenResult.claims as Record<string, unknown>,
+              );
+            } catch (e) {
+              console.warn("[auth] server-side claim resync failed", {
+                uid: fbUser.uid,
+                docRoles,
+                claimRoles,
+                e,
+              });
+            }
           }
         }
         // PIPEDA: refuse to seat the session for an account that's been
@@ -277,11 +292,23 @@ export const useAuthStore = defineStore("auth", {
           role: opts.role,
           termsAcceptedVersion: LEGAL_VERSION,
         });
-        // Cloud Function `setRoleOnSignup` mirrors roles to a custom claim;
-        // force a token refresh so the claim is visible right away.
+        // setRoleOnSignup mirrors roles → claims via an async Firestore
+        // trigger, which RACES the token refresh below — when the refresh
+        // wins, the session caches a role-less token for ~1h and every
+        // role-gated callable rejects ("Role client required") until reload.
+        // ensureSelfRoles reconciles doc → claims synchronously, so the
+        // refresh is guaranteed to pick the role up. On failure, fall back
+        // to the optimistic local role; applyAuthState's divergence recovery
+        // heals the token next page-load.
+        let roles: Role[] = [opts.role];
+        try {
+          roles = (await callEnsureSelfRoles()).roles;
+        } catch (e) {
+          console.warn("[auth] claim reconcile at signup failed", e);
+        }
         await cred.user.getIdToken(true);
         await sendEmailVerification(cred.user).catch(() => {});
-        this.roles = [opts.role];
+        this.roles = roles;
         this.activeRole = opts.role;
       } catch (e) {
         this.error = (e as Error).message;
@@ -333,8 +360,16 @@ export const useAuthStore = defineStore("auth", {
             role: intendedRole,
             termsAcceptedVersion: LEGAL_VERSION,
           });
+          // Same trigger race as signUp: reconcile doc → claims synchronously
+          // before refreshing so the new token carries the role.
+          let roles: Role[] = [intendedRole];
+          try {
+            roles = (await callEnsureSelfRoles()).roles;
+          } catch (e) {
+            console.warn("[auth] claim reconcile at signup failed", e);
+          }
           await cred.user.getIdToken(true);
-          this.roles = [intendedRole];
+          this.roles = roles;
           this.activeRole = intendedRole;
         }
       } catch (e) {
@@ -379,13 +414,21 @@ export const useAuthStore = defineStore("auth", {
             role: "tradesperson",
             termsAcceptedVersion: LEGAL_VERSION,
           });
-          this.roles = ["tradesperson"];
+          // Same trigger race as signUp: reconcile doc → claims synchronously
+          // so the refresh below carries the roles claim, not just
+          // email_verified.
+          let roles: Role[] = ["tradesperson"];
+          try {
+            roles = (await callEnsureSelfRoles()).roles;
+          } catch (e) {
+            console.warn("[auth] claim reconcile at signup failed", e);
+          }
+          this.roles = roles;
           this.activeRole = "tradesperson";
         }
         // Refresh the token so the verified-email claim is visible to the
-        // claimProspect callable (which gates on email_verified). The roles
-        // claim lands on a later refresh via setRoleOnSignup + applyAuthState's
-        // claim-lag recovery; claimProspect doesn't depend on it.
+        // claimProspect callable (which gates on email_verified) and the
+        // roles claim is visible to role-gated rules + callables.
         await cred.user.getIdToken(true);
         return { isNew };
       } catch (e) {

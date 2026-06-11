@@ -34,8 +34,13 @@ export const setRoleOnSignup = onDocumentCreated("users/{uid}", async (event) =>
     return;
   }
 
-  // Preserve admin if it was already set out-of-band, and merge with whatever
-  // claims already exist (tenant, region, etc.).
+  // Union with whatever known roles the claims already carry rather than
+  // overwriting: this trigger runs async off the CREATE-time doc snapshot, so
+  // ensureSelfRoles (called synchronously during signup) can have already
+  // granted an implied role (tradesperson ⇒ client) before we execute —
+  // overwriting from the stale snapshot would clobber it. Also preserves an
+  // out-of-band admin grant and merges non-role claims (tenant, region, etc.).
+  const KNOWN_CLAIM_ROLES = ["client", "tradesperson", "admin"];
   const current = await adminAuth.getUser(uid);
   const existing = (current.customClaims ?? {}) as {
     roles?: unknown;
@@ -47,8 +52,10 @@ export const setRoleOnSignup = onDocumentCreated("users/{uid}", async (event) =>
       ? [existing.role]
       : [];
   const roles: string[] = [...validRoles];
-  if (existingRoles.includes("admin") && !roles.includes("admin")) {
-    roles.push("admin");
+  for (const r of existingRoles) {
+    if (KNOWN_CLAIM_ROLES.includes(r) && !roles.includes(r)) {
+      roles.push(r);
+    }
   }
 
   const merged = {
