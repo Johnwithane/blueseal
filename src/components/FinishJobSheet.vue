@@ -34,6 +34,9 @@ const props = defineProps<{
   // Change orders on the job — approved flat ones become invoice lines; approved
   // hourly ones are billed via their clocked time (labelled in the rollup).
   extras: WithId<JobExtraDoc>[];
+  /** Upfront fee the client has already PAID (cents); 0/absent when none.
+   *  Credited on the invoice, and the invoice may never total less than it. */
+  upfrontFeePaidCents?: number;
 }>();
 
 const emit = defineEmits<{
@@ -346,8 +349,23 @@ const discountExceedsSubtotal = computed(
     centsFromDollars(discountValue.value ?? 0) > totals.value.subtotal,
 );
 
+// The invoice may never total LESS than the upfront fee the client already
+// paid — the credit clamps at $0 due, so the shortfall would silently vanish.
+// Mirrors the submitJobForApproval server check.
+const upfrontCredit = computed(() => Math.max(0, props.upfrontFeePaidCents ?? 0));
+const belowUpfrontFloor = computed(
+  () => upfrontCredit.value > 0 && totals.value.total > 0 && totals.value.total < upfrontCredit.value,
+);
+const amountDueAfterCredit = computed(() =>
+  Math.max(0, totals.value.total - upfrontCredit.value),
+);
+
 const canSubmit = computed(
-  () => !submitting.value && totals.value.total > 0 && !discountExceedsSubtotal.value,
+  () =>
+    !submitting.value &&
+    totals.value.total > 0 &&
+    !discountExceedsSubtotal.value &&
+    !belowUpfrontFloor.value,
 );
 
 const totalTimeLabel = computed(() => {
@@ -762,7 +780,28 @@ function close() {
             <dt>Total</dt>
             <dd>{{ money(totals.total) }}</dd>
           </div>
+          <template v-if="upfrontCredit > 0">
+            <div class="flex items-center justify-between text-xs text-[color:var(--bs-blue-dark)]">
+              <dt class="flex items-center gap-1">
+                <i class="pi pi-wallet text-[10px]"></i>
+                Less upfront fee already paid
+              </dt>
+              <dd>−{{ money(upfrontCredit) }}</dd>
+            </div>
+            <div class="flex items-center justify-between text-sm font-semibold">
+              <dt>Client still owes</dt>
+              <dd>{{ money(amountDueAfterCredit) }}</dd>
+            </div>
+          </template>
         </dl>
+        <p
+          v-if="belowUpfrontFloor"
+          class="text-[11px] text-[color:var(--bs-danger)] mt-2 leading-snug"
+        >
+          The total is below the {{ money(upfrontCredit) }} upfront fee the client
+          already paid — the invoice must cover at least that amount. Add the
+          remaining work or reduce the discount before sending.
+        </p>
         <p class="text-[11px] text-[color:var(--bs-muted)] mt-2 leading-snug">
           Tax is rolled up from each line item's rate (Canadian retail convention —
           applied after discount). Edit individual rates in the Invoice section after
@@ -777,9 +816,11 @@ function close() {
         <span class="hidden flex-1 sm:block"></span>
         <Button
           :label="
-            totals.total > 0
-              ? `Send for approval — ${money(totals.total)}`
-              : 'Add something to bill first'
+            belowUpfrontFloor
+              ? `Must cover the ${money(upfrontCredit)} upfront`
+              : totals.total > 0
+                ? `Send for approval — ${money(totals.total)}`
+                : 'Add something to bill first'
           "
           icon="pi pi-send"
           :loading="submitting"

@@ -265,13 +265,25 @@ export const submitJobForApproval = onCall(CALLABLE_OPTS, async (req) => {
     );
   }
   // Pre-credit total has to clear zero. The post-credit total CAN be zero
-  // (or close to it) when the upfront fee already covered the whole job —
-  // that's a valid outcome, not a failed precondition.
+  // when the upfront fee exactly covered the whole job — that's a valid
+  // outcome, not a failed precondition.
   const preCreditTotal = totals.subtotal - totals.discountAmount + totals.taxTotal;
   if (preCreditTotal <= 0) {
     throw new HttpsError(
       "failed-precondition",
       "Nothing to bill — add time, expenses, or a custom line item before finishing.",
+    );
+  }
+  // The final bill can never come in UNDER the upfront fee the client already
+  // paid: the credit is clamped at $0 due, so the difference would silently
+  // vanish (there's no refund path at MVP — payments are offline or captured
+  // at invoice time). Force the tradesperson to bill at least the upfront.
+  if (upfrontCreditCents > 0 && preCreditTotal < upfrontCreditCents) {
+    throw new HttpsError(
+      "failed-precondition",
+      `The invoice total ($${(preCreditTotal / 100).toFixed(2)}) is less than the upfront fee the ` +
+        `client already paid ($${(upfrontCreditCents / 100).toFixed(2)}). The final invoice must ` +
+        `cover at least the upfront amount — add the remaining work or reduce the discount.`,
     );
   }
 

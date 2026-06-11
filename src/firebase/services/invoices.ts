@@ -113,6 +113,21 @@ function persistableTotals(totals: ReturnType<typeof recomputeTotals>) {
   };
 }
 
+/**
+ * An invoice can never total less than the upfront fee already paid — the
+ * credit clamps at $0 due, so the shortfall would silently vanish (no refund
+ * path at MVP). Mirrors the submitJobForApproval server check.
+ */
+function assertCoversUpfrontCredit(totals: InvoiceTotals): void {
+  if (totals.upfrontFeeCreditAmount > 0 && totals.totalBeforeCredit < totals.upfrontFeeCreditAmount) {
+    throw new Error(
+      `The invoice total ($${(totals.totalBeforeCredit / 100).toFixed(2)}) is less than the upfront ` +
+        `fee the client already paid ($${(totals.upfrontFeeCreditAmount / 100).toFixed(2)}). ` +
+        `The final invoice must cover at least the upfront amount.`,
+    );
+  }
+}
+
 export async function updateInvoiceLineItems(id: string, items: LineItem[]): Promise<void> {
   // Re-read the live discount + upfrontFeeCredit so a line-items edit doesn't
   // accidentally wipe either deduction on the same write.
@@ -121,6 +136,7 @@ export async function updateInvoiceLineItems(id: string, items: LineItem[]): Pro
   const discount = data?.discount ?? null;
   const creditCents = data?.upfrontFeeCredit?.amountCents ?? 0;
   const totals = recomputeTotals(items, discount, creditCents);
+  assertCoversUpfrontCredit(totals);
   await updateDoc(doc(db, "invoices", id), { lineItems: items, ...persistableTotals(totals) });
 }
 
@@ -134,6 +150,7 @@ export async function updateInvoiceDiscount(
   const items = snap.data().lineItems ?? [];
   const creditCents = snap.data().upfrontFeeCredit?.amountCents ?? 0;
   const totals = recomputeTotals(items, discount, creditCents);
+  assertCoversUpfrontCredit(totals);
   await updateDoc(doc(db, "invoices", id), { discount, ...persistableTotals(totals) });
 }
 

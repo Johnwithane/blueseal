@@ -1439,6 +1439,7 @@ function onReturnToApplicants() {
       :client-id="job.clientId"
       :billing-type="jobBillingType(job)"
       :extras="jobExtras"
+      :upfront-fee-paid-cents="job.upfrontFee?.paidAt ? job.upfrontFee.amountCents : 0"
       @submitted="load"
     />
 
