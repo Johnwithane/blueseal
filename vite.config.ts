@@ -40,6 +40,9 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // The FCM service worker registers itself (separate scope) — keep it
+        // out of the precache so Workbox never serves a stale copy of it.
+        globIgnores: ["firebase-messaging-sw.js"],
         // SPA navigation: serve the cached app shell for any client-side route
         // so Vue Router can resolve it. Do NOT point this at /offline.html —
         // that swallows every direct navigation (e.g. /onboarding) and shows

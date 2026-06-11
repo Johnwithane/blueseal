@@ -128,6 +128,23 @@ service cloud.firestore {
           && request.resource.data.createdAt is timestamp;
         allow delete: if isOwner(userId) || isAdmin();
       }
+
+      // ---------- users/{userId}/devices (web-push registrations) ----------
+      // One doc per opted-in device; doc id is the FCM token itself so the
+      // server can prune dead registrations by id. Owner-only — tokens are
+      // capability-ish (knowing one lets you target that device), so nobody
+      // else may read them. notify() reads/deletes via Admin SDK.
+      match /devices/{deviceId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create, update: if isOwner(userId)
+          && request.resource.data.keys().hasOnly(['token', 'userAgent', 'createdAt', 'updatedAt'])
+          && request.resource.data.token is string
+          && request.resource.data.token.size() >= 1
+          && request.resource.data.token.size() <= 512
+          && request.resource.data.userAgent is string
+          && request.resource.data.userAgent.size() <= 300;
+        allow delete: if isOwner(userId) || isAdmin();
+      }
     }
 
     // ---------- tradespeople (public profile, owner-editable while vetting) ----------

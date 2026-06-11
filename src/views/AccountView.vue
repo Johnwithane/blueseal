@@ -27,6 +27,13 @@ import {
   updateUserPhoto,
 } from "@/firebase/services/users";
 import {
+  disablePush,
+  enablePush,
+  pushConfigured,
+  pushEnabledLocally,
+  pushSupported,
+} from "@/firebase/services/push";
+import {
   createOrUpdateDraft,
   getTradesperson,
   getTradespersonContact,
@@ -171,6 +178,37 @@ const emailEnabled = ref(true);
 const whatsappEnabled = ref(true);
 const savingPrefs = ref(false);
 
+// Web push is per-device (token registration), so it applies immediately on
+// toggle rather than via "Save preferences". Hidden entirely until the VAPID
+// key is configured (see HUMANTASKS.md) and on browsers without push —
+// e.g. iOS Safari before the PWA is installed to the home screen.
+const pushIsConfigured = pushConfigured();
+const pushAvailable = ref(false);
+const pushOn = ref(false);
+const pushBusy = ref(false);
+
+async function onPushToggle(value: unknown) {
+  if (!auth.fbUser || pushBusy.value) return;
+  const enable = value === true;
+  pushBusy.value = true;
+  try {
+    if (enable) {
+      await enablePush(auth.fbUser.uid);
+      pushOn.value = true;
+      toast.success("Push enabled", "This device will get instant notifications.");
+    } else {
+      await disablePush(auth.fbUser.uid);
+      pushOn.value = false;
+      toast.success("Push disabled for this device");
+    }
+  } catch (e) {
+    pushOn.value = !enable;
+    toast.error("Couldn't update push notifications", humanizeError(e));
+  } finally {
+    pushBusy.value = false;
+  }
+}
+
 // Tab navigation. The active tab is persisted in the URL (?tab=) so reloads
 // and shared links return to the same place. The Tradesperson tab is only
 // shown to users with the tradesperson role; if a non-tradie lands on it via
@@ -283,6 +321,11 @@ function handleGoogleReturn() {
 onMounted(async () => {
   if (!auth.fbUser) return;
   handleGoogleReturn();
+  // Push state resolves independently of the user doc (browser-level).
+  void pushSupported().then((ok) => {
+    pushAvailable.value = ok;
+    pushOn.value = ok && pushEnabledLocally() && Notification.permission === "granted";
+  });
   const u = await getUser(auth.fbUser.uid);
   if (!u) return;
   displayName.value = u.displayName;
@@ -1524,6 +1567,30 @@ async function grantAllTrades() {
               </p>
             </div>
             <ToggleSwitch v-model="whatsappEnabled" />
+          </div>
+
+          <!-- Per-device, applies immediately (no Save needed). Hidden until
+               the web-push key is configured. -->
+          <div
+            v-if="pushIsConfigured"
+            class="flex items-start justify-between gap-3 rounded-lg border border-[color:var(--bs-border)] p-3"
+          >
+            <div>
+              <div class="font-medium">Push notifications</div>
+              <p class="text-xs text-[color:var(--bs-muted)] mt-0.5">
+                Instant alerts on this device, even when Blue Seal is closed.
+                Applies right away — no need to save.
+                <template v-if="!pushAvailable">
+                  Not supported in this browser — on iPhone, add Blue Seal to your
+                  home screen first.
+                </template>
+              </p>
+            </div>
+            <ToggleSwitch
+              v-model="pushOn"
+              :disabled="!pushAvailable || pushBusy"
+              @update:model-value="onPushToggle"
+            />
           </div>
         </div>
 

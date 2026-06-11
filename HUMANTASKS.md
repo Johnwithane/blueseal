@@ -6,6 +6,21 @@ Tasks are grouped by the phase that introduced them so you can see why each one 
 
 ---
 
+## Web push notifications (added 2026-06-10)
+
+Push notifications (FCM) ship **safe-by-default**: until the key below is set, the
+Account → Notifications push toggle stays hidden and nothing sends. The code is
+live (client `src/firebase/services/push.ts`, SW `public/firebase-messaging-sw.js`,
+server fan-out in `functions/src/lib/notify.ts`, `users/{uid}/devices` rules).
+
+### [ ] Generate the Web Push certificate (VAPID key) and set it in the env
+
+- **Why:** The browser push subscription requires a Web Push certificate key pair; without it `getToken()` can't run, so the whole feature stays dormant.
+- **What:** Firebase Console → **Project settings → Cloud Messaging → Web configuration** → **Generate key pair**. Copy the public key into `.env` as `VITE_FIREBASE_VAPID_KEY=...` (and into the CI/hosting build env), then build + deploy hosting.
+- **Verify:** Account → Notifications now shows the **Push notifications** toggle. Enable it on a desktop Chrome profile → permission prompt → toggle sticks, and a doc appears under `users/{your-uid}/devices`. Send yourself a test (e.g. have a second account message you on a job) with the tab **closed** → an OS notification arrives and tapping it opens the right job. On iPhone: install the PWA to the home screen first, then enable push inside it (iOS 16.4+).
+
+---
+
 ## Google Business reviews integration (added 2026-06-06)
 
 Opt-in "Connect Google Business" for verified tradespeople: they OAuth-connect their Google Business Profile and we display their Google reviews in a separate, attributed section on their public profile (never merged into the native Blue Seal rating). The whole feature ships **safe-by-default** — the callables return "Google Business integration isn't configured yet", the scheduled daily sync no-ops, and the profile section stays hidden until everything below is set. Nothing breaks while it's unset.

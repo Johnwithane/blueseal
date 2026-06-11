@@ -66,6 +66,20 @@ export interface SavedTradieDoc {
 }
 
 // ---------------------------------------------------------------------------
+// users/{uid}/devices/{token}
+// One web-push (FCM) registration per opted-in device. Doc id IS the FCM
+// token so notify()'s dead-token cleanup can delete by id after a failed
+// send. Owner-only; created by enablePush, removed by disablePush or the
+// server-side prune.
+// ---------------------------------------------------------------------------
+export interface UserDeviceDoc {
+  token: string;
+  userAgent: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+// ---------------------------------------------------------------------------
 // tradespeople/{uid}
 // ---------------------------------------------------------------------------
 export type PricingModel = "hourly" | "quote" | "both";

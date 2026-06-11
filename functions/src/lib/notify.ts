@@ -1,6 +1,6 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
-import { db } from "./admin";
+import { db, messaging } from "./admin";
 import { enqueueMail } from "./mail";
 import { enqueueWhatsApp } from "./whatsapp";
 // sms.ts is intentionally not imported here. The SMS queue + helper are
@@ -244,6 +244,50 @@ export async function notify(input: NotifyInput): Promise<void> {
   const contact = await getUserContact(input.userId);
   const url = absoluteUrl(link);
   const cta = url ? `\n\nOpen Blue Seal: ${url}` : "";
+
+  // Web push on normal + high, to every device the user opted in
+  // (users/{uid}/devices, written by the client's enablePush). Token
+  // presence IS the opt-in — disabling removes the doc — so there's no
+  // separate pref to consult. Dead registrations are pruned on failed
+  // sends, which keeps the list self-healing as devices churn.
+  try {
+    const devicesSnap = await db.collection(`users/${input.userId}/devices`).get();
+    if (!devicesSnap.empty) {
+      const tokens = devicesSnap.docs.map((d) => d.id);
+      const res = await messaging.sendEachForMulticast({
+        tokens,
+        notification: { title, body },
+        webpush: {
+          notification: {
+            icon: absoluteUrl("/android-icon-192x192.png") ?? undefined,
+            badge: absoluteUrl("/android-icon-96x96.png") ?? undefined,
+          },
+          ...(url ? { fcmOptions: { link: url } } : {}),
+        },
+      });
+      const prunes: Promise<unknown>[] = [];
+      res.responses.forEach((r, i) => {
+        const code = r.error?.code ?? "";
+        if (
+          code === "messaging/registration-token-not-registered" ||
+          code === "messaging/invalid-argument"
+        ) {
+          prunes.push(devicesSnap.docs[i].ref.delete());
+        }
+      });
+      await Promise.all(prunes);
+      if (res.failureCount > 0) {
+        logger.warn("notify: web push partial failure", {
+          type: input.type,
+          userId: input.userId,
+          failureCount: res.failureCount,
+          pruned: prunes.length,
+        });
+      }
+    }
+  } catch (err) {
+    logger.error("notify: web push failed", { type: input.type, userId: input.userId, err });
+  }
 
   // Email on normal + high (unless the user has opted out).
   if (contact.email && contact.emailEnabled) {
