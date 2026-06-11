@@ -154,6 +154,14 @@ const totals = computed(() =>
   ),
 );
 
+// recomputeTotals silently clamps an over-large fixed discount to the
+// subtotal (→ $0 invoice). Surface it instead so the tradie fixes the number.
+const discountExceedsSubtotal = computed(
+  () =>
+    discountMode.value === "fixed" &&
+    cents(discountValueDisplay.value ?? 0) > totals.value.subtotal,
+);
+
 async function load() {
   loading.value = true;
   invoice.value = await getInvoice(props.invoiceId);
@@ -305,6 +313,10 @@ function validateLineItems(): LineItem[] | null {
 async function save() {
   const next = validateLineItems();
   if (!next) return;
+  if (discountExceedsSubtotal.value) {
+    toast.error("Discount too large", "The discount is more than the invoice subtotal.");
+    return;
+  }
   saving.value = true;
   try {
     // Order matters: line items first (updateInvoiceLineItems re-reads the
@@ -527,6 +539,13 @@ async function markPaid() {
             />
           </div>
         </div>
+        <p
+          v-if="discountExceedsSubtotal"
+          class="text-[11px] text-[color:var(--bs-danger)] mt-2"
+        >
+          This discount is more than the subtotal ({{ money(totals.subtotal) }}) — reduce it
+          before saving.
+        </p>
         <p class="text-[11px] text-[color:var(--bs-muted)] mt-2">
           Applied to the subtotal before tax. Save the invoice to persist the change.
         </p>

@@ -338,7 +338,17 @@ const discountForCallable = computed<InvoiceDiscount | null>(() => {
 
 const totals = computed(() => recomputeTotals(previewLines.value, discountForCallable.value));
 
-const canSubmit = computed(() => !submitting.value && totals.value.total > 0);
+// recomputeTotals silently clamps an over-large fixed discount to the
+// subtotal (→ $0 invoice). Block submit and point at the number instead.
+const discountExceedsSubtotal = computed(
+  () =>
+    discountMode.value === "fixed" &&
+    centsFromDollars(discountValue.value ?? 0) > totals.value.subtotal,
+);
+
+const canSubmit = computed(
+  () => !submitting.value && totals.value.total > 0 && !discountExceedsSubtotal.value,
+);
 
 const totalTimeLabel = computed(() => {
   let total = 0;
@@ -693,6 +703,13 @@ function close() {
             />
           </div>
         </div>
+        <p
+          v-if="discountExceedsSubtotal"
+          class="text-[11px] text-[color:var(--bs-danger)] mt-2"
+        >
+          This discount is more than the subtotal ({{ money(totals.subtotal) }}) — reduce it
+          before sending.
+        </p>
       </section>
 
       <!-- Note to client -->
