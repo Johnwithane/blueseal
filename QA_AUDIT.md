@@ -21,7 +21,7 @@ All deployed (rules + functions) before their commits, per deploy-before-commit 
 | `e988360` | **Invoices:** a fixed discount larger than the subtotal silently clamped to a $0 invoice — both entry points (InvoiceEditor, FinishJobSheet) now warn inline and block. |
 | `8f2f638` | **PWA:** `/apple-touch-icon.png` 404'd (referenced by index.html + manifest includeAssets) — restored from the current-brand 180×180. |
 
-One more 1-line fix is written but **held in the working tree**: clearing `pendingApp` after a successful accept-quote in `JobPostDetailView.vue` — that file had staged changes from a concurrent session, so it wasn't committed here.
+| `4fc6a50` | **Job board:** `pendingApp` cleared after a successful accept-quote (state hygiene; committed separately once a concurrent session's staged work in the same file landed). |
 
 ---
 
