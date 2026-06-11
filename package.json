@@ -19,9 +19,13 @@
     "functions:deploy": "firebase deploy --only functions",
     "rules:deploy": "firebase deploy --only firestore:rules,storage",
     "deploy:hosting": "npm run build && firebase deploy --only hosting",
-    "deploy:prod": "npm run build && firebase deploy"
+    "deploy:prod": "npm run build && firebase deploy",
+    "cap:sync": "npm run build && cap sync",
+    "cap:ios": "npm run build && cap sync ios && cap open ios",
+    "cap:android": "npm run build && cap sync android && cap open android"
   },
   "dependencies": {
+    "@capacitor/core": "^8.4.0",
     "@googlemaps/js-api-loader": "^2.0.2",
     "@primevue/themes": "^4.2.5",
     "@stripe/stripe-js": "^9.6.0",
@@ -41,6 +45,9 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.4.0",
+    "@capacitor/cli": "^8.4.0",
+    "@capacitor/ios": "^8.4.0",
     "@firebase/rules-unit-testing": "^4.0.1",
     "@playwright/test": "^1.60.0",
     "@tailwindcss/vite": "^4.0.0",

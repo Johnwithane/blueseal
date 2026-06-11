@@ -39,3 +39,14 @@ public/characters/raw/
 # Prospect audit exports — contain harvested business contact data; never commit
 prospect-audit.json
 prospect-audit.csv
+
+# Native store wrappers — generated artifacts, not source. Regenerate with
+# `cap add` (Capacitor) / `bubblewrap build` (TWA). iOS only builds on a Mac.
+/ios/
+/android/
+# Signing material + build outputs must NEVER be committed.
+*.keystore
+*.jks
+store/app/
+store/*.aab
+store/*.apk

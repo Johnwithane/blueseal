@@ -26,6 +26,13 @@ export default [
     },
   },
   {
-    ignores: ["dist/", "node_modules/", "functions/lib/", "functions/node_modules/"],
+    ignores: [
+      "dist/",
+      "node_modules/",
+      "functions/lib/",
+      "functions/node_modules/",
+      "ios/",
+      "android/",
+    ],
   },
 ];
