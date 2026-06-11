@@ -25,6 +25,9 @@ export default defineConfig({
         "icons/blueseal_logo_Character.png",
       ],
       manifest: {
+        // `id` pins the app's identity across origin/start_url changes — without
+        // it, Play (TWA) and browsers can treat a moved start_url as a new app.
+        id: "/",
         name: "Blue Seal",
         short_name: "BlueSeal",
         description: "Verified tradespeople, real reviews, AI-powered job tools.",
@@ -32,11 +35,25 @@ export default defineConfig({
         background_color: "#FAF9F6",
         display: "standalone",
         start_url: "/",
+        scope: "/",
+        lang: "en-CA",
+        dir: "ltr",
+        orientation: "portrait",
+        // Used by Play Store listing categorisation when wrapped as a TWA.
+        categories: ["business", "productivity", "utilities"],
         // These must point at files that exist in public/ — the previous
         // android-chrome-* paths 404'd, so the install prompt had no icon.
+        // A `maskable` icon (cream safe-zone padding, see scripts) is required
+        // for clean Android adaptive icons and the TWA launcher icon.
         icons: [
-          { src: "/android-icon-192x192.png", sizes: "192x192", type: "image/png" },
-          { src: "/icons/blueseal_logoCircle_RED.png", sizes: "512x512", type: "image/png" },
+          { src: "/android-icon-192x192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+          {
+            src: "/icons/blueseal_logoCircle_RED.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "any",
+          },
+          { src: "/icons/maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
         ],
       },
       workbox: {
