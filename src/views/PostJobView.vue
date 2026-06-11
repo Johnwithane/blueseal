@@ -8,6 +8,8 @@ import Textarea from "primevue/textarea";
 import Select from "primevue/select";
 import Message from "primevue/message";
 import DatePicker from "primevue/datepicker";
+import Dialog from "primevue/dialog";
+import Tag from "primevue/tag";
 import { useAuthStore } from "@/stores/auth";
 import { TRADES, tradeLabel } from "@/data/trades";
 import { intakeFieldsForTrade } from "@/data/intakeSchemas";
@@ -272,6 +274,31 @@ function toIsoDate(d: Date | null): string | null {
   const dd = String(d.getDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
 }
+
+// ---- Preview: the post exactly as tradespeople will see it on the board.
+// Mirrors BrowseJobsView's card + JobPostDetailView's public fields — street
+// address deliberately absent (only city/region/FSA are ever public).
+const showPreview = ref(false);
+
+const previewFsa = computed(() => postalCode.value.trim().slice(0, 3).toUpperCase());
+
+function urgencyLabel(u: string): string {
+  if (u === "this_week") return "This week";
+  if (u === "urgent") return "Urgent";
+  return "Flexible";
+}
+
+const URGENCY_TONE: Record<string, "danger" | "warn" | "info"> = {
+  urgent: "danger",
+  this_week: "warn",
+  flexible: "info",
+};
+
+const previewBudget = computed(() => {
+  if (budgetMin.value == null || budgetMax.value == null) return "Budget not set";
+  const fmt = (dollars: number) => `$${Math.round(dollars).toLocaleString("en-CA")}`;
+  return `${fmt(budgetMin.value)}–${fmt(budgetMax.value)}`;
+});
 
 async function submit() {
   error.value = null;
@@ -603,7 +630,7 @@ async function submit() {
         </div>
       </div>
 
-      <div class="pt-2">
+      <div class="pt-2 flex flex-wrap items-center gap-2">
         <Button
           type="submit"
           :label="auth.fbUser ? 'Post job' : 'Sign in and post job'"
@@ -611,10 +638,81 @@ async function submit() {
           :loading="submitting"
           size="large"
         />
-        <p v-if="!auth.fbUser" class="text-xs text-[color:var(--bs-muted)] mt-2">
+        <Button
+          type="button"
+          label="Preview"
+          icon="pi pi-eye"
+          outlined
+          size="large"
+          :disabled="!title.trim() && !description.trim()"
+          @click="showPreview = true"
+        />
+        <p v-if="!auth.fbUser" class="text-xs text-[color:var(--bs-muted)] mt-2 w-full">
           Your draft is saved as you type. You'll be asked to sign in to post.
         </p>
       </div>
+
+      <!-- Preview: rendered with the same shape as the BrowseJobsView card +
+           the public section of the post detail page. -->
+      <Dialog
+        v-model:visible="showPreview"
+        modal
+        header="How tradespeople will see it"
+        class="w-[95vw] max-w-lg"
+        :dismissable-mask="true"
+      >
+        <div class="bs-card p-5">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <div class="font-semibold truncate">{{ title.trim() || "Untitled job" }}</div>
+              <div class="text-xs text-[color:var(--bs-muted)]">
+                {{ trade ? tradeLabel(trade) : "No trade selected" }} • just now
+              </div>
+            </div>
+            <Tag :value="urgencyLabel(urgency)" :severity="URGENCY_TONE[urgency] ?? 'info'" />
+          </div>
+          <p class="text-sm mt-2 text-[color:var(--bs-muted)] whitespace-pre-line">
+            {{ description.trim() || "No description yet." }}
+          </p>
+          <div v-if="photos.length" class="mt-3 grid grid-cols-4 gap-1.5">
+            <img
+              v-for="p in photos.slice(0, 8)"
+              :key="p.previewUrl"
+              :src="p.previewUrl"
+              alt="Job photo"
+              class="aspect-square w-full rounded object-cover"
+            />
+          </div>
+          <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+            <div>
+              <div class="text-xs text-[color:var(--bs-muted)]">Budget</div>
+              <div class="font-medium">{{ previewBudget }} <span v-if="budgetMin != null">CAD</span></div>
+            </div>
+            <div>
+              <div class="text-xs text-[color:var(--bs-muted)]">Location</div>
+              <div class="font-medium">
+                {{ city.trim() || "City" }}<template v-if="region">, {{ region }}</template>
+                <span v-if="previewFsa.length === 3" class="text-xs text-[color:var(--bs-muted)]">
+                  ({{ previewFsa }})
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="mt-3 text-xs text-[color:var(--bs-muted)]">
+          <i class="pi pi-lock mr-1"></i>
+          Your street address is never shown on the board — tradespeople see only your city and
+          postal area until you choose someone.
+        </p>
+        <template #footer>
+          <Button label="Keep editing" text @click="showPreview = false" />
+          <Button
+            label="Looks good"
+            icon="pi pi-check"
+            @click="showPreview = false"
+          />
+        </template>
+      </Dialog>
     </form>
   </section>
 </template>
