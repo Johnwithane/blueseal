@@ -14,7 +14,11 @@ import { useFormatters } from "@/composables/useFormatters";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 import QuoteComposer from "@/components/QuoteComposer.vue";
-import type { QuoteComposerInitial, QuoteComposerState } from "@/components/QuoteComposer.vue";
+import type {
+  QuoteComposerInitial,
+  QuoteComposerSection,
+  QuoteComposerState,
+} from "@/components/QuoteComposer.vue";
 import SiteVisitForm from "@/components/SiteVisitForm.vue";
 import type { SiteVisitFormState } from "@/components/SiteVisitForm.vue";
 
@@ -52,6 +56,60 @@ const canRequestVisit = computed(() => !isResend.value && existingVisitStatus.va
 // what's missing. Submit stays clickable; an invalid attempt flips `attempted`
 // so the composer renders every blocking issue inline.
 const attempted = ref(false);
+
+// Guided walkthrough for a FRESH quote: the composer's sections are revealed
+// one step at a time, ending on the full form to review & send. Resends skip
+// it (the tradie is tweaking, not building) and "Skip" drops straight to the
+// form. State lives in the one composer instance, so nothing is lost between
+// steps.
+const WIZARD_STEPS: { title: string; hint: string; sections: QuoteComposerSection[] }[] = [
+  {
+    title: "Scope of work",
+    hint: "Add what you'll do — hourly time, flat-rate work, materials.",
+    sections: ["items"],
+  },
+  {
+    title: "Timing",
+    hint: "When you can start, how long it'll take, and how long the quote stands.",
+    sections: ["timing", "validity"],
+  },
+  {
+    title: "Money details",
+    hint: "Optional — ask for an upfront fee, or add a discount.",
+    sections: ["upfront", "discount"],
+  },
+  {
+    title: "Note & terms",
+    hint: "A short cover note, anything excluded from the price, and your total so far.",
+    sections: ["notes", "summary"],
+  },
+];
+const wizardStep = ref<number | null>(null);
+const inWizard = computed(() => mode.value === "quote" && wizardStep.value !== null);
+const wizardSections = computed<QuoteComposerSection[] | null>(() =>
+  inWizard.value ? WIZARD_STEPS[wizardStep.value as number].sections : null,
+);
+
+function wizardNext() {
+  const i = wizardStep.value;
+  if (i === null) return;
+  // The scope step is the only must-have — don't walk forward with nothing to bill.
+  if (i === 0 && !composer.value?.valid) {
+    attempted.value = true;
+    toast.error(
+      "Add the work first",
+      composer.value?.issues[0] ?? "Add at least one line item with an amount.",
+    );
+    return;
+  }
+  wizardStep.value = i + 1 >= WIZARD_STEPS.length ? null : i + 1;
+}
+function wizardBack() {
+  if (wizardStep.value && wizardStep.value > 0) wizardStep.value -= 1;
+}
+function wizardSkip() {
+  wizardStep.value = null;
+}
 const submitLabel = computed(() => {
   if (mode.value === "site_visit") {
     const fee = siteVisitForm.value?.fee.feeCents ?? 0;
@@ -127,6 +185,8 @@ watch(
     } else if (seededLines) {
       initial.value = { lineItems: seededLines };
     }
+    // Fresh quote → guided walkthrough; resend/edit → straight to the form.
+    wizardStep.value = existing ? null : 0;
     loading.value = false;
   },
 );
@@ -223,9 +283,10 @@ function close() {
       </div>
 
       <!-- Mode toggle: full quote vs "site visit first". Only on a fresh quote
-           with no visit already in flight. -->
+           with no visit already in flight, and only on the wizard's first step
+           (switching paths mid-walkthrough would be disorienting). -->
       <div
-        v-if="canRequestVisit"
+        v-if="canRequestVisit && (!inWizard || wizardStep === 0)"
         class="flex rounded-lg border border-[color:var(--bs-border)] p-1 mb-4 text-sm"
       >
         <button
@@ -246,6 +307,34 @@ function close() {
         </button>
       </div>
 
+      <!-- Wizard chrome: step counter, skip link, title + progress. -->
+      <div v-if="inWizard" class="mb-4">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-xs font-semibold text-[color:var(--bs-muted)]">
+            Step {{ (wizardStep ?? 0) + 1 }} of {{ WIZARD_STEPS.length }}
+          </span>
+          <button
+            type="button"
+            class="text-xs text-[color:var(--bs-blue)] underline"
+            @click="wizardSkip"
+          >
+            Skip — fill out the full form
+          </button>
+        </div>
+        <h4 class="font-semibold mt-1">{{ WIZARD_STEPS[wizardStep!].title }}</h4>
+        <p class="text-xs text-[color:var(--bs-muted)] mt-0.5">
+          {{ WIZARD_STEPS[wizardStep!].hint }}
+        </p>
+        <div class="mt-2 flex gap-1" aria-hidden="true">
+          <span
+            v-for="i in WIZARD_STEPS.length"
+            :key="i"
+            class="h-1 flex-1 rounded-full"
+            :class="i - 1 <= wizardStep! ? 'bg-[color:var(--bs-blue)]' : 'bg-[color:var(--bs-border)]'"
+          ></span>
+        </div>
+      </div>
+
       <SiteVisitForm
         v-if="mode === 'site_visit'"
         @update:state="(s) => (siteVisitForm = s)"
@@ -255,12 +344,30 @@ function close() {
         :hourly-rate-cents="hourlyRateCents"
         :initial="initial"
         :show-errors="attempted"
+        :visible-sections="wizardSections"
         @update:state="(s) => (composer = s)"
       />
     </template>
 
     <template #footer>
-      <div class="flex flex-col-reverse gap-2 w-full sm:flex-row sm:items-center">
+      <!-- Wizard: Back / Next. The send button only appears on the review form. -->
+      <div v-if="inWizard && !loading" class="flex w-full items-center gap-2">
+        <Button
+          label="Back"
+          icon="pi pi-arrow-left"
+          text
+          :disabled="wizardStep === 0"
+          @click="wizardBack"
+        />
+        <span class="flex-1"></span>
+        <Button
+          :label="wizardStep === WIZARD_STEPS.length - 1 ? 'Review & send' : 'Next'"
+          icon="pi pi-arrow-right"
+          icon-pos="right"
+          @click="wizardNext"
+        />
+      </div>
+      <div v-else class="flex flex-col-reverse gap-2 w-full sm:flex-row sm:items-center">
         <Button label="Cancel" text :disabled="submitting" class="w-full sm:w-auto" @click="close" />
         <span class="hidden flex-1 sm:block"></span>
         <Button

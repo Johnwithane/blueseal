@@ -59,6 +59,17 @@ export interface QuoteComposerState {
   issues: string[];
 }
 
+// Section keys for the guided (wizard) mode — hosts can show a subset of the
+// form one step at a time. v-show (not v-if) keeps all state alive across steps.
+export type QuoteComposerSection =
+  | "items"
+  | "discount"
+  | "upfront"
+  | "validity"
+  | "timing"
+  | "notes"
+  | "summary";
+
 // Hydration seed for resend/edit (QuoteSheet) — pass null for a fresh form.
 export interface QuoteComposerInitial {
   lineItems?: LineItem[];
@@ -83,6 +94,9 @@ const props = defineProps<{
   /** Flip on after a failed submit attempt: every blocking issue renders
    *  inline (per field + summary list) instead of the gentle nudges only. */
   showErrors?: boolean;
+  /** Guided mode: render only these sections (null/absent = all). State in
+   *  hidden sections is preserved — they're v-show'd, not destroyed. */
+  visibleSections?: QuoteComposerSection[] | null;
 }>();
 
 const emit = defineEmits<{
@@ -90,6 +104,10 @@ const emit = defineEmits<{
 }>();
 
 const { money, date } = useFormatters();
+
+function sectionShown(key: QuoteComposerSection): boolean {
+  return !props.visibleSections || props.visibleSections.includes(key);
+}
 
 // Per-row local state — both hourly + flat inputs are kept so flipping kind
 // never loses typing.
@@ -479,7 +497,7 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
 <template>
   <div class="space-y-4">
     <!-- Line items -->
-    <section class="rounded-lg border border-[color:var(--bs-border)] p-3">
+    <section v-show="sectionShown('items')" class="rounded-lg border border-[color:var(--bs-border)] p-3">
       <header class="flex items-center gap-2 mb-2">
         <i class="pi pi-list text-[color:var(--bs-blue)]"></i>
         <h4 class="font-semibold text-sm">Scope of work</h4>
@@ -679,7 +697,7 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
     </section>
 
     <!-- Discount -->
-    <section class="rounded-lg border border-[color:var(--bs-border)] p-3">
+    <section v-show="sectionShown('discount')" class="rounded-lg border border-[color:var(--bs-border)] p-3">
       <header class="flex items-center gap-2 mb-2">
         <i class="pi pi-percentage text-[color:var(--bs-blue)]"></i>
         <h4 class="font-semibold text-sm">Discount</h4>
@@ -722,7 +740,7 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
     </section>
 
     <!-- Upfront fee -->
-    <section class="rounded-lg border border-[color:var(--bs-border)] p-3">
+    <section v-show="sectionShown('upfront')" class="rounded-lg border border-[color:var(--bs-border)] p-3">
       <header class="flex items-center gap-2 mb-2">
         <i class="pi pi-wallet text-[color:var(--bs-blue)]"></i>
         <h4 class="font-semibold text-sm">Upfront fee</h4>
@@ -777,7 +795,7 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
     </section>
 
     <!-- Validity -->
-    <section class="rounded-lg border border-[color:var(--bs-border)] p-3">
+    <section v-show="sectionShown('validity')" class="rounded-lg border border-[color:var(--bs-border)] p-3">
       <label class="font-semibold text-sm flex items-center gap-2 mb-2">
         <i class="pi pi-calendar text-[color:var(--bs-blue)]"></i>
         Valid for
@@ -798,7 +816,7 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
 
     <!-- Timing: when work can start + how long it should take. Shown to the
          client alongside the quote so availability is part of the comparison. -->
-    <section class="rounded-lg border border-[color:var(--bs-border)] p-3">
+    <section v-show="sectionShown('timing')" class="rounded-lg border border-[color:var(--bs-border)] p-3">
       <header class="flex items-center gap-2 mb-2">
         <i class="pi pi-calendar-plus text-[color:var(--bs-blue)]"></i>
         <h4 class="font-semibold text-sm">Timing</h4>
@@ -829,7 +847,7 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
     </section>
 
     <!-- Note + terms -->
-    <section class="rounded-lg border border-[color:var(--bs-border)] p-3">
+    <section v-show="sectionShown('notes')" class="rounded-lg border border-[color:var(--bs-border)] p-3">
       <template v-if="!hideNote">
         <label class="font-semibold text-sm flex items-center gap-2 mb-2">
           <i class="pi pi-comment text-[color:var(--bs-blue)]"></i>
@@ -857,6 +875,7 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
 
     <!-- Summary -->
     <section
+      v-show="sectionShown('summary')"
       class="rounded-lg border-2 border-[color:var(--bs-blue)] p-3"
       style="background: color-mix(in srgb, var(--bs-blue-light) 30%, transparent);"
     >

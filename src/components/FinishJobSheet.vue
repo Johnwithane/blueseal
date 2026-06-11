@@ -102,6 +102,63 @@ const noteToClient = ref("");
 
 const submitting = ref(false);
 
+// Guided walkthrough: reveal the wrap-up one section at a time, ending on the
+// full form (summary + send). Skippable for tradies who just want the form.
+// Sections are v-show'd, so nothing typed is lost moving back and forth.
+const FINISH_STEPS = computed<{ key: string; title: string; hint: string }[]>(() => {
+  const steps = [
+    {
+      key: "time",
+      title: "Time",
+      hint: "The tracked time that will be billed. Running timers close when you send.",
+    },
+    {
+      key: "expenses",
+      title: "Expenses",
+      hint: costTrackingOnly.value
+        ? "Receipts on this fixed-price job are records only — nothing bills here."
+        : "Receipts and materials billed through with your markup.",
+    },
+  ];
+  if (loadingQuote.value || quoteRows.value.length > 0) {
+    steps.push({
+      key: "quote",
+      title: "From your quote",
+      hint: "The fixed items the client agreed to — adjust if the work differed.",
+    });
+  }
+  steps.push(
+    {
+      key: "extras",
+      title: "Extras & charges",
+      hint: "Travel, callout, disposal — anything outside time and receipts.",
+    },
+    {
+      key: "wrapup",
+      title: "Discount & note",
+      hint: "An optional discount and a short note to the client.",
+    },
+  );
+  return steps;
+});
+const wizardStep = ref<number | null>(0);
+const inWizard = computed(() => wizardStep.value !== null);
+function stepShown(key: string): boolean {
+  if (wizardStep.value === null) return true;
+  return FINISH_STEPS.value[wizardStep.value]?.key === key;
+}
+function wizardNext() {
+  const i = wizardStep.value;
+  if (i === null) return;
+  wizardStep.value = i + 1 >= FINISH_STEPS.value.length ? null : i + 1;
+}
+function wizardBack() {
+  if (wizardStep.value && wizardStep.value > 0) wizardStep.value -= 1;
+}
+function wizardSkip() {
+  wizardStep.value = null;
+}
+
 // ----- lifecycle -----
 function attach() {
   detach();
@@ -187,6 +244,7 @@ watch(
       discountValue.value = 0;
       discountLabel.value = "";
       noteToClient.value = "";
+      wizardStep.value = 0;
       attach();
       void hydrateFromQuote();
     } else {
@@ -473,8 +531,36 @@ function close() {
     @update:visible="(v) => emit('update:visible', v)"
   >
     <div class="space-y-4">
+      <!-- Wizard chrome: step counter, skip link, title + progress. -->
+      <div v-if="inWizard">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-xs font-semibold text-[color:var(--bs-muted)]">
+            Step {{ (wizardStep ?? 0) + 1 }} of {{ FINISH_STEPS.length }}
+          </span>
+          <button
+            type="button"
+            class="text-xs text-[color:var(--bs-blue)] underline"
+            @click="wizardSkip"
+          >
+            Skip — fill out the full form
+          </button>
+        </div>
+        <h4 class="font-semibold mt-1">{{ FINISH_STEPS[wizardStep!].title }}</h4>
+        <p class="text-xs text-[color:var(--bs-muted)] mt-0.5">
+          {{ FINISH_STEPS[wizardStep!].hint }}
+        </p>
+        <div class="mt-2 flex gap-1" aria-hidden="true">
+          <span
+            v-for="(s, i) in FINISH_STEPS"
+            :key="s.key"
+            class="h-1 flex-1 rounded-full"
+            :class="i <= wizardStep! ? 'bg-[color:var(--bs-blue)]' : 'bg-[color:var(--bs-border)]'"
+          ></span>
+        </div>
+      </div>
+
       <!-- Time summary -->
-      <section class="rounded-lg border border-[color:var(--bs-border)] p-3">
+      <section v-show="stepShown('time')" class="rounded-lg border border-[color:var(--bs-border)] p-3">
         <header class="flex items-center justify-between gap-2 mb-2">
           <div class="flex items-center gap-2">
             <i class="pi pi-clock text-[color:var(--bs-blue)]"></i>
@@ -514,7 +600,7 @@ function close() {
       </section>
 
       <!-- Expenses summary -->
-      <section class="rounded-lg border border-[color:var(--bs-border)] p-3">
+      <section v-show="stepShown('expenses')" class="rounded-lg border border-[color:var(--bs-border)] p-3">
         <header class="flex items-center gap-2 mb-2">
           <i class="pi pi-receipt text-[color:var(--bs-blue)]"></i>
           <h4 class="font-semibold text-sm">Expenses</h4>
@@ -561,6 +647,7 @@ function close() {
            happened on-site without re-typing the whole quote. -->
       <section
         v-if="loadingQuote || quoteRows.length > 0"
+        v-show="stepShown('quote')"
         class="rounded-lg border border-[color:var(--bs-border)] p-3"
       >
         <header class="flex items-center gap-2 mb-2">
@@ -613,7 +700,7 @@ function close() {
            truck/callout charges, travel, tool rental, disposal, and any
            change/extra the job picked up along the way. Approved by the
            client when they sign off on this invoice. -->
-      <section class="rounded-lg border border-[color:var(--bs-border)] p-3">
+      <section v-show="stepShown('extras')" class="rounded-lg border border-[color:var(--bs-border)] p-3">
         <header class="flex items-center justify-between gap-2 mb-2">
           <div class="flex items-center gap-2">
             <i class="pi pi-plus-circle text-[color:var(--bs-blue)]"></i>
@@ -679,7 +766,7 @@ function close() {
       </section>
 
       <!-- Discount -->
-      <section class="rounded-lg border border-[color:var(--bs-border)] p-3">
+      <section v-show="stepShown('wrapup')" class="rounded-lg border border-[color:var(--bs-border)] p-3">
         <header class="flex items-center gap-2 mb-2">
           <i class="pi pi-percentage text-[color:var(--bs-blue)]"></i>
           <h4 class="font-semibold text-sm">Discount</h4>
@@ -731,7 +818,7 @@ function close() {
       </section>
 
       <!-- Note to client -->
-      <section class="rounded-lg border border-[color:var(--bs-border)] p-3">
+      <section v-show="stepShown('wrapup')" class="rounded-lg border border-[color:var(--bs-border)] p-3">
         <label
           for="finish-note"
           class="font-semibold text-sm flex items-center gap-2 mb-2"
@@ -749,8 +836,9 @@ function close() {
         />
       </section>
 
-      <!-- Summary -->
+      <!-- Summary — review only (the wizard's last stop is the full form). -->
       <section
+        v-show="!inWizard"
         class="rounded-lg border-2 border-[color:var(--bs-blue)] p-3"
         style="background: color-mix(in srgb, var(--bs-blue-light) 30%, transparent);"
       >
@@ -811,7 +899,24 @@ function close() {
     </div>
 
     <template #footer>
-      <div class="flex flex-col-reverse gap-2 w-full sm:flex-row sm:items-center">
+      <!-- Wizard: Back / Next. The send button only appears on the review form. -->
+      <div v-if="inWizard" class="flex w-full items-center gap-2">
+        <Button
+          label="Back"
+          icon="pi pi-arrow-left"
+          text
+          :disabled="wizardStep === 0"
+          @click="wizardBack"
+        />
+        <span class="flex-1"></span>
+        <Button
+          :label="wizardStep === FINISH_STEPS.length - 1 ? 'Review & send' : 'Next'"
+          icon="pi pi-arrow-right"
+          icon-pos="right"
+          @click="wizardNext"
+        />
+      </div>
+      <div v-else class="flex flex-col-reverse gap-2 w-full sm:flex-row sm:items-center">
         <Button label="Cancel" text :disabled="submitting" class="w-full sm:w-auto" @click="close" />
         <span class="hidden flex-1 sm:block"></span>
         <Button
