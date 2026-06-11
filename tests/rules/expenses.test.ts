@@ -186,6 +186,31 @@ describe("expenses — create (receipt-backed and manual shapes)", () => {
       createAs(TRADIE_UID, TRADIE_CLAIMS, "new_y", manualExpense({ markupPercent: 1001 })),
     );
   });
+
+  it("can create with a normal vendor string", async () => {
+    await seed();
+    await assertSucceeds(
+      createAs(TRADIE_UID, TRADIE_CLAIMS, "new_v", manualExpense({ vendor: "Home Depot" })),
+    );
+  });
+
+  it("cannot create with oversized strings or money above the cap", async () => {
+    await seed();
+    await assertFails(
+      createAs(TRADIE_UID, TRADIE_CLAIMS, "new_x", manualExpense({ vendor: "v".repeat(121) })),
+    );
+    await assertFails(
+      createAs(
+        TRADIE_UID,
+        TRADIE_CLAIMS,
+        "new_y",
+        manualExpense({ description: "d".repeat(301) }),
+      ),
+    );
+    await assertFails(
+      createAs(TRADIE_UID, TRADIE_CLAIMS, "new_z", manualExpense({ totalCost: 10_000_001 })),
+    );
+  });
 });
 
 describe("expenses — update keeps identity + receipt path immutable", () => {
@@ -232,6 +257,17 @@ describe("expenses — update keeps identity + receipt path immutable", () => {
         { billedAmount: 1 },
       ),
     );
+  });
+
+  // Bounds are re-checked on update, not just create — otherwise an edit
+  // could corrupt values that were valid at create time.
+  it("the owner cannot update past the field bounds", async () => {
+    await seed();
+    const ref = doc(fsAs(TRADIE_UID, TRADIE_CLAIMS), "jobs", JOB_ID, "expenses", MANUAL_EXPENSE_ID);
+    await assertFails(updateDoc(ref, { vendor: "v".repeat(121) }));
+    await assertFails(updateDoc(ref, { billedAmount: 10_000_001 }));
+    await assertFails(updateDoc(ref, { markupPercent: 1001 }));
+    await assertFails(updateDoc(ref, { status: "paid" }));
   });
 });
 

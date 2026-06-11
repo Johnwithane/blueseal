@@ -494,6 +494,29 @@ service cloud.firestore {
       // expense into an invoice. Receipt files in Storage are restricted
       // the same way (see storage.rules).
       match /expenses/{expenseId} {
+        // Field bounds shared by create + update. Strings are size-capped so a
+        // client can't bloat docs, and numerics are re-checked on UPDATE too —
+        // create-only checks would let a later edit corrupt them. Money caps
+        // mirror the invoice line-item cap ($100k in cents). status: invoiced
+        // is stamped server-side (pullBillablesFromJob), so client writes only
+        // need the enum bound, not a transition rule.
+        function validExpenseFields() {
+          let d = request.resource.data;
+          return d.description is string && d.description.size() <= 300
+            && (d.vendor == null || (d.vendor is string && d.vendor.size() <= 120))
+            && (d.category == null || (d.category is string && d.category.size() <= 40))
+            && (d.spentAt == null || d.spentAt is timestamp)
+            && d.status in ['parsing', 'ready', 'invoiced']
+            && d.totalCost is int
+            && d.totalCost >= 0
+            && d.totalCost <= 10000000
+            && d.billedAmount is int
+            && d.billedAmount >= 0
+            && d.billedAmount <= 10000000
+            && d.markupPercent is number
+            && d.markupPercent >= 0
+            && d.markupPercent <= 1000;
+        }
         allow read: if isSignedIn()
           && (resource.data.tradespersonId == uid() || isAdmin());
         allow create: if isTradie()
@@ -502,19 +525,17 @@ service cloud.firestore {
           && request.resource.data.clientId == jobDoc(jobId).data.clientId
           && request.resource.data.invoicedAt == null
           && request.resource.data.status in ['parsing', 'ready']
-          && request.resource.data.totalCost is int
-          && request.resource.data.totalCost >= 0
-          && request.resource.data.billedAmount is int
-          && request.resource.data.billedAmount >= 0
-          && request.resource.data.markupPercent is number
-          && request.resource.data.markupPercent >= 0
-          && request.resource.data.markupPercent <= 1000;
+          && (request.resource.data.receiptStoragePath == null
+            || (request.resource.data.receiptStoragePath is string
+              && request.resource.data.receiptStoragePath.size() <= 400))
+          && validExpenseFields();
         allow update: if (isOwner(resource.data.tradespersonId)
                          && request.resource.data.tradespersonId == resource.data.tradespersonId
                          && request.resource.data.clientId == resource.data.clientId
                          && request.resource.data.receiptStoragePath == resource.data.receiptStoragePath
                          && request.resource.data.createdAt == resource.data.createdAt
-                         && request.resource.data.invoicedAt == resource.data.invoicedAt)
+                         && request.resource.data.invoicedAt == resource.data.invoicedAt
+                         && validExpenseFields())
                       || isAdmin();
         allow delete: if (isOwner(resource.data.tradespersonId)
                          && resource.data.invoicedAt == null)
