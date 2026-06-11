@@ -63,6 +63,19 @@ function priceLabel(p: ApplicationDoc["proposedPrice"]): string {
   return p.type === "fixed" ? fmt(p.amount) : `${fmt(p.amount)}/hr`;
 }
 
+// Mirrors ApplicantCard.priceSummary: chat-first and site-visit applications
+// have no real price yet — a bare "Proposed: $0" would mislead.
+function summaryLine(a: WithId<ApplicationDoc>): string {
+  if (a.kind === "chat" && !a.quote) return "Chat first — quote to follow";
+  if (a.kind === "site_visit") {
+    const cents = a.siteVisitFee?.feeCents ?? a.proposedPrice.amount;
+    return cents > 0
+      ? `Site visit · ${priceLabel({ type: "fixed", amount: cents })}`
+      : "Free site visit";
+  }
+  return `Proposed: ${priceLabel(a.proposedPrice)}`;
+}
+
 const myUid = computed(() => auth.fbUser?.uid ?? null);
 function unreadFor(a: WithId<ApplicationDoc>): number {
   return myUid.value ? (a.threadUnreadCounts?.[myUid.value] ?? 0) : 0;
@@ -114,7 +127,7 @@ function unreadFor(a: WithId<ApplicationDoc>): number {
             Client: “{{ a.declinedReason }}”
           </p>
           <div class="text-xs text-[color:var(--bs-muted)] mt-2">
-            Proposed: {{ priceLabel(a.proposedPrice) }}
+            {{ summaryLine(a) }}
           </div>
         </RouterLink>
       </div>

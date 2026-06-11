@@ -50,9 +50,11 @@ interface InvoiceData {
     taxRate: number;
   }>;
   subtotal: number;
+  discountAmount?: number;
   taxTotal: number;
   total: number;
   currency: string;
+  upfrontFeeCredit?: { amountCents: number } | null;
   paymentInstructions: string;
   status?: string;
   payment?: {
@@ -173,6 +175,19 @@ export const sendInvoice = onCall(
       throw new HttpsError(
         "failed-precondition",
         "Invoice has no line items or zero total.",
+      );
+    }
+    // The bill can never come in under the upfront fee already paid — the
+    // credit clamps at $0 due, so the shortfall would silently vanish.
+    // Mirrors submitJobForApproval; this backstop catches drafts whose
+    // totals were edited outside that path.
+    const creditCents = inv.upfrontFeeCredit?.amountCents ?? 0;
+    const totalBeforeCredit = inv.subtotal - (inv.discountAmount ?? 0) + inv.taxTotal;
+    if (creditCents > 0 && totalBeforeCredit < creditCents) {
+      throw new HttpsError(
+        "failed-precondition",
+        `The invoice total ($${(totalBeforeCredit / 100).toFixed(2)}) is less than the upfront ` +
+          `fee already paid ($${(creditCents / 100).toFixed(2)}). Add the remaining work before sending.`,
       );
     }
 

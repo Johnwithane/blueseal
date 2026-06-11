@@ -7,6 +7,7 @@ import { VertexAI, type Part } from "@google-cloud/vertexai";
 import { db } from "../lib/admin";
 import { requireAuth } from "../lib/auth";
 import { enforceRateLimit, AI_DAILY_CAP } from "../lib/rateLimit";
+import { requireAiEntitlement } from "../lib/entitlements";
 
 /**
  * Vertex AI Gemini wrappers. No API key needed — the Cloud Function's
@@ -177,6 +178,7 @@ function makeTool(tool: "diagnose" | "quote" | "summary") {
     const parsed = Input.safeParse(req.data);
     if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);
 
+    await requireAiEntitlement(uid, "legacyTools");
     await enforceRateLimit(uid, "ai", AI_DAILY_CAP);
     const { job, messages } = await loadContext(parsed.data.jobId, uid);
     const prompt = buildPrompt(tool, job, messages, parsed.data.prompt);

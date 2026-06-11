@@ -7,6 +7,7 @@ import { VertexAI } from "@google-cloud/vertexai";
 import { db } from "../lib/admin";
 import { requireRole } from "../lib/auth";
 import { enforceRateLimit, AI_DAILY_CAP } from "../lib/rateLimit";
+import { requireAiEntitlement } from "../lib/entitlements";
 
 /**
  * aiUpdateJobLog — append AI-generated log entries to a job's privateNotes
@@ -158,6 +159,7 @@ export const aiUpdateJobLog = onCall(CALLABLE_OPTS, async (req) => {
   // short-circuits — so only calls that actually hit Vertex consume the
   // user's daily AI budget. This also covers the force=true path, which
   // skips the per-job cooldown above.
+  await requireAiEntitlement(uid, "updateJobLog");
   await enforceRateLimit(uid, "ai", AI_DAILY_CAP);
 
   let entryText = "";

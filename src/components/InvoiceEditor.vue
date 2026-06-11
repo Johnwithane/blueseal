@@ -162,6 +162,17 @@ const discountExceedsSubtotal = computed(
     cents(discountValueDisplay.value ?? 0) > totals.value.subtotal,
 );
 
+// The invoice can never total less than the upfront fee the client already
+// paid (the credit clamps at $0 due — a lower total silently vanishes the
+// difference). Checked BEFORE any write: save() runs two sequential updates,
+// and letting the service-level assert fire on the second would leave the
+// line items persisted but the discount not (half-saved state).
+const belowUpfrontFloor = computed(
+  () =>
+    totals.value.upfrontFeeCreditAmount > 0 &&
+    totals.value.totalBeforeCredit < totals.value.upfrontFeeCreditAmount,
+);
+
 async function load() {
   loading.value = true;
   invoice.value = await getInvoice(props.invoiceId);
@@ -317,6 +328,13 @@ async function save() {
     toast.error("Discount too large", "The discount is more than the invoice subtotal.");
     return;
   }
+  if (belowUpfrontFloor.value) {
+    toast.error(
+      "Total below the upfront fee",
+      `The invoice must cover at least the ${money(totals.value.upfrontFeeCreditAmount)} the client already paid.`,
+    );
+    return;
+  }
   saving.value = true;
   try {
     // Order matters: line items first (updateInvoiceLineItems re-reads the
@@ -336,6 +354,13 @@ async function save() {
 async function send() {
   const next = validateLineItems();
   if (!next) return;
+  if (belowUpfrontFloor.value) {
+    toast.error(
+      "Total below the upfront fee",
+      `The invoice must cover at least the ${money(totals.value.upfrontFeeCreditAmount)} the client already paid.`,
+    );
+    return;
+  }
   saving.value = true;
   try {
     // Persist the latest edits before sending so the PDF reflects them.
@@ -496,6 +521,14 @@ async function markPaid() {
         </tfoot>
       </table>
       </div>
+
+      <p
+        v-if="props.canEdit && belowUpfrontFloor"
+        class="text-[11px] text-[color:var(--bs-danger)] mt-2"
+      >
+        The total is below the {{ money(totals.upfrontFeeCreditAmount) }} upfront fee the
+        client already paid — the invoice must cover at least that amount.
+      </p>
 
       <div v-if="props.canEdit" class="mt-3 rounded-lg border border-[color:var(--bs-border)] p-3">
         <div class="flex items-center gap-2 mb-2">

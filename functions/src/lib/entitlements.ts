@@ -17,10 +17,24 @@ export type AiFeature =
   | "suggestReplies"
   | "receiptOcr"
   | "draftQuote"
-  | "draftInvoiceNote";
+  | "draftInvoiceNote"
+  | "updateJobLog"
+  | "legacyTools"; // aiDiagnose/aiQuote/aiSummarize — slated for retirement into chat
 
 export async function requireAiEntitlement(_uid: string, _feature: AiFeature): Promise<void> {
   // Subscription gating not yet live — see MONETIZATION.md. Intentionally a
   // no-op; per-call costs are still tracked via the aiUsage collection.
+  return;
+}
+
+/**
+ * Seam for gating tradesperson-created jobs ("bring your own client" /
+ * solo-mode project tracking) behind a future paid tier. Founder decision
+ * 2026-06-11: when the gate flips it should cap ACTIVE SOLO-JOB VOLUME (e.g.
+ * N free, unlimited on Pro) — never the client invite link itself, because
+ * every invite sent to an off-platform client is free user acquisition.
+ * No-op until the subscription ships; createInviteJob must route through this.
+ */
+export async function requireInviteJobEntitlement(_uid: string): Promise<void> {
   return;
 }
