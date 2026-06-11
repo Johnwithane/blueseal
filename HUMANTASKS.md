@@ -16,7 +16,10 @@ server fan-out in `functions/src/lib/notify.ts`, `users/{uid}/devices` rules).
 ### [ ] Generate the Web Push certificate (VAPID key) and set it in the env
 
 - **Why:** The browser push subscription requires a Web Push certificate key pair; without it `getToken()` can't run, so the whole feature stays dormant.
-- **What:** Firebase Console → **Project settings → Cloud Messaging → Web configuration** → **Generate key pair**. Copy the public key into `.env` as `VITE_FIREBASE_VAPID_KEY=...` (and into the CI/hosting build env), then build + deploy hosting.
+- **What:** Firebase Console → **Project settings → Cloud Messaging → Web configuration** → **Generate key pair**. Copy the public key into:
+  1. `.env` as `VITE_FIREBASE_VAPID_KEY=...` (for local builds) — ✅ done 2026-06-10
+  2. GitHub → repo **Settings → Secrets and variables → Actions → New repository secret**, name `VITE_FIREBASE_VAPID_KEY`, value = the same key (deploy.yml already reads it). It's a *public* key (ships in the JS bundle) — Secrets is just where the workflow sources build config, matching the other `VITE_*` values.
+  Then push to main (or run the Deploy workflow) so hosting rebuilds with it.
 - **Verify:** Account → Notifications now shows the **Push notifications** toggle. Enable it on a desktop Chrome profile → permission prompt → toggle sticks, and a doc appears under `users/{your-uid}/devices`. Send yourself a test (e.g. have a second account message you on a job) with the tab **closed** → an OS notification arrives and tapping it opens the right job. On iPhone: install the PWA to the home screen first, then enable push inside it (iOS 16.4+).
 
 ---
