@@ -303,10 +303,12 @@ const applicationBaseFields = {
     .optional(),
 };
 
-// An application is EITHER a full itemized quote (kind "full") OR a "site visit
-// before quoting" ask (kind "site_visit", carrying a single siteVisitFee instead
-// of a quote). Wrapped in preprocess so legacy callers that omit `kind` resolve
-// to "full" — discriminatedUnion needs the discriminator present to route.
+// An application is a full itemized quote (kind "full"), a "site visit before
+// quoting" ask (kind "site_visit", carrying a single siteVisitFee instead of a
+// quote), OR a "chat first" opener (kind "chat" — no quote yet; the message
+// seeds the Q&A thread and the quote follows via reviseApplication). Wrapped
+// in preprocess so legacy callers that omit `kind` resolve to "full" —
+// discriminatedUnion needs the discriminator present to route.
 export const submitApplicationSchema = z.preprocess(
   (val) =>
     val && typeof val === "object" && !("kind" in val) ? { ...val, kind: "full" } : val,
@@ -324,6 +326,12 @@ export const submitApplicationSchema = z.preprocess(
       // Single visit fee ($0 = free). No full quote yet — the tradesperson quotes
       // after the visit.
       siteVisitFee: siteVisitFeeSchema,
+    }),
+    z.object({
+      kind: z.literal("chat"),
+      ...applicationBaseFields,
+      // The opener IS the application — it has to say something.
+      message: z.string().trim().min(1, "Write an opening message").max(2000),
     }),
   ]),
 );

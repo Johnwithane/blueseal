@@ -113,6 +113,19 @@ describe("submitApplicationSchema (discriminated union)", () => {
     expect(r.success).toBe(false);
   });
 
+  it("parses a chat-first application and requires an opening message", () => {
+    const ok = submitApplicationSchema.safeParse({
+      kind: "chat",
+      postId: "post1",
+      message: "Hi — does the panel have space for a new breaker?",
+    });
+    expect(ok.success).toBe(true);
+    if (ok.success) expect(ok.data.kind).toBe("chat");
+    expect(
+      submitApplicationSchema.safeParse({ kind: "chat", postId: "post1", message: "" }).success,
+    ).toBe(false);
+  });
+
   // The cover message is a suggestion, never a gate — an empty or missing
   // message must not block a quote (2026-06-11).
   it("accepts an empty or missing cover message", () => {

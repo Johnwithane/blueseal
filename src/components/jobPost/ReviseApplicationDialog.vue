@@ -40,12 +40,18 @@ const composer = ref<QuoteComposerState | null>(null);
 
 const declinedReason = computed(() => props.application.declinedReason ?? null);
 
+// A chat-first application has no quote yet — this dialog is then the FIRST
+// send, not a revision (the callable flips kind to "full" either way).
+const isFirstQuote = computed(() => !props.application.quote);
+
 // Submit stays clickable when invalid — a failed attempt flips `attempted` so
 // the composer renders every blocking issue inline (mirrors QuoteSheet).
 const attempted = ref(false);
 const submitLabel = computed(() => {
   const s = composer.value;
-  if (s && s.totals.total > 0) return `Re-send quote — ${money(s.totals.total)}`;
+  if (s && s.totals.total > 0) {
+    return `${isFirstQuote.value ? "Send" : "Re-send"} quote — ${money(s.totals.total)}`;
+  }
   return s?.hasIncompleteLine ? "Add a description to each line" : "Add a line to bill first";
 });
 
@@ -105,7 +111,12 @@ async function onSubmit() {
   submitting.value = true;
   try {
     await reviseApplication(parsed.data);
-    toast.success("Quote updated", "The client has been notified of your revised quote.");
+    toast.success(
+      isFirstQuote.value ? "Quote sent" : "Quote updated",
+      isFirstQuote.value
+        ? "The client can now compare and accept your quote."
+        : "The client has been notified of your revised quote.",
+    );
     emit("submitted");
     emit("update:visible", false);
   } catch (e) {
@@ -128,7 +139,7 @@ function close() {
     :closable="!submitting"
     :dismissable-mask="false"
     :draggable="false"
-    header="Revise quote"
+    :header="isFirstQuote ? 'Send your quote' : 'Revise quote'"
     :pt="{ root: { class: 'revise-app-dialog' } }"
     @update:visible="(v) => emit('update:visible', v)"
   >

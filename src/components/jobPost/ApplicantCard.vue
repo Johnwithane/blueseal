@@ -72,10 +72,12 @@ function priceLabel(p: ApplicationDoc["proposedPrice"]): string {
 }
 
 // A "site visit first" application carries no quote — just a single visit fee
-// ($0 = free). Show that instead of a bare price so the client understands the
-// applicant wants to see the job before pricing.
+// ($0 = free). A "chat" application carries no price at all yet. Show those
+// instead of a bare price so the client understands what the applicant wants.
 const isSiteVisit = computed(() => props.app.kind === "site_visit");
+const isChat = computed(() => props.app.kind === "chat" && !props.app.quote);
 const priceSummary = computed(() => {
+  if (isChat.value) return "Wants to chat first";
   if (isSiteVisit.value) {
     const cents = props.app.siteVisitFee?.feeCents ?? props.app.proposedPrice.amount;
     return cents > 0 ? `Site visit · ${fmtCents(cents)}` : "Free site visit";
@@ -189,6 +191,17 @@ const priceSummary = computed(() => {
       <span class="font-medium text-[color:var(--bs-text)]">
         {{ (app.siteVisitFee?.feeCents ?? 0) > 0 ? fmtCents(app.siteVisitFee!.feeCents) : "free" }}
       </span>.
+    </p>
+
+    <!-- Chat-first application: no quote yet — point at the Message button. -->
+    <p
+      v-else-if="isChat"
+      class="mt-3 text-sm rounded-lg border border-[color:var(--bs-border)] bg-[color:var(--bs-bg)] p-3 text-[color:var(--bs-muted)]"
+    >
+      <i class="pi pi-comments mr-1"></i>
+      They have a few questions before pricing the job — use
+      <span class="font-medium text-[color:var(--bs-text)]">Message</span> to talk it
+      through, and they'll send a full quote.
     </p>
 
     <!-- Action row: message + decline + accept while the post is open. -->

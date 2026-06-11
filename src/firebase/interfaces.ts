@@ -1086,7 +1086,10 @@ export interface ApplicationDoc {
   // `quote` is null and `siteVisitFee` carries the single line. The client
   // accepts it one-tap (acceptApplication), the job is created in "requested",
   // and the agreed fee seeds jobs/{jobId}/siteVisit/current.
-  kind?: "full" | "site_visit";
+  // "chat" = the tradesperson opens a conversation BEFORE quoting; `quote` is
+  // null and the cover message seeds the Q&A thread. They attach a quote later
+  // via reviseApplication (which flips kind to "full").
+  kind?: "full" | "site_visit" | "chat";
   siteVisitFee?: SiteVisitFee | null; // present only when kind === "site_visit"
   proposedStartDate: Timestamp | null;
   // Set by declineApplication when the client dismisses this applicant with a
@@ -1155,6 +1158,10 @@ export interface MessageDoc {
   // these as null — the UI renders them centered with no avatar.
   senderName: string | null;
   senderPhotoURL: string | null;
+  // True on messages copied in from the pre-acceptance application thread at
+  // job creation. onMessageCreated skips these (no unread bumps / re-notify
+  // for history both parties already read). Absent on live messages.
+  carriedOver?: boolean;
 }
 
 // ---------------------------------------------------------------------------

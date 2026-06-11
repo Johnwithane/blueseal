@@ -113,6 +113,10 @@ export const reviseApplication = onCall(CALLABLE_OPTS, async (req) => {
         quote: applicationQuote,
         proposedPrice,
         proposedStartDate: proposedStartTs,
+        // Attaching a full quote makes this a full application whatever it
+        // started as — in particular a "chat" opener graduates to a real bid
+        // the client can accept.
+        kind: "full",
         ...(message ? { message } : {}),
         // Re-entering the active list: clear the decline + flip back to pending.
         ...(wasDeclined

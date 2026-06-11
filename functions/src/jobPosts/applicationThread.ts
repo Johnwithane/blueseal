@@ -48,3 +48,79 @@ export async function postApplicationSystemMessage(
     logger.warn("postApplicationSystemMessage failed", { postId, applicationId, err });
   }
 }
+
+/**
+ * Copy the pre-acceptance Q&A thread into the new job chat so the negotiation
+ * carries over when an application converts to a job — the conversation
+ * shouldn't evaporate at acceptance. Original senders + timestamps are
+ * preserved (the chat reads chronologically); copies are flagged
+ * `carriedOver: true`, which onMessageCreated skips, so no unread bumps or
+ * notification spam for history both parties already read. Capped at the most
+ * recent `cap` messages. Best-effort: a copy failure must never fail the
+ * accept (the thread also remains readable on the closed post).
+ *
+ * This is a one-time COPY at the acceptance boundary, not a unification of
+ * the two systems — see the module comment above for why application threads
+ * stay separate from chats/ before a job exists.
+ */
+export async function copyApplicationThreadToChat(
+  postId: string,
+  applicationId: string,
+  chatId: string,
+  cap = 200,
+): Promise<void> {
+  try {
+    const snap = await applicationMessagesCol(postId, applicationId)
+      .orderBy("createdAt", "desc")
+      .limit(cap)
+      .get();
+    if (snap.empty) return;
+    const docs = [...snap.docs].reverse(); // back to chronological order
+    const chatMessages = db.collection(`chats/${chatId}/messages`);
+
+    // Firestore batches cap at 500 ops; chunk defensively.
+    let batch = db.batch();
+    let ops = 0;
+    for (const d of docs) {
+      const m = d.data() as {
+        senderId: string;
+        text?: string;
+        createdAt?: FirebaseFirestore.Timestamp;
+        type?: string;
+        senderName?: string | null;
+        senderPhotoURL?: string | null;
+      };
+      batch.set(chatMessages.doc(), {
+        senderId: m.senderId,
+        text: m.text ?? "",
+        photoUrl: null,
+        createdAt: m.createdAt ?? FieldValue.serverTimestamp(),
+        type: m.type === "system" ? "system" : "text",
+        senderName: m.senderName ?? null,
+        senderPhotoURL: m.senderPhotoURL ?? null,
+        carriedOver: true,
+      });
+      ops++;
+      if (ops >= 450) {
+        await batch.commit();
+        batch = db.batch();
+        ops = 0;
+      }
+    }
+    // Seed the chat-list preview from the carried history (no unread bump —
+    // nothing here is new to either party). Any post-accept system message
+    // lands after this and overwrites it.
+    const last = docs[docs.length - 1].data() as {
+      text?: string;
+      createdAt?: FirebaseFirestore.Timestamp;
+    };
+    batch.update(db.doc(`chats/${chatId}`), {
+      lastMessageAt: last.createdAt ?? FieldValue.serverTimestamp(),
+      lastMessagePreview: (last.text ?? "").slice(0, 120),
+    });
+    await batch.commit();
+    logger.info("copyApplicationThreadToChat", { postId, applicationId, chatId, copied: docs.length });
+  } catch (err) {
+    logger.warn("copyApplicationThreadToChat failed", { postId, applicationId, chatId, err });
+  }
+}

@@ -10,6 +10,7 @@ import { postSystemMessage } from "../lib/chatSystemMessage";
 import { notify } from "../lib/notify";
 import { resolveBillingType, type QuoteLineKindLike } from "../lib/billing";
 import { SignatureDataUrl, writeQuoteSignature } from "../lib/signature";
+import { copyApplicationThreadToChat } from "./applicationThread";
 
 const Input = z.object({
   postId: z.string().min(1).max(128),
@@ -359,6 +360,11 @@ export const acceptApplicationQuote = onCall(CALLABLE_OPTS, async (req) => {
   } catch (err) {
     logger.error("acceptApplicationQuote reject-others failed", { ...ctx, err });
   }
+
+  // Carry the pre-acceptance Q&A thread into the new job chat so the
+  // conversation continues where it left off. Before the system line below so
+  // the "quote accepted" line lands after the history.
+  await copyApplicationThreadToChat(postId, applicationId, chatRef.id);
 
   // Chat system line + notify the selected tradie.
   const dollars = (cents: number) => `$${(cents / 100).toFixed(2)}`;

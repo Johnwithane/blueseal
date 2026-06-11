@@ -176,6 +176,8 @@ Your posting is shown to **verified tradespeople** in your trade and region. Eac
 
 Some applicants may ask to do a **site visit first** instead of quoting blind — shown as "Site visit first" with the visit fee (or "Free site visit"). Agreeing is one tap (no signature); that pro then visits and sends a full quote you accept the usual way.
 
+Others may want to **chat first** — shown as "Wants to chat first". They have questions before pricing the job; tap **Message** on their card to talk it through, and they'll send a full quote when they have what they need. If you accept someone you've been chatting with, the conversation **carries over into the job chat**.
+
 Your exact address stays private until you accept a quote; the public posting only shows your general area.`,
   },
   {
@@ -257,6 +259,8 @@ If something needs another look, we'll let you know what to re-upload — you wo
 2. **Browse jobs** — clients post jobs to the board. Browse postings in your trade and area and **apply with a full itemized quote** (line items, taxes, optional upfront fee). The client compares quotes side by side and accepts one — so a clear, well-priced quote wins the job outright. Track everything you've applied to under **My applications**.
 
 Can't price a job without seeing it? On either path, toggle **Site visit first** instead of quoting blind. Add a single visit fee (or leave it at $0 for a free visit) — the client agrees with one tap, you do the visit, and the fee is **pre-filled into your real quote**, which you can keep to charge on top or delete to waive.
+
+Need answers before you can price it? On the job board you can also apply with **Chat first** — your opening message starts a conversation on the post, and you send your full quote from your application when you're ready (**Send quote**). If the client picks you, the conversation **carries over into the job chat**, so nothing gets repeated.
 
 Browsing with the **Any trade** filter and spot a job outside your trade? Use the **share icon** on the card (or **Refer this job** on the post) to send it to a verified tradesperson in that trade — they're notified and can apply directly.
 
@@ -389,7 +393,7 @@ Once installed, Blue Seal opens full-screen like a normal app and updates itself
     keywords: ["notifications", "alerts", "bell", "email", "push", "updates"],
     body: `The **bell** icon shows your in-app notifications — new messages, quote and application updates, and job status changes. Tap one to jump straight to the job it's about.
 
-Outside the app, Blue Seal can reach you by **email**, **WhatsApp** (time-critical events), and **push notifications** — instant alerts on your device even when Blue Seal is closed. We'll offer to switch push on at the moments it matters most — when a tradesperson signs up, and when a client requests a tradesperson or posts a job — but you can turn it on (or off) any time per device from **Account → Notifications**. Your browser asks permission once. On iPhone, add Blue Seal to your home screen first (see "Install Blue Seal"), then enable push from inside the installed app.
+Outside the app, Blue Seal can reach you by **email**, **WhatsApp** (time-critical events), and **push notifications** — instant alerts on your device even when Blue Seal is closed. We'll offer to switch push on when you create your account, and keep offering when you come back until it's on for the device you're using — but you stay in control: you can turn it on (or off) any time per device from **Account → Notifications**. Your browser asks permission once. On iPhone, add Blue Seal to your home screen first (see "Install Blue Seal"), then enable push from inside the installed app.
 
 You can manage all of these from your **Account** settings.`,
   },
@@ -852,7 +856,7 @@ const faqs: FaqItem[] = [
   {
     question: "Can I get notifications on my phone?",
     answer:
-      "Yes — turn on **push notifications** from **Account → Notifications**. We'll also offer to switch it on when you sign up as a tradesperson, or when you request a tradesperson or post a job as a client. It's per device: your browser asks permission once, and from then on you get instant alerts (new messages, quotes, job updates) even when Blue Seal is closed. On iPhone, add Blue Seal to your home screen first, then enable push from inside the installed app. Turn it off any time from the same toggle.",
+      "Yes — turn on **push notifications** from **Account → Notifications**. We'll also offer to switch it on when you create your account, and again when you come back until it's on. It's per device: your browser asks permission once, and from then on you get instant alerts (new messages, quotes, job updates) even when Blue Seal is closed. On iPhone, add Blue Seal to your home screen first, then enable push from inside the installed app. Turn it off any time from the same toggle.",
     categoryId: "account-app",
     audience: "all",
   },

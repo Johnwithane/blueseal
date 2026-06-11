@@ -39,15 +39,23 @@ const baseFields = {
     .optional(),
 };
 
-// An application is EITHER a full quote (kind "full") OR a "site visit before
-// quoting" ask (kind "site_visit", carrying a single siteVisitFee). preprocess
-// injects kind "full" for any legacy caller that omits it.
+// An application is a full quote (kind "full"), a "site visit before quoting"
+// ask (kind "site_visit", carrying a single siteVisitFee), or a "chat first"
+// opener (kind "chat" — no quote yet; the message seeds the Q&A thread and a
+// quote follows via reviseApplication). preprocess injects kind "full" for any
+// legacy caller that omits it.
 const Input = z.preprocess(
   (val) =>
     val && typeof val === "object" && !("kind" in val) ? { ...val, kind: "full" } : val,
   z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("full"), ...baseFields, quote: QuoteInput }),
     z.object({ kind: z.literal("site_visit"), ...baseFields, siteVisitFee: SiteVisitFeeSchema }),
+    z.object({
+      kind: z.literal("chat"),
+      ...baseFields,
+      // The opener IS the application — it has to say something.
+      message: z.string().trim().min(1).max(2000),
+    }),
   ]),
 );
 
@@ -80,7 +88,13 @@ export const submitApplication = onCall(CALLABLE_OPTS, async (req) => {
   let siteVisitFee: { description: string; feeCents: number; taxRate: number } | null;
   let proposedPrice: { type: "fixed"; amount: number };
 
-  if (data.kind === "site_visit") {
+  if (data.kind === "chat") {
+    // No quote yet — the conversation comes first. The compare UI overrides
+    // the $0 summary with a "wants to chat first" label.
+    applicationQuote = null;
+    siteVisitFee = null;
+    proposedPrice = { type: "fixed", amount: 0 };
+  } else if (data.kind === "site_visit") {
     applicationQuote = null;
     siteVisitFee = data.siteVisitFee;
     // The one-line summary = the visit fee (0 = free). The client compare UI
@@ -197,11 +211,47 @@ export const submitApplication = onCall(CALLABLE_OPTS, async (req) => {
     // paired trigger.)
     const postSnap = await postRef.get();
     const post = postSnap.data() as { clientId: string; title: string };
+
+    // Chat-first application: the cover message IS the conversation opener —
+    // seed it into the Q&A thread (with an unread bump, like any first
+    // message) so the client can simply reply. Best-effort: a seeding miss
+    // leaves the message on the application card, which the thread UI shows
+    // anyway.
+    if (data.kind === "chat") {
+      try {
+        let sender: { displayName?: string | null; photoURL?: string | null } = {};
+        try {
+          sender =
+            ((await db.doc(`users/${uid}`).get()).data() as typeof sender | undefined) ?? {};
+        } catch {
+          /* name/photo stay null */
+        }
+        await appRef.collection("messages").add({
+          senderId: uid,
+          text: message,
+          createdAt: FieldValue.serverTimestamp(),
+          type: "text",
+          senderName: (sender.displayName ?? "").trim() || null,
+          senderPhotoURL: sender.photoURL ?? null,
+        });
+        await appRef.update({
+          threadLastMessageAt: FieldValue.serverTimestamp(),
+          threadLastMessagePreview: message.slice(0, 120),
+          [`threadUnreadCounts.${post.clientId}`]: FieldValue.increment(1),
+        });
+      } catch (err) {
+        logger.warn("submitApplication: chat opener seed failed", { ...ctx, err });
+      }
+    }
+
     await notify({
       userId: post.clientId,
       type: "new_application",
-      title: "New tradesperson applied",
-      body: `Someone applied to your job "${post.title}".`,
+      title: data.kind === "chat" ? "A tradesperson wants to chat" : "New tradesperson applied",
+      body:
+        data.kind === "chat"
+          ? `Someone has questions about your job "${post.title}" before quoting — open it to reply.`
+          : `Someone applied to your job "${post.title}".`,
       link: `/jobs/posted/${postId}`,
       actorUid: uid,
       recipientRole: "client",

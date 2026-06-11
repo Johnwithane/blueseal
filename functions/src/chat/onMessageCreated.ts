@@ -8,6 +8,7 @@ interface MessageLike {
   text?: string;
   photoUrl?: string | null;
   type?: string;
+  carriedOver?: boolean;
 }
 
 interface ChatLike {
@@ -30,6 +31,9 @@ export const onMessageCreated = onDocumentCreated(
     // them — both parties are already looking at the event that caused
     // them, and pinging the bell on every schedule edit is too noisy.
     if (msg.type === "system" || msg.senderId === "system") return;
+    // History copied in from a pre-acceptance application thread — both
+    // parties already read it there; no unread bump, no re-notification.
+    if (msg.carriedOver) return;
     const chatId = event.params.chatId;
     const chatRef = db.doc(`chats/${chatId}`);
     const chatSnap = await chatRef.get();

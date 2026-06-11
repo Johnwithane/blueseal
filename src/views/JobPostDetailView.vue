@@ -101,10 +101,12 @@ const pendingApp = ref<WithId<ApplicationDoc> | null>(null);
 const applyHourlyRate = ref<number | null>(null);
 const composerState = ref<QuoteComposerState | null>(null);
 // "quote" = apply with a full itemized quote. "site_visit" = apply asking to
-// see the job first, with an optional fee (no quote yet).
-const applyMode = ref<"quote" | "site_visit">("quote");
+// see the job first, with an optional fee (no quote yet). "chat" = open a
+// conversation first — no quote until the tradie has the answers they need.
+const applyMode = ref<"quote" | "site_visit" | "chat">("quote");
 const siteVisitState = ref<SiteVisitFormState | null>(null);
 const applySubmitLabel = computed(() => {
+  if (applyMode.value === "chat") return "Apply & start chat";
   if (applyMode.value === "site_visit") {
     const fee = siteVisitState.value?.fee.feeCents ?? 0;
     return fee > 0 ? `Apply — site visit ${money(fee)}` : "Apply — free site visit";
@@ -264,9 +266,20 @@ async function submitApply() {
   if (!post.value || submittingApply.value) return;
   applyError.value = null;
 
-  // Build the payload per mode: a full quote, or a "site visit first" ask.
+  // Build the payload per mode: a full quote, a "site visit first" ask, or a
+  // "chat first" opener.
   let payload: unknown;
-  if (applyMode.value === "site_visit") {
+  if (applyMode.value === "chat") {
+    if (!applyMessage.value.trim()) {
+      applyError.value = "Write an opening message — it starts the chat with the client.";
+      return;
+    }
+    payload = {
+      kind: "chat",
+      postId: postId.value,
+      message: applyMessage.value.trim(),
+    };
+  } else if (applyMode.value === "site_visit") {
     const sv = siteVisitState.value;
     if (!sv || !sv.valid) {
       applyError.value = "Tell the client what the site visit is for.";
@@ -308,10 +321,12 @@ async function submitApply() {
   try {
     await submitApplication(parsed.data);
     toast.success(
-      applyMode.value === "site_visit" ? "Application sent" : "Quote sent",
-      applyMode.value === "site_visit"
-        ? "You asked to visit first. If the client picks you, you'll arrange the visit, then quote."
-        : "The client can compare and accept it. They typically respond within 24 hours.",
+      applyMode.value === "quote" ? "Quote sent" : "Application sent",
+      applyMode.value === "chat"
+        ? "Your message is in front of the client. Chat it through, then send your quote when you're ready."
+        : applyMode.value === "site_visit"
+          ? "You asked to visit first. If the client picks you, you'll arrange the visit, then quote."
+          : "The client can compare and accept it. They typically respond within 24 hours.",
     );
     applyMessage.value = "";
     applyAttempted.value = false;
@@ -375,8 +390,11 @@ async function onAccept(app: WithId<ApplicationDoc>) {
     message: isVisit
       ? `Go with ${tradieLabel}? They'll do a site visit first, then send you a full quote. ` +
         `Other applicants will be told you've chosen someone.`
-      : `Start a job with ${tradieLabel}? Other applicants will be told you've chosen someone. ` +
-        `If it doesn't work out, you can return to your applicants before completing the brief.`,
+      : app.kind === "chat"
+        ? `Go with ${tradieLabel}? They'll send you a full quote on the job — your conversation ` +
+          `carries over. Other applicants will be told you've chosen someone.`
+        : `Start a job with ${tradieLabel}? Other applicants will be told you've chosen someone. ` +
+          `If it doesn't work out, you can return to your applicants before completing the brief.`,
     header: isVisit ? "Agree to a site visit?" : "Pick this tradesperson?",
     icon: "pi pi-check-circle",
     acceptLabel: isVisit ? "Yes, agree" : "Yes, pick them",
@@ -653,6 +671,11 @@ const visibleApplications = computed(() =>
                 : "free"
             }}. You'll send a full quote after the visit.
           </div>
+          <div v-else-if="myApplication.kind === 'chat'" class="text-xs mt-2">
+            <i class="pi pi-comments mr-1"></i>You asked to chat first — no quote yet.
+            Talk it through in Messages, then hit <span class="font-medium">Send quote</span>
+            when you're ready.
+          </div>
           <div v-else class="text-xs mt-2">Proposed: {{ priceLabel(myApplication.proposedPrice) }}</div>
 
           <!-- Client passed with a reason — surfaced so the tradie knows what
@@ -685,8 +708,8 @@ const visibleApplications = computed(() =>
             />
             <Tag v-if="myUnread > 0 && !showMyThread" value="New" severity="danger" />
             <Button
-              label="Revise quote"
-              icon="pi pi-pencil"
+              :label="myApplication.quote ? 'Revise quote' : 'Send quote'"
+              :icon="myApplication.quote ? 'pi pi-pencil' : 'pi pi-send'"
               size="small"
               @click="showRevise = true"
             />
@@ -723,21 +746,29 @@ const visibleApplications = computed(() =>
           @submit.prevent="submitApply"
         >
           <h2 class="text-lg font-semibold">
-            {{ applyMode === "site_visit" ? "Apply with a site visit" : "Send a quote" }}
+            {{
+              applyMode === "site_visit"
+                ? "Apply with a site visit"
+                : applyMode === "chat"
+                  ? "Chat before quoting"
+                  : "Send a quote"
+            }}
           </h2>
           <p class="text-xs text-[color:var(--bs-muted)]">
             {{
               applyMode === "site_visit"
                 ? "Some jobs can't be priced sight-unseen. Ask to see it first — if the client picks you, you'll arrange the visit, then send a full quote."
-                : "Your quote is what the client compares and accepts — itemize the work so they can say yes with confidence."
+                : applyMode === "chat"
+                  ? "Need more detail before pricing? Start a conversation with the client — once you have the answers, send your quote from this page."
+                  : "Your quote is what the client compares and accepts — itemize the work so they can say yes with confidence."
             }}
           </p>
 
-          <!-- Mode toggle: full quote vs "site visit first". -->
+          <!-- Mode toggle: full quote / site visit first / chat first. -->
           <div class="flex rounded-lg border border-[color:var(--bs-border)] p-1 text-sm">
             <button
               type="button"
-              class="flex-1 rounded-md py-2 px-3 font-medium transition-colors"
+              class="flex-1 rounded-md py-2 px-2 font-medium transition-colors"
               :class="applyMode === 'quote' ? 'bg-[color:var(--bs-brand)] text-white' : 'text-[color:var(--bs-muted)]'"
               @click="applyMode = 'quote'"
             >
@@ -745,27 +776,48 @@ const visibleApplications = computed(() =>
             </button>
             <button
               type="button"
-              class="flex-1 rounded-md py-2 px-3 font-medium transition-colors"
+              class="flex-1 rounded-md py-2 px-2 font-medium transition-colors"
               :class="applyMode === 'site_visit' ? 'bg-[color:var(--bs-brand)] text-white' : 'text-[color:var(--bs-muted)]'"
               @click="applyMode = 'site_visit'"
             >
               Site visit first
             </button>
+            <button
+              type="button"
+              class="flex-1 rounded-md py-2 px-2 font-medium transition-colors"
+              :class="applyMode === 'chat' ? 'bg-[color:var(--bs-brand)] text-white' : 'text-[color:var(--bs-muted)]'"
+              @click="applyMode = 'chat'"
+            >
+              Chat first
+            </button>
           </div>
 
           <div>
             <label class="text-sm font-medium">
-              Cover message <span class="font-normal text-[color:var(--bs-muted)]">(optional)</span>
+              <template v-if="applyMode === 'chat'">Your message</template>
+              <template v-else>
+                Cover message
+                <span class="font-normal text-[color:var(--bs-muted)]">(optional)</span>
+              </template>
             </label>
             <Textarea
               v-model="applyMessage"
               rows="4"
               maxlength="2000"
-              placeholder="Why you're a good fit, your approach, when you can start, and what's included…"
+              :placeholder="
+                applyMode === 'chat'
+                  ? 'Introduce yourself and ask what you need to know to price this job…'
+                  : 'Why you\'re a good fit, your approach, when you can start, and what\'s included…'
+              "
               class="mt-1 w-full"
             />
             <p class="mt-1 text-xs text-[color:var(--bs-muted)]">
-              Tip: a couple of sentences about your fit and approach improves your chances.
+              <template v-if="applyMode === 'chat'">
+                This opens the conversation — the client replies right on their post.
+              </template>
+              <template v-else>
+                Tip: a couple of sentences about your fit and approach improves your chances.
+              </template>
             </p>
           </div>
 
@@ -774,7 +826,7 @@ const visibleApplications = computed(() =>
             @update:state="(s) => (siteVisitState = s)"
           />
           <QuoteComposer
-            v-else
+            v-else-if="applyMode === 'quote'"
             :hourly-rate-cents="applyHourlyRate"
             hide-note
             :show-errors="applyAttempted"

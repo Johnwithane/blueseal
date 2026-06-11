@@ -7,6 +7,7 @@ import { db, storage } from "../lib/admin";
 import { requireRoleOrAdmin } from "../lib/auth";
 import { logAdminAction } from "../lib/audit";
 import { notify } from "../lib/notify";
+import { copyApplicationThreadToChat } from "./applicationThread";
 
 const Input = z.object({
   postId: z.string().min(1).max(128),
@@ -38,8 +39,10 @@ interface ApplicationDoc {
   tradespersonId: string;
   status: string;
   // Absent ⇒ "full". A "site_visit" application carries no quote; accepting it
-  // is the client agreeing to a visit first, with this single fee.
-  kind?: "full" | "site_visit";
+  // is the client agreeing to a visit first, with this single fee. A "chat"
+  // application is a conversation opener with no quote yet — picking the
+  // tradesperson starts the job in "requested" so they can quote.
+  kind?: "full" | "site_visit" | "chat";
   siteVisitFee?: { description: string; feeCents: number; taxRate: number } | null;
 }
 
@@ -115,6 +118,7 @@ export const acceptApplication = onCall(CALLABLE_OPTS, async (req) => {
 
   let postSnapshot: PostDoc | null = null;
   let isSiteVisit = false;
+  let isChat = false;
 
   try {
     await db.runTransaction(async (tx) => {
@@ -220,6 +224,7 @@ export const acceptApplication = onCall(CALLABLE_OPTS, async (req) => {
       // jobs/{jobId}/siteVisit/current as "agreed" so the tradesperson's quote
       // composer later pre-fills the visit fee line (same seam as the direct flow).
       isSiteVisit = app.kind === "site_visit" && !!app.siteVisitFee;
+      isChat = app.kind === "chat";
       if (isSiteVisit && app.siteVisitFee) {
         tx.set(jobRef.collection("siteVisit").doc("current"), {
           tradespersonId: app.tradespersonId,
@@ -291,6 +296,10 @@ export const acceptApplication = onCall(CALLABLE_OPTS, async (req) => {
     }
   }
 
+  // Carry the pre-acceptance Q&A thread into the new job chat so the
+  // conversation continues where it left off.
+  await copyApplicationThreadToChat(postId, applicationId, chatRef.id);
+
   // Notify the selected tradie.
   if (post) {
     await notify({
@@ -299,7 +308,9 @@ export const acceptApplication = onCall(CALLABLE_OPTS, async (req) => {
       title: "You were selected!",
       body: isSiteVisit
         ? `The client chose you for "${post.title}" and agreed to a site visit first. Open the job to arrange the visit, then send your quote.`
-        : `The client chose you for "${post.title}". Open the job to introduce yourself.`,
+        : isChat
+          ? `The client chose you for "${post.title}". Open the job to send your quote.`
+          : `The client chose you for "${post.title}". Open the job to introduce yourself.`,
       link: `/jobs/${jobRef.id}`,
       jobId: jobRef.id,
       actorUid: uid,
