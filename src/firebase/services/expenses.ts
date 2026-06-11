@@ -55,6 +55,18 @@ export async function listJobExpenses(jobId: string): Promise<WithId<ExpenseDoc>
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
+/** Watch a single expense — used by AddExpenseDialog to reflect OCR results. */
+export function subscribeExpense(
+  jobId: string,
+  expenseId: string,
+  cb: (e: WithId<ExpenseDoc> | null) => void,
+): () => void {
+  const r = doc(db, "jobs", jobId, "expenses", expenseId).withConverter(
+    typedConverter<ExpenseDoc>(),
+  );
+  return onSnapshot(r, (snap) => cb(snap.exists() ? { id: snap.id, ...snap.data() } : null));
+}
+
 function extForFile(file: File): string {
   const name = file.name.toLowerCase();
   if (name.endsWith(".pdf")) return "pdf";
@@ -119,19 +131,21 @@ export async function uploadReceiptAndCreateExpense(
 export async function createManualExpense(
   jobId: string,
   clientId: string,
+  initial?: ExpensePatch,
 ): Promise<{ expenseId: string }> {
   const uid = fbAuth.currentUser?.uid;
   if (!uid) throw new Error("Sign in required to add an expense.");
   const docRef = await addDoc(expensesCol(jobId), {
     tradespersonId: uid,
     clientId,
-    description: "",
-    vendor: null,
-    spentAt: null,
-    totalCost: 0,
-    markupPercent: DEFAULT_MARKUP_PERCENT,
-    billedAmount: 0,
-    category: "materials",
+    description: (initial?.description ?? "").slice(0, 300),
+    vendor: initial?.vendor ?? null,
+    // Date converts to Timestamp on write (same dodge as serverTimestamp below).
+    spentAt: (initial?.spentAt ?? null) as never,
+    totalCost: Math.max(0, Math.round(initial?.totalCost ?? 0)),
+    markupPercent: Math.max(0, Math.min(1000, initial?.markupPercent ?? DEFAULT_MARKUP_PERCENT)),
+    billedAmount: Math.max(0, Math.round(initial?.billedAmount ?? 0)),
+    category: initial?.category !== undefined ? initial.category : "materials",
     receiptStoragePath: null,
     status: "ready",
     aiParsed: false,

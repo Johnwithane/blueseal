@@ -2,12 +2,10 @@
 import { computed, ref } from "vue";
 import Button from "primevue/button";
 import Tag from "primevue/tag";
-import InputText from "primevue/inputtext";
-import InputNumber from "primevue/inputnumber";
-import SelectButton from "primevue/selectbutton";
 import Message from "primevue/message";
 import type { JobExtraDoc, WithId } from "@/firebase/interfaces";
-import { proposeExtra, respondExtra, cancelExtra } from "@/firebase/services/jobExtras";
+import { respondExtra, cancelExtra } from "@/firebase/services/jobExtras";
+import ChangeOrderDialog from "@/components/ChangeOrderDialog.vue";
 import { useFormatters } from "@/composables/useFormatters";
 import { useToast } from "@/composables/useToast";
 import { useConfirmAction } from "@/composables/useConfirmAction";
@@ -43,47 +41,8 @@ function priceLabel(ex: WithId<JobExtraDoc>): string {
     : money(ex.flatAmountCents ?? 0);
 }
 
-// ---- propose (tradie) ----
-const showForm = ref(false);
-const desc = ref("");
-const billingType = ref<"flat" | "hourly">("hourly");
-const amountDollars = ref<number | null>(null);
-const submitting = ref(false);
-
-const billingOptions = [
-  { label: "Hourly", value: "hourly" },
-  { label: "Flat fee", value: "flat" },
-];
-
-const canSubmit = computed(
-  () => desc.value.trim().length > 0 && amountDollars.value != null && amountDollars.value > 0,
-);
-
-function resetForm() {
-  desc.value = "";
-  amountDollars.value = null;
-  billingType.value = "hourly";
-  showForm.value = false;
-}
-
-async function submit() {
-  if (!canSubmit.value || submitting.value) return;
-  submitting.value = true;
-  try {
-    await proposeExtra({
-      jobId: props.jobId,
-      description: desc.value.trim(),
-      billingType: billingType.value,
-      amountCents: Math.round((amountDollars.value as number) * 100),
-    });
-    toast.success("Change order sent", "The client will be asked to approve it.");
-    resetForm();
-  } catch (e) {
-    toast.error("Couldn't send change order", humanizeError(e));
-  } finally {
-    submitting.value = false;
-  }
-}
+// ---- propose (tradie): popup dialog, same pattern as "Add time manually" ----
+const showProposeDialog = ref(false);
 
 // ---- respond (client) ----
 const respondingId = ref<string | null>(null);
@@ -134,71 +93,15 @@ function withdraw(ex: WithId<JobExtraDoc>) {
         </p>
       </div>
       <Button
-        v-if="isTradie && !showForm"
+        v-if="isTradie"
         label="Add"
         icon="pi pi-plus"
         size="small"
         outlined
         class="shrink-0"
-        @click="showForm = true"
+        @click="showProposeDialog = true"
       />
     </header>
-
-    <!-- Propose form (tradie) -->
-    <div
-      v-if="isTradie && showForm"
-      class="rounded-lg border border-[color:var(--bs-border)] p-3 mb-3 space-y-3"
-    >
-      <div>
-        <label class="text-xs font-medium" for="co-desc">What's the extra work?</label>
-        <InputText
-          id="co-desc"
-          v-model="desc"
-          maxlength="200"
-          placeholder="e.g. Replace corroded shut-off valve"
-          class="w-full mt-1"
-        />
-      </div>
-      <div>
-        <label class="text-xs font-medium">How is it billed?</label>
-        <SelectButton
-          v-model="billingType"
-          :options="billingOptions"
-          option-label="label"
-          option-value="value"
-          :allow-empty="false"
-          class="mt-1"
-        />
-      </div>
-      <div>
-        <label class="text-xs font-medium" for="co-amount">
-          {{ billingType === "hourly" ? "Hourly rate (CAD)" : "Amount (CAD)" }}
-        </label>
-        <InputNumber
-          v-model="amountDollars"
-          input-id="co-amount"
-          mode="currency"
-          currency="CAD"
-          :min="0"
-          class="w-full mt-1"
-        />
-        <p v-if="billingType === 'hourly'" class="text-[11px] text-[color:var(--bs-muted)] mt-1">
-          Once approved, clock your time against it from the time tracker above.
-        </p>
-      </div>
-      <div class="flex gap-2">
-        <Button label="Cancel" size="small" text severity="secondary" @click="resetForm" />
-        <Button
-          label="Send for approval"
-          icon="pi pi-send"
-          size="small"
-          class="ml-auto"
-          :loading="submitting"
-          :disabled="!canSubmit"
-          @click="submit"
-        />
-      </div>
-    </div>
 
     <Message
       v-if="visible.length === 0"
@@ -227,6 +130,9 @@ function withdraw(ex: WithId<JobExtraDoc>) {
               {{ priceLabel(ex) }}
               <span v-if="ex.billingType === 'hourly'"> · hourly</span>
               <span v-else> · flat fee</span>
+              <span v-if="ex.billingType === 'hourly' && ex.estimatedHours">
+                · ~{{ ex.estimatedHours }}h est.</span
+              >
             </div>
           </div>
           <Tag :value="STATUS_TAG[ex.status].label" :severity="STATUS_TAG[ex.status].severity" />
@@ -276,5 +182,11 @@ function withdraw(ex: WithId<JobExtraDoc>) {
         </div>
       </li>
     </ul>
+
+    <ChangeOrderDialog
+      v-if="isTradie"
+      v-model:visible="showProposeDialog"
+      :job-id="jobId"
+    />
   </div>
 </template>

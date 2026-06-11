@@ -9,16 +9,13 @@ import Message from "primevue/message";
 import {
   DEFAULT_MARKUP_PERCENT,
   computeBilledAmount,
-  createManualExpense,
   deleteExpense,
   getReceiptDownloadUrl,
-  parseReceiptCallable,
   subscribeJobExpenses,
   updateExpense,
-  uploadReceiptAndCreateExpense,
 } from "@/firebase/services/expenses";
 import type { ExpenseCategory, ExpenseDoc, WithId } from "@/firebase/interfaces";
-import { compressOrPassPdf } from "@/utils/image";
+import AddExpenseDialog from "@/components/AddExpenseDialog.vue";
 import { useFormatters } from "@/composables/useFormatters";
 import { useToast } from "@/composables/useToast";
 import { useConfirmAction } from "@/composables/useConfirmAction";
@@ -44,9 +41,8 @@ const { confirmDestructive } = useConfirmAction();
 const expenses = ref<WithId<ExpenseDoc>[]>([]);
 const loading = ref(true);
 const loadError = ref<string | null>(null);
-const uploading = ref(false);
-const adding = ref(false);
-const fileInput = ref<HTMLInputElement | null>(null);
+// "Add expense" popup — receipt upload + AI auto-fill, or manual entry.
+const showAddDialog = ref(false);
 
 const CATEGORY_OPTIONS: { label: string; value: ExpenseCategory }[] = [
   { label: "Materials", value: "materials" },
@@ -86,55 +82,6 @@ function attach() {
 onMounted(attach);
 onBeforeUnmount(() => unsubscribe?.());
 watch(() => props.jobId, attach);
-
-function pickFile() {
-  fileInput.value?.click();
-}
-
-async function onFileChange(ev: Event) {
-  const input = ev.target as HTMLInputElement;
-  const file = input.files?.[0];
-  input.value = "";
-  if (!file) return;
-  await handleUpload(file);
-}
-
-async function handleUpload(file: File) {
-  if (uploading.value) return;
-  uploading.value = true;
-  try {
-    // Storage rules accept webp + pdf only. Compress images first; pass PDFs through.
-    const prepared = await compressOrPassPdf(file, { maxDimension: 1800, quality: 0.82 });
-    const { expenseId } = await uploadReceiptAndCreateExpense(
-      props.jobId,
-      props.clientId,
-      prepared,
-    );
-    toast.info("Receipt uploaded", "Reading it now…");
-    // Fire-and-forget OCR; the snapshot stream updates fields when it returns.
-    parseReceiptCallable(props.jobId, expenseId).catch((e) => {
-      // Subscription-gate or transient — surface but don't block.
-      toast.warn("Couldn't auto-read", humanizeError(e));
-    });
-  } catch (e) {
-    toast.error("Upload failed", humanizeError(e));
-  } finally {
-    uploading.value = false;
-  }
-}
-
-async function addManual() {
-  if (adding.value) return;
-  adding.value = true;
-  try {
-    await createManualExpense(props.jobId, props.clientId);
-    toast.info("Material added", "Fill in the description and cost below");
-  } catch (e) {
-    toast.error("Couldn't add", humanizeError(e));
-  } finally {
-    adding.value = false;
-  }
-}
 
 async function patchField(
   entry: WithId<ExpenseDoc>,
@@ -218,35 +165,15 @@ function statusTagSeverity(s: ExpenseDoc["status"]): "info" | "warn" | "success"
       </div>
     </header>
 
-    <input
-      ref="fileInput"
-      type="file"
-      accept="image/*,application/pdf"
-      class="hidden"
-      @change="onFileChange"
+    <Button
+      label="Add expense"
+      icon="pi pi-plus"
+      class="w-full"
+      @click="showAddDialog = true"
     />
-    <div class="grid grid-cols-2 gap-2">
-      <Button
-        label="Upload receipt"
-        icon="pi pi-camera"
-        class="w-full"
-        :loading="uploading"
-        :disabled="uploading"
-        @click="pickFile"
-      />
-      <Button
-        label="Add material"
-        icon="pi pi-plus"
-        outlined
-        class="w-full"
-        :loading="adding"
-        :disabled="adding"
-        @click="addManual"
-      />
-    </div>
     <p class="text-[11px] text-[color:var(--bs-muted)] mt-1.5 leading-snug">
-      Receipts are auto-read for total, vendor and date — or add a material
-      you supplied yourself, no receipt needed.
+      Upload a receipt and it's auto-read for total, vendor and date — or add a
+      material you supplied yourself, no receipt needed.
       <template v-if="costTrackingOnly">
         On a fixed-price job these stay on your records — to charge an out-of-scope
         material, add a change order above.
@@ -368,5 +295,12 @@ function statusTagSeverity(s: ExpenseDoc["status"]): "info" | "warn" | "success"
         </div>
       </li>
     </ul>
+
+    <AddExpenseDialog
+      v-model:visible="showAddDialog"
+      :job-id="jobId"
+      :client-id="clientId"
+      :cost-tracking-only="costTrackingOnly"
+    />
   </div>
 </template>

@@ -14,6 +14,9 @@ const Input = z.object({
   billingType: z.enum(["flat", "hourly"]),
   // For "flat": the one-off amount in cents. For "hourly": the rate in cents/hr.
   amountCents: z.number().int().min(1).max(100_000_000),
+  // Optional ballpark for hourly change orders (display-only — the invoice
+  // bills actual clocked time). Ignored for flat.
+  estimatedHours: z.number().min(0).max(10_000).nullable().optional(),
 });
 
 interface JobData {
@@ -39,6 +42,10 @@ export const proposeExtra = onCall(CALLABLE_OPTS, async (req) => {
   const parsed = Input.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);
   const { jobId, description, billingType, amountCents } = parsed.data;
+  const estimatedHours =
+    billingType === "hourly" && (parsed.data.estimatedHours ?? 0) > 0
+      ? parsed.data.estimatedHours!
+      : null;
 
   const jobRef = db.doc(`jobs/${jobId}`);
   const extraRef = jobRef.collection("extras").doc();
@@ -62,6 +69,7 @@ export const proposeExtra = onCall(CALLABLE_OPTS, async (req) => {
       billingType,
       flatAmountCents: billingType === "flat" ? amountCents : null,
       hourlyRateCents: billingType === "hourly" ? amountCents : null,
+      estimatedHours,
       status: "proposed",
       proposedAt: FieldValue.serverTimestamp(),
       decidedAt: null,
@@ -79,7 +87,9 @@ export const proposeExtra = onCall(CALLABLE_OPTS, async (req) => {
 
   const dollars = (cents: number) => `$${(cents / 100).toFixed(2)}`;
   const priceLabel =
-    billingType === "hourly" ? `${dollars(amountCents)}/hr` : dollars(amountCents);
+    billingType === "hourly"
+      ? `${dollars(amountCents)}/hr${estimatedHours ? ` (~${estimatedHours}h est.)` : ""}`
+      : dollars(amountCents);
 
   if (result.chatId) {
     await postSystemMessage(

@@ -40,6 +40,7 @@ export async function proposeExtra(input: {
   description: string;
   billingType: "flat" | "hourly";
   amountCents: number; // flat: the amount; hourly: the rate (cents/hr)
+  estimatedHours?: number | null; // hourly only — display ballpark for the client
 }): Promise<{ ok: true; extraId: string }> {
   const fn = httpsCallable<typeof input, { ok: true; extraId: string }>(functions, "proposeExtra");
   const res = await fn(input);

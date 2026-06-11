@@ -894,6 +894,9 @@ export interface JobExtraDoc {
   billingType: "flat" | "hourly";
   flatAmountCents: number | null; // set when billingType === "flat"
   hourlyRateCents: number | null; // set when billingType === "hourly"
+  // Optional ballpark for hourly change orders — display-only (the invoice
+  // bills actual clocked time). Null for flat or when the tradie skipped it.
+  estimatedHours?: number | null;
   status: JobExtraStatus;
   proposedAt: Timestamp;
   decidedAt: Timestamp | null; // when the client approved/declined
