@@ -55,6 +55,7 @@ import UpfrontFeePaymentBanner from "@/components/UpfrontFeePaymentBanner.vue";
 import TradieChangesRequestedBanner from "@/components/TradieChangesRequestedBanner.vue";
 import MutualReviewCard from "@/components/MutualReviewCard.vue";
 import JobChangeBanner from "@/components/JobChangeBanner.vue";
+import JobStatusTimeline from "@/components/JobStatusTimeline.vue";
 import ProposedChangeOrderBanner from "@/components/ProposedChangeOrderBanner.vue";
 import ProposedSiteVisitBanner from "@/components/ProposedSiteVisitBanner.vue";
 import { SEED_INTAKE_SCHEMAS } from "@/data/intakeSchemas";
@@ -1028,6 +1029,14 @@ function onReturnToApplicants() {
             <span class="font-medium text-[color:var(--bs-text)]">{{ counterpartyName }}</span>
           </span>
         </div>
+
+        <!-- "Where are we?" at a glance — five fixed milestones; the Tag still
+             carries the exact status. Hidden on cancelled jobs. -->
+        <JobStatusTimeline
+          :status="job.status"
+          :status-before-hold="job.statusBeforeHold ?? null"
+          class="mt-3 max-w-md"
+        />
 
         <!-- Quick clock for the tradie while the job is active. The full
              Work Order tab handles travel + change-order sessions. -->
