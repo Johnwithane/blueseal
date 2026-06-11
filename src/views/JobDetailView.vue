@@ -448,14 +448,14 @@ watch(
 // the bar gets thinner on mobile so the chat composer can sit comfortably
 // above it.
 // Every tradesperson-actionable step in the loop gets a sticky CTA so
-// "what's next" is never buried in a tab. `awaiting_client_approval` is
-// the one wait-state we intentionally skip — the InvoiceTab already
-// renders the explainer card, and there's no tradie action to take.
+// "what's next" is never buried in a tab. Two intentional skips:
+// `awaiting_client_approval` (wait-state — the InvoiceTab explains it) and
+// `in_progress` (Create invoice lives ONLY in the Invoice tab now, so the
+// invoice gets made where invoices live).
 const stickyCTAStatuses: ReadonlySet<JobStatus> = new Set([
   "requested",
   "quoted",
   "awaiting_upfront_payment",
-  "in_progress",
   "awaiting_payment",
 ]);
 const showStickyCTA = computed(
@@ -1234,9 +1234,8 @@ function onReturnToApplicants() {
 
       <ClientApprovalBanner
         v-if="isClient && job.status === 'awaiting_client_approval'"
-        :job-id="job.id"
         class="mb-4"
-        @decided="load"
+        @review="onTabChange('invoice')"
       />
 
       <!-- Changes-requested loopback. Mirrors the quote decline -> revise
@@ -1340,6 +1339,8 @@ function onReturnToApplicants() {
           :resolved-client-name="resolvedClientName"
           @mark-paid="onMarkPaid"
           @revise-quote="showQuoteSheet = true"
+          @create-invoice="showFinishSheet = true"
+          @decided="load"
           @paid="load"
         />
       </div>
@@ -1409,14 +1410,6 @@ function onReturnToApplicants() {
           size="large"
           :loading="markingUpfront"
           @click="onMarkUpfrontPaid"
-        />
-        <Button
-          v-else-if="job.status === 'in_progress'"
-          :label="job.clientChangesRequestedAt ? 'Update invoice' : 'Create invoice'"
-          :icon="job.clientChangesRequestedAt ? 'pi pi-pencil' : 'pi pi-receipt'"
-          class="w-full"
-          size="large"
-          @click="showFinishSheet = true"
         />
         <Button
           v-else-if="job.status === 'awaiting_payment'"
