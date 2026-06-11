@@ -227,6 +227,15 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, role: "tradesperson", layout: "app", title: "Payouts" },
   },
 
+  // Tradesperson-created job for an off-platform client ("bring your own
+  // client"). Static path wins over /jobs/:id in route ranking.
+  {
+    path: "/jobs/new",
+    name: "TradieNewJob",
+    component: () => import("@/views/tradie/CreateJobView.vue"),
+    meta: { requiresAuth: true, role: "tradesperson", layout: "app", title: "New job" },
+  },
+
   // Job detail (tradies + clients)
   {
     path: "/jobs/:id",

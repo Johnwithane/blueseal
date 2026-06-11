@@ -49,6 +49,7 @@ import type {
 import { useFormatters } from "@/composables/useFormatters";
 import FinishJobSheet from "@/components/FinishJobSheet.vue";
 import ClientApprovalBanner from "@/components/ClientApprovalBanner.vue";
+import InviteStatusBanner from "@/components/InviteStatusBanner.vue";
 import QuoteSheet from "@/components/QuoteSheet.vue";
 import ClientQuoteApprovalBanner from "@/components/ClientQuoteApprovalBanner.vue";
 import UpfrontFeePaymentBanner from "@/components/UpfrontFeePaymentBanner.vue";
@@ -1153,6 +1154,14 @@ function onReturnToApplicants() {
 
       <!-- Global banners — always above the tabs so the user can't miss them
            while browsing tab content. -->
+
+      <!-- Bring-your-own-client: the invited client hasn't joined yet
+           (clientId null) — show the tradesperson the invite state. -->
+      <InviteStatusBanner
+        v-if="isTradie && job.clientId === null && job.clientInvite"
+        :invite="job.clientInvite"
+        class="mb-4"
+      />
 
       <!-- Cancel/postpone request loop: respond (tradie), withdraw (client),
            or resume a held job (either). Self-renders only when there's a

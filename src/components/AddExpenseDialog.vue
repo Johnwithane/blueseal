@@ -16,6 +16,7 @@ import Select from "primevue/select";
 import Message from "primevue/message";
 import {
   DEFAULT_MARKUP_PERCENT,
+  EXPENSE_CATEGORY_OPTIONS,
   computeBilledAmount,
   createManualExpense,
   deleteExpense,
@@ -33,7 +34,7 @@ import { humanizeError } from "@/utils/errors";
 const props = defineProps<{
   visible: boolean;
   jobId: string;
-  clientId: string;
+  clientId: string | null;
   // Fixed-price jobs: receipts are cost-tracking only — hide markup/billing.
   costTrackingOnly?: boolean;
 }>();
@@ -46,13 +47,7 @@ const emit = defineEmits<{
 const { date, money } = useFormatters();
 const toast = useToast();
 
-const CATEGORY_OPTIONS: { label: string; value: ExpenseCategory }[] = [
-  { label: "Materials", value: "materials" },
-  { label: "Fuel", value: "fuel" },
-  { label: "Disposal", value: "disposal" },
-  { label: "Parking", value: "parking" },
-  { label: "Other", value: "other" },
-];
+const CATEGORY_OPTIONS = EXPENSE_CATEGORY_OPTIONS;
 
 // ----- form state -----
 const description = ref("");

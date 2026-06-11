@@ -8,6 +8,7 @@ import Tag from "primevue/tag";
 import Message from "primevue/message";
 import {
   DEFAULT_MARKUP_PERCENT,
+  EXPENSE_CATEGORY_OPTIONS,
   computeBilledAmount,
   deleteExpense,
   getReceiptDownloadUrl,
@@ -23,7 +24,7 @@ import { humanizeError } from "@/utils/errors";
 
 const props = defineProps<{
   jobId: string;
-  clientId: string;
+  clientId: string | null;
   tradespersonId: string;
   // On a fixed-price job receipts are cost-tracking only — they never bill the
   // client (the agreed price covers materials), so the markup / "client pays"
@@ -44,13 +45,7 @@ const loadError = ref<string | null>(null);
 // "Add expense" popup — receipt upload + AI auto-fill, or manual entry.
 const showAddDialog = ref(false);
 
-const CATEGORY_OPTIONS: { label: string; value: ExpenseCategory }[] = [
-  { label: "Materials", value: "materials" },
-  { label: "Fuel", value: "fuel" },
-  { label: "Disposal", value: "disposal" },
-  { label: "Parking", value: "parking" },
-  { label: "Other", value: "other" },
-];
+const CATEGORY_OPTIONS = EXPENSE_CATEGORY_OPTIONS;
 
 const totalCost = computed(() => expenses.value.reduce((acc, e) => acc + (e.totalCost ?? 0), 0));
 const totalBilled = computed(() =>

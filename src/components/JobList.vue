@@ -9,7 +9,7 @@ import { useToast } from "@/composables/useToast";
 import { useActiveClock } from "@/composables/useActiveClock";
 import { clockIn, clockOut, formatElapsed } from "@/firebase/services/timeEntries";
 import { humanizeError } from "@/utils/errors";
-import { statusLabel, STATUS_SEVERITY } from "@/utils/jobStatus";
+import { inviteTag, statusLabel, STATUS_SEVERITY } from "@/utils/jobStatus";
 import { tradeLabel } from "@/data/trades";
 import JobCounterparty from "@/components/JobCounterparty.vue";
 
@@ -307,6 +307,7 @@ function counterpartyPhoto(job: WithId<JobDoc>): string | null | undefined {
                 </div>
               </div>
               <div class="flex shrink-0 items-center gap-1.5">
+                <Tag v-if="inviteTag(job)" :value="inviteTag(job)!" severity="secondary" />
                 <Tag
                   v-if="changeTag(job)"
                   :value="changeTag(job)!.label"

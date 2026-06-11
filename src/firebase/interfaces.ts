@@ -655,8 +655,40 @@ export interface JobAddress {
   geo: GeoPoint | null;
 }
 
+// Pending invite to an off-platform client on a tradesperson-created job
+// ("bring your own client"). Server-managed end-to-end: createInviteJob mints
+// it, resendJobInvite / revokeJobInvite mutate it, claimJobInvite closes it —
+// the rules pin it against direct party writes (like pendingChange). Only the
+// SHA-256 hash of the copyable invite token is stored, so job-doc readability
+// never leaks the credential.
+export type ClientInviteStatus = "invited" | "claimed" | "revoked";
+
+export interface ClientInvite {
+  emailLower: string; // lowercased+trimmed at the boundary; claim matches on this
+  clientName: string; // what the tradesperson entered; also denormalized to job.clientName
+  status: ClientInviteStatus;
+  invitedAt: Timestamp;
+  // Gates the copy-link verify flow only (claim-by-verified-email ignores it
+  // while status is "invited"). Resend resets it.
+  expiresAt: Timestamp;
+  claimedAt: Timestamp | null;
+  revokedAt: Timestamp | null;
+  resendCount: number;
+  lastSentAt: Timestamp | null;
+  // null = the magic-link email never actually went out (CASL mailing-address
+  // gate unmet, or tradesperson chose copy-link-only delivery).
+  emailedAt: Timestamp | null;
+  // sha256 of the copyable invite-link token; rotated on resend, cleared on
+  // claim/revoke so stale links die.
+  tokenHash: string | null;
+}
+
 export interface JobDoc {
-  clientId: string;
+  // null = tradesperson-created job whose client hasn't claimed their invite
+  // yet (solo mode / "bring your own client"). Every "is the caller the
+  // client?" comparison is safely false against null; claimJobInvite (admin
+  // SDK) is the only writer that can attach a uid.
+  clientId: string | null;
   tradespersonId: string;
   // Denormalized at job-creation time so each party can render the
   // counterparty's name + avatar on dashboard cards without a cross-account
@@ -747,6 +779,18 @@ export interface JobDoc {
   // lazily from the quote and treat unknown as "fixed". Server-managed: the
   // rules pin it immutable so a party can't flip their own billing basis.
   billingType?: "hourly" | "fixed" | null;
+  // Present only on tradesperson-created jobs — see ClientInvite above.
+  // Server-managed; rules pin it against direct party writes.
+  clientInvite?: ClientInvite | null;
+  // Creation marker mirroring claimOriginated: the tradesperson created this
+  // job themselves, so onJobCreated skips the "new job request" page.
+  inviteOriginated?: boolean;
+  // Set (and never cleared) by recordOfflineQuoteAcceptance: the quote was
+  // accepted outside Blue Seal on the tradesperson's word, with no client
+  // signature. Sticky reputation gate — jobs with this flag never seed a
+  // review pair and the reviews create rules reject them, so offline-recorded
+  // jobs can't be used to fabricate public reputation. Server-managed.
+  acceptedOffline?: boolean;
 }
 
 // Tradesperson-private job log, stored at jobs/{jobId}/private/notes so it is
@@ -794,7 +838,7 @@ export type TimeEntryKind = "labour" | "travel" | "extra";
 
 export interface TimeEntryDoc {
   tradespersonId: string; // duplicated so rules don't need a job lookup
-  clientId: string; // duplicated so rules don't need a job lookup
+  clientId: string | null; // duplicated so rules don't need a job lookup; null on unclaimed invite jobs
   startedAt: Timestamp;
   endedAt: Timestamp | null;
   hourlyRateSnapshot: number; // cents — the resolved rate for this kind
@@ -826,7 +870,7 @@ export interface TimeEntryDoc {
 // ---------------------------------------------------------------------------
 export interface SessionDoc {
   tradespersonId: string; // duplicated so rules don't need a job lookup
-  clientId: string; // duplicated so rules don't need a job lookup
+  clientId: string | null; // duplicated so rules don't need a job lookup; null on unclaimed invite jobs
   start: Timestamp;
   end: Timestamp;
   note: string; // optional free text (e.g. "first fix"); "" when none
@@ -856,7 +900,7 @@ export type ExpenseStatus = "parsing" | "ready" | "invoiced";
 
 export interface ExpenseDoc {
   tradespersonId: string;
-  clientId: string;
+  clientId: string | null; // null on unclaimed invite jobs
   description: string;
   vendor: string | null;
   spentAt: Timestamp | null;
@@ -1137,7 +1181,7 @@ export interface ApplicationMessageDoc {
 // ---------------------------------------------------------------------------
 export interface ChatDoc {
   jobId: string;
-  clientId: string;
+  clientId: string | null; // null on unclaimed invite jobs; claimJobInvite attaches the uid
   tradespersonId: string;
   lastMessageAt: Timestamp | null;
   lastMessagePreview: string;
@@ -1400,7 +1444,7 @@ export interface InvoiceUpfrontFeeCredit {
 
 export interface InvoiceDoc {
   tradespersonId: string;
-  clientId: string;
+  clientId: string | null; // null on unclaimed invite jobs; backfilled at claim
   jobId: string;
   invoiceNumber: string;
   status: InvoiceStatus;
@@ -1510,7 +1554,7 @@ export type QuoteUpfrontFee =
 
 export interface QuoteDoc {
   tradespersonId: string;
-  clientId: string;
+  clientId: string | null; // null on unclaimed invite jobs; backfilled at claim
   jobId: string;
   quoteNumber: string;
   status: QuoteStatus;
@@ -1559,6 +1603,14 @@ export interface QuoteDoc {
   // before this feature shipped. The signed instant IS acceptedAt (the
   // signature is the acceptance), so no separate timestamp is stored.
   clientSignatureStoragePath?: string | null;
+  // Offline acceptance (solo-mode invite jobs only): the tradesperson attested
+  // the client accepted outside Blue Seal. No signature is ever synthesized —
+  // clientSignatureStoragePath stays null. acceptedRecordedBy is the
+  // tradesperson uid who recorded it, kept for the audit trail and surfaced to
+  // a later-claiming client ("recorded by your tradesperson before you
+  // joined"). Server-stamped by recordOfflineQuoteAcceptance.
+  acceptedOffline?: boolean;
+  acceptedRecordedBy?: string | null;
 }
 
 // ---------------------------------------------------------------------------

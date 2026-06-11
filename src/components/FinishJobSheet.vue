@@ -30,7 +30,7 @@ const props = defineProps<{
   visible: boolean;
   jobId: string;
   tradespersonId: string;
-  clientId: string;
+  clientId: string | null;
   billingType: "hourly" | "fixed";
   // Change orders on the job — approved flat ones become invoice lines; approved
   // hourly ones are billed via their clocked time (labelled in the rollup).
@@ -144,6 +144,13 @@ const FINISH_STEPS = computed<{ key: string; title: string; hint: string }[]>(()
 });
 const wizardStep = ref<number | null>(0);
 const inWizard = computed(() => wizardStep.value !== null);
+// The step list can shrink under the user (the quote step disappears when the
+// quote loads with no fixed rows) — clamp instead of pointing past the end.
+watch(FINISH_STEPS, (steps) => {
+  if (wizardStep.value !== null && wizardStep.value >= steps.length) {
+    wizardStep.value = steps.length - 1;
+  }
+});
 function stepShown(key: string): boolean {
   if (wizardStep.value === null) return true;
   return FINISH_STEPS.value[wizardStep.value]?.key === key;

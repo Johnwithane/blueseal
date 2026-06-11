@@ -51,7 +51,7 @@ export async function createSession(
   jobId: string,
   input: {
     tradespersonId: string;
-    clientId: string;
+    clientId: string | null;
     start: Date;
     end: Date;
     note?: string;

@@ -140,6 +140,36 @@ export const jobRequestSchema = z.object({
   intakePhotos: z.array(z.string().url().max(2000)).min(1).max(8),
 });
 
+// Tradesperson-created job for an off-platform client (createInviteJob).
+// Email is lowercased here so the invite's emailLower matches what the claim
+// flow compares against; the callable re-validates server-side.
+export const inviteJobSchema = z.object({
+  trade: tradeKeyEnum,
+  title: z.string().trim().min(3).max(140),
+  description: z.string().trim().min(10).max(4000),
+  clientName: z.string().trim().min(1, "Your client's name").max(80),
+  clientEmail: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .email("Enter a valid email address")
+    .max(200),
+  urgency: z.enum(["flexible", "this_week", "urgent"]),
+  address: z.object({
+    line1: z.string().trim().min(2).max(200),
+    city: z.string().trim().min(2).max(100),
+    region: z.string().trim().min(2).max(100),
+    postalCode: z
+      .string()
+      .trim()
+      .regex(caPostalRegex, "Enter a valid Canadian postal code"),
+  }),
+  preferredStart: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable(),
+});
+
 export const reviewSchema = z.object({
   rating: z.number().int().min(1).max(5),
   text: z.string().trim().max(2000),

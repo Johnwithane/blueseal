@@ -1,4 +1,4 @@
-import type { JobStatus } from "@/firebase/interfaces";
+import type { JobDoc, JobStatus } from "@/firebase/interfaces";
 
 export const STATUS_LABEL: Record<JobStatus, string> = {
   accepted: "Accepted",
@@ -49,6 +49,18 @@ export function statusLabel(
   if (viewer === "client") return CLIENT_STATUS_LABEL[status] ?? STATUS_LABEL[status];
   if (viewer === "tradesperson") return TRADIE_STATUS_LABEL[status] ?? STATUS_LABEL[status];
   return STATUS_LABEL[status];
+}
+
+/**
+ * Badge for tradesperson-created jobs whose client hasn't joined yet
+ * (clientId null). "Invited" while the invite is live, "Solo" once revoked.
+ * Null for ordinary jobs — and for any claimed job, since claiming sets
+ * clientId. Only tradesperson surfaces ever see these jobs (a client can't
+ * query a null-clientId job), so no viewer-role parameter is needed.
+ */
+export function inviteTag(job: Pick<JobDoc, "clientId" | "clientInvite">): string | null {
+  if (job.clientId !== null) return null;
+  return job.clientInvite?.status === "invited" ? "Invited" : "Solo";
 }
 
 export type StatusSeverity = "info" | "warn" | "success" | "danger" | "secondary";

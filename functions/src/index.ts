@@ -72,6 +72,9 @@ export { cancelExtra } from "./jobs/cancelExtra";
 // Pre-quote site-visit loop (tradesperson asks to see the job first, client agrees).
 export { proposeSiteVisit } from "./jobs/proposeSiteVisit";
 export { respondSiteVisit } from "./jobs/respondSiteVisit";
+// Invite jobs (bring-your-own-client): tradesperson-created jobs for
+// off-platform clients, run solo until the client claims their invite.
+export { createInviteJob } from "./jobs/createInviteJob";
 
 // Invoicing
 export { onJobCompleted } from "./invoicing/onJobCompleted";

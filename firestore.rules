@@ -412,6 +412,22 @@ service cloud.firestore {
         && (isAdmin()
             || request.resource.data.get('statusBeforeHold', null)
                 == resource.data.get('statusBeforeHold', null))
+        // clientInvite is server-managed: only createInviteJob / resendJobInvite /
+        // revokeJobInvite / claimJobInvite (admin SDK) may write it. A party
+        // forging status:"claimed" or swapping the email/tokenHash would subvert
+        // the bring-your-own-client claim flow.
+        && (isAdmin()
+            || request.resource.data.get('clientInvite', null)
+                == resource.data.get('clientInvite', null))
+        // acceptedOffline + inviteOriginated are server-stamped audit/reputation
+        // markers (offline-recorded jobs never feed public reviews) — a party
+        // must not be able to set or clear them.
+        && (isAdmin()
+            || request.resource.data.get('acceptedOffline', null)
+                == resource.data.get('acceptedOffline', null))
+        && (isAdmin()
+            || request.resource.data.get('inviteOriginated', null)
+                == resource.data.get('inviteOriginated', null))
         // billingType is stamped server-side at quote acceptance and frozen
         // thereafter — a party must not be able to flip their own job from
         // fixed to hourly (or vice-versa) to change how clock-in prices time.

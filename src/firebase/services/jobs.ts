@@ -96,6 +96,34 @@ export async function createJob(input: NewJobInput, chatId: string): Promise<str
   return docRef.id;
 }
 
+// Tradesperson-created job for an off-platform client ("bring your own
+// client"). Callable-only: the server mints the invite token (hash-only at
+// rest), enforces the vetted-tradesperson gate + the future subscription
+// seam, and writes the job with clientId: null. `inviteLink` is the copyable
+// /invite/{token} URL — returned exactly once; copying it again later goes
+// through resendJobInvite (which rotates the token).
+export interface InviteJobInput {
+  title: string;
+  description: string;
+  trade: string;
+  clientName: string;
+  clientEmail: string;
+  address: Omit<JobAddress, "geo">;
+  urgency: Urgency;
+  preferredStart: string | null; // YYYY-MM-DD or null
+}
+
+export async function createInviteJob(
+  input: InviteJobInput,
+): Promise<{ jobId: string; inviteLink: string; emailed: boolean }> {
+  const fn = httpsCallable<InviteJobInput, { jobId: string; inviteLink: string; emailed: boolean }>(
+    functions,
+    "createInviteJob",
+  );
+  const res = await fn(input);
+  return res.data;
+}
+
 export async function getJob(id: string): Promise<WithId<JobDoc> | null> {
   const snap = await getDoc(jobRef(id));
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;

@@ -78,6 +78,9 @@ const commentPlaceholder = computed(() =>
 
 async function submit() {
   if (submitting.value) return;
+  // Review pairs are never seeded for unclaimed invite jobs (clientId null),
+  // so this prompt shouldn't render for them — narrow the type defensively.
+  if (!props.job.clientId) return;
   error.value = null;
 
   if (props.asRole === "client") {

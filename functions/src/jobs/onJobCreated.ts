@@ -10,6 +10,7 @@ interface JobLike {
   status?: string;
   sourcePostId?: string | null;
   claimOriginated?: boolean;
+  inviteOriginated?: boolean;
   urgency?: "flexible" | "this_week" | "urgent";
 }
 
@@ -26,6 +27,7 @@ export const onJobCreated = onDocumentCreated("jobs/{jobId}", async (event) => {
   if (!job?.tradespersonId) return;
   if (job.sourcePostId) return; // marketplace-converted; already notified
   if (job.claimOriginated) return; // prospect-claim; summary sent by claimProspect
+  if (job.inviteOriginated) return; // tradesperson created it themselves; paging them is noise
 
   const jobId = event.params.jobId;
   const title = job.title ?? "a job";

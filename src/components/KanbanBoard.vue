@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useRouter } from "vue-router";
+import Tag from "primevue/tag";
 import type { JobDoc, JobStatus, WithId } from "@/firebase/interfaces";
 import { useFormatters } from "@/composables/useFormatters";
 import JobCounterparty from "@/components/JobCounterparty.vue";
+import { inviteTag } from "@/utils/jobStatus";
 
 const props = defineProps<{ jobs: WithId<JobDoc>[] }>();
 const router = useRouter();
@@ -98,13 +100,14 @@ function openJob(id: string) {
           <i class="pi pi-calendar text-[10px]"></i>
           Scheduled
         </div>
-        <div class="mt-2 pt-2 border-t border-[color:var(--bs-border)]">
+        <div class="mt-2 pt-2 border-t border-[color:var(--bs-border)] flex items-center justify-between gap-2">
           <JobCounterparty
             role="client"
             size="small"
             :name="job.clientName"
             :photo-url="job.clientPhotoURL"
           />
+          <Tag v-if="inviteTag(job)" :value="inviteTag(job)!" severity="secondary" />
         </div>
       </article>
 

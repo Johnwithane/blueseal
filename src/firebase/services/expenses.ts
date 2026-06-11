@@ -25,6 +25,15 @@ const expenseRef = (jobId: string, id: string) => doc(db, "jobs", jobId, "expens
 
 export const DEFAULT_MARKUP_PERCENT = 15;
 
+/** Category choices for expense UIs — single source for card + dialog. */
+export const EXPENSE_CATEGORY_OPTIONS: { label: string; value: ExpenseCategory }[] = [
+  { label: "Materials", value: "materials" },
+  { label: "Fuel", value: "fuel" },
+  { label: "Disposal", value: "disposal" },
+  { label: "Parking", value: "parking" },
+  { label: "Other", value: "other" },
+];
+
 export function subscribeJobExpenses(
   jobId: string,
   tradespersonId: string,
@@ -90,7 +99,7 @@ export interface UploadReceiptResult {
  */
 export async function uploadReceiptAndCreateExpense(
   jobId: string,
-  clientId: string,
+  clientId: string | null,
   file: File,
 ): Promise<UploadReceiptResult> {
   const uid = fbAuth.currentUser?.uid;
@@ -130,7 +139,7 @@ export async function uploadReceiptAndCreateExpense(
  */
 export async function createManualExpense(
   jobId: string,
-  clientId: string,
+  clientId: string | null,
   initial?: ExpensePatch,
 ): Promise<{ expenseId: string }> {
   const uid = fbAuth.currentUser?.uid;

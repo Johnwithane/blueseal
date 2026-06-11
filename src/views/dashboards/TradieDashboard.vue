@@ -321,12 +321,18 @@ const awaitingVerificationMessage = computed(() => {
       />
     </div>
 
-    <!-- Completed-view toggle, list-view only. Lives above JobList so it's
-         always visible regardless of which status filter is selected. -->
+    <!-- New job (bring your own client) + completed-view toggle, list-view
+         only. New job is vetted-tradie-only — same gate as the callable. -->
     <div
       v-if="view === 'list' && tradie?.isVisible"
-      class="mb-3 flex items-center justify-end"
+      class="mb-3 flex items-center justify-between gap-2"
     >
+      <Button
+        label="New job"
+        icon="pi pi-plus"
+        size="small"
+        @click="router.push('/jobs/new')"
+      />
       <Button
         :label="showCompleted ? 'Back to active jobs' : 'View completed'"
         :icon="showCompleted ? 'pi pi-arrow-left' : 'pi pi-check-circle'"
