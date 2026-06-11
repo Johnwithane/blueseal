@@ -13,7 +13,7 @@ import AppShell from "@/components/shell/AppShell.vue";
 import ActiveClockBanner from "@/components/ActiveClockBanner.vue";
 import { useNotificationsStore } from "@/stores/notifications";
 import { useAuthStore } from "@/stores/auth";
-import { useAppUpdate } from "@/composables";
+import { useAppUpdate, usePushAutoPrompt } from "@/composables";
 
 const route = useRoute();
 const router = useRouter();
@@ -25,6 +25,11 @@ const primeToast = primeUseToast();
 // re-checks for a new build on resume + hourly, and applies it only when it
 // won't interrupt the user (app backgrounded, or idle). See useAppUpdate.
 useAppUpdate();
+// Push is essential (job requests / quotes / messages are time-critical), so
+// every signed-in session — signup, sign-in, returning — gets the soft-ask
+// until this device has push on. Re-offers are cooldown-limited and the
+// native browser prompt still only fires from the dialog's "Enable" click.
+usePushAutoPrompt();
 // `meta.layout` decides which shell wraps the route. Unset → "public" (the
 // marketing AppHeader/Footer chrome). "app" mounts the Instagram-style
 // AppShell; "chromeless" renders the view alone (onboarding wizard).

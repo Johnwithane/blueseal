@@ -11,27 +11,16 @@ import { useAuthStore } from "@/stores/auth";
 import { signUpSchema } from "@/validation/schemas";
 import { humanizeError } from "@/utils/errors";
 import { useSeo } from "@/composables/useSeo";
-import { usePushPrompt } from "@/composables/usePushPrompt";
 
 useSeo({ title: "Create your account", noindex: true });
 
 const auth = useAuthStore();
 const router = useRouter();
 const route = useRoute();
-const { maybePromptForPush } = usePushPrompt();
 
-// Tradespeople opt into push the moment they sign up — a new job request or
-// client message is time-critical for them. Clients are asked later, when
-// they actually request a tradesperson or post a job (see those views), so
-// the ask lands with context rather than cold on an empty account.
-function offerPushIfTradie() {
-  if (role.value !== "tradesperson") return;
-  void maybePromptForPush({
-    header: "Never miss a job",
-    message:
-      "Get an instant alert when a client requests you or messages about a job — even when Blue Seal is closed.",
-  });
-}
+// Push opt-in is no longer offered here: usePushAutoPrompt (App.vue) fires
+// the soft-ask for every role the moment the new session lands — including
+// right after this signup completes.
 
 // Preselect tradesperson when arriving via /sign-up?as=tradesperson (or the
 // old /sign-up/tradie route, which now redirects here).
@@ -82,7 +71,6 @@ async function submit() {
   }
   try {
     await auth.signUp(parsed.data);
-    offerPushIfTradie();
     router.replace(redirectTo.value);
   } catch (e) {
     formError.value = humanizeError(e);
@@ -100,10 +88,7 @@ async function google() {
   fieldErrors.value = {};
   formError.value = null;
   try {
-    const { isNew } = await auth.signInWithGoogle(role.value);
-    // Only a brand-new tradesperson account gets the push offer — an existing
-    // user tapping "Continue with Google" here is just signing in.
-    if (isNew) offerPushIfTradie();
+    await auth.signInWithGoogle(role.value);
     router.replace(redirectTo.value);
   } catch (e) {
     formError.value = humanizeError(e);
