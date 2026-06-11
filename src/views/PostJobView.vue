@@ -20,6 +20,7 @@ import { uploadFile } from "@/firebase/services/storage";
 import { createJobPost } from "@/firebase/services/jobPosts";
 import { useGoogleMaps } from "@/composables/useGoogleMaps";
 import { useToast } from "@/composables/useToast";
+import { usePushPrompt } from "@/composables/usePushPrompt";
 import { humanizeError } from "@/utils/errors";
 import { createJobPostSchema } from "@/validation/schemas";
 import { deriveTitle, deriveUrgency } from "@/utils/requestPrefill";
@@ -41,6 +42,7 @@ useSeo({
 const router = useRouter();
 const auth = useAuthStore();
 const toast = useToast();
+const { maybePromptForPush } = usePushPrompt();
 
 const DRAFT_KEY = "jobPostDraft";
 
@@ -396,6 +398,13 @@ async function submit() {
 
     localStorage.removeItem(DRAFT_KEY);
     toast.success("Your post is live", "Verified tradespeople in your area are being notified.");
+    // Applications can start landing within minutes — offer push so the
+    // client hears about the first one without having to keep checking back.
+    void maybePromptForPush({
+      header: "Know the moment a pro applies",
+      message:
+        "Turn on notifications and we'll alert you as soon as a verified tradesperson applies to your job — even when Blue Seal is closed.",
+    });
     router.push({ name: "JobPostDetail", params: { postId } });
   } catch (e) {
     error.value = humanizeError(e);

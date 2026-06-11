@@ -18,6 +18,7 @@ import type { IntakeField, TradespersonDoc, WithId, Urgency } from "@/firebase/i
 import { tradeLabel } from "@/data/trades";
 import IntakeFormRenderer from "@/components/IntakeFormRenderer.vue";
 import { useToast } from "@/composables/useToast";
+import { usePushPrompt } from "@/composables/usePushPrompt";
 import { useGoogleMaps } from "@/composables/useGoogleMaps";
 import { compressToWebp } from "@/utils/image";
 import { humanizeError } from "@/utils/errors";
@@ -33,6 +34,7 @@ const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
 const toast = useToast();
+const { maybePromptForPush } = usePushPrompt();
 
 const tradieUid = route.params.uid as string;
 const tradie = ref<WithId<TradespersonDoc> | null>(null);
@@ -307,6 +309,12 @@ async function submit() {
     // Request submitted — the carried-over search description has done its job.
     clearRequestPrefill();
     toast.success("Request sent", "We'll let the tradesperson know.");
+    // First time a client requests work, offer push so they hear back fast.
+    void maybePromptForPush({
+      header: "Get replies the moment they land",
+      message:
+        "Turn on notifications and we'll alert you the instant your tradesperson replies or sends a quote — even when Blue Seal is closed.",
+    });
     router.push({ name: "JobDetail", params: { id: jobId } });
   } catch (e) {
     error.value = humanizeError(e);

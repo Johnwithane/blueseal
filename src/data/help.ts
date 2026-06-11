@@ -389,7 +389,7 @@ Once installed, Blue Seal opens full-screen like a normal app and updates itself
     keywords: ["notifications", "alerts", "bell", "email", "push", "updates"],
     body: `The **bell** icon shows your in-app notifications — new messages, quote and application updates, and job status changes. Tap one to jump straight to the job it's about.
 
-Outside the app, Blue Seal can reach you by **email**, **WhatsApp** (time-critical events), and **push notifications** — instant alerts on your device even when Blue Seal is closed. Turn push on per device from **Account → Notifications**; your browser will ask permission once. On iPhone, add Blue Seal to your home screen first (see "Install Blue Seal"), then enable push from inside the installed app.
+Outside the app, Blue Seal can reach you by **email**, **WhatsApp** (time-critical events), and **push notifications** — instant alerts on your device even when Blue Seal is closed. We'll offer to switch push on at the moments it matters most — when a tradesperson signs up, and when a client requests a tradesperson or posts a job — but you can turn it on (or off) any time per device from **Account → Notifications**. Your browser asks permission once. On iPhone, add Blue Seal to your home screen first (see "Install Blue Seal"), then enable push from inside the installed app.
 
 You can manage all of these from your **Account** settings.`,
   },
@@ -852,7 +852,7 @@ const faqs: FaqItem[] = [
   {
     question: "Can I get notifications on my phone?",
     answer:
-      "Yes — turn on **push notifications** from **Account → Notifications**. It's per device: your browser asks permission once, and from then on you get instant alerts (new messages, quotes, job updates) even when Blue Seal is closed. On iPhone, add Blue Seal to your home screen first, then enable push from inside the installed app. Turn it off any time from the same toggle.",
+      "Yes — turn on **push notifications** from **Account → Notifications**. We'll also offer to switch it on when you sign up as a tradesperson, or when you request a tradesperson or post a job as a client. It's per device: your browser asks permission once, and from then on you get instant alerts (new messages, quotes, job updates) even when Blue Seal is closed. On iPhone, add Blue Seal to your home screen first, then enable push from inside the installed app. Turn it off any time from the same toggle.",
     categoryId: "account-app",
     audience: "all",
   },
