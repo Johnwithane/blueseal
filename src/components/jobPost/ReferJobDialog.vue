@@ -31,6 +31,12 @@ const toast = useToast();
 
 type Candidate = WithId<TradespersonDoc> & { distanceKm: number };
 
+// The post's public geohash is a length-6 cell (~1.2 km wide), so its decoded
+// center can sit up to ~0.7 km from the true job location. Pad the search cap
+// and the service-radius filter by this much so a tradie right on the boundary
+// isn't wrongly excluded — for a human-mediated referral, inclusive beats exact.
+const GEOHASH_SLACK_KM = 1;
+
 const step = ref<"pick" | "compose">("pick");
 const loading = ref(false);
 const loadError = ref<string | null>(null);
@@ -67,14 +73,17 @@ async function load() {
         trade: props.post.trade,
         centerLat: center.lat,
         centerLng: center.lng,
-        radiusKm: 50,
+        radiusKm: 50 + GEOHASH_SLACK_KM,
         limit: 50,
       }),
       listMyReferralsForPost(uid, props.post.id),
     ]);
     alreadyReferred.value = new Set(mine.map((r) => r.toUserId));
     candidates.value = results.filter(
-      (t) => t.id !== uid && t.id !== props.post.clientId && t.distanceKm <= t.serviceRadiusKm,
+      (t) =>
+        t.id !== uid &&
+        t.id !== props.post.clientId &&
+        t.distanceKm <= t.serviceRadiusKm + GEOHASH_SLACK_KM,
     );
   } catch (e) {
     loadError.value = humanizeError(e);
@@ -139,7 +148,10 @@ function avatarInitial(name: string | undefined): string {
 
     <!-- STEP: pick a recipient -->
     <div v-if="step === 'pick'" class="mt-3">
-      <Message v-if="loadError" severity="error" :closable="false">{{ loadError }}</Message>
+      <div v-if="loadError">
+        <Message severity="error" :closable="false">{{ loadError }}</Message>
+        <Button label="Try again" icon="pi pi-refresh" outlined size="small" class="mt-3" @click="load" />
+      </div>
 
       <template v-else>
         <InputText

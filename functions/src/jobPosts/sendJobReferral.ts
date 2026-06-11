@@ -160,13 +160,15 @@ export const sendJobReferral = onCall(CALLABLE_OPTS, async (req) => {
       );
     });
 
+    // Job title leads the notification so multiple referrals are tellable
+    // apart at a glance in the inbox; who sent it goes in the body.
     await notify({
       userId: toUserId,
       type: "job_referred",
-      title: `${fromDisplay.fromDisplayName} referred a job to you`,
+      title: `New referral: ${postTitle}`,
       body: message
-        ? `"${postTitle}"${postCity ? ` in ${postCity}` : ""} — "${message}"`
-        : `"${postTitle}"${postCity ? ` in ${postCity}` : ""} — open the post to apply.`,
+        ? `${fromDisplay.fromDisplayName}${postCity ? ` — job in ${postCity}` : ""}: "${message}"`
+        : `${fromDisplay.fromDisplayName} referred this${postCity ? ` ${postCity}` : ""} job to you — open the post to apply.`,
       link: `/jobs/posted/${postId}`,
       actorUid: uid,
       recipientRole: "tradesperson",
