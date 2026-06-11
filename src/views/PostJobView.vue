@@ -295,7 +295,15 @@ async function submit() {
   }
 
   // Auth gate: if not signed in, draft is already persisted — bounce to sign-in.
+  // Photos are NOT in the draft (Files don't survive JSON.stringify), so say so
+  // up front instead of silently dropping them after sign-in.
   if (!auth.fbUser) {
+    if (photos.value.length > 0) {
+      toast.warn(
+        "Sign in to post",
+        "We saved your job details, but photos can't be kept through sign-in — please re-add them after.",
+      );
+    }
     router.push({ name: "SignIn", query: { redirect: "/jobs/post" } });
     return;
   }
