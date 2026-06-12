@@ -14,6 +14,7 @@ import { inviteJobSchema } from "@/validation/schemas";
 import { TRADES, tradeLabel } from "@/data/trades";
 import type { Urgency } from "@/firebase/interfaces";
 import { useAuthStore } from "@/stores/auth";
+import { useGoogleMaps } from "@/composables/useGoogleMaps";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 
@@ -40,14 +41,51 @@ const tradeOptions = computed(() =>
 );
 
 onMounted(async () => {
-  if (!auth.fbUser) return;
+  // Default the trade dropdown to the tradesperson's own trades.
+  if (auth.fbUser) {
+    try {
+      const doc = await getTradesperson(auth.fbUser.uid);
+      myTrades.value = doc?.trades ?? [];
+      // Default to the primary trade (don't clobber a value already chosen).
+      if (myTrades.value.length && !trade.value) trade.value = myTrades.value[0];
+    } catch {
+      // Non-fatal — leave myTrades empty so the dropdown falls back to TRADES.
+    }
+  }
+
+  // Google Places autocomplete on the street-address line — same widget the
+  // rest of the app uses (PostJobView). Picking a suggestion fills
+  // line1/city/region/postal from the parsed components. Coordinates aren't
+  // captured: the invite-job schema stores only the text address, so there's
+  // no geocode fallback to wire up here.
   try {
-    const doc = await getTradesperson(auth.fbUser.uid);
-    myTrades.value = doc?.trades ?? [];
-    // Default to the primary trade (don't clobber a value already chosen).
-    if (myTrades.value.length && !trade.value) trade.value = myTrades.value[0];
+    await useGoogleMaps().load();
+    if (addressAutocompleteEl.value) {
+      const ac = new google.maps.places.Autocomplete(addressAutocompleteEl.value, {
+        fields: ["address_components", "formatted_address"],
+        types: ["geocode"],
+        componentRestrictions: { country: "ca" },
+      });
+      ac.addListener("place_changed", () => {
+        const place = ac.getPlace();
+        if (!place?.address_components) return;
+        const comp = (type: string) =>
+          place.address_components?.find((c) => c.types.includes(type))?.long_name ?? "";
+        const short = (type: string) =>
+          place.address_components?.find((c) => c.types.includes(type))?.short_name ?? "";
+        const streetNumber = comp("street_number");
+        const route = comp("route");
+        addressLine1.value =
+          [streetNumber, route].filter(Boolean).join(" ").trim() ||
+          place.formatted_address?.split(",")[0] ||
+          "";
+        city.value = comp("locality") || comp("sublocality") || "";
+        region.value = short("administrative_area_level_1") || "";
+        postalCode.value = comp("postal_code") || "";
+      });
+    }
   } catch {
-    // Non-fatal — leave myTrades empty so the dropdown falls back to TRADES.
+    /* maps failed to load — fall back to manual entry */
   }
 });
 const title = ref("");
@@ -60,6 +98,9 @@ const region = ref("");
 const postalCode = ref("");
 const urgency = ref<Urgency>("flexible");
 const preferredStart = ref<Date | null>(null);
+
+// Backs the Places autocomplete on the street-address line (see onMounted).
+const addressAutocompleteEl = ref<HTMLInputElement | null>(null);
 
 const submitting = ref(false);
 const error = ref<string | null>(null);
@@ -181,7 +222,19 @@ function openJob() {
 
       <fieldset>
         <legend class="text-sm font-medium mb-2">Job address</legend>
-        <InputText v-model="addressLine1" placeholder="Street address" maxlength="200" autocomplete="off" class="w-full" />
+        <!-- Raw input (not InputText) so the Places autocomplete in onMounted
+             can attach to a real HTMLInputElement. autocomplete="off" keeps the
+             browser from autofilling the tradesperson's own address over the
+             client's, and keeps the Places dropdown unobstructed. -->
+        <input
+          ref="addressAutocompleteEl"
+          v-model="addressLine1"
+          type="text"
+          class="p-inputtext p-component w-full"
+          placeholder="Start typing the job address…"
+          maxlength="200"
+          autocomplete="off"
+        />
         <div class="grid sm:grid-cols-2 gap-2 mt-2">
           <InputText v-model="city" placeholder="City" maxlength="100" />
           <InputText v-model="region" placeholder="Province" maxlength="100" />
