@@ -18,9 +18,11 @@ import type { IntakeField, TradespersonDoc, WithId, Urgency } from "@/firebase/i
 import { tradeLabel } from "@/data/trades";
 import IntakeFormRenderer from "@/components/IntakeFormRenderer.vue";
 import FormErrorBanner from "@/components/FormErrorBanner.vue";
+import FieldError from "@/components/FieldError.vue";
 import { useToast } from "@/composables/useToast";
 import { usePushPrompt } from "@/composables/usePushPrompt";
 import { useGoogleMaps } from "@/composables/useGoogleMaps";
+import { useFormErrors } from "@/composables/useFormErrors";
 import { compressToWebp } from "@/utils/image";
 import { humanizeError } from "@/utils/errors";
 import {
@@ -63,6 +65,18 @@ const addressAutocompleteEl = ref<HTMLInputElement | null>(null);
 
 const submitting = ref(false);
 const error = ref<string | null>(null);
+
+// Field-level validation errors (under each field) + scroll-to-first; `error`
+// stays for general submit/network failures shown by the banner near submit.
+const {
+  errors,
+  clear: clearErrors,
+  set: setError,
+  setFromZod,
+  has: hasErrors,
+  focusFirst,
+} = useFormErrors();
+const FIELD_ORDER = ["trade", "title", "description", "address", "photos", "intake"];
 
 // Page-level load state: the tradie doc + intake schema must arrive before the
 // form is usable. Failures here used to be unhandled (blank form, no clue why).
@@ -189,17 +203,17 @@ function removePhoto(idx: number) {
 
 async function submit() {
   error.value = null;
+  clearErrors();
   if (submitting.value) return;
   if (!auth.fbUser || !tradie.value) return;
+
+  // Collect every field problem, then jump to the topmost (errors render under
+  // their own field, not in one banner).
   if (photos.value.length === 0) {
-    error.value = "Upload at least one photo of the issue or area.";
-    return;
+    setError("photos", "Upload at least one photo of the issue or area.");
   }
   const missingDetail = firstMissingRequired(intakeFields.value, intakeData.value);
-  if (missingDetail) {
-    error.value = `Please fill: ${missingDetail}`;
-    return;
-  }
+  if (missingDetail) setError("intake", `Please fill: ${missingDetail}`);
 
   // Use the canonical Zod schema for everything except the not-yet-uploaded
   // photos (we validate the URL list after upload).
@@ -220,9 +234,22 @@ async function submit() {
   };
   const parsed = jobRequestSchema.safeParse(candidate);
   if (!parsed.success) {
-    error.value = parsed.error.issues[0]?.message ?? "Check the form for errors";
+    setFromZod(parsed.error, (path) => {
+      const head = String(path[0] ?? "form");
+      if (head === "address") return "address";
+      if (head === "intakeFormData") return "intake";
+      if (head === "intakePhotos") return "photos";
+      return head; // title, description, trade…
+    });
+  }
+
+  if (hasErrors()) {
+    await focusFirst(FIELD_ORDER);
     return;
   }
+  // No field errors means the Zod parse succeeded; narrow parsed.data for the
+  // writes below (a failed parse always adds an error, so we'd have returned).
+  if (!parsed.success) return;
 
   submitting.value = true;
   try {
@@ -356,7 +383,7 @@ async function submit() {
     </div>
 
     <form v-else class="bs-form bs-card p-5 mt-4 space-y-4" @submit.prevent="submit">
-      <div v-if="tradie && tradie.trades.length > 1">
+      <div v-if="tradie && tradie.trades.length > 1" data-field="trade">
         <label class="text-sm font-medium">Which trade?</label>
         <Select
           v-model="selectedTrade"
@@ -364,18 +391,28 @@ async function submit() {
           option-label="label"
           option-value="key"
           class="mt-1 w-full"
+          :invalid="!!errors.trade"
           @update:model-value="loadIntake"
         />
+        <FieldError :message="errors.trade" />
       </div>
 
-      <div>
+      <div data-field="title">
         <label class="text-sm font-medium">Title</label>
-        <InputText v-model="title" placeholder="Short summary of the job" maxlength="140" class="mt-1" />
+        <InputText
+          v-model="title"
+          placeholder="Short summary of the job"
+          maxlength="140"
+          class="mt-1"
+          :invalid="!!errors.title"
+        />
+        <FieldError :message="errors.title" />
       </div>
 
-      <div>
+      <div data-field="description">
         <label class="text-sm font-medium">Describe the issue</label>
-        <Textarea v-model="description" rows="4" maxlength="4000" />
+        <Textarea v-model="description" rows="4" maxlength="4000" :invalid="!!errors.description" />
+        <FieldError :message="errors.description" />
       </div>
 
       <div>
@@ -393,7 +430,7 @@ async function submit() {
         />
       </div>
 
-      <fieldset>
+      <fieldset data-field="address">
         <legend class="text-sm font-medium mb-2">Address</legend>
         <!-- Autocomplete input doubles as the addressLine1 source. Picking a
              Google suggestion overrides with the cleanly-parsed street and
@@ -413,10 +450,12 @@ async function submit() {
           <InputText v-model="region" placeholder="Province" maxlength="100" autocomplete="address-level1" />
           <InputText v-model="postalCode" placeholder="Postal code (A1A 1A1)" maxlength="7" autocomplete="postal-code" />
         </div>
+        <FieldError :message="errors.address" />
       </fieldset>
 
-      <div>
+      <div data-field="photos">
         <label class="text-sm font-medium">Photos (1–8 required)</label>
+        <FieldError :message="errors.photos" />
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
           <div
             v-for="(p, idx) in photos"
@@ -446,9 +485,10 @@ async function submit() {
         <input ref="photoInput" type="file" accept="image/*" multiple class="hidden" @change="onPhotos" />
       </div>
 
-      <div v-if="intakeFields.length">
+      <div v-if="intakeFields.length" data-field="intake">
         <h3 class="font-semibold text-sm mb-2">Trade-specific details</h3>
         <IntakeFormRenderer v-model="intakeData" :fields="intakeFields" />
+        <FieldError :message="errors.intake" />
       </div>
 
       <FormErrorBanner :message="error" />
