@@ -308,6 +308,20 @@ A contextual, **informational** panel shown inside the post-a-job flow when the 
 
 **Data**: admin-curated Firestore collection `rebatePrograms/{slug}` (see Data Model + Security Rules). World-readable reference data; admin-only writes (no callable — the admin form validates with Zod at the boundary). A code seed (`src/data/rebatePrograms.ts`, web-verified starter set) is the read fallback when the collection is empty, and the source for the admin "Import starter set" action. Admins keep the live copy current without code deploys; the post-a-job panel + the admin screen (`/admin/rebate-programs`) are the only surfaces — there is **no** standalone public rebates page.
 
+### 4.8 Bring-your-own-client jobs (added 2026-06-11)
+
+A vetted tradesperson creates a job for an **off-platform client** (`/jobs/new` → `createInviteJob` callable; the jobs create rule stays client-only). The job starts **unclaimed**: `clientId: null` plus a server-managed `clientInvite` map on the job doc holding the invited email, status (`invited`/`claimed`/`revoked`), and the SHA-256 of a copyable invite-link token (never the raw token).
+
+**Delivery, two channels.** (1) We email the client a Firebase **magic sign-in link** (passwordless; continue URL `/claim-job`) when email-link sign-in + CASL env are configured — fixed template, escaped, mailing-address footer, HMAC unsubscribe (`inviteSuppression` tombstones). (2) The tradesperson gets a **copyable link** (`/invite/{token}`) to text themselves; that page can only ask the server to send a magic link **to the stored invite email** — it never signs anyone in, so inbox control stays the credential even for a forwarded text.
+
+**Claim.** The magic link lands on `/claim-job` (explicit button press — nothing auto-runs, so mail-scanner prefetch can't consume the link), signs the client in with a **verified email** and provisions a `client` account if new. `claimJobInvite` is two-phase: preview ("X invited you to Y") → confirm → idempotent per-job transactions set `clientId` on the job, chat (+`unreadCounts`), and backfill `quotes/{jobId}` + `invoices/{jobId}` denormalized `clientId` (their read rules key on it). Self-claim (claimer == tradesperson), admin claimers, and closed accounts are rejected; a revoked invite can never attach (status re-checked in-transaction — a stale magic link only signs in, never claims).
+
+**Solo mode.** If the client never joins, nothing is blocked: the tradesperson quotes, then `recordOfflineQuoteAcceptance` (explicit attestation; **no signature is ever synthesized**; quote + job stamped `acceptedOffline`, sticky), `submitJobForApproval` goes **straight to awaiting_payment** (no approval round-trip without a counterparty), and the existing mark-paid path closes it out. Change orders + site visits are rejected on solo jobs (no client to approve); extra work bills as invoice line items.
+
+**Reputation firewall (non-negotiable).** Jobs with `clientId: null` or `acceptedOffline: true` never feed public reputation: `markJobPaid`/`clientMarkPaid` skip `ensureReviewPair`, and the `/reviews` + `/clientReviews` create rules reject them (`/clientReviews` additionally requires `jobDoc.clientId is string` — `null == null` would otherwise allow a phantom client review). A tradesperson cannot fabricate reviews by inventing solo jobs.
+
+**Subscription seam.** `createInviteJob` routes through `requireInviteJobEntitlement` (no-op today). Flip-time intent: gate **active solo-job volume**, never the invite link — every invite to an off-platform client is free user acquisition.
+
 ---
 
 ## 5. Core Features

@@ -340,6 +340,40 @@ You can return to the **Payouts** screen any time to finish setup or open your p
 **Receipts & expenses.** The tradesperson can upload receipts (materials, fuel, disposal) on the Work order tab — we auto-read the total, vendor and date, and the receipt itself stays private to the tradesperson. Materials supplied from the tradesperson's own stock can be **added manually too — no receipt needed** — and bill the same way. On an **hourly** job each expense becomes a billable line with an optional markup. On a **fixed-price** job expenses are **for the tradesperson's records only and aren't billed** — the agreed price already covers materials. To charge for a material that was genuinely outside the original scope, the tradesperson proposes a **change order** the client approves, rather than adding it as an expense.`,
   },
   {
+    slug: "bring-your-own-client",
+    categoryId: "for-tradespeople",
+    title: "Jobs for your own clients (invite them, or run it solo)",
+    excerpt: "Create a job for a client who isn't on Blue Seal — invite them with one link, or manage the whole job yourself.",
+    audience: "tradesperson",
+    popular: true,
+    keywords: [
+      "own client",
+      "invite client",
+      "invite link",
+      "new job",
+      "solo job",
+      "off platform",
+      "existing customer",
+      "project tracker",
+      "record offline",
+    ],
+    body: `Most of your customers aren't on Blue Seal — and they don't need to be. **New job** (on your dashboard) lets you set up a job for your own client, so you get the full toolkit — quote, schedule, time tracking, receipts, invoice — for every job you do, not just the ones that come through the platform.
+
+**Creating the job.** Tap **New job**, describe the work, and enter your client's name and email. The job lands in your pipeline like any other, and you get an **invite link** for your client.
+
+**Inviting your client.** We email your client a sign-in link when we can, and you can always **copy the link** and text it yourself. One tap signs them in — **no password, no signup form**. Once they join, they see the job like any Blue Seal client: they can chat with you, accept your quote with a signature, approve change orders, and review and pay the invoice. From the job page you can **resend** the invite, **fix a typo'd email**, or **revoke** it (revoking kills the link immediately).
+
+**Running it solo.** If your client never joins, nothing is blocked:
+
+- Send your quote, then tap **Record client acceptance** once they've agreed outside the app (verbally, by text). It's logged as recorded **by you** — no signature is created on their behalf.
+- Track time, sessions, and receipts as usual.
+- When the work's done, **Finalize invoice** — there's no approval round-trip without a client — and **mark it paid** when the money arrives.
+
+**What's different on a solo job:** change orders and site-visit requests are off (there's no client to approve them — bill extra work as an invoice line item instead), and a job whose quote acceptance was **recorded offline doesn't produce Blue Seal reviews** in either direction. The review system only counts work a verified client accepted in-app — that's what keeps the badges and ratings meaningful, including yours.
+
+If your client joins **later**, everything you recorded is visible to them in the job log, clearly marked as recorded by you before they joined.`,
+  },
+  {
     slug: "how-verification-works",
     categoryId: "verification-trust",
     title: "How the verification badges work",
@@ -485,6 +519,13 @@ const faqs: FaqItem[] = [
       "You can browse and search without signing in. You'll need a free account to request a quote, post a job, message a tradesperson, or apply to work.",
     categoryId: "getting-started",
     audience: "all",
+  },
+  {
+    question: "My tradesperson sent me a Blue Seal invite link — what is it?",
+    answer:
+      "Your tradesperson set up your job on Blue Seal so you can both track it in one place — the quote, schedule, messages, and invoice. The link signs you in with just your email (**no password, nothing to install**), and it only works for the email address they invited. Once you're in, you can chat, accept the quote, and review and pay the invoice. If you weren't expecting it, check with your tradesperson before tapping — and nothing is linked to you until you confirm it's your job.",
+    categoryId: "getting-started",
+    audience: "client",
   },
   {
     question: "How is Blue Seal different from other directories?",
@@ -641,6 +682,20 @@ const faqs: FaqItem[] = [
     question: "How do jobs reach me?",
     answer:
       "Two ways: **direct requests** from clients who find your profile, and the **job board**, where you browse postings in your trade and area and apply. Track everything you've applied to under My applications.",
+    categoryId: "for-tradespeople",
+    audience: "tradesperson",
+  },
+  {
+    question: "Can I manage jobs for clients who aren't on Blue Seal?",
+    answer:
+      "Yes — tap **New job** on your dashboard. You get the full toolkit (quote, schedule, time tracking, invoice) and your client gets an **invite link**: one tap signs them in, no password or signup form. If they never join, you can run the whole job solo — record their acceptance, finalize the invoice, and mark it paid.",
+    categoryId: "for-tradespeople",
+    audience: "tradesperson",
+  },
+  {
+    question: "Why doesn't my solo job earn reviews?",
+    answer:
+      "Reviews only count for work a **verified client accepted in-app**. On a solo job (or one where you recorded the quote acceptance on your client's behalf), there's no verified counterparty — so no review is created in either direction. That gate is what keeps Blue Seal ratings meaningful, including yours.",
     categoryId: "for-tradespeople",
     audience: "tradesperson",
   },
