@@ -3,13 +3,14 @@
 // prop flips it to edit) so the form lives in one place — ClientsPanel opens it
 // to add, ClientDetailView to edit. Validates with clientDraftSchema at the
 // boundary; the service writes the server-managed fields.
-import { computed, reactive, ref, watch } from "vue";
+import { computed, nextTick, reactive, ref, watch } from "vue";
 import Dialog from "primevue/dialog";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import Textarea from "primevue/textarea";
 import { clientDraftSchema } from "@/validation/clients";
 import { createClient, updateClient } from "@/firebase/services/clientsService";
+import { useGoogleMaps } from "@/composables/useGoogleMaps";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 import type { ClientDoc, WithId } from "@/firebase/interfaces";
@@ -61,6 +62,56 @@ watch(
   () => props.visible,
   (v) => {
     if (v) reset();
+    else attachedEl = null; // dialog body unmounts on close — re-attach next open
+  },
+);
+
+// Google Places autocomplete on the street line — same widget the rest of the
+// app uses (CreateJobView / PostJobView). Picking a suggestion fills
+// line1/city/region/postal. We store text only (geo stays null in the client
+// book), so there's no geocode fallback to wire up. autocomplete tokens on the
+// fields are left ON (not "off") so the browser can also autofill naturally.
+const addressEl = ref<HTMLInputElement | null>(null);
+let attachedEl: HTMLInputElement | null = null;
+
+async function initAddressAutocomplete() {
+  await nextTick();
+  const el = addressEl.value;
+  if (!el || el === attachedEl) return;
+  try {
+    await useGoogleMaps().load();
+    const ac = new google.maps.places.Autocomplete(el, {
+      fields: ["address_components", "formatted_address"],
+      types: ["geocode"],
+      componentRestrictions: { country: "ca" },
+    });
+    attachedEl = el;
+    ac.addListener("place_changed", () => {
+      const place = ac.getPlace();
+      if (!place?.address_components) return;
+      const comp = (type: string) =>
+        place.address_components?.find((c) => c.types.includes(type))?.long_name ?? "";
+      const short = (type: string) =>
+        place.address_components?.find((c) => c.types.includes(type))?.short_name ?? "";
+      form.line1 =
+        [comp("street_number"), comp("route")].filter(Boolean).join(" ").trim() ||
+        place.formatted_address?.split(",")[0] ||
+        "";
+      form.city = comp("locality") || comp("sublocality") || "";
+      form.region = short("administrative_area_level_1") || "";
+      form.postalCode = comp("postal_code") || "";
+    });
+  } catch {
+    /* maps failed to load — manual entry still works */
+  }
+}
+
+// The address inputs live inside a v-if and the dialog only mounts its body
+// when open, so attach once both are true.
+watch(
+  () => props.visible && showAddress.value,
+  (on) => {
+    if (on) void initAddressAutocomplete();
   },
 );
 
@@ -159,12 +210,41 @@ async function save() {
         {{ showAddress ? "Hide address" : "Add address (optional)" }}
       </button>
       <div v-if="showAddress" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <!-- Raw input (not InputText) so the Places autocomplete can attach to
+             a real HTMLInputElement. autocomplete tokens are real (not "off")
+             so the browser can autofill too. -->
         <div class="sm:col-span-2">
-          <InputText v-model="form.line1" maxlength="200" class="w-full" placeholder="Street address" />
+          <input
+            ref="addressEl"
+            v-model="form.line1"
+            type="text"
+            class="p-inputtext p-component w-full"
+            placeholder="Start typing the address…"
+            maxlength="200"
+            autocomplete="address-line1"
+          />
         </div>
-        <InputText v-model="form.city" maxlength="100" class="w-full" placeholder="City" />
-        <InputText v-model="form.region" maxlength="100" class="w-full" placeholder="Province" />
-        <InputText v-model="form.postalCode" maxlength="12" class="w-full" placeholder="Postal code" />
+        <InputText
+          v-model="form.city"
+          maxlength="100"
+          class="w-full"
+          placeholder="City"
+          autocomplete="address-level2"
+        />
+        <InputText
+          v-model="form.region"
+          maxlength="100"
+          class="w-full"
+          placeholder="Province"
+          autocomplete="address-level1"
+        />
+        <InputText
+          v-model="form.postalCode"
+          maxlength="12"
+          class="w-full"
+          placeholder="Postal code"
+          autocomplete="postal-code"
+        />
       </div>
 
       <div>
