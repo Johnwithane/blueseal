@@ -23,6 +23,10 @@
         "source": "/p/unsubscribe",
         "function": { "functionId": "suppressProspect", "region": "us-central1" }
       },
+      {
+        "source": "/jobs-invite-unsub",
+        "function": { "functionId": "unsubscribeJobInvite", "region": "us-central1" }
+      },
       { "source": "**", "destination": "/200.html" }
     ],
     "headers": [

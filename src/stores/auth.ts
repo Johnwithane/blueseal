@@ -384,11 +384,17 @@ export const useAuthStore = defineStore("auth", {
 
     /**
      * Completes a Firebase email-link (magic-link) sign-in from the current
-     * URL. Used by the prospect-claim flow: clicking the link in the outreach
-     * email proves the recipient controls that inbox and signs them in with a
-     * VERIFIED email. Provisions a tradesperson user doc on first sign-in.
+     * URL. Clicking the link proves the recipient controls that inbox and
+     * signs them in with a VERIFIED email. Provisions a user doc on first
+     * sign-in with the given role: the prospect-claim flow (/claim) provisions
+     * tradespeople (the default, so that caller is unchanged); the job-invite
+     * claim flow (/claim-job) provisions clients.
      */
-    async completeEmailLinkSignIn(email: string): Promise<{ isNew: boolean }> {
+    async completeEmailLinkSignIn(
+      email: string,
+      opts?: { role?: "tradesperson" | "client" },
+    ): Promise<{ isNew: boolean }> {
+      const role = opts?.role ?? "tradesperson";
       this.pending = true;
       this.error = null;
       // Guard applyAuthState's self-heal from racing our provisioning below
@@ -411,20 +417,20 @@ export const useAuthStore = defineStore("auth", {
             email: cred.user.email ?? email,
             displayName: cred.user.displayName ?? "",
             photoURL: cred.user.photoURL,
-            role: "tradesperson",
+            role,
             termsAcceptedVersion: LEGAL_VERSION,
           });
           // Same trigger race as signUp: reconcile doc → claims synchronously
           // so the refresh below carries the roles claim, not just
           // email_verified.
-          let roles: Role[] = ["tradesperson"];
+          let roles: Role[] = [role];
           try {
             roles = (await callEnsureSelfRoles()).roles;
           } catch (e) {
             console.warn("[auth] claim reconcile at signup failed", e);
           }
           this.roles = roles;
-          this.activeRole = "tradesperson";
+          this.activeRole = role;
         }
         // Refresh the token so the verified-email claim is visible to the
         // claimProspect callable (which gates on email_verified) and the

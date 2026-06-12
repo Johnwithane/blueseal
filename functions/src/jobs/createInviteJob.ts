@@ -22,6 +22,7 @@ import { enforceRateLimit } from "../lib/rateLimit";
 import { requireInviteJobEntitlement } from "../lib/entitlements";
 import { requireVisibleTradie } from "../jobPosts/helpers";
 import { appBaseUrl, emailHashOf, sha256 } from "../prospects/helpers";
+import { inviteMagicLink, isInviteEmailSuppressed, sendInviteEmail } from "./inviteHelpers";
 
 const Input = z.object({
   title: z.string().trim().min(3).max(140),
@@ -158,10 +159,35 @@ export const createInviteJob = onCall(CALLABLE_OPTS, async (req) => {
     });
     await batch.commit();
 
-    // The magic-link invite email is enqueued by the claim-flow increment
-    // (the /claim-job landing has to exist before we mail links to it).
-    // Until then the tradesperson shares the copyable link themselves.
-    const emailed = false;
+    // Best-effort invite email. Gates (all must hold, mirroring prospect
+    // outreach): recipient not on the suppression list, magic link could be
+    // generated (email-link sign-in enabled), CASL mailing address configured
+    // (checked inside sendInviteEmail). Any gate failing degrades to
+    // copy-link-only — the job is already created either way.
+    let emailed = false;
+    try {
+      if (!(await isInviteEmailSuppressed(input.clientEmail))) {
+        const signinLink = await inviteMagicLink(input.clientEmail);
+        if (signinLink) {
+          emailed = await sendInviteEmail({
+            toEmail: input.clientEmail,
+            clientName: input.clientName,
+            tradieName,
+            tradeName: input.trade,
+            signinLink,
+            jobId: jobRef.id,
+          });
+        }
+      }
+      if (emailed) {
+        await jobRef.update({
+          "clientInvite.emailedAt": FieldValue.serverTimestamp(),
+          "clientInvite.lastSentAt": FieldValue.serverTimestamp(),
+        });
+      }
+    } catch (err) {
+      logger.warn("createInviteJob: invite email skipped", { ...ctx, jobId: jobRef.id, err });
+    }
 
     logger.info("success", { ...ctx, jobId: jobRef.id, emailed });
     return {

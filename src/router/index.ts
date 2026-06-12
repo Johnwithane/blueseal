@@ -127,6 +127,23 @@ const routes: RouteRecordRaw[] = [
     meta: { layout: "public" },
   },
 
+  // Bring-your-own-client invite flow. /invite/:token is the copied/texted
+  // link (confirm email → magic link sent); /claim-job is the magic-link
+  // landing (signs the CLIENT in and attaches them to their job — distinct
+  // from /claim, which provisions tradespeople).
+  {
+    path: "/invite/:token",
+    name: "InviteLanding",
+    component: () => import("@/views/InviteLandingView.vue"),
+    meta: { layout: "public", title: "Your job on Blue Seal" },
+  },
+  {
+    path: "/claim-job",
+    name: "InviteClaim",
+    component: () => import("@/views/InviteClaimView.vue"),
+    meta: { layout: "public", title: "Join your job" },
+  },
+
   // Auth
   {
     path: "/sign-in",

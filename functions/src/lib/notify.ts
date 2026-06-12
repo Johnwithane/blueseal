@@ -55,6 +55,9 @@ export type NotificationType =
   // Fires to the requesting client when a seeded prospect they asked for signs
   // up and their held lead converts into a real job.
   | "prospect_claimed"
+  // Fires to the tradesperson when their off-platform client accepts a job
+  // invite (claimJobInvite) and the solo job becomes two-party.
+  | "invite_claimed"
   // Client cancel/postpone request loop (requestJobChange / respondJobChange /
   // withdrawJobChange / resumeJob). Kept in sync with src/firebase/interfaces.ts.
   | "job_change_requested"

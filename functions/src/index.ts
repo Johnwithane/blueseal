@@ -76,6 +76,11 @@ export { respondSiteVisit } from "./jobs/respondSiteVisit";
 // off-platform clients, run solo until the client claims their invite.
 export { createInviteJob } from "./jobs/createInviteJob";
 export { recordOfflineQuoteAcceptance } from "./jobs/recordOfflineQuoteAcceptance";
+export { resendJobInvite } from "./jobs/resendJobInvite";
+export { revokeJobInvite } from "./jobs/revokeJobInvite";
+export { sendJobInviteSignInLink } from "./jobs/sendJobInviteSignInLink";
+export { claimJobInvite } from "./jobs/claimJobInvite";
+export { unsubscribeJobInvite } from "./jobs/unsubscribeJobInvite";
 
 // Invoicing
 export { onJobCompleted } from "./invoicing/onJobCompleted";

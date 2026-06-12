@@ -306,6 +306,25 @@ describe("invite jobs — reputation firewall on reviews", () => {
   });
 });
 
+describe("inviteSuppression — server-only tombstones", () => {
+  it("non-admins can neither read nor write a suppression tombstone", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "inviteSuppression", "somehash"), {
+        reason: "unsubscribe",
+        identifier: "somehash",
+        createdAt: Timestamp.now(),
+      });
+    });
+    const tradie = env.authenticatedContext(TRADIE_UID, TRADIE_CLAIMS).firestore();
+    await assertFails(getDoc(doc(tradie, "inviteSuppression", "somehash")));
+    await assertFails(
+      setDoc(doc(tradie, "inviteSuppression", "otherhash"), { reason: "fake" }),
+    );
+    const admin = env.authenticatedContext(ADMIN_UID, ADMIN_CLAIMS).firestore();
+    await assertSucceeds(getDoc(doc(admin, "inviteSuppression", "somehash")));
+  });
+});
+
 describe("invite jobs — subcollections with null clientId", () => {
   it("tradesperson can book a session on an unclaimed job (row clientId null matches parent)", async () => {
     await seedInviteJob();

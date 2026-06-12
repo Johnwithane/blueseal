@@ -1252,6 +1252,16 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    // ---------- inviteSuppression (job-invite email opt-out tombstones) ----------
+    // Same contract as prospectSuppression, for the bring-your-own-client
+    // invite emails: keyed by emailHash, written only by the
+    // unsubscribeJobInvite endpoint (Admin SDK), checked before every invite
+    // send. Never client-readable — it would leak who opted out.
+    match /inviteSuppression/{suppressionKey} {
+      allow read: if isAdmin();
+      allow create, update, delete: if false;
+    }
+
     // ---------- siteContent (admin-editable public site copy) ----------
     // World-readable so the home page can render testimonials etc. without
     // requiring auth. Admin-only write — adding new editable content blocks

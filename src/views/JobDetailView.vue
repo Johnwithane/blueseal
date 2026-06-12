@@ -1160,8 +1160,10 @@ function onReturnToApplicants() {
            (clientId null) — show the tradesperson the invite state. -->
       <InviteStatusBanner
         v-if="isTradie && job.clientId === null && job.clientInvite"
+        :job-id="job.id"
         :invite="job.clientInvite"
         class="mb-4"
+        @changed="load"
       />
 
       <!-- Cancel/postpone request loop: respond (tradie), withdraw (client),

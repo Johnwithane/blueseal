@@ -124,6 +124,69 @@ export async function createInviteJob(
   return res.data;
 }
 
+// Rotates the invite token (old copy links die) and optionally re-emails the
+// magic link or fixes a typo'd address. channel "link" just returns a fresh
+// copyable URL without sending anything.
+export async function resendJobInvite(input: {
+  jobId: string;
+  channel: "email" | "link";
+  newEmail?: string;
+  newClientName?: string;
+}): Promise<{ inviteLink: string; emailed: boolean }> {
+  const fn = httpsCallable<typeof input, { inviteLink: string; emailed: boolean }>(
+    functions,
+    "resendJobInvite",
+  );
+  const res = await fn(input);
+  return res.data;
+}
+
+export async function revokeJobInvite(jobId: string): Promise<{ ok: true }> {
+  const fn = httpsCallable<{ jobId: string }, { ok: true }>(functions, "revokeJobInvite");
+  const res = await fn({ jobId });
+  return res.data;
+}
+
+// Unauthenticated by design: the copied invite link can only trigger sending
+// a magic sign-in link to the email the tradesperson stored on the invite.
+export async function sendJobInviteSignInLink(
+  token: string,
+  email: string,
+): Promise<{ ok: true }> {
+  const fn = httpsCallable<{ token: string; email: string }, { ok: true }>(
+    functions,
+    "sendJobInviteSignInLink",
+  );
+  const res = await fn({ token, email });
+  return res.data;
+}
+
+export interface InvitePreview {
+  jobId: string;
+  title: string;
+  trade: string;
+  tradieName: string;
+  clientName: string;
+  acceptedOffline: boolean;
+}
+
+export type ClaimJobInviteResult =
+  | { status: "needs_verification" }
+  | { status: "none"; invites: [] }
+  | { status: "preview"; invites: InvitePreview[] }
+  | { status: "claimed"; claimed: number; jobIds: string[] };
+
+// Two-phase: confirm:false previews the invites matching the signed-in
+// user's verified email; confirm:true attaches them as the jobs' client.
+export async function claimJobInvite(confirm: boolean): Promise<ClaimJobInviteResult> {
+  const fn = httpsCallable<{ confirm: boolean }, ClaimJobInviteResult>(
+    functions,
+    "claimJobInvite",
+  );
+  const res = await fn({ confirm });
+  return res.data;
+}
+
 export async function getJob(id: string): Promise<WithId<JobDoc> | null> {
   const snap = await getDoc(jobRef(id));
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;

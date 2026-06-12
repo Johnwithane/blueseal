@@ -160,6 +160,18 @@ the items below are set. Nothing breaks while they're unset.
 - **Why:** Outreach relies on the "conspicuous publication" implied-consent basis (only rows with `emailConspicuouslyPublished: true` are emailed) + the "only on a real client request" relevance argument.
 - **What:** Have counsel confirm the basis before the first real send. The footer wording is row-accurate (varies by `dataConsentBasis`), and provenance (`sourceUrl`, `dataConsentBasis`) is retained on every prospect for the audit trail.
 
+> **Also depends on the two items above (added 2026-06-11):** the
+> **bring-your-own-client job invite emails** (`createInviteJob` /
+> `resendJobInvite` / `sendJobInviteSignInLink`) reuse this exact setup —
+> email-link sign-in + authorized domain (the continue URL is `/claim-job`),
+> `BLUE_SEAL_MAILING_ADDRESS`, and `PROSPECT_UNSUB_SECRET` (invite unsubscribe
+> tokens are `HMAC(secret, "invite_" + jobId)`). Until those are set, invite
+> jobs still work but degrade to **copy-link-only** delivery (the tradesperson
+> texts the link; the client confirms their email on `/invite/:token` —
+> which then ALSO needs email-link sign-in enabled to actually send the
+> magic link). Net: solo mode works fully today; client claiming needs the
+> email-link toggle at minimum.
+
 ---
 
 ## Monetization pivot — Stripe Connect Express (added 2026-05-24)
