@@ -114,6 +114,14 @@
       "collectionGroup": "invoices",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "recurring.enabled", "order": "ASCENDING" },
+        { "fieldPath": "recurring.nextRunAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "invoices",
+      "queryScope": "COLLECTION",
+      "fields": [
         { "fieldPath": "tradespersonId", "order": "ASCENDING" },
         { "fieldPath": "issuedAt", "order": "DESCENDING" }
       ]

@@ -12,7 +12,10 @@ import {
   markInvoicePaid,
   pullBillablesFromJob,
   recomputeTotals,
+  setInvoiceRecurring,
+  type RecurringFrequency,
 } from "@/firebase/services/invoices";
+import { useSubscriptionStore } from "@/stores/subscription";
 import { getInvoicePartyInfo } from "@/firebase/services/jobs";
 import { getTradesperson } from "@/firebase/services/tradespeople";
 import { subscribePayoutsState } from "@/firebase/services/payoutsService";
@@ -78,6 +81,40 @@ async function openPdfPreview() {
 }
 
 const invoice = ref<WithId<InvoiceDoc> | null>(null);
+
+// Recurring (Pro): toggle this invoice as a recurring template. A daily Cloud
+// Function clones it as a draft each period for the tradesperson to review.
+const subscription = useSubscriptionStore();
+const recurringSaving = ref(false);
+const recurringOptions = [
+  { label: "Off", value: "off" as const },
+  { label: "Weekly", value: "weekly" as const },
+  { label: "Monthly", value: "monthly" as const },
+  { label: "Quarterly", value: "quarterly" as const },
+];
+const recurringValue = computed<RecurringFrequency | "off">(() =>
+  invoice.value?.recurring?.enabled
+    ? ((invoice.value.recurring.frequency as RecurringFrequency) ?? "monthly")
+    : "off",
+);
+async function setRecurring(freq: RecurringFrequency | "off") {
+  if (recurringSaving.value) return;
+  recurringSaving.value = true;
+  try {
+    await setInvoiceRecurring(props.invoiceId, freq === "off" ? null : freq);
+    invoice.value = await getInvoice(props.invoiceId);
+    toast.success(
+      freq === "off"
+        ? "Recurring turned off"
+        : "Recurring set — a draft copy will appear each period for you to review.",
+    );
+  } catch (e) {
+    toast.error(humanizeError(e));
+  } finally {
+    recurringSaving.value = false;
+  }
+}
+
 // Tradesperson's company logo + name, surfaced at the top of the editor
 // card so the in-app invoice view matches what the client will see on the
 // PDF. Pulled fresh from /tradespeople/{uid} each load so logo updates
@@ -581,6 +618,32 @@ async function markPaid() {
         </p>
         <p class="text-[11px] text-[color:var(--bs-muted)] mt-2">
           Applied to the subtotal before tax. Save the invoice to persist the change.
+        </p>
+      </div>
+
+      <!-- Recurring (Pro only). -->
+      <div
+        v-if="props.canEdit && subscription.isPro"
+        class="mt-3 rounded-lg border border-[color:var(--bs-border)] p-3"
+      >
+        <div class="flex items-center gap-2 mb-2">
+          <i class="pi pi-replay text-[color:var(--bs-blue)]"></i>
+          <h4 class="font-semibold text-sm">Repeat this invoice</h4>
+          <Tag value="Pro" severity="info" class="text-[10px]" />
+        </div>
+        <SelectButton
+          :model-value="recurringValue"
+          :options="recurringOptions"
+          option-label="label"
+          option-value="value"
+          :allow-empty="false"
+          :disabled="recurringSaving"
+          class="text-xs"
+          @update:model-value="setRecurring"
+        />
+        <p class="text-[11px] text-[color:var(--bs-muted)] mt-2">
+          A draft copy appears for you to review and send each period — it's
+          never sent automatically.
         </p>
       </div>
 

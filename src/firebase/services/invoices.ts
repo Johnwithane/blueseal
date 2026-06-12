@@ -8,6 +8,7 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  Timestamp,
   updateDoc,
   where,
 } from "firebase/firestore";
@@ -261,6 +262,32 @@ export interface PaymentIntentResult {
  * invoice total. Rejects (failed-precondition) if the tradesperson hasn't
  * finished payout setup — the caller offers the fee-free offline path instead.
  */
+export type RecurringFrequency = "weekly" | "monthly" | "quarterly";
+
+/**
+ * Turn an invoice into a recurring template, or turn it off. When enabled, a
+ * daily Cloud Function clones it as a fresh DRAFT each period for the
+ * tradesperson to review and send (it never auto-sends). nextRunAt is the first
+ * clone date — computed from the local clock (a day's tolerance is fine for a
+ * schedule). Pro-gated in the UI; the scheduled function re-checks Pro.
+ */
+export async function setInvoiceRecurring(
+  id: string,
+  frequency: RecurringFrequency | null,
+): Promise<void> {
+  if (!frequency) {
+    await updateDoc(invRef(id), { recurring: null });
+    return;
+  }
+  const next = new Date();
+  if (frequency === "weekly") next.setDate(next.getDate() + 7);
+  else if (frequency === "quarterly") next.setMonth(next.getMonth() + 3);
+  else next.setMonth(next.getMonth() + 1);
+  await updateDoc(invRef(id), {
+    recurring: { enabled: true, frequency, nextRunAt: Timestamp.fromDate(next) },
+  });
+}
+
 export async function createInvoicePaymentIntent(invoiceId: string): Promise<PaymentIntentResult> {
   const fn = httpsCallable<{ invoiceId: string }, PaymentIntentResult>(
     functions,

@@ -91,6 +91,8 @@ export { setInvoiceNumbering } from "./billing/setInvoiceNumbering";
 export { sendInvoice } from "./invoicing/sendInvoice";
 export { markInvoiceOverdue } from "./invoicing/scheduledOverdue";
 export { pullBillablesFromJob } from "./invoicing/pullBillablesFromJob";
+// Blue Seal Pro: clones due recurring invoices as drafts (review-and-send).
+export { scheduledRecurringInvoices } from "./invoicing/scheduledRecurringInvoices";
 
 // AI
 export { aiDiagnose, aiQuote, aiSummarize } from "./ai/tools";
