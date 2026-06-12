@@ -379,6 +379,14 @@ If you write the same pattern 3+ times, **stop and extract**:
 
 We're keeping it lightweight at the start — no separate ADR folder until we actually have decisions worth tracking formally.
 
+### Claude Code tooling (cost routing)
+
+Which Claude model to use when on this repo, plus pre-built cheap subagents so the expensive model isn't doing grunt work:
+
+- [`docs/MODEL_STRATEGY.md`](./docs/MODEL_STRATEGY.md) — the four-tier playbook (Opus 4.8 is the default; reserve Fable; hand off to a cheap subagent for search/tests/QA). The Opus default is set globally at user level, so this repo already inherits it.
+- [`.claude/agents/`](./.claude/agents/) — `scout` (Haiku, read-only research), `test-writer` (Sonnet, Vitest + `tests/rules/`), `qa-runner` (Sonnet, Playwright QA). Each pins its own model.
+- [`docs/QA_PLAYWRIGHT.md`](./docs/QA_PLAYWRIGHT.md) — the runbook `qa-runner` drives (emulators + seeded roles, per-role route sweeps, mobile 375px).
+
 ### Help Center & FAQ upkeep
 
 The Help Center, FAQ, and homepage FAQ teaser are all driven by **one hardcoded source of truth**: [`src/data/help.ts`](./src/data/help.ts) (`HELP_CONTENT_SEED` — categories, articles, FAQs). There is **no CMS / admin editor and no Firestore doc** — editing help content is a deliberate code change, on purpose, so it goes through review like everything else.
