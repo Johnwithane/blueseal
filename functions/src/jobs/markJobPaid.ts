@@ -6,8 +6,13 @@ import { z } from "zod";
 import { db } from "../lib/admin";
 import { requireRole } from "../lib/auth";
 import { postSystemMessage } from "../lib/chatSystemMessage";
+import { enqueueMail } from "../lib/mail";
 import { notify } from "../lib/notify";
 import { ensureReviewPair } from "../lib/reviewPair";
+
+function appBaseUrl(): string {
+  return (process.env.APP_BASE_URL ?? "https://blueseal.app").replace(/\/$/, "");
+}
 
 const Input = z.object({
   jobId: z.string().min(1).max(128),
@@ -101,6 +106,40 @@ export const markJobPaid = onCall(CALLABLE_OPTS, async (req) => {
     recipientRole: "client",
     priority: "normal",
   });
+
+  // Auto-receipt: email the client a paid-receipt confirmation so an
+  // offline-paid (cash / e-transfer) job feels as documented as a card one.
+  // Best-effort — a mail miss must not roll back the completed job. Skipped on
+  // solo bring-your-own-client jobs (no claimed client to email).
+  if (result.clientId) {
+    try {
+      const [clientUser, tradieUser, invSnap] = await Promise.all([
+        db.doc(`users/${result.clientId}`).get(),
+        db.doc(`users/${uid}`).get(),
+        invoiceRef.get(),
+      ]);
+      const clientEmail = (clientUser.data() as { email?: string })?.email;
+      const clientName = (clientUser.data() as { displayName?: string })?.displayName ?? "there";
+      const tradieName =
+        (tradieUser.data() as { displayName?: string })?.displayName ?? "your tradesperson";
+      const pdfUrl = (invSnap.data() as { pdfUrl?: string | null })?.pdfUrl ?? null;
+      if (clientEmail) {
+        await enqueueMail({
+          to: clientEmail,
+          subject: `Receipt — invoice ${result.invoiceNumber} paid`,
+          text:
+            `Hi ${clientName},\n\n` +
+            `This confirms your payment of $${(result.total / 100).toFixed(2)} to ${tradieName} ` +
+            `for invoice ${result.invoiceNumber}.\n\n` +
+            `View receipt: ${appBaseUrl()}/invoices/${jobId}/receipt\n` +
+            (pdfUrl ? `Invoice PDF: ${pdfUrl}\n` : "") +
+            `\nThanks,\nBlue Seal`,
+        });
+      }
+    } catch (err) {
+      logger.warn("markJobPaid: receipt email failed", { jobId, err });
+    }
+  }
 
   // Mutual-review loop — idempotent. Both this callable and clientMarkPaid
   // call ensureReviewPair so whichever closes the invoice first seeds the

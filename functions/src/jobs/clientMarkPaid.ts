@@ -1,13 +1,11 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { CALLABLE_OPTS } from "../lib/callable";
-import { FieldValue } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { z } from "zod";
 import { db } from "../lib/admin";
 import { requireRole } from "../lib/auth";
 import { postSystemMessage } from "../lib/chatSystemMessage";
 import { notify } from "../lib/notify";
-import { ensureReviewPair } from "../lib/reviewPair";
 
 const Input = z.object({
   jobId: z.string().min(1).max(128),
@@ -18,30 +16,17 @@ interface JobData {
   clientId: string | null;
   status: string;
   chatId: string;
-  acceptedOffline?: boolean;
-}
-
-interface InvoiceData {
-  invoiceNumber: string;
-  total: number;
-  status: string;
 }
 
 /**
- * Client-initiated "I've paid this invoice" path. Pre-Stripe-Connect we
- * support fully-offline payment (e-transfer, cash, etc.), so either party
- * can close the loop — the tradesperson via `markJobPaid`, the client via
- * this callable.
+ * Client "I've paid this invoice" — a NUDGE, not a state change.
  *
- * Atomically flips the invoice (→ paid) and the job (→ complete), same as
- * `markJobPaid`, with the auth check inverted (client role instead of
- * tradesperson). When Stripe Connect is live this becomes a no-op for the
- * client (the Stripe Elements flow takes over) — leave it deployed for
- * legacy manual-flow invoices and as a fallback for tradies who collect
- * outside Stripe (e.g. e-transfer for repeat customers).
- *
- * onJobUpdated suppresses its generic line on the awaiting_payment →
- * complete transition because we post a friendlier one here.
+ * Cash-policy decision (2026-06-11): the tradesperson's confirmation is
+ * authoritative for offline payment. A client saying they've paid no longer
+ * flips the job/invoice to complete/paid — it pings the tradesperson to confirm
+ * receipt (via markJobPaid), which is what actually completes the job and seeds
+ * the review pair + receipt. This prevents a client from closing a job on an
+ * unverified "I paid". Card payments settle automatically through Stripe.
  */
 export const clientMarkPaid = onCall(CALLABLE_OPTS, async (req) => {
   const uid = requireRole(req, "client");
@@ -49,116 +34,39 @@ export const clientMarkPaid = onCall(CALLABLE_OPTS, async (req) => {
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);
   const { jobId } = parsed.data;
 
-  const jobRef = db.doc(`jobs/${jobId}`);
-  const invoiceRef = db.doc(`invoices/${jobId}`);
+  const jobSnap = await db.doc(`jobs/${jobId}`).get();
+  if (!jobSnap.exists) throw new HttpsError("not-found", "Job not found.");
+  const job = jobSnap.data() as JobData;
+  if (job.clientId !== uid) {
+    throw new HttpsError("permission-denied", "Not your job.");
+  }
+  if (job.status !== "awaiting_payment") {
+    throw new HttpsError(
+      "failed-precondition",
+      `Job must be awaiting payment. Current status: ${job.status}.`,
+    );
+  }
 
-  const result = await db.runTransaction(async (tx) => {
-    const [jobSnap, invoiceSnap] = await Promise.all([tx.get(jobRef), tx.get(invoiceRef)]);
-    if (!jobSnap.exists) throw new HttpsError("not-found", "Job not found.");
-    const job = jobSnap.data() as JobData;
-    if (job.clientId !== uid) {
-      throw new HttpsError("permission-denied", "Not your job.");
-    }
-    if (job.status !== "awaiting_payment") {
-      throw new HttpsError(
-        "failed-precondition",
-        `Job must be awaiting payment. Current status: ${job.status}.`,
-      );
-    }
-    if (!invoiceSnap.exists) {
-      throw new HttpsError("not-found", "Invoice not found.");
-    }
-    const invoice = invoiceSnap.data() as InvoiceData;
-
-    tx.update(jobRef, {
-      status: "complete",
-      completedAt: FieldValue.serverTimestamp(),
-    });
-    if (invoice.status !== "paid") {
-      tx.update(invoiceRef, {
-        status: "paid",
-        paidAt: FieldValue.serverTimestamp(),
-      });
-    }
-    return {
-      tradespersonId: job.tradespersonId,
-      chatId: job.chatId,
-      invoiceNumber: invoice.invoiceNumber,
-      total: invoice.total,
-      acceptedOffline: job.acceptedOffline === true,
-    };
-  });
-
-  if (result.chatId) {
+  if (job.chatId) {
     await postSystemMessage(
-      result.chatId,
-      `Client confirmed payment for ${result.invoiceNumber} ($${(result.total / 100).toFixed(2)}). Job complete.`,
+      job.chatId,
+      "The client says they've sent payment. Tradesperson — confirm you've received it to complete the job.",
     );
   }
 
   await notify({
-    userId: result.tradespersonId,
-    type: "invoice_paid",
-    title: "Client confirmed payment",
-    body: `${result.invoiceNumber} marked paid ($${(result.total / 100).toFixed(2)}).`,
+    userId: job.tradespersonId,
+    type: "invoice_sent",
+    title: "Client says they've paid",
+    body: "Confirm you've received payment to mark the job complete.",
     link: `/jobs/${jobId}`,
     actorUid: uid,
     jobId,
-    chatId: result.chatId ?? null,
+    chatId: job.chatId ?? null,
     recipientRole: "tradesperson",
-    priority: "normal",
+    priority: "high",
   });
 
-  // Mutual-review loop — same contract as markJobPaid (the other invoice-
-  // paid callable). ensureReviewPair is idempotent; we only fire the
-  // initial fan-out on the create branch so we don't double-prompt when
-  // both callables race.
-  //
-  // Reputation firewall (mirrors markJobPaid): a client who claimed their
-  // invite AFTER the tradesperson recorded an offline quote acceptance can
-  // pay the invoice, but the job never feeds public reviews — the binding
-  // acceptance wasn't made by a verified counterparty in-app.
-  if (result.acceptedOffline) {
-    logger.info("clientMarkPaid: review pair skipped (offline-accepted job)", { jobId });
-    return { ok: true };
-  }
-  try {
-    const { created } = await ensureReviewPair({
-      jobId,
-      clientId: uid,
-      tradespersonId: result.tradespersonId,
-    });
-    if (created) {
-      const reviewLink = `/jobs/${jobId}`;
-      await Promise.all([
-        notify({
-          userId: result.tradespersonId,
-          type: "review_requested",
-          title: "Leave a review for your client",
-          body: "Reviews stay hidden until both of you submit. You have 14 days.",
-          link: reviewLink,
-          jobId,
-          actorUid: uid,
-          recipientRole: "tradesperson",
-          priority: "normal",
-        }),
-        notify({
-          userId: uid,
-          type: "review_requested",
-          title: "Leave a review for your tradesperson",
-          body: "Reviews stay hidden until both of you submit. You have 14 days.",
-          link: reviewLink,
-          jobId,
-          actorUid: result.tradespersonId,
-          recipientRole: "client",
-          priority: "normal",
-        }),
-      ]);
-    }
-  } catch (err) {
-    logger.error("clientMarkPaid: review-pair seed failed", { jobId, err });
-  }
-
-  logger.info("clientMarkPaid", { jobId, clientId: uid, invoiceNumber: result.invoiceNumber });
+  logger.info("clientMarkPaid (nudge)", { jobId, clientId: uid });
   return { ok: true };
 });

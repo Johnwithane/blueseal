@@ -1,6 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { CALLABLE_OPTS } from "../lib/callable";
-import { FieldValue } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { z } from "zod";
 import { db } from "../lib/admin";
@@ -14,32 +13,25 @@ const Input = z.object({
 
 interface UpfrontFeeData {
   amountCents: number;
-  source: "fixed" | "percent";
-  paymentMethod: "manual" | "stripe";
   paidAt: unknown;
-  paidBy: string | null;
-  appliedInvoiceId: string | null;
 }
 
 interface JobData {
   tradespersonId: string;
-  clientId: string;
+  clientId: string | null;
   status: string;
   chatId: string;
   upfrontFee?: UpfrontFeeData | null;
 }
 
 /**
- * Client-initiated "I've paid the upfront fee" path. Mirrors
- * `clientMarkPaid` for final invoices: flips the upfront fee state to
- * paid (paidBy = "client_marked") and advances the job to in_progress.
- * Useful for asynchronous payment methods like e-transfer where the
- * client knows they've sent it before the tradesperson has confirmed
- * receipt. The tradesperson can re-mark via `markUpfrontFeePaid`
- * idempotently (transaction guards the status check).
+ * Client "I've paid the upfront fee" — a NUDGE, not a state change.
  *
- * onJobUpdated suppresses its generic line on the awaiting_upfront_payment →
- * in_progress transition.
+ * Cash-policy decision (2026-06-11): the tradesperson confirms receipt of the
+ * deposit (via markUpfrontFeePaid), which is what advances the job to
+ * in_progress. A client claiming they paid shouldn't start work on an
+ * unconfirmed deposit, so this just pings the tradesperson. Card payment of the
+ * upfront fee settles automatically through Stripe.
  */
 export const clientMarkUpfrontFeePaid = onCall(CALLABLE_OPTS, async (req) => {
   const uid = requireRole(req, "client");
@@ -47,62 +39,39 @@ export const clientMarkUpfrontFeePaid = onCall(CALLABLE_OPTS, async (req) => {
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);
   const { jobId } = parsed.data;
 
-  const jobRef = db.doc(`jobs/${jobId}`);
+  const jobSnap = await db.doc(`jobs/${jobId}`).get();
+  if (!jobSnap.exists) throw new HttpsError("not-found", "Job not found.");
+  const job = jobSnap.data() as JobData;
+  if (job.clientId !== uid) {
+    throw new HttpsError("permission-denied", "Not your job.");
+  }
+  if (job.status !== "awaiting_upfront_payment") {
+    throw new HttpsError(
+      "failed-precondition",
+      `Job must be awaiting upfront payment. Current: ${job.status}.`,
+    );
+  }
 
-  const result = await db.runTransaction(async (tx) => {
-    const jobSnap = await tx.get(jobRef);
-    if (!jobSnap.exists) throw new HttpsError("not-found", "Job not found.");
-    const job = jobSnap.data() as JobData;
-    if (job.clientId !== uid) {
-      throw new HttpsError("permission-denied", "Not your job.");
-    }
-    if (job.status !== "awaiting_upfront_payment") {
-      throw new HttpsError(
-        "failed-precondition",
-        `Job must be awaiting upfront payment. Current: ${job.status}.`,
-      );
-    }
-    const fee = job.upfrontFee;
-    if (!fee || fee.amountCents <= 0) {
-      throw new HttpsError("failed-precondition", "No upfront fee on this job.");
-    }
-
-    tx.update(jobRef, {
-      status: "in_progress",
-      "upfrontFee.paidAt": FieldValue.serverTimestamp(),
-      "upfrontFee.paidBy": "client_marked",
-    });
-    return {
-      tradespersonId: job.tradespersonId,
-      chatId: job.chatId,
-      amountCents: fee.amountCents,
-    };
-  });
-
-  if (result.chatId) {
+  if (job.chatId) {
     await postSystemMessage(
-      result.chatId,
-      `Client confirmed paying the $${(result.amountCents / 100).toFixed(2)} upfront fee. Job is now active.`,
+      job.chatId,
+      "The client says they've sent the upfront fee. Tradesperson — confirm you've received it to start work.",
     );
   }
 
   await notify({
-    userId: result.tradespersonId,
-    type: "invoice_paid",
-    title: "Client paid the upfront fee",
-    body: `$${(result.amountCents / 100).toFixed(2)} marked paid. Job is active — work can start.`,
+    userId: job.tradespersonId,
+    type: "invoice_sent",
+    title: "Client says they've paid the upfront fee",
+    body: "Confirm you've received it to start work on the job.",
     link: `/jobs/${jobId}`,
     actorUid: uid,
     jobId,
-    chatId: result.chatId ?? null,
+    chatId: job.chatId ?? null,
     recipientRole: "tradesperson",
     priority: "high",
   });
 
-  logger.info("clientMarkUpfrontFeePaid", {
-    jobId,
-    clientId: uid,
-    amountCents: result.amountCents,
-  });
+  logger.info("clientMarkUpfrontFeePaid (nudge)", { jobId, clientId: uid });
   return { ok: true };
 });
