@@ -19,6 +19,13 @@ jobs:
       # Inlined here (NOT GitHub secrets) so an empty/missing secret can never
       # again produce a config-less bundle — that was the auth/invalid-api-key
       # production outage on 2026-06-12. These mirror .env "Firebase (production)".
+      #
+      # ⚠ DO NOT move these back to GitHub secrets to silence a scanner.
+      # Secret scanners (GitGuardian etc.) flag these AIzaSy* keys, but that is an
+      # EXPECTED false positive — they are public client keys, verified locked down
+      # on 2026-06-12: the Maps key is referrer+API-restricted to our domains; the
+      # Firebase key is API-restricted to Firebase services. Resolve the alert as a
+      # false positive; reverting to secrets just reintroduces the empty-secret outage.
       VITE_FIREBASE_API_KEY: AIzaSyBAH4g0acwSAvOO7SFE8j5U4q3RptyjUV8
       VITE_FIREBASE_AUTH_DOMAIN: blueseal-762af.firebaseapp.com
       VITE_FIREBASE_PROJECT_ID: blueseal-762af
