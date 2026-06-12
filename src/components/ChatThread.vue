@@ -14,6 +14,7 @@ import { suggestChatReplies } from "@/firebase/services/assistant";
 import type { MessageDoc, WithId } from "@/firebase/interfaces";
 import { useAuthStore } from "@/stores/auth";
 import { useSubscriptionStore } from "@/stores/subscription";
+import { usePaywallStore } from "@/stores/paywall";
 import { compressToWebp } from "@/utils/image";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
@@ -30,6 +31,7 @@ const props = defineProps<{
 
 const auth = useAuthStore();
 const subscription = useSubscriptionStore();
+const paywall = usePaywallStore();
 const toast = useToast();
 
 const messages = ref<WithId<MessageDoc>[]>([]);
@@ -80,11 +82,12 @@ watch(lastMessageId, () => {
   if (suggestions.value.length) suggestions.value = [];
 });
 
+// The button is offered whenever there's a client message to reply to —
+// independent of Pro status, so non-Pro tradespeople can tap it and meet the
+// upgrade popup (the Pro check lives in fetchSuggestions). Admins always pass.
+const isAiAdmin = computed(() => (auth.roles ?? []).includes("admin"));
 const canSuggest = computed(() => {
   if (!props.enableAiReplies || !props.jobId) return false;
-  // AI reply suggestions are a Blue Seal Pro feature (admins always pass).
-  const isAdmin = (auth.roles ?? []).includes("admin");
-  if (!subscription.isPro && !isAdmin) return false;
   const last = messages.value[messages.value.length - 1];
   if (!last) return false;
   if (last.senderId === myUid.value) return false;
@@ -93,6 +96,12 @@ const canSuggest = computed(() => {
 
 async function fetchSuggestions() {
   if (!props.jobId || loadingSuggestions.value) return;
+  // AI reply suggestions are a Blue Seal Pro feature — show the upgrade popup
+  // immediately for non-Pro tradespeople rather than a round-trip to a paywall.
+  if (!subscription.isPro && !isAiAdmin.value) {
+    paywall.open("AI reply suggestions are part of Blue Seal Pro. Start a free trial to use them.");
+    return;
+  }
   loadingSuggestions.value = true;
   try {
     const res = await suggestChatReplies(props.jobId);
@@ -101,6 +110,7 @@ async function fetchSuggestions() {
       toast.info("No suggestions", "Try once the client has replied.");
     }
   } catch (err) {
+    if (paywall.fromError(err)) return;
     toast.error("Suggestions unavailable", humanizeError(err));
   } finally {
     loadingSuggestions.value = false;

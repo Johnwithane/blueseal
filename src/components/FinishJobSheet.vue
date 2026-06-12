@@ -24,6 +24,7 @@ import type {
 } from "@/firebase/interfaces";
 import { useFormatters } from "@/composables/useFormatters";
 import { useToast } from "@/composables/useToast";
+import { usePaywallStore } from "@/stores/paywall";
 import { humanizeError } from "@/utils/errors";
 
 const props = defineProps<{
@@ -47,6 +48,7 @@ const emit = defineEmits<{
 
 const { money } = useFormatters();
 const toast = useToast();
+const paywall = usePaywallStore();
 
 // ----- data: live subscriptions to time + expenses on this job -----
 const timeEntries = ref<WithId<TimeEntryDoc>[]>([]);
@@ -499,6 +501,7 @@ async function onDraftNote() {
     noteToClient.value = await draftInvoiceNoteWithAi(props.jobId);
     toast.success("Note drafted", "Give it a quick read before sending.");
   } catch (e) {
+    if (paywall.fromError(e)) return;
     toast.error("Couldn't draft the note", humanizeError(e));
   } finally {
     draftingNote.value = false;

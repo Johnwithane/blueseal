@@ -8,6 +8,7 @@ import AppHeader from "@/components/AppHeader.vue";
 import AppFooter from "@/components/AppFooter.vue";
 import TradieStatusBanner from "@/components/TradieStatusBanner.vue";
 import AssistantBubble from "@/components/assistant/AssistantBubble.vue";
+import PaywallDialog from "@/components/PaywallDialog.vue";
 import RoleSwitchOverlay from "@/components/RoleSwitchOverlay.vue";
 import AppShell from "@/components/shell/AppShell.vue";
 import ActiveClockBanner from "@/components/ActiveClockBanner.vue";
@@ -187,6 +188,9 @@ function openFromToast(notifId: string) {
          it on their respective pages. The bubble has its own route + role
          visibility rules. -->
     <AssistantBubble />
+    <!-- Global Blue Seal Pro upgrade popup. Any gated AI/Pro action funnels its
+         paywall error into the paywall store, which this dialog renders. -->
+    <PaywallDialog />
     <!-- Global overlay for Airbnb-style role switches. Stays mounted; the
          component shows/hides itself based on the role-switch animation
          store, which `auth.switchActiveRole` drives. -->

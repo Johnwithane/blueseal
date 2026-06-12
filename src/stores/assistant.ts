@@ -13,6 +13,7 @@ import type {
   AssistantScope,
   WithId,
 } from "@/firebase/interfaces";
+import { usePaywallStore } from "@/stores/paywall";
 
 interface State {
   // Panel chrome
@@ -200,6 +201,15 @@ export const useAssistantStore = defineStore("assistant", {
           this.attachToConversation(res.conversationId);
         }
       } catch (e) {
+        // Pro paywall (e.g. a trial/comp lapsed mid-session — the panel
+        // normally gates non-Pro out of the composer): show the upgrade popup
+        // instead of leaking the raw token into the thread, and don't rethrow
+        // so call sites don't also toast.
+        if (usePaywallStore().fromError(e)) {
+          this.error = null;
+          this.optimisticUserMessage = null;
+          return;
+        }
         this.error = (e as Error).message;
         this.optimisticUserMessage = null;
         throw e;

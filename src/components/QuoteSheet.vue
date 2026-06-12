@@ -11,6 +11,7 @@ import { getSiteVisit, proposeSiteVisit } from "@/firebase/services/siteVisits";
 import { getTradesperson } from "@/firebase/services/tradespeople";
 import { draftQuoteWithAi } from "@/firebase/services/aiDrafts";
 import { useAuthStore } from "@/stores/auth";
+import { usePaywallStore } from "@/stores/paywall";
 import { useFormatters } from "@/composables/useFormatters";
 import { useToast } from "@/composables/useToast";
 import { useConfirmAction } from "@/composables/useConfirmAction";
@@ -37,6 +38,7 @@ const emit = defineEmits<{
 const { money } = useFormatters();
 const toast = useToast();
 const auth = useAuthStore();
+const paywall = usePaywallStore();
 
 const submitting = ref(false);
 const loading = ref(false);
@@ -148,6 +150,7 @@ async function runDraft() {
     };
     toast.success("Draft ready", "Prices are AI estimates — review every line before sending.");
   } catch (e) {
+    if (paywall.fromError(e)) return;
     toast.error("Couldn't draft the quote", humanizeError(e));
   } finally {
     drafting.value = false;

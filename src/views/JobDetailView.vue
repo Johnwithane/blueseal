@@ -36,6 +36,7 @@ import { subscribeReviewPair } from "@/firebase/services/reviews";
 import { subscribeJobExtras } from "@/firebase/services/jobExtras";
 import { subscribeSiteVisit } from "@/firebase/services/siteVisits";
 import { useAuthStore } from "@/stores/auth";
+import { usePaywallStore } from "@/stores/paywall";
 import type {
   JobDoc,
   JobExtraDoc,
@@ -68,7 +69,7 @@ import { tradeLabel } from "@/data/trades";
 import { useToast } from "@/composables/useToast";
 import { useActiveClock } from "@/composables/useActiveClock";
 import { clockIn, clockOut, formatElapsed } from "@/firebase/services/timeEntries";
-import { humanizeError } from "@/utils/errors";
+import { humanizeError, isPaywallError } from "@/utils/errors";
 import { statusLabel, STATUS_SEVERITY } from "@/utils/jobStatus";
 import { jobBillingType } from "@/utils/jobBilling";
 import JobTabBar, { type JobTab } from "@/features/jobDetail/JobTabBar.vue";
@@ -84,6 +85,7 @@ const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
 const toast = useToast();
+const paywall = usePaywallStore();
 const confirmDialog = useConfirm();
 const { dateTime, money } = useFormatters();
 
@@ -802,6 +804,7 @@ async function updateLogManually() {
       toast.info("Nothing new to log", "No action-relevant client messages since the last update.");
     }
   } catch (e) {
+    if (paywall.fromError(e)) return;
     toast.error("Couldn't update log", humanizeError(e));
   } finally {
     updatingLog.value = false;
@@ -816,6 +819,10 @@ async function maybeAutoUpdateLog() {
       privateNotes.value = await getJobPrivateNotes(job.value.id);
     }
   } catch (e) {
+    // Auto-log is a silent background nicety. For non-Pro tradespeople it hits
+    // the AI paywall every time — swallow that quietly (no popup: they didn't
+    // ask for this; no scary console error). Real failures still warn.
+    if (isPaywallError(e)) return;
     console.warn("auto-log failed", e);
   }
 }

@@ -1,15 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { RouterLink, useRouter } from "vue-router";
+import { RouterLink } from "vue-router";
 import Button from "primevue/button";
 import SelectButton from "primevue/selectbutton";
 import { storeToRefs } from "pinia";
 import { useAuthStore } from "@/stores/auth";
 import { useSubscriptionStore } from "@/stores/subscription";
-import { createSubscriptionCheckout } from "@/firebase/services/subscriptionService";
-import { useToast } from "@/composables/useToast";
+import { useProCheckout } from "@/composables/useProCheckout";
 import { useSeo } from "@/composables/useSeo";
-import { humanizeError } from "@/utils/errors";
 import type { SubscriptionPlan } from "@/firebase/interfaces";
 
 // Public pricing page. Core app is free for everyone; Blue Seal Pro is the
@@ -22,17 +20,15 @@ useSeo({
 });
 
 const auth = useAuthStore();
-const router = useRouter();
-const toast = useToast();
 const store = useSubscriptionStore();
 const { isPro } = storeToRefs(store);
+const { busy, startPro } = useProCheckout();
 
 const plan = ref<SubscriptionPlan>("annual");
 const planOptions = [
   { label: "Monthly", value: "monthly" as const },
   { label: "Annual (2 months free)", value: "annual" as const },
 ];
-const busy = ref(false);
 
 const priceLine = computed(() =>
   plan.value === "monthly" ? "$29 CAD / month" : "$290 CAD / year",
@@ -40,30 +36,8 @@ const priceLine = computed(() =>
 
 const isTradie = computed(() => auth.hasTradieRole);
 
-async function onProCta() {
-  if (isPro.value) {
-    void router.push({ path: "/account", query: { tab: "pro" } });
-    return;
-  }
-  if (!auth.isAuthenticated) {
-    void router.push({ path: "/sign-up", query: { as: "tradesperson" } });
-    return;
-  }
-  if (!isTradie.value) {
-    // Client-only account — they need the tradesperson role to subscribe.
-    void router.push({ path: "/account", query: { tab: "account" } });
-    toast.info("Blue Seal Pro is for tradespeople", "Add the tradesperson role to subscribe.");
-    return;
-  }
-  busy.value = true;
-  try {
-    const { url } = await createSubscriptionCheckout(plan.value);
-    if (url) window.location.assign(url);
-    else throw new Error("Couldn't start checkout.");
-  } catch (err) {
-    toast.error(humanizeError(err));
-    busy.value = false;
-  }
+function onProCta() {
+  void startPro(plan.value);
 }
 
 const proCtaLabel = computed(() => {

@@ -7,6 +7,7 @@ import Tag from "primevue/tag";
 import Message from "primevue/message";
 import { useConfirm } from "primevue/useconfirm";
 import { useAuthStore } from "@/stores/auth";
+import { usePaywallStore } from "@/stores/paywall";
 import {
   getJobPost,
   subscribeJobPostMeta,
@@ -61,6 +62,7 @@ const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
 const toast = useToast();
+const paywall = usePaywallStore();
 const confirm = useConfirm();
 const { relativeTime, money } = useFormatters();
 
@@ -300,6 +302,7 @@ async function runApplyDraft() {
     }
     toast.success("Draft ready", "Prices are AI estimates — review every line before sending.");
   } catch (e) {
+    if (paywall.fromError(e)) return;
     toast.error("Couldn't draft the quote", humanizeError(e));
   } finally {
     draftingApply.value = false;

@@ -3,6 +3,7 @@ export * from "./useToast";
 export * from "./useFormatters";
 export * from "./useGoogleMaps";
 export * from "./useConfirmAction";
+export * from "./useProCheckout";
 export * from "./usePushPrompt";
 export * from "./useActiveClock";
 export * from "./useHelpContent";

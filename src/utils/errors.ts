@@ -40,8 +40,36 @@ interface FirebaseLikeError {
   message?: string;
 }
 
+// Stable token the server leads a Blue Seal Pro paywall message with (a callable
+// HttpsError can't carry a custom code, so the token rides in the message). Keep
+// in sync with functions/src/lib/{entitlements,subscription}.ts.
+const PAYWALL_TOKEN = "BLUESEAL_PRO_REQUIRED";
+
+/** True when an error is the server's Blue Seal Pro paywall signal. */
+export function isPaywallError(e: unknown): boolean {
+  const msg = (e as FirebaseLikeError | null)?.message;
+  return typeof msg === "string" && msg.includes(PAYWALL_TOKEN);
+}
+
+/**
+ * The human half of a paywall error — everything after the `BLUESEAL_PRO_REQUIRED:`
+ * token (e.g. "The AI assistant is part of Blue Seal Pro. Start a free trial to
+ * use it.") — or null when `e` isn't a paywall error. Lets the upgrade dialog
+ * reuse the server's feature-specific copy.
+ */
+export function paywallMessage(e: unknown): string | null {
+  const msg = (e as FirebaseLikeError | null)?.message;
+  if (typeof msg !== "string" || !msg.includes(PAYWALL_TOKEN)) return null;
+  const after = msg.split(PAYWALL_TOKEN)[1] ?? "";
+  return after.replace(/^[:\s]+/, "").trim() || null;
+}
+
 export function humanizeError(e: unknown): string {
   if (e == null) return "Something went wrong. Please try again.";
+  // Paywall errors should normally be intercepted upstream (→ upgrade dialog),
+  // but if one reaches a toast, show the clean copy without the raw token.
+  const paywall = paywallMessage(e);
+  if (paywall) return paywall;
   const err = e as FirebaseLikeError;
   const code = typeof err.code === "string" ? err.code : "";
   const rawMsg = (err.message ?? "").replace(/^Firebase:\s*/, "").trim();
