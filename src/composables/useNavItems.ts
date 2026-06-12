@@ -108,21 +108,6 @@ export function useNavItems(): {
           mobile: true,
           matches: prefix("/jobs/browse"),
         },
-        // Clients book (CRM + recurring billing — Blue Seal Pro). Desktop
-        // side-panel shortcut to the dashboard's Clients tab; on mobile the
-        // tab itself (in TradieDashboard) is the entry point, so this row is
-        // desktop-only (`mobile: false`). Highlights on the tab or any
-        // /clients/:id detail page.
-        {
-          key: "clients",
-          label: "Clients",
-          icon: "pi-users",
-          to: "/dashboard?view=clients",
-          mobile: false,
-          matches: (r) =>
-            (r.path.startsWith("/dashboard") && r.query.view === "clients") ||
-            r.path.startsWith("/clients"),
-        },
         // Profile is reachable via the ProfileMenu avatar at the bottom of the
         // side panel (desktop) and the Profile tab on mobile — it used to be
         // duplicated as an explicit row here, which no other role had. Removed
@@ -147,6 +132,21 @@ export function useNavItems(): {
           to: "/account/recommendations",
           mobile: false,
           matches: exact("/account/recommendations"),
+        },
+        // Pro tools, grouped at the bottom of the list (below Recommendations):
+        // Clients book + recurring billing, then Reports. Desktop side-panel
+        // only — on mobile, Clients is a tab in the dashboard and Reports rides
+        // the dashboard header button. Clients highlights on the ?view=clients
+        // tab or any /clients/:id detail page.
+        {
+          key: "clients",
+          label: "Clients",
+          icon: "pi-users",
+          to: "/dashboard?view=clients",
+          mobile: false,
+          matches: (r) =>
+            (r.path.startsWith("/dashboard") && r.query.view === "clients") ||
+            r.path.startsWith("/clients"),
         },
         // Earnings / job reports. Desktop side-panel only, like the dashboard
         // header button it mirrors.
