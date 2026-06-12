@@ -9,6 +9,7 @@ import { requireAuth } from "../lib/auth";
 import { enforceRateLimit, AI_DAILY_CAP } from "../lib/rateLimit";
 import { requireAiEntitlement } from "../lib/entitlements";
 import { JOB_TOOLS, executeTool, type ToolContext } from "./chatTools";
+import { buildTradeExpertisePrompt } from "./tradeExpertise";
 
 /**
  * aiChat — persistent multi-turn assistant for tradespeople + admins.
@@ -111,16 +112,33 @@ function buildSystemPrompt(opts: {
   scope: "job" | "general" | "admin";
   pageRoute: string | null;
   jobContext: { job: JobDoc; chatTranscript: string[] } | null;
+  tradeProfile: { trades: string[]; yearsExperience: Record<string, number> } | null;
   toolsEnabled: boolean;
   nowISO: string;
 }): string {
-  const tradieBase =
+  // Generic fallback — used for a tradesperson with no registered trade yet
+  // (draft profile). When they have trades, this is replaced by an expert
+  // persona built from their trade(s) (see buildTradeExpertisePrompt).
+  let tradieBase =
     "You are Blue Seal's in-app assistant for tradespeople in Canada. " +
     "Help with on-site diagnosis, quoting, scheduling logistics, supplier suggestions, " +
     "and explaining how Blue Seal works. Be concise and practical. Use Canadian " +
     "spellings (e.g. 'metre', 'colour'), Canadian dollars (CAD), and metric units. " +
     "When the user hasn't given you enough information, ask one focused follow-up " +
     "question rather than guessing.";
+
+  if (!opts.isAdmin && opts.tradeProfile) {
+    const trades = opts.tradeProfile.trades;
+    // On a job thread, lead with the job's trade; otherwise the primary trade.
+    const leadTradeKey =
+      opts.scope === "job" && opts.jobContext ? opts.jobContext.job.trade : (trades[0] ?? null);
+    const expert = buildTradeExpertisePrompt({
+      leadTradeKey,
+      otherTradeKeys: trades,
+      yearsForLead: leadTradeKey ? (opts.tradeProfile.yearsExperience[leadTradeKey] ?? null) : null,
+    });
+    if (expert) tradieBase = expert;
+  }
 
   const adminBase =
     "You are Blue Seal's in-app assistant for admins. Help with reviewing tradesperson " +
@@ -212,6 +230,27 @@ async function loadJobContext(
     return `${who}: ${m.text ?? ""}`;
   });
   return { job, chatTranscript: transcript };
+}
+
+/**
+ * Load the caller's trade(s) so the assistant can answer as an expert in them.
+ * One read of the public tradespeople/{uid} doc; returns null for accounts with
+ * no tradesperson profile (e.g. admin-only). Missing fields default to empty so
+ * a draft profile (no trades yet) cleanly falls back to the generic persona.
+ */
+async function loadTradeProfile(
+  uid: string,
+): Promise<{ trades: string[]; yearsExperience: Record<string, number> } | null> {
+  const snap = await db.doc(`tradespeople/${uid}`).get();
+  if (!snap.exists) return null;
+  const data = snap.data() as {
+    trades?: string[];
+    yearsExperience?: Record<string, number>;
+  };
+  return {
+    trades: Array.isArray(data.trades) ? data.trades : [],
+    yearsExperience: data.yearsExperience ?? {},
+  };
 }
 
 export const aiChat = onCall(CALLABLE_OPTS, async (req) => {
@@ -321,11 +360,16 @@ export const aiChat = onCall(CALLABLE_OPTS, async (req) => {
     !!jobContext &&
     jobContext.job.tradespersonId === uid;
 
+  // Trade profile drives the expert persona; admins use the admin persona, so
+  // skip the read for them. One extra Firestore read per tradesperson turn.
+  const tradeProfile = isAdmin ? null : await loadTradeProfile(uid);
+
   const systemPrompt = buildSystemPrompt({
     isAdmin,
     scope: conversation.scope,
     pageRoute: input.pageRoute ?? null,
     jobContext,
+    tradeProfile,
     toolsEnabled,
     nowISO: new Date().toISOString(),
   });

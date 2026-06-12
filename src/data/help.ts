@@ -744,6 +744,13 @@ const faqs: FaqItem[] = [
     audience: "tradesperson",
   },
   {
+    question: "Can the assistant help with the actual trade work, not just the app?",
+    answer:
+      "Yes. The in-app **AI assistant** knows the trade(s) on your profile and answers as a specialist in them — walk-throughs for installing, setting up, commissioning and diagnosing the systems you work on, with materials, sizing, Canadian code and metric units, and a clear heads-up when a job needs a permit, an inspection, or a different licensed trade. Open it from the assistant button on your dashboard for general questions, or inside a job to ground its answers in that job's details. Treat it as an experienced second opinion — always lean on your own judgement and local code.",
+    categoryId: "for-tradespeople",
+    audience: "tradesperson",
+  },
+  {
     question: "What makes a strong profile?",
     answer:
       "Complete verification, a clear bio, a portfolio of past work, your service area and availability, and good reviews. Clients can see all of this at a glance — a complete profile wins more work.",
