@@ -17,6 +17,7 @@ import { firstMissingRequired } from "@/utils/intake";
 import type { IntakeField, TradespersonDoc, WithId, Urgency } from "@/firebase/interfaces";
 import { tradeLabel } from "@/data/trades";
 import IntakeFormRenderer from "@/components/IntakeFormRenderer.vue";
+import FormErrorBanner from "@/components/FormErrorBanner.vue";
 import { useToast } from "@/composables/useToast";
 import { usePushPrompt } from "@/composables/usePushPrompt";
 import { useGoogleMaps } from "@/composables/useGoogleMaps";
@@ -345,8 +346,6 @@ async function submit() {
       We filled in the title, details and urgency from your search — please review and tweak before sending.
     </Message>
 
-    <Message v-if="error" severity="error" :closable="false" class="mt-4">{{ error }}</Message>
-
     <div v-if="pageLoading" class="bs-card p-5 mt-4 text-sm text-[color:var(--bs-muted)]">
       <i class="pi pi-spinner pi-spin mr-2"></i>Loading tradesperson…
     </div>
@@ -451,6 +450,8 @@ async function submit() {
         <h3 class="font-semibold text-sm mb-2">Trade-specific details</h3>
         <IntakeFormRenderer v-model="intakeData" :fields="intakeFields" />
       </div>
+
+      <FormErrorBanner :message="error" />
 
       <div class="flex justify-end">
         <Button type="submit" label="Send request" icon="pi pi-send" :loading="submitting" :disabled="submitting" />

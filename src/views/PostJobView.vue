@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch, computed, nextTick } from "vue";
+import { onMounted, onUnmounted, ref, watch, computed } from "vue";
 import { useRouter } from "vue-router";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import InputNumber from "primevue/inputnumber";
 import Textarea from "primevue/textarea";
 import Select from "primevue/select";
-import Message from "primevue/message";
 import DatePicker from "primevue/datepicker";
 import Dialog from "primevue/dialog";
 import Tag from "primevue/tag";
@@ -27,6 +26,7 @@ import { deriveTitle, deriveUrgency } from "@/utils/requestPrefill";
 import type { IntakeField, Urgency } from "@/firebase/interfaces";
 import type { TradeSuggestion } from "@/data/tradeKeywords";
 import TradeDescribeBox from "@/components/TradeDescribeBox.vue";
+import FormErrorBanner from "@/components/FormErrorBanner.vue";
 import IntakeFormRenderer from "@/components/IntakeFormRenderer.vue";
 import RebateMatchPanel from "@/components/RebateMatchPanel.vue";
 import { useSeo } from "@/composables/useSeo";
@@ -76,14 +76,6 @@ const addressAutocompleteEl = ref<HTMLInputElement | null>(null);
 const submitting = ref(false);
 const geocoding = ref(false);
 const error = ref<string | null>(null);
-// The error banner lives right next to the submit button; scroll it into view
-// when it appears so a tap on "Post job" never fails silently off-screen.
-const errorEl = ref<HTMLElement | null>(null);
-watch(error, async (msg) => {
-  if (!msg) return;
-  await nextTick();
-  errorEl.value?.scrollIntoView({ behavior: "smooth", block: "center" });
-});
 
 // "What do you need done?" — the smart entry: describe the job in plain English
 // (or just name the room), tap the suggested trade, and it sets the trade +
@@ -677,9 +669,7 @@ async function submit() {
         </div>
       </div>
 
-      <div ref="errorEl">
-        <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
-      </div>
+      <FormErrorBanner :message="error" />
 
       <div class="pt-2 flex flex-wrap items-center gap-2">
         <Button
