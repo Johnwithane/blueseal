@@ -7,6 +7,8 @@ import type { TradespersonDoc, WithId } from "@/firebase/interfaces";
 import { tradeLabel } from "@/data/trades";
 import { useFormatters } from "@/composables/useFormatters";
 import VerifiedBadge from "@/components/VerifiedBadge.vue";
+import RedSealBadge from "@/components/RedSealBadge.vue";
+import { hasRedSeal } from "@/utils/credentials";
 
 const props = defineProps<{
   tradie: WithId<TradespersonDoc> & { distanceKm?: number };
@@ -41,6 +43,7 @@ const wsibLive = computed(() => {
   const exp = props.tradie.wsibExpiresAt?.toDate?.().getTime();
   return exp == null || exp > now;
 });
+const showRedSeal = computed(() => hasRedSeal(props.tradie));
 </script>
 
 <template>
@@ -67,6 +70,7 @@ const wsibLive = computed(() => {
           <span class="font-semibold truncate min-w-0 max-w-full">
             {{ props.tradie.displayName?.trim() || tradeLabel(props.tradie.trades[0]) }}
           </span>
+          <RedSealBadge v-if="showRedSeal" />
           <Tag v-if="props.tradie.idVerified" value="ID verified" severity="success" />
           <VerifiedBadge
             v-if="insuranceLive"

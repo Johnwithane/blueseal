@@ -30,8 +30,11 @@ import { useAuthStore } from "@/stores/auth";
 import { useToast } from "@/composables/useToast";
 import CalendarView from "@/components/CalendarView.vue";
 import VerifiedBadge from "@/components/VerifiedBadge.vue";
+import RedSealBadge from "@/components/RedSealBadge.vue";
+import VerifiedCredentials from "@/components/VerifiedCredentials.vue";
 import ProspectProfile from "@/components/ProspectProfile.vue";
 import LoadingState from "@/components/LoadingState.vue";
+import { hasRedSeal } from "@/utils/credentials";
 
 const route = useRoute();
 const router = useRouter();
@@ -93,6 +96,7 @@ const wsibLive = computed(() => {
   const exp = tradie.value.wsibExpiresAt?.toDate?.().getTime();
   return exp == null || exp > Date.now();
 });
+const showRedSeal = computed(() => hasRedSeal(tradie.value));
 
 const shareUrl = computed(() => {
   if (typeof window === "undefined") return "";
@@ -335,6 +339,7 @@ onMounted(async () => {
               <span v-if="tradie.serviceRadiusKm"> • {{ tradie.serviceRadiusKm }} km radius</span>
             </div>
             <div class="mt-2 flex flex-wrap items-center gap-1">
+              <RedSealBadge v-if="showRedSeal" variant="tag" />
               <Tag v-if="tradie.idVerified" value="ID verified" severity="success" />
               <VerifiedBadge
                 v-if="insuranceLive"
@@ -428,6 +433,8 @@ onMounted(async () => {
           </ul>
         </section>
       </div>
+
+      <VerifiedCredentials :tradie="tradie" />
 
       <section
         v-if="tradie.portfolioPhotos.length"

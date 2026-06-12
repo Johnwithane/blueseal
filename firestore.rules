@@ -191,6 +191,13 @@ service cloud.firestore {
       // grant themselves these badges.
       allow update: if isOwner(tradieId)
         && request.resource.data.verifiedTrades == resource.data.verifiedTrades
+        // Public credential summary (incl. the Red Seal flag) is re-derived
+        // from approved certs by the onCertApproved trigger — owner can't
+        // self-grant it. `.get(...,null)` because it's optional on docs that
+        // predate the field / have no approved certs (without the default the
+        // evaluator throws and locks out every such tradie's own updates).
+        && request.resource.data.get('verifiedCredentials', null)
+             == resource.data.get('verifiedCredentials', null)
         && request.resource.data.idVerified == resource.data.idVerified
         && request.resource.data.insuranceVerified == resource.data.insuranceVerified
         && request.resource.data.insuranceExpiresAt == resource.data.insuranceExpiresAt

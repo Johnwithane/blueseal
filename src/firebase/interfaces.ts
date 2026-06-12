@@ -226,6 +226,18 @@ export interface GoogleReviewsSnapshot {
   syncError: string | null;
 }
 
+// A single PUBLIC, denormalized credential on a tradesperson's profile — one
+// entry per APPROVED certification, mirrored from certifications/{certId} by
+// the onCertApproved trigger. Carries only what's safe to show a client
+// browsing a profile/search/applicant card: the trade, the issuing body, and
+// whether it's a Red Seal. Never the cert number or the uploaded file.
+export interface VerifiedCredential {
+  trade: string; // canonical trade key (see data/trades.ts)
+  issuingBody: string; // e.g. "Red Seal Program", "TSSA (Ontario)", "ESA (Ontario)"
+  redSeal: boolean; // true when issued under the Red Seal interprovincial standard
+  expiresAt: Timestamp | null; // licence expiry where one applies; null = no expiry
+}
+
 export interface TradespersonDoc {
   // Denormalized from users/{uid} so the public profile page can show the
   // tradie's name and avatar without needing read access to users (which is
@@ -270,6 +282,16 @@ export interface TradespersonDoc {
     value: RatingDimension;
   };
   verifiedTrades: string[];
+  // PUBLIC, server-managed mirror of verifiedTrades that ALSO carries each
+  // approved cert's issuing body — so the public profile, search cards and
+  // applicant cards can show *which* credential a tradesperson holds (and flag
+  // the Red Seal interprovincial standard) without read access to the admin+
+  // owner-only certifications/{certId} docs. Re-derived from all approved certs
+  // by the onCertApproved trigger; never written by the owner (locked in
+  // firestore.rules). Optional/absent on docs that predate the field or have no
+  // approved certs — readers treat undefined as []. Deliberately carries NO
+  // cert number or file (those stay private). See VerifiedCredential.
+  verifiedCredentials?: VerifiedCredential[];
   idVerified: boolean;
   // Set by the onInsuranceApproved / onWsibApproved Cloud Function triggers.
   // Owner cannot edit these directly; they're sourced from the verification

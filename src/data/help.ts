@@ -855,7 +855,14 @@ const faqs: FaqItem[] = [
   {
     question: "What do the verification badges mean?",
     answer:
-      "**ID verified** = government photo ID confirmed. **Certified** = trade certification/licence on file. **Insured** = liability insurance on file. **WSIB** = workers' comp coverage on file where required. Each is granted only after our team reviews the actual document.",
+      "**Red Seal** = a Red Seal trade certificate is on file (see below). **ID verified** = government photo ID confirmed. **Certified** = trade certification/licence on file. **Insured** = liability insurance on file. **WSIB** = workers' comp coverage on file where required. Each is granted only after our team reviews the actual document. A profile's **Verified credentials** section lists exactly which ones a tradesperson holds.",
+    categoryId: "verification-trust",
+    audience: "all",
+  },
+  {
+    question: "What does the Red Seal badge mean?",
+    answer:
+      "The **Red Seal** is Canada's interprovincial standard of trade qualification — a tradesperson who's passed the Red Seal exam can work in their trade across the country. When you see the red badge, it means our team reviewed a Red Seal certificate for that tradesperson before they went live; their profile's **Verified credentials** section shows which trade it covers. Like every badge, it confirms we checked the document — it isn't a guarantee the credential is currently in force or that it covers your specific job, so it's always worth asking to see current proof before work begins.",
     categoryId: "verification-trust",
     audience: "all",
   },

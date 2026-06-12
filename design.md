@@ -442,6 +442,10 @@ tradespeople/{uid}                // doc id = uid
   ratingDimensions: { quality, punctuality, communication, value }
                                   // each {avg, count}
   verifiedTrades: string[]        // set by onCertApproved
+  verifiedCredentials?: { trade, issuingBody, redSeal, expiresAt }[]
+                                  // PUBLIC denormalized cert summary (drives the
+                                  // Red Seal badge + profile credentials list);
+                                  // re-derived from approved certs by onCertApproved
   idVerified: bool                // set by onIdApproved
   vettingStatus: "draft" | "pending" | "info_requested" | "approved" | "rejected"
   vettingNotes: string            // admin's notes if info_requested or rejected
@@ -587,7 +591,7 @@ These fields are denormalized for read performance and **must** be updated by Cl
 | Field | Updated by |
 |---|---|
 | `tradespeople.ratingAvg`, `ratingCount`, `ratingDimensions` | `onReviewCreated` |
-| `tradespeople.verifiedTrades` | `onCertApproved` |
+| `tradespeople.verifiedTrades`, `verifiedCredentials` | `onCertApproved` |
 | `tradespeople.idVerified`, `isVisible` | `onIdApproved` (and `onCertApproved` if all certs done) |
 | `tradespeople.payouts.*` | `stripeWebhook` (`account.updated` for onboarding state; subsequent `payout.*` events write `/payouts/{po_…}` rather than the tradesperson doc) |
 | `invoices.payment.*`, `invoices.status` | `stripeWebhook` (`payment_intent.*`, `charge.refunded`, `charge.dispute.*`) |

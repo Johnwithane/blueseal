@@ -8,8 +8,10 @@ import Button from "primevue/button";
 import Tag from "primevue/tag";
 import Avatar from "primevue/avatar";
 import VerifiedBadge from "@/components/VerifiedBadge.vue";
+import RedSealBadge from "@/components/RedSealBadge.vue";
 import QuoteBreakdown from "@/components/QuoteBreakdown.vue";
 import { tradeLabel } from "@/data/trades";
+import { hasRedSeal } from "@/utils/credentials";
 import { useFormatters } from "@/composables";
 import type { ApplicationDoc, TradespersonDoc, WithId } from "@/firebase/interfaces";
 
@@ -135,6 +137,7 @@ const priceSummary = computed(() => {
             ({{ props.tradie.ratingCount }})
           </div>
           <div v-if="props.tradie" class="flex flex-wrap gap-1 mt-1.5">
+            <RedSealBadge v-if="hasRedSeal(props.tradie)" />
             <VerifiedBadge v-if="props.tradie.idVerified" kind="id" variant="pill" />
             <VerifiedBadge
               v-if="(props.tradie.verifiedTrades?.length ?? 0) > 0"
