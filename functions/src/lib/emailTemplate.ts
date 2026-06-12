@@ -12,6 +12,7 @@ const SIGNATURE_URL = `${BASE}/branding/Horizontal/BlueSeal_Logo-Hor_Full%28nobo
 
 const NAVY = "#2A3A5C";
 const BLUE = "#374C76";
+const MIDBLUE = "#5E81C9"; // used to make a person's NAME pop in the heading
 const INK = "#494C4F";
 const MUTED = "#6B6862";
 const BORDER = "#EAE7DF";
@@ -36,6 +37,20 @@ export interface BrandedEmailOpts {
   ctaUrl?: string;
   /** Hidden inbox-preview text. Defaults to the first body line. */
   preheader?: string;
+  /**
+   * Optional avatar of the person who triggered the notification (the chat
+   * sender, the client who accepted, etc). Absolute URL. When present it's
+   * shown as a round avatar to the left of the heading, so it's instantly
+   * clear WHO the email is about.
+   */
+  actorPhotoUrl?: string;
+  /**
+   * Optional name of that person. Given a distinct colour treatment: if the
+   * title already contains it, the name is just recoloured; otherwise it's
+   * surfaced on its own line above the title (so a generic "Client accepted
+   * your quote" still shows WHO).
+   */
+  actorName?: string;
 }
 
 /**
@@ -62,6 +77,33 @@ export function brandedEmailHtml(opts: BrandedEmailOpts): string {
         `</td></tr></table>`
       : "";
 
+  // Heading — name gets a distinct colour. If the title already contains the
+  // name, recolour it in place; otherwise surface it on its own line above.
+  const name = opts.actorName?.trim();
+  let titleInner = esc(opts.title);
+  let namePrefix = "";
+  if (name) {
+    const en = esc(name);
+    if (titleInner.includes(en)) {
+      titleInner = titleInner.split(en).join(`<span style="color:${MIDBLUE};">${en}</span>`);
+    } else {
+      namePrefix = `<div style="font-size:15px;font-weight:800;line-height:1.2;color:${MIDBLUE};margin:0 0 3px;">${en}</div>`;
+    }
+  }
+  const titleH1 =
+    namePrefix +
+    `<h1 style="margin:0;font-size:20px;line-height:1.3;color:${NAVY};font-weight:700;">${titleInner}</h1>`;
+
+  // Avatar to the left of the heading when we have one, so the reader sees who
+  // messaged/acted at a glance.
+  const heading = opts.actorPhotoUrl
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 14px;"><tr>` +
+      `<td valign="middle" width="56" style="padding-right:12px;">` +
+      `<img src="${esc(opts.actorPhotoUrl)}" width="48" height="48" alt="" style="display:block;border:0;width:48px;height:48px;border-radius:50%;object-fit:cover;"></td>` +
+      `<td valign="middle">${titleH1}</td>` +
+      `</tr></table>`
+    : `<div style="margin:0 0 14px;">${titleH1}</div>`;
+
   return (
     `<!doctype html><html lang="en"><head><meta charset="utf-8">` +
     `<meta name="viewport" content="width=device-width,initial-scale=1">` +
@@ -71,13 +113,13 @@ export function brandedEmailHtml(opts: BrandedEmailOpts): string {
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BG};padding:24px 12px;">` +
     `<tr><td align="center">` +
     `<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">` +
-    // header
-    `<tr><td align="center" style="padding:6px 0 18px;">` +
-    `<a href="${BASE}"><img src="${AVATAR_URL}" width="56" height="56" alt="Blue Seal" style="display:block;border:0;border-radius:14px;"></a>` +
+    // header — brandmark at 84px (between the original 56 and a 2x 112)
+    `<tr><td align="center" style="padding:6px 0 20px;">` +
+    `<a href="${BASE}"><img src="${AVATAR_URL}" width="84" height="84" alt="Blue Seal" style="display:block;border:0;border-radius:20px;"></a>` +
     `</td></tr>` +
     // card
     `<tr><td style="background:#ffffff;border:1px solid ${BORDER};border-radius:14px;padding:28px 28px 24px;">` +
-    `<h1 style="margin:0 0 14px;font-size:20px;line-height:1.3;color:${NAVY};font-weight:700;">${esc(opts.title)}</h1>` +
+    heading +
     paras +
     cta +
     `</td></tr>` +

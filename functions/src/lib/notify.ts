@@ -193,6 +193,32 @@ function absoluteUrl(link: string | null | undefined): string | null {
   return `${base}${link.startsWith("/") ? "" : "/"}${link}`;
 }
 
+// Per-notification CTA verb for the email button — clearer than a blanket
+// "Open Blue Seal". Keyed by string so it never has to stay exhaustive over
+// the NotificationType union; anything unmapped falls back to the generic.
+const CTA_BY_TYPE: Record<string, string> = {
+  message_received: "Reply on Blue Seal",
+  application_message: "Reply on Blue Seal",
+  invoice_sent: "View the invoice",
+  invoice_paid: "View the receipt",
+  review_requested: "Leave a review",
+  review_reminder: "Leave a review",
+  review_revealed: "See the review",
+  job_requested: "View the job",
+  prospect_claimed: "View the job",
+  new_application: "View applicants",
+  application_accepted: "View the job",
+  vetting_approved: "View your profile",
+  vetting_rejected: "See what's needed",
+  vetting_info_requested: "See what's needed",
+  job_change_requested: "Respond on Blue Seal",
+  change_order_proposed: "Review the request",
+  site_visit_proposed: "Respond on Blue Seal",
+};
+function ctaLabelForType(type: NotificationType): string {
+  return CTA_BY_TYPE[type] ?? "Open Blue Seal";
+}
+
 /**
  * Write the notification + (depending on priority) email + SMS. Failures in
  * any channel are logged but never thrown — a notification miss must not
@@ -308,9 +334,13 @@ export async function notify(input: NotifyInput): Promise<void> {
         html: brandedEmailHtml({
           title,
           bodyLines: [body],
-          ctaLabel: url ? "Open Blue Seal" : undefined,
+          ctaLabel: url ? ctaLabelForType(input.type) : undefined,
           ctaUrl: url ?? undefined,
           preheader: body,
+          // Avatar + name of whoever triggered this (chat sender, the client
+          // who accepted, etc) — already fetched above for the in-app row.
+          actorPhotoUrl: actorSnapshot.photoURL ?? undefined,
+          actorName: actorSnapshot.displayName ?? undefined,
         }),
       });
     } catch (err) {
