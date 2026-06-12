@@ -36,7 +36,11 @@ function prefix(path: string) {
 // review /jobs/posted/:postId) — those are reached *from* the Jobs list.
 // Excludes /jobs/post and /jobs/browse, which have their own nav items.
 function jobsMatcher(r: RouteLocationNormalizedLoaded): boolean {
-  if (r.path === "/dashboard" || r.path.startsWith("/dashboard/")) return true;
+  if (r.path === "/dashboard" || r.path.startsWith("/dashboard/")) {
+    // The Clients tab lives at /dashboard?view=clients and has its own nav
+    // item — don't also light up "Jobs" there.
+    return r.query.view !== "clients";
+  }
   if (r.path === "/jobs/post" || r.path === "/jobs/browse" || r.path === "/jobs/new")
     return false;
   return r.path.startsWith("/jobs/");
@@ -103,6 +107,21 @@ export function useNavItems(): {
           to: "/jobs/browse",
           mobile: true,
           matches: prefix("/jobs/browse"),
+        },
+        // Clients book (CRM + recurring billing — Blue Seal Pro). Desktop
+        // side-panel shortcut to the dashboard's Clients tab; on mobile the
+        // tab itself (in TradieDashboard) is the entry point, so this row is
+        // desktop-only (`mobile: false`). Highlights on the tab or any
+        // /clients/:id detail page.
+        {
+          key: "clients",
+          label: "Clients",
+          icon: "pi-users",
+          to: "/dashboard?view=clients",
+          mobile: false,
+          matches: (r) =>
+            (r.path.startsWith("/dashboard") && r.query.view === "clients") ||
+            r.path.startsWith("/clients"),
         },
         // Profile is reachable via the ProfileMenu avatar at the bottom of the
         // side panel (desktop) and the Profile tab on mobile — it used to be

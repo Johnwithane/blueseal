@@ -753,6 +753,44 @@ export interface ClientInvite {
   tokenHash: string | null;
 }
 
+// Tradesperson-owned client contact ("client book" / CRM) — Blue Seal Pro.
+// Distinct from a `users/{uid}` client account: this is the tradesperson's own
+// record of someone they work with, who may have no Blue Seal account at all
+// (off-platform). Stores contact info + private notes only — no money. The
+// per-client job/invoice history is queried on demand (jobs where
+// clientRef == this id), not denormalized here; only the slow-changing
+// activeRecurringPlans counter is cached. Owned by tradespersonId; the whole
+// Clients surface is Pro-gated (rules require an active Pro subscription to
+// write; the UI gates the tab). linkedUserId + activeRecurringPlans are
+// server-managed (rules pin them against direct writes).
+export interface ClientDoc {
+  tradespersonId: string;
+  displayName: string;
+  // Lowercased + trimmed at the boundary (for dedupe + future invite linking).
+  // null = a phone-only contact with no email on file.
+  emailLower: string | null;
+  phone: string | null;
+  company: string | null;
+  // Reuses the JobAddress shape; geo stays null at MVP (no geocoding here).
+  address: JobAddress | null;
+  // Free-text private notes the tradesperson keeps on this client.
+  notes: string | null;
+  // Set server-side if/when this contact is matched to a real Blue Seal account
+  // (a future "save client from job" / invite-claim path). null = off-platform
+  // contact. Never written by the client SDK (rules pin it).
+  linkedUserId: string | null;
+  // Cached count of enabled recurring plans for this client, kept correct by
+  // the createRecurringPlan / setRecurringPlanState callables (written in the
+  // same batch as the plan). Server-managed; rules pin it.
+  activeRecurringPlans: number;
+  source: "manual" | "import";
+  // Soft delete — archived contacts are hidden from the default list but never
+  // hard-deleted by the tradesperson (delete is admin-only in rules).
+  archivedAt: Timestamp | null;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
 export interface JobDoc {
   // null = tradesperson-created job whose client hasn't claimed their invite
   // yet (solo mode / "bring your own client"). Every "is the caller the
@@ -868,6 +906,23 @@ export interface JobDoc {
   // capRemaining = 9900 − this. Incremented server-side inside the webhook
   // success transaction. Absent/0 until the first card payment settles.
   serviceFeeCapUsedCents?: number;
+  // ---- Clients / recurring-billing linkage (Blue Seal Pro). All optional and
+  // server-stamped; rules pin them immutable against party writes. Legacy jobs
+  // read them as undefined. ----
+  // How this job originated. "recurring_plan" jobs are the hidden backing job
+  // for a client's recurring charge — they're filtered out of the kanban /
+  // calendar and surfaced only under the client. Absent on legacy jobs (treat
+  // as "direct").
+  originType?: "direct" | "invite" | "marketplace" | "recurring_plan" | null;
+  // -> clients/{clientId}: the tradesperson-owned contact this job belongs to.
+  // Set server-side (currently only on recurring backing jobs); drives the
+  // per-client history rollup. Null/absent when the job isn't linked to a
+  // contact-book entry.
+  clientRef?: string | null;
+  // For a recurring backing job, equals the job's own id — the addressable
+  // "plan" is jobs/{recurringPlanId} + its recurring template invoice. Null on
+  // every non-recurring job.
+  recurringPlanId?: string | null;
 }
 
 // Tradesperson-private job log, stored at jobs/{jobId}/private/notes so it is

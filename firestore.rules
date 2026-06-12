@@ -22,6 +22,19 @@ service cloud.firestore {
 
     function jobDoc(jobId) { return get(/databases/$(database)/documents/jobs/$(jobId)); }
 
+    // True when the signed-in tradesperson has an active Blue Seal Pro
+    // entitlement, read from the public `isPro` mirror on their /tradespeople
+    // doc (kept in sync server-side from users/{uid}.subscription). Gates writes
+    // to the Pro-only Clients book. Costs one document read per evaluation —
+    // fine at the low write volume of contact-book edits. `.get('isPro', false)`
+    // defaults so a tradesperson with no /tradespeople doc is treated as
+    // non-Pro rather than throwing.
+    function isProTradesperson() {
+      return isTradie()
+        && exists(/databases/$(database)/documents/tradespeople/$(uid()))
+        && get(/databases/$(database)/documents/tradespeople/$(uid())).data.get('isPro', false) == true;
+    }
+
     // ---------- users ----------
     // Public profile fields (displayName, photoURL) live here. Email/phone/Stripe are
     // private; rules below restrict read to owner + admin. Anyone needing a tradie's
@@ -360,6 +373,43 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    // ---------- clients (tradesperson client book / CRM — Blue Seal Pro) ----------
+    // A tradesperson-owned contact record (see ClientDoc). Read is
+    // ownership-only — a lapsed Pro tradesperson never loses access to their own
+    // data; the *tab* is Pro-gated in the UI. Create/update additionally require
+    // an active Pro subscription (isProTradesperson). linkedUserId +
+    // activeRecurringPlans are server-managed (the createRecurringPlan / claim
+    // callables, admin SDK) and pinned against direct writes. Delete is
+    // admin-only; tradespeople soft-delete via archivedAt.
+    match /clients/{clientId} {
+      function ownsExisting() {
+        return isSignedIn() && resource.data.tradespersonId == uid();
+      }
+      allow read: if ownsExisting() || isAdmin();
+      allow create: if isProTradesperson()
+        && request.resource.data.tradespersonId == uid()
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() >= 1
+        && request.resource.data.displayName.size() <= 120
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.get('linkedUserId', null) == null
+        && request.resource.data.get('activeRecurringPlans', 0) == 0;
+      allow update: if (isAdmin() || (ownsExisting() && isProTradesperson()))
+        && request.resource.data.tradespersonId == resource.data.tradespersonId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() >= 1
+        && request.resource.data.displayName.size() <= 120
+        && (isAdmin()
+            || request.resource.data.get('linkedUserId', null)
+                == resource.data.get('linkedUserId', null))
+        && (isAdmin()
+            || request.resource.data.get('activeRecurringPlans', 0)
+                == resource.data.get('activeRecurringPlans', 0));
+      allow delete: if isAdmin();
+    }
+
     // ---------- jobs ----------
     match /jobs/{jobId} {
       allow read: if isSignedIn() && (
@@ -458,6 +508,20 @@ service cloud.firestore {
         && (isAdmin()
             || request.resource.data.get('serviceFeeCapUsedCents', null)
                 == resource.data.get('serviceFeeCapUsedCents', null))
+        // originType / clientRef / recurringPlanId link a job to the Clients
+        // book + recurring-billing engine. Server-stamped at creation (recurring
+        // backing jobs) and frozen — a party must not be able to re-home a job
+        // to another contact or forge a recurring plan. `.get(field, null)`
+        // defaults so legacy jobs (no field) aren't locked out.
+        && (isAdmin()
+            || request.resource.data.get('originType', null)
+                == resource.data.get('originType', null))
+        && (isAdmin()
+            || request.resource.data.get('clientRef', null)
+                == resource.data.get('clientRef', null))
+        && (isAdmin()
+            || request.resource.data.get('recurringPlanId', null)
+                == resource.data.get('recurringPlanId', null))
         // Direct (non-admin) status writes are limited to the two pre-commitment
         // client paths: marketplace intake advance (accepted→requested) and the
         // instant pre-commitment cancel (cancelJob, only from accepted/requested/

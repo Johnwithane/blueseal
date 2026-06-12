@@ -309,6 +309,16 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, role: "tradesperson", layout: "app", title: "Reports" },
   },
 
+  // Client book detail (CRM — Blue Seal Pro). The Clients LIST is a tab in the
+  // tradesperson dashboard (/dashboard?view=clients); this is the per-contact
+  // page reached from that list. Pro-gated in-view.
+  {
+    path: "/clients/:id",
+    name: "ClientDetail",
+    component: () => import("@/views/ClientDetailView.vue"),
+    meta: { requiresAuth: true, role: "tradesperson", layout: "app", title: "Client" },
+  },
+
   // Job-board marketplace
   {
     path: "/jobs/post",

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue";
-import { RouterLink, useRouter } from "vue-router";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 import Button from "primevue/button";
 import SelectButton from "primevue/selectbutton";
 import Message from "primevue/message";
@@ -37,9 +37,11 @@ import CalendarView from "@/components/CalendarView.vue";
 import JobList from "@/components/JobList.vue";
 import AvailabilityEditor from "@/components/AvailabilityEditor.vue";
 import MyApplicationsList from "@/components/MyApplicationsList.vue";
+import ClientsPanel from "@/components/clients/ClientsPanel.vue";
 
 const auth = useAuthStore();
 const router = useRouter();
+const route = useRoute();
 const toast = useToast();
 const tradie = ref<WithId<TradespersonDoc> | null>(null);
 const jobs = ref<WithId<JobDoc>[]>([]);
@@ -48,14 +50,39 @@ const jobs = ref<WithId<JobDoc>[]>([]);
 // the scheduling/blocking surface. Applied surfaces the job-board
 // applications the tradie has sent — same data as /my-applications but
 // co-located with the rest of their job pipeline.
-type DashboardView = "list" | "board" | "calendar" | "applied";
-const view = ref<DashboardView>("list");
+type DashboardView = "list" | "board" | "calendar" | "applied" | "clients";
 const viewOptions: { label: string; value: DashboardView; icon: string }[] = [
   { label: "List", value: "list", icon: "pi-list" },
   { label: "Board", value: "board", icon: "pi-th-large" },
   { label: "Calendar", value: "calendar", icon: "pi-calendar" },
   { label: "Applied", value: "applied", icon: "pi-send" },
+  { label: "Clients", value: "clients", icon: "pi-users" },
 ];
+
+// `view` is mirrored to the `?view=` query param so the side-panel "Clients"
+// button (→ /dashboard?view=clients) selects the tab, and tab switches are
+// back-button friendly + shareable. List is the default and stays bare (no
+// query) so /dashboard reads clean.
+function viewFromQuery(): DashboardView {
+  const v = route.query.view;
+  return typeof v === "string" && viewOptions.some((o) => o.value === v)
+    ? (v as DashboardView)
+    : "list";
+}
+const view = ref<DashboardView>(viewFromQuery());
+watch(view, (v) => {
+  const desired = v === "list" ? undefined : v;
+  if (route.query.view !== desired) {
+    void router.replace({ query: { ...route.query, view: desired } });
+  }
+});
+watch(
+  () => route.query.view,
+  () => {
+    const v = viewFromQuery();
+    if (v !== view.value) view.value = v;
+  },
+);
 // Mapped to the shared TabBar's {key,label,icon} shape.
 const viewTabs = computed(() =>
   viewOptions.map((o) => ({ key: o.value, label: o.label, icon: o.icon })),
@@ -65,6 +92,8 @@ const viewHint = computed(() => {
   if (view.value === "board") return "Pipeline overview. Tap a card to open the job.";
   if (view.value === "calendar") return "Tap a free day to block it off.";
   if (view.value === "applied") return "Jobs you've applied to, grouped by status.";
+  if (view.value === "clients")
+    return "Your client book — add, import, and set up recurring billing.";
   if (showCompleted.value)
     return "Completed and cancelled jobs — tap one to revisit its invoice, receipt and reviews.";
   return "Tap a job to open it. Filter by status with the chips above.";
@@ -380,16 +409,19 @@ const awaitingVerificationMessage = computed(() => {
          (an unverified tradie can't actually submit applications anyway, but
          we render the list either way and let the empty state speak). -->
     <MyApplicationsList v-else-if="view === 'applied'" />
+    <!-- Clients book (CRM + recurring billing — Blue Seal Pro). Self-gates on
+         Pro and runs its own subscribe, so it's independent of `isVisible`. -->
+    <ClientsPanel v-else-if="view === 'clients'" />
 
     <div
-      v-if="awaitingVerification"
+      v-if="awaitingVerification && view !== 'clients'"
       class="bs-empty mt-4"
     >
       <i class="pi pi-check-circle text-3xl mb-2 block text-[color:var(--bs-blue)]"></i>
       <p>{{ awaitingVerificationMessage }}</p>
     </div>
     <div
-      v-else-if="!tradie?.isVisible && vetting !== 'pending'"
+      v-else-if="!tradie?.isVisible && vetting !== 'pending' && view !== 'clients'"
       class="bs-empty mt-4"
     >
       <i class="pi pi-clock text-3xl mb-2 block"></i>
