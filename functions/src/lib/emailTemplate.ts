@@ -12,7 +12,6 @@ const SIGNATURE_URL = `${BASE}/branding/Horizontal/BlueSeal_Logo-Hor_Full%28nobo
 
 const NAVY = "#2A3A5C";
 const BLUE = "#374C76";
-const MIDBLUE = "#5E81C9"; // used to make a person's NAME pop in the heading
 const INK = "#494C4F";
 const MUTED = "#6B6862";
 const BORDER = "#EAE7DF";
@@ -85,8 +84,9 @@ export function brandedEmailHtml(opts: BrandedEmailOpts): string {
   //  • name sits mid-title and can't be split out → recolour it in place.
   const name = opts.actorName?.trim();
   const cap = (s: string): string => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+  // The NAME is the hero: dark + bold. The action reads as a lighter subtitle.
   const nameDiv = (n: string): string =>
-    `<div style="font-size:15px;font-weight:800;line-height:1.2;color:${MIDBLUE};margin:0 0 3px;">${esc(n)}</div>`;
+    `<div style="font-size:19px;font-weight:700;line-height:1.25;color:${NAVY};margin:0 0 2px;">${esc(n)}</div>`;
 
   let titleText = opts.title;
   let namePrefix = "";
@@ -101,11 +101,13 @@ export function brandedEmailHtml(opts: BrandedEmailOpts): string {
   }
   let titleInner = esc(titleText);
   if (name && !namePrefix && titleInner.includes(esc(name))) {
-    titleInner = titleInner.split(esc(name)).join(`<span style="color:${MIDBLUE};">${esc(name)}</span>`);
+    titleInner = titleInner.split(esc(name)).join(`<span style="color:${NAVY};font-weight:700;">${esc(name)}</span>`);
   }
-  const titleH1 =
-    namePrefix +
-    `<h1 style="margin:0;font-size:20px;line-height:1.3;color:${NAVY};font-weight:700;">${titleInner}</h1>`;
+  // Under a name → lighter subtitle; standalone (no actor) → bold dark heading.
+  const titleStyle = namePrefix
+    ? `margin:0;font-size:16px;line-height:1.45;color:${MUTED};font-weight:400;`
+    : `margin:0;font-size:20px;line-height:1.3;color:${NAVY};font-weight:700;`;
+  const titleH1 = namePrefix + `<h1 style="${titleStyle}">${titleInner}</h1>`;
 
   // Avatar to the left of the heading when we have one, so the reader sees who
   // messaged/acted at a glance.
