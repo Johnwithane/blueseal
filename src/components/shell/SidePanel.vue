@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { RouterLink } from "vue-router";
+import { computed } from "vue";
+import { RouterLink, useRoute } from "vue-router";
 import { useNavItems } from "@/composables/useNavItems";
 import NotificationsButton from "@/components/shell/NotificationsButton.vue";
 import ProfileMenu from "@/components/shell/ProfileMenu.vue";
@@ -7,6 +8,14 @@ import RoleSwitcher from "@/components/shell/RoleSwitcher.vue";
 import BlueSealLockup from "@/components/brand/BlueSealLockup.vue";
 
 const { sideItems, isActive } = useNavItems();
+
+// Help is a role-agnostic utility link pinned to the footer (just above the
+// profile) rather than a primary nav item — the conventional spot for it.
+// Active for the Help Center and any article under /help/:slug.
+const route = useRoute();
+const helpActive = computed(
+  () => route.path === "/help" || route.path.startsWith("/help/"),
+);
 </script>
 
 <template>
@@ -35,6 +44,18 @@ const { sideItems, isActive } = useNavItems();
         </RouterLink>
       </template>
     </nav>
+
+    <!-- Footer utility link, pinned below the scrollable nav. Help sits just
+         above the role switcher / profile so it's always reachable without
+         hunting through the primary nav. -->
+    <RouterLink
+      to="/help"
+      class="side-row side-panel__help"
+      :class="{ 'side-row--active': helpActive }"
+    >
+      <i class="pi pi-question-circle side-row__icon" aria-hidden="true"></i>
+      <span class="side-row__label">Help</span>
+    </RouterLink>
 
     <!-- Multi-role users get a segmented pill toggle just above the profile
          row. The component self-hides when the user holds only one role. -->
@@ -90,6 +111,12 @@ const { sideItems, isActive } = useNavItems();
   padding-top: 0.5rem;
   margin-top: 0.5rem;
   border-top: 1px solid var(--bs-border);
+}
+
+/* Help footer link: a hair of breathing room from the nav above it so it
+   doesn't butt against the list when the nav scrolls. */
+.side-panel__help {
+  margin-top: 0.25rem;
 }
 
 .side-row {
