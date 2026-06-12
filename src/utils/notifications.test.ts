@@ -34,6 +34,17 @@ describe("resolveNotificationLink", () => {
     ).toBe("/jobs/posted/p123");
   });
 
+  it("redirects application_rejected to /my-applications (lost post access)", () => {
+    // Old notifications linked to the now-inaccessible post; self-heal them.
+    expect(
+      resolveNotificationLink(linkFor("application_rejected", "/jobs/posted/p123")),
+    ).toBe("/my-applications");
+    // New notifications already link here — still passes through.
+    expect(
+      resolveNotificationLink(linkFor("application_rejected", "/my-applications")),
+    ).toBe("/my-applications");
+  });
+
   it("appends ?chat=open for message_received on a job-detail link", () => {
     expect(resolveNotificationLink(linkFor("message_received", "/jobs/abc"))).toBe(
       "/jobs/abc?chat=open",

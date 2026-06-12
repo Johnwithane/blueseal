@@ -349,7 +349,11 @@ export const acceptApplicationQuote = onCall(CALLABLE_OPTS, async (req) => {
             type: "application_rejected",
             title: "Not selected this time",
             body: `The client chose another tradesperson for "${post.title}".`,
-            link: `/jobs/posted/${postId}`,
+            // Land them on their own applications list, not the post — they
+            // were just rejected, so they no longer have read access to
+            // /jobs/posted/:postId and the link would 'permission denied'.
+            // Matches onJobPostClosed.ts, which fires the same type.
+            link: `/my-applications`,
             actorUid: uid,
             recipientRole: "tradesperson",
             priority: "normal",

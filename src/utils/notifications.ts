@@ -64,6 +64,14 @@ export function resolveNotificationLink(
   notif: Pick<NotificationDoc, "link" | "type">,
 ): string | null {
   if (!notif.link) return null;
+
+  // A rejected applicant loses read access to the job post, so an old
+  // `/jobs/posted/:postId` link 'permission denied's. Their own applications
+  // list is the safe, useful landing page (it surfaces the "client chose
+  // another tradesperson" message). Self-heals notifications created before
+  // acceptApplicationQuote.ts switched to linking here.
+  if (notif.type === "application_rejected") return "/my-applications";
+
   const isJobDetail =
     notif.link.startsWith("/jobs/") && !notif.link.startsWith("/jobs/posted/");
   if (!isJobDetail) return notif.link;

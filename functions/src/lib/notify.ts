@@ -2,6 +2,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { db, messaging } from "./admin";
 import { enqueueMail } from "./mail";
+import { brandedEmailHtml } from "./emailTemplate";
 import { enqueueWhatsApp } from "./whatsapp";
 // sms.ts is intentionally not imported here. The SMS queue + helper are
 // kept in the repo as a future opt-in fallback (a preferences UI could
@@ -295,13 +296,22 @@ export async function notify(input: NotifyInput): Promise<void> {
     logger.error("notify: web push failed", { type: input.type, userId: input.userId, err });
   }
 
-  // Email on normal + high (unless the user has opted out).
+  // Email on normal + high (unless the user has opted out). Branded HTML
+  // shell (logo header, CTA button, signature + CASL footer) plus the plain
+  // text fallback for clients that don't render HTML.
   if (contact.email && contact.emailEnabled) {
     try {
       await enqueueMail({
         to: contact.email,
         subject: title,
         text: `${body}${cta}`,
+        html: brandedEmailHtml({
+          title,
+          bodyLines: [body],
+          ctaLabel: url ? "Open Blue Seal" : undefined,
+          ctaUrl: url ?? undefined,
+          preheader: body,
+        }),
       });
     } catch (err) {
       logger.error("notify: email enqueue failed", {
