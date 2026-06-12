@@ -297,6 +297,23 @@ export async function createInvoicePaymentIntent(invoiceId: string): Promise<Pay
   return res.data;
 }
 
+// All invoices for one job, newest first. Unlike getInvoiceByJobId (single
+// deterministic doc), this surfaces every invoice on a job — needed for
+// recurring plans, where the engine drafts a fresh invoice (auto-id) each
+// period on the same backing job. Constrained by tradespersonId so the rules
+// authorize the query; two equality filters need no composite index.
+export async function listJobInvoices(
+  tradieUid: string,
+  jobId: string,
+): Promise<WithId<InvoiceDoc>[]> {
+  const snap = await getDocs(
+    query(invCol(), where("tradespersonId", "==", tradieUid), where("jobId", "==", jobId)),
+  );
+  return snap.docs
+    .map((d) => ({ id: d.id, ...d.data() }) as WithId<InvoiceDoc>)
+    .sort((a, b) => (b.issuedAt?.toMillis?.() ?? 0) - (a.issuedAt?.toMillis?.() ?? 0));
+}
+
 export async function getInvoiceByJobId(jobId: string): Promise<WithId<InvoiceDoc> | null> {
   // Try the deterministic ID first (onJobCompleted writes invoices/{jobId}).
   // Both reads are wrapped in try/catch because Firestore returns

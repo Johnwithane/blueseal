@@ -106,7 +106,8 @@ function clearThread() {
       <h3 class="mt-3 text-lg font-semibold">Blue Seal AI is part of Pro</h3>
       <p class="mt-2 text-sm text-[color:var(--bs-muted)] max-w-xs">
         Diagnose problems, draft quotes and invoice notes, and summarize jobs —
-        plus a service-fee waiver for your clients and featured placement.
+        plus a service-fee waiver for your clients, featured placement, and a
+        client book with recurring billing.
       </p>
       <RouterLink to="/pricing" class="mt-5 w-full max-w-xs">
         <Button label="Start 30-day free trial" icon="pi pi-star" class="w-full" />

@@ -18,9 +18,10 @@ import {
   where,
   writeBatch,
 } from "firebase/firestore";
-import { auth as fbAuth, db } from "@/firebase/config";
+import { httpsCallable } from "firebase/functions";
+import { auth as fbAuth, db, functions } from "@/firebase/config";
 import { typedConverter } from "@/firebase/converters";
-import type { ClientDoc, JobDoc, WithId } from "@/firebase/interfaces";
+import type { ClientDoc, JobDoc, LineItem, WithId } from "@/firebase/interfaces";
 import type { ClientDraft } from "@/validation/clients";
 
 const clientsCol = () => collection(db, "clients").withConverter(typedConverter<ClientDoc>());
@@ -136,6 +137,32 @@ export function subscribeClients(
       .sort((a, b) => a.displayName.localeCompare(b.displayName));
     cb(rows);
   });
+}
+
+// ---- Recurring billing (Blue Seal Pro) — callable wrappers ----
+// A recurring charge is created server-side (hidden backing job + template
+// invoice the engine clones each period). LineItem unitPrice is in CENTS.
+export interface RecurringPlanInput {
+  clientId: string;
+  label: string;
+  frequency: "weekly" | "monthly" | "quarterly";
+  lineItems: Pick<LineItem, "description" | "quantity" | "unitPrice" | "taxRate">[];
+  discount: { type: "percent" | "fixed"; value: number; label: string | null } | null;
+}
+
+export async function createRecurringPlan(
+  input: RecurringPlanInput,
+): Promise<{ jobId: string; invoiceId: string; total: number }> {
+  const fn = httpsCallable(functions, "createRecurringPlan");
+  const res = await fn(input);
+  return res.data as { jobId: string; invoiceId: string; total: number };
+}
+
+// Pause / resume a plan (keeps the client's activeRecurringPlans badge correct
+// server-side). planJobId is the backing job id.
+export async function setRecurringPlanState(planJobId: string, enabled: boolean): Promise<void> {
+  const fn = httpsCallable(functions, "setRecurringPlanState");
+  await fn({ planJobId, enabled });
 }
 
 // Jobs linked to a contact (the per-client history rollup). Constrained by

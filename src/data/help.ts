@@ -268,26 +268,54 @@ Browsing with the **Any trade** filter and spot a job outside your trade? Use th
 
 A complete, verified profile with a strong portfolio and good reviews wins more work — clients can see your reputation at a glance.
 
-Want an edge? **Blue Seal Pro** features your applications at the top of clients' job posts (clearly marked "Featured"), and adds the AI assistant, a service-fee waiver for your clients, and business reports — see "Blue Seal Pro" below or the Pricing page.`,
+Want an edge? **Blue Seal Pro** features your applications at the top of clients' job posts (clearly marked "Featured"), and adds the AI assistant, a service-fee waiver for your clients, business reports, and a client book with recurring billing — see "Blue Seal Pro" below or the Pricing page.`,
   },
   {
     slug: "blue-seal-pro",
     categoryId: "for-tradespeople",
     title: "Blue Seal Pro",
-    excerpt: "The optional upgrade: AI assistant, fee waiver, featured placement, reports.",
+    excerpt: "The optional upgrade: AI assistant, fee waiver, featured placement, reports, clients & recurring billing.",
     audience: "tradesperson",
     popular: true,
-    keywords: ["pro", "subscription", "upgrade", "ai", "trial", "billing", "cancel"],
+    keywords: ["pro", "subscription", "upgrade", "ai", "trial", "billing", "cancel", "clients", "recurring"],
     body: `Blue Seal Pro is the optional upgrade for tradespeople. The core app — quoting, invoicing, scheduling, chat, the job board — stays free. Pro adds:
 
 - **AI assistant** — diagnose problems, draft quotes and invoice notes, and summarize jobs. (Receipt scanning stays free for everyone.)
 - **Your clients pay no service fee** — the Blue Seal service fee on card payments is waived for your jobs, so you're cheaper to hire.
 - **Featured placement** — your applications appear first on clients' job posts, marked "Featured".
 - **Business reports + CSV export** — revenue and tax-collected summaries plus an accountant-ready export.
+- **Clients & recurring billing** — keep a client book (add or import your existing clients) and put your regulars on a standing charge Blue Seal drafts for you to review and send each period.
 
 **Price:** $29 CAD/month or $290 CAD/year (two months free on annual). Every new subscription starts with a **30-day free trial** — a card is required, but you won't be charged until the trial ends, and you can cancel anytime before then for $0.
 
 **Manage it** under **Account → Blue Seal Pro**: see your status, switch monthly/annual, update your card, or cancel (you keep Pro until the end of the period you've paid for). Cancelling, switching, and payment updates all go through Stripe's secure customer portal.`,
+  },
+  {
+    slug: "clients-and-recurring-billing",
+    categoryId: "for-tradespeople",
+    title: "Your client book & recurring billing",
+    excerpt: "Keep your clients in one place and bill your regulars on repeat.",
+    audience: "tradesperson",
+    popular: true,
+    keywords: [
+      "clients",
+      "client book",
+      "crm",
+      "recurring",
+      "recurring billing",
+      "import clients",
+      "regulars",
+      "standing charge",
+    ],
+    body: `**Clients** is your own contact book, on the **Clients** tab of your dashboard (and in the side panel). It's part of **Blue Seal Pro**.
+
+**Add or import your clients.** Add a client by hand, or **import a CSV** with a Name column (Email, Phone, Company and Notes are optional). We skip duplicates and anyone already in your book. Each client gets a page with their contact details, your private notes, and a history of the jobs you've done together.
+
+**Recurring billing.** Open a client and tap **Add recurring charge** — give it a name (e.g. "Monthly pool maintenance"), pick weekly, monthly, or quarterly, and list what you charge. Blue Seal then **drafts that invoice for you each period**.
+
+**Nothing is ever sent automatically.** Each draft waits for you to review and send, so an amount is never charged to a client without you. You can **pause or resume** a recurring charge any time, and edit the amount whenever it changes.
+
+Your clients here are yours: adding a client or setting up recurring billing doesn't notify them or change anything on their side until you choose to send an invoice.`,
   },
   {
     slug: "quotes-and-invoices",
@@ -534,7 +562,14 @@ const faqs: FaqItem[] = [
   {
     question: "What is Blue Seal Pro and how much does it cost?",
     answer:
-      "Blue Seal Pro is an optional upgrade for tradespeople — $29 CAD/month or $290 CAD/year — with a 30-day free trial. It adds the AI assistant, waives the Blue Seal service fee for your clients on card payments, features your applications at the top of clients' job posts, and includes business reports with a CSV export. The core app stays free.",
+      "Blue Seal Pro is an optional upgrade for tradespeople — $29 CAD/month or $290 CAD/year — with a 30-day free trial. It adds the AI assistant, waives the Blue Seal service fee for your clients on card payments, features your applications at the top of clients' job posts, includes business reports with a CSV export, and gives you a client book with recurring billing for your regulars. The core app stays free.",
+    categoryId: "for-tradespeople",
+    audience: "tradesperson",
+  },
+  {
+    question: "Will my client be charged automatically with recurring billing?",
+    answer:
+      "No. Recurring billing **drafts** the invoice for you each period — nothing is sent or charged without you. You review each draft and send it when you're ready, and you can pause or resume a recurring charge any time. Recurring billing is part of Blue Seal Pro.",
     categoryId: "for-tradespeople",
     audience: "tradesperson",
   },

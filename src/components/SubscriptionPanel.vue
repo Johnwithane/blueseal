@@ -104,7 +104,8 @@ async function manage() {
             </template>
             <template v-else>
               Unlock the AI assistant, waive your clients' service fee, get featured placement,
-              and run business reports — $29 CAD/month or $290/year, 30-day free trial.
+              run business reports, and bill clients on repeat — $29 CAD/month or $290/year,
+              30-day free trial.
             </template>
           </p>
         </div>
@@ -160,6 +161,7 @@ async function manage() {
         <li><strong>Your clients pay no service fee</strong> — the Blue Seal fee is waived on card payments for your jobs, so you're cheaper to hire.</li>
         <li><strong>Featured placement</strong> — your applications appear first on clients' job posts.</li>
         <li><strong>Business reports + CSV export</strong> — revenue, tax collected, and an accountant-ready export.</li>
+        <li><strong>Clients &amp; recurring billing</strong> — keep a client book and put your regulars on a standing charge Blue Seal drafts for you to review and send each period.</li>
       </ul>
       <p class="mt-3 text-xs text-[color:var(--bs-muted)]">
         Receipt scanning stays free for everyone. Cancel anytime — you keep Pro until the end of the period you've paid for.

@@ -82,6 +82,11 @@ export { revokeJobInvite } from "./jobs/revokeJobInvite";
 export { sendJobInviteSignInLink } from "./jobs/sendJobInviteSignInLink";
 export { claimJobInvite } from "./jobs/claimJobInvite";
 export { unsubscribeJobInvite } from "./jobs/unsubscribeJobInvite";
+// Clients book recurring billing (Blue Seal Pro): a recurring charge is a
+// hidden backing solo-job + a recurring-flagged template invoice the existing
+// scheduledRecurringInvoices engine clones into review-and-send drafts.
+export { createRecurringPlan } from "./clients/createRecurringPlan";
+export { setRecurringPlanState } from "./clients/setRecurringPlanState";
 
 // Invoicing
 export { onJobCompleted } from "./invoicing/onJobCompleted";

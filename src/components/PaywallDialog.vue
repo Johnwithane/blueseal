@@ -88,6 +88,10 @@ watch(
             <span class="pw-check"><i class="pi pi-chart-bar" aria-hidden="true"></i></span>
             <span><strong>Business reports</strong> &amp; CSV export for tax time</span>
           </li>
+          <li>
+            <span class="pw-check"><i class="pi pi-users" aria-hidden="true"></i></span>
+            <span><strong>Clients &amp; recurring billing</strong> — a client book + standing charges drafted for you each period</span>
+          </li>
         </ul>
 
         <div class="pw-price">

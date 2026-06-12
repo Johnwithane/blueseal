@@ -16,7 +16,7 @@ import type { SubscriptionPlan } from "@/firebase/interfaces";
 useSeo({
   title: "Pricing — Blue Seal",
   description:
-    "Blue Seal is free for clients and tradespeople. Blue Seal Pro ($29 CAD/mo or $290/yr) adds an AI assistant, waives your clients' service fee, and more — 30-day free trial.",
+    "Blue Seal is free for clients and tradespeople. Blue Seal Pro ($29 CAD/mo or $290/yr) adds an AI assistant, waives your clients' service fee, a client book with recurring billing, and more — 30-day free trial.",
 });
 
 const auth = useAuthStore();
@@ -102,6 +102,7 @@ const proCtaLabel = computed(() => {
           <li class="flex gap-2"><i class="pi pi-star-fill text-[color:var(--bs-blue)]"></i> <span><strong>Your clients pay no service fee</strong> on card payments — you're cheaper to hire</span></li>
           <li class="flex gap-2"><i class="pi pi-star-fill text-[color:var(--bs-blue)]"></i> <span><strong>Featured placement</strong> on clients' job posts</span></li>
           <li class="flex gap-2"><i class="pi pi-star-fill text-[color:var(--bs-blue)]"></i> <span><strong>Business reports + CSV export</strong> for tax time</span></li>
+          <li class="flex gap-2"><i class="pi pi-star-fill text-[color:var(--bs-blue)]"></i> <span><strong>Clients &amp; recurring billing</strong> — a client book + standing charges Blue Seal drafts for you each period</span></li>
         </ul>
         <Button
           :label="proCtaLabel"

@@ -371,7 +371,11 @@ export async function saveJobIntakeAndAdvance(
   });
 }
 
-// Subscribe to all jobs for a tradesperson (kanban + calendar feed).
+// Subscribe to all jobs for a tradesperson (kanban + calendar + list feed).
+// Recurring-billing backing jobs (originType "recurring_plan") are filtered out
+// — they're hidden billing vehicles surfaced only under their client, never on
+// the job board/kanban/calendar. Filtered client-side (post-limit), which is
+// fine at the handful of recurring plans a tradesperson runs.
 export function subscribeTradieJobs(
   tradieUid: string,
   cb: (jobs: WithId<JobDoc>[]) => void,
@@ -382,7 +386,13 @@ export function subscribeTradieJobs(
     orderBy("createdAt", "desc"),
     limit(200),
   );
-  return onSnapshot(q, (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
+  return onSnapshot(q, (snap) =>
+    cb(
+      snap.docs
+        .map((d) => ({ id: d.id, ...d.data() }) as WithId<JobDoc>)
+        .filter((j) => j.originType !== "recurring_plan"),
+    ),
+  );
 }
 
 export function subscribeClientJobs(

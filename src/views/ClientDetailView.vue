@@ -16,6 +16,7 @@ import { useSeo } from "@/composables/useSeo";
 import type { ClientDoc, WithId } from "@/firebase/interfaces";
 import ClientFormDialog from "@/components/clients/ClientFormDialog.vue";
 import ClientHistory from "@/components/clients/ClientHistory.vue";
+import ClientRecurringList from "@/components/clients/ClientRecurringList.vue";
 
 useSeo({ title: "Client — Blue Seal", noindex: true });
 
@@ -141,6 +142,11 @@ async function toggleArchive() {
             @click="toggleArchive"
           />
         </div>
+      </div>
+
+      <!-- Recurring billing (Pro) -->
+      <div class="bs-card p-4 mb-4">
+        <ClientRecurringList :tradie-uid="client.tradespersonId" :client-id="client.id" />
       </div>
 
       <!-- History -->
