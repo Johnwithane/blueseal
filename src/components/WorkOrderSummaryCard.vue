@@ -99,12 +99,12 @@ const tally = computed(() =>
 
 const hasCharges = computed(() => tally.value.totalCents > 0);
 
+const isFixed = computed(() => props.billingType === "fixed");
+
 // The client can't see receipts here; flag it on hourly jobs so a lower total
 // than the eventual invoice doesn't read as a discrepancy. (Fixed jobs never
-// bill receipts, so there's nothing to disclose.)
-const showMaterialsNote = computed(
-  () => props.isClient && props.billingType !== "fixed",
-);
+// bill receipts — the fixed-price note covers that instead.)
+const showMaterialsNote = computed(() => props.isClient && !isFixed.value);
 
 const showCreateInvoice = computed(
   () => props.isTradie && props.job.status === "in_progress",
@@ -127,6 +127,21 @@ const createInvoiceLabel = computed(() =>
     <p class="text-[11px] text-[color:var(--bs-muted)] mt-0.5">
       A running, pre-tax total of the work added so far. Tax and anything from
       the original quote are settled when the invoice is built.
+    </p>
+
+    <!-- Fixed-price jobs bill the agreed quote, not tracked time or receipts,
+         so the running total here only moves with approved change orders. Spell
+         that out so an empty/low total reads as "as expected", not "missing". -->
+    <p
+      v-if="isFixed"
+      class="text-[11px] text-[color:var(--bs-muted)] mt-2 flex items-start gap-1.5"
+    >
+      <i class="pi pi-info-circle mt-0.5 text-[color:var(--bs-blue)]"></i>
+      <span>
+        This is a <strong>fixed-price</strong> job — the agreed quote covers the
+        work. Tracked time and receipts are kept for the record but don't add to
+        the total; only client-approved change orders do.
+      </span>
     </p>
 
     <!-- Breakdown — only the lines that actually carry a charge, to keep it
