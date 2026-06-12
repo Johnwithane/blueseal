@@ -53,6 +53,7 @@ import PortfolioEditor from "@/components/PortfolioEditor.vue";
 import TradieDocsManager from "@/components/TradieDocsManager.vue";
 import VouchesPanel from "@/components/VouchesPanel.vue";
 import PayoutsPanel from "@/components/PayoutsPanel.vue";
+import SubscriptionPanel from "@/components/SubscriptionPanel.vue";
 import GoogleBusinessPanel from "@/components/GoogleBusinessPanel.vue";
 import LocationPicker, { type LocationValue } from "@/components/LocationPicker.vue";
 import TabBar from "@/components/TabBar.vue";
@@ -215,7 +216,7 @@ async function onPushToggle(value: unknown) {
 // a URL, we fall back to Profile. Notifications used to be its own tab —
 // it's now a section inside Privacy & account since the two are conceptually
 // "settings" rather than profile-editing.
-type TabKey = "profile" | "tradesperson" | "payouts" | "account";
+type TabKey = "profile" | "tradesperson" | "payouts" | "pro" | "account";
 
 interface TabDef {
   key: TabKey;
@@ -236,6 +237,12 @@ const tabs = computed<TabDef[]>(() => [
     key: "payouts",
     label: "Payouts",
     icon: "pi-credit-card",
+    visible: auth.hasTradieRole,
+  },
+  {
+    key: "pro",
+    label: "Blue Seal Pro",
+    icon: "pi-star",
     visible: auth.hasTradieRole,
   },
   { key: "account", label: "Privacy & account", icon: "pi-cog", visible: true },
@@ -318,9 +325,27 @@ function handleGoogleReturn() {
   void router.replace({ query: rest });
 }
 
+// Stripe Checkout / Customer Portal return (success_url is /account?tab=pro&
+// checkout=success). Toast + strip the `checkout` flag; the live subscription
+// store reflects the real state, so we don't trust the query beyond the toast.
+function handleCheckoutReturn() {
+  const raw = route.query.checkout;
+  const status = Array.isArray(raw) ? raw[0] : raw;
+  if (!status) return;
+  if (status === "success") {
+    toast.success("Welcome to Blue Seal Pro", "Your subscription is being set up — it'll show here in a moment.");
+  } else if (status === "cancelled") {
+    toast.info("Checkout cancelled", "No charge was made. You can start your free trial anytime.");
+  }
+  const { checkout: _omit, ...rest } = route.query;
+  void _omit;
+  void router.replace({ query: rest });
+}
+
 onMounted(async () => {
   if (!auth.fbUser) return;
   handleGoogleReturn();
+  handleCheckoutReturn();
   // Push state resolves independently of the user doc (browser-level).
   void pushSupported().then((ok) => {
     pushAvailable.value = ok;
@@ -1389,6 +1414,11 @@ async function grantAllTrades() {
     <!-- PAYOUTS TAB ----------------------------------------------------- -->
     <div v-if="auth.hasTradieRole" v-show="activeTab === 'payouts'">
       <PayoutsPanel />
+    </div>
+
+    <!-- BLUE SEAL PRO TAB ------------------------------------------------ -->
+    <div v-if="auth.hasTradieRole" v-show="activeTab === 'pro'">
+      <SubscriptionPanel />
     </div>
 
     <!-- PRIVACY & ACCOUNT TAB ------------------------------------------ -->

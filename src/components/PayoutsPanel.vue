@@ -75,7 +75,7 @@ const headline = computed(() => {
 const subhead = computed(() => {
   switch (status.value) {
     case "enabled":
-      return "Invoices you send through Blue Seal will pay out to the bank account you connected with Stripe. Blue Seal's 12% platform fee is taken at the time of payment — you see the net on every invoice before you send it.";
+      return "Invoices you send through Blue Seal pay out to the bank account you connected with Stripe. You receive the full invoice amount — Blue Seal's service fee is paid by the client at card checkout, not deducted from you.";
     case "restricted":
       return "Stripe paused payouts on your account because of the items below. Click 'Continue Stripe setup' to provide what's needed — the link below opens Stripe's hosted form.";
     case "in_progress":
@@ -248,9 +248,11 @@ function prettyRequirement(req: string): string {
           settle into Stripe.
         </li>
         <li>
-          Blue Seal's 12% platform fee is deducted automatically. The net
-          transfers to your connected bank account on Stripe's standard
-          payout schedule (typically 2 business days for Canadian accounts).
+          You receive the <strong>full invoice amount</strong>. The Blue Seal
+          service fee is added to the client's card payment at checkout — not
+          taken from your payout. Funds transfer to your connected bank account
+          on Stripe's standard schedule (typically 2 business days for Canadian
+          accounts).
         </li>
         <li>
           Disputes, refunds, and tax docs are managed inside the Stripe

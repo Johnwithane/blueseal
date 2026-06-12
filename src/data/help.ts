@@ -266,7 +266,28 @@ Need answers before you can price it? On the job board you can also apply with *
 
 Browsing with the **Any trade** filter and spot a job outside your trade? Use the **share icon** on the card (or **Refer this job** on the post) to send it to a verified tradesperson in that trade — they're notified and can apply directly.
 
-A complete, verified profile with a strong portfolio and good reviews wins more work — clients can see your reputation at a glance.`,
+A complete, verified profile with a strong portfolio and good reviews wins more work — clients can see your reputation at a glance.
+
+Want an edge? **Blue Seal Pro** features your applications at the top of clients' job posts (clearly marked "Featured"), and adds the AI assistant, a service-fee waiver for your clients, and business reports — see "Blue Seal Pro" below or the Pricing page.`,
+  },
+  {
+    slug: "blue-seal-pro",
+    categoryId: "for-tradespeople",
+    title: "Blue Seal Pro",
+    excerpt: "The optional upgrade: AI assistant, fee waiver, featured placement, reports.",
+    audience: "tradesperson",
+    popular: true,
+    keywords: ["pro", "subscription", "upgrade", "ai", "trial", "billing", "cancel"],
+    body: `Blue Seal Pro is the optional upgrade for tradespeople. The core app — quoting, invoicing, scheduling, chat, the job board — stays free. Pro adds:
+
+- **AI assistant** — diagnose problems, draft quotes and invoice notes, and summarize jobs. (Receipt scanning stays free for everyone.)
+- **Your clients pay no service fee** — the Blue Seal service fee on card payments is waived for your jobs, so you're cheaper to hire.
+- **Featured placement** — your applications appear first on clients' job posts, marked "Featured".
+- **Business reports + CSV export** — revenue and tax-collected summaries plus an accountant-ready export.
+
+**Price:** $29 CAD/month or $290 CAD/year (two months free on annual). Every new subscription starts with a **30-day free trial** — a card is required, but you won't be charged until the trial ends, and you can cancel anytime before then for $0.
+
+**Manage it** under **Account → Blue Seal Pro**: see your status, switch monthly/annual, update your card, or cancel (you keep Pro until the end of the period you've paid for). Cancelling, switching, and payment updates all go through Stripe's secure customer portal.`,
   },
   {
     slug: "quotes-and-invoices",
@@ -504,9 +525,23 @@ const faqs: FaqItem[] = [
   {
     question: "Is Blue Seal free to use?",
     answer:
-      "Creating an account, searching for tradespeople, and posting a job are free. You pay for the work itself through the job thread.",
+      "Yes — creating an account, searching for tradespeople, posting a job, quoting, invoicing, and scheduling are all free, for clients and tradespeople alike. You pay for the work itself through the job thread. Tradespeople can optionally subscribe to **Blue Seal Pro** for the AI assistant, featured placement, and more — the core app stays free.",
     categoryId: "getting-started",
     audience: "all",
+  },
+  {
+    question: "What is Blue Seal Pro and how much does it cost?",
+    answer:
+      "Blue Seal Pro is an optional upgrade for tradespeople — $29 CAD/month or $290 CAD/year — with a 30-day free trial. It adds the AI assistant, waives the Blue Seal service fee for your clients on card payments, features your applications at the top of clients' job posts, and includes business reports with a CSV export. The core app stays free.",
+    categoryId: "for-tradespeople",
+    audience: "tradesperson",
+  },
+  {
+    question: "How do I cancel or change my Blue Seal Pro plan?",
+    answer:
+      "Go to **Account → Blue Seal Pro** and open **Manage subscription** — that takes you to Stripe's secure portal where you can cancel, switch between monthly and annual, or update your card. If you cancel, you keep Pro until the end of the period you've already paid for. Cancelling during your free trial means no charge at all.",
+    categoryId: "for-tradespeople",
+    audience: "tradesperson",
   },
   {
     question: "Which areas does Blue Seal cover?",

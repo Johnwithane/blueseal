@@ -45,6 +45,14 @@ const routes: RouteRecordRaw[] = [
     meta: { layout: "hybrid" },
   },
   {
+    path: "/pricing",
+    name: "Pricing",
+    component: () => import("@/views/PricingView.vue"),
+    // Hybrid: signed-in tradespeople reach it from their account; visitors see
+    // the marketing chrome.
+    meta: { layout: "hybrid", title: "Pricing" },
+  },
+  {
     // Shared public profile for both real tradespeople AND seeded prospects.
     // TradieProfileView resolves the :uid: a real tradesperson renders the full
     // verified layout; a seeded prospect renders the unverified ProspectProfile

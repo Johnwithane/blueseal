@@ -12,12 +12,14 @@ import RoleSwitchOverlay from "@/components/RoleSwitchOverlay.vue";
 import AppShell from "@/components/shell/AppShell.vue";
 import ActiveClockBanner from "@/components/ActiveClockBanner.vue";
 import { useNotificationsStore } from "@/stores/notifications";
+import { useSubscriptionStore } from "@/stores/subscription";
 import { useAuthStore } from "@/stores/auth";
 import { useAppUpdate, usePushAutoPrompt } from "@/composables";
 
 const route = useRoute();
 const router = useRouter();
 const notifs = useNotificationsStore();
+const subscription = useSubscriptionStore();
 const auth = useAuthStore();
 const primeToast = primeUseToast();
 
@@ -49,6 +51,7 @@ const layout = computed<"public" | "app" | "chromeless">(() => {
 // NotificationsButton consume the same store.
 onMounted(() => {
   notifs.init();
+  subscription.init();
 });
 
 // Live toast surface for newly-arrived notifications. The bell already shows

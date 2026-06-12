@@ -18,6 +18,7 @@ const year = new Date().getFullYear();
         <router-link to="/search">Find a tradesperson</router-link>
         <router-link to="/trades">Browse trades</router-link>
         <router-link to="/sign-up?as=tradesperson">I'm a tradesperson</router-link>
+        <router-link to="/pricing">Pricing</router-link>
         <router-link to="/help">Help &amp; support</router-link>
       </nav>
     </div>
