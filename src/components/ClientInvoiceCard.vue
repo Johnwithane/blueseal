@@ -210,27 +210,34 @@ async function openPdfPreview() {
         </div>
       </div>
 
-      <!-- Payment due. -->
+      <!-- Payment due. Card (with the Blue Seal service fee) is primary when the
+           tradesperson can accept it; the fee-free offline path is always
+           available as a secondary option. -->
       <div v-else-if="job.status === 'awaiting_payment'" class="mt-4">
-        <RouterLink v-if="invoicePayable" :to="`/invoices/${invoiceId}/pay`" class="block">
-          <Button label="Pay invoice" icon="pi pi-credit-card" severity="success" class="w-full" />
-        </RouterLink>
-        <Button
-          v-else
-          label="Pay invoice"
-          icon="pi pi-wallet"
-          severity="success"
-          class="w-full"
-          @click="showPayDialog = true"
-        />
-        <p class="text-xs text-[color:var(--bs-muted)] mt-2">
-          <template v-if="invoicePayable">
-            Pay by card — you'll get a receipt right after.
-          </template>
-          <template v-else>
-            Pay the tradesperson directly (e-transfer, cash, etc.), then confirm here.
-          </template>
-        </p>
+        <template v-if="invoicePayable">
+          <RouterLink :to="`/invoices/${invoiceId}/pay`" class="block">
+            <Button label="Pay by card" icon="pi pi-credit-card" severity="success" class="w-full" />
+          </RouterLink>
+          <button
+            type="button"
+            class="mt-2 w-full text-center text-xs text-[color:var(--bs-muted)] underline"
+            @click="showPayDialog = true"
+          >
+            Paid by e-transfer or cash? Mark it here — no fee
+          </button>
+        </template>
+        <template v-else>
+          <Button
+            label="I've paid the tradesperson"
+            icon="pi pi-wallet"
+            severity="success"
+            class="w-full"
+            @click="showPayDialog = true"
+          />
+          <p class="text-xs text-[color:var(--bs-muted)] mt-2">
+            Pay the tradesperson directly (e-transfer, cash, etc.), then let them know here.
+          </p>
+        </template>
       </div>
 
       <div class="flex items-center gap-2 mt-4 flex-wrap">
@@ -244,7 +251,7 @@ async function openPdfPreview() {
           @click="openPdfPreview"
         />
         <RouterLink
-          v-if="(job.status === 'complete' || job.status === 'reviewed') && invoicePayable"
+          v-if="job.status === 'complete' || job.status === 'reviewed'"
           :to="`/invoices/${invoiceId}/receipt`"
         >
           <Button label="View receipt" icon="pi pi-file" outlined size="small" />

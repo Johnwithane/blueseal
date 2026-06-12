@@ -211,6 +211,37 @@ export async function pullBillablesFromJob(invoiceId: string): Promise<PullBilla
   return res.data;
 }
 
+// The fee breakdown the client sees: ONE "Blue Seal service fee" line
+// (totalFeeCents) plus the grand total the card is charged (chargeTotalCents).
+// The platform/processing split is internal — not surfaced.
+export interface ClientServiceFee {
+  totalFeeCents: number;
+  chargeTotalCents: number;
+  baseAmountCents: number;
+  waived: boolean;
+}
+
+export interface PaymentIntentResult {
+  clientSecret: string | null;
+  serviceFee: ClientServiceFee;
+}
+
+/**
+ * Create (or refresh) the Stripe PaymentIntent for an invoice at pay time and
+ * return the client secret + the service-fee snapshot. Called by InvoicePayView
+ * on mount. The fee + Pro waiver are computed server-side against the live
+ * invoice total. Rejects (failed-precondition) if the tradesperson hasn't
+ * finished payout setup — the caller offers the fee-free offline path instead.
+ */
+export async function createInvoicePaymentIntent(invoiceId: string): Promise<PaymentIntentResult> {
+  const fn = httpsCallable<{ invoiceId: string }, PaymentIntentResult>(
+    functions,
+    "createInvoicePaymentIntent",
+  );
+  const res = await fn({ invoiceId });
+  return res.data;
+}
+
 export async function getInvoiceByJobId(jobId: string): Promise<WithId<InvoiceDoc> | null> {
   // Try the deterministic ID first (onJobCompleted writes invoices/{jobId}).
   // Both reads are wrapped in try/catch because Firestore returns

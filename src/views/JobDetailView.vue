@@ -144,14 +144,14 @@ let unsubscribeReviewPair: (() => void) | null = null;
 let unsubscribeJob: (() => void) | null = null;
 const intakeFields = ref<IntakeField[]>([]);
 const invoiceId = ref<string | null>(null);
-// True only for invoices sent through the Stripe Connect pipeline (i.e.
-// `payment.clientSecret` is set). Legacy "mark paid" / manual-flow
-// invoices have no client-side pay path, so the InvoiceTab's pay /
-// receipt CTAs must not link to /invoices/:id/pay — those would just
-// surface a "re-send it from their dashboard" error. Pre-launch the
-// difference is moot (no legacy invoices in prod), but during the
-// rollout window stale jobs may exist and shouldn't break.
-const invoicePayable = ref(false);
+// True when the tradesperson can accept a card payment — i.e. their Connect
+// payouts are enabled. The PaymentIntent is now created at pay time (when the
+// client opens /invoices/:id/pay), so we can't key off clientSecret anymore;
+// instead we read the tradie's public payouts state. When false, the client
+// only gets the fee-free offline path (mark-as-paid).
+const invoicePayable = computed(
+  () => tradieInfo.value?.payouts?.payoutsEnabled === true,
+);
 const loading = ref(true);
 // When the URL points at a job the signed-in user can't read (notification
 // pointing at a stale or wrong id, deep link from another account) the
@@ -563,7 +563,6 @@ async function loadJobDependents(j: WithId<JobDoc>) {
   ]);
   intakeFields.value = remote?.fields ?? SEED_INTAKE_SCHEMAS[j.trade] ?? [];
   invoiceId.value = invoice?.id ?? null;
-  invoicePayable.value = !!invoice?.payment?.clientSecret;
 
   // Private notes live in a tradie-only subdoc; the client can't read it
   // (rules deny it), so only fetch when the viewer is the tradesperson.

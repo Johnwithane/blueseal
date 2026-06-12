@@ -78,6 +78,13 @@ const isParty = computed(
     (invoice.value.clientId === auth.fbUser.uid ||
       invoice.value.tradespersonId === auth.fbUser.uid),
 );
+
+// Card payments carry a service-fee snapshot (client paid invoice + fee);
+// offline-paid invoices don't (no fee), so fall back to the invoice total.
+const serviceFee = computed(() => invoice.value?.payment?.serviceFee ?? null);
+const totalPaidCents = computed(
+  () => serviceFee.value?.chargeTotalCents ?? invoice.value?.total ?? 0,
+);
 </script>
 
 <template>
@@ -121,7 +128,7 @@ const isParty = computed(
       <h1 class="mt-2 text-xl font-semibold">Payment confirmed</h1>
       <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
         Invoice {{ invoice.invoiceNumber }} —
-        {{ fmtMoney(invoice.total, invoice.currency) }} paid.
+        {{ fmtMoney(totalPaidCents, invoice.currency) }} paid.
         <span v-if="invoice.status === 'partially_refunded'">
           A partial refund was issued back to your card.
         </span>
@@ -143,10 +150,22 @@ const isParty = computed(
             {{ fmtMoney(invoice.taxTotal, invoice.currency) }}
           </span>
         </div>
+        <div v-if="serviceFee" class="flex justify-between">
+          <span class="text-[color:var(--bs-muted)]">Invoice total</span>
+          <span class="tabular-nums">
+            {{ fmtMoney(invoice.total, invoice.currency) }}
+          </span>
+        </div>
+        <div v-if="serviceFee" class="flex justify-between">
+          <span class="text-[color:var(--bs-muted)]">Blue Seal service fee</span>
+          <span class="tabular-nums">
+            {{ fmtMoney(serviceFee.totalFeeCents, invoice.currency) }}
+          </span>
+        </div>
         <div class="flex justify-between font-semibold pt-1 border-t border-[color:var(--bs-border)]">
           <span>Total paid</span>
           <span class="tabular-nums">
-            {{ fmtMoney(invoice.total, invoice.currency) }}
+            {{ fmtMoney(totalPaidCents, invoice.currency) }}
           </span>
         </div>
       </div>

@@ -834,7 +834,28 @@ const faqs: FaqItem[] = [
   {
     question: "How does paying for a job work?",
     answer:
-      "Your tradesperson sends an invoice in the job thread with a clear breakdown. You pay securely from there, and a receipt is saved to the thread for both of you.",
+      "Your tradesperson sends an invoice in the job thread with a clear breakdown. You can pay securely by card from there, or pay by e-transfer or cash and have your tradesperson mark it paid. Either way a receipt is saved to the thread for both of you.",
+    categoryId: "payments-invoices",
+    audience: "client",
+  },
+  {
+    question: "What is the Blue Seal service fee?",
+    answer:
+      "When you pay an invoice **by card**, a small **Blue Seal service fee** is added at checkout — 5% of the invoice (minimum $2), **capped at $99 per job**. It covers secure card processing and payment protection through Blue Seal. You see the exact amount before you pay. If your tradesperson is on **Blue Seal Pro**, the platform portion is waived.",
+    categoryId: "payments-invoices",
+    audience: "client",
+  },
+  {
+    question: "Do I pay a fee if I use e-transfer or cash?",
+    answer:
+      "No. The service fee only applies to **card payments through Blue Seal**. Paying by e-transfer or cash is always fee-free — just arrange it with your tradesperson and they'll mark the invoice as paid. You'll still get a receipt in the job thread.",
+    categoryId: "payments-invoices",
+    audience: "client",
+  },
+  {
+    question: "Is the Blue Seal service fee refundable?",
+    answer:
+      "If a job is fully refunded, the service fee is returned to you as well. For a partial refund (say an adjustment for part of the work), the refund comes from your tradesperson's side and the service fee isn't returned. Refunds go back to your original card.",
     categoryId: "payments-invoices",
     audience: "client",
   },

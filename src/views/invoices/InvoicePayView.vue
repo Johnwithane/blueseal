@@ -15,8 +15,10 @@ import { useAuthStore } from "@/stores/auth";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 import {
+  createInvoicePaymentIntent,
   markInvoiceViewed,
   subscribeInvoice,
+  type ClientServiceFee,
 } from "@/firebase/services/invoices";
 import { STRIPE_PUBLISHABLE_KEY } from "@/firebase/config";
 import type { InvoiceDoc, WithId } from "@/firebase/interfaces";
@@ -43,11 +45,14 @@ const loading = ref(true);
 const submitting = ref(false);
 const initError = ref<string | null>(null);
 const submitError = ref<string | null>(null);
+const serviceFee = ref<ClientServiceFee | null>(null);
+const clientSecretRef = ref<string | null>(null);
 
 let unsub: (() => void) | null = null;
 let stripe: Stripe | null = null;
 let elements: StripeElements | null = null;
 let elementMounted = false;
+let piRequested = false;
 
 const paymentElementRef = ref<HTMLDivElement | null>(null);
 
@@ -77,14 +82,28 @@ onMounted(async () => {
       return;
     }
 
-    // First time we have the clientSecret, mount the Element. The watch
-    // below also handles late arrivals (e.g. sendInvoice ran during the
-    // session).
-    if (!elementMounted) {
-      await tryMountElement();
+    // Payable invoice → create the PaymentIntent (once) at pay time. This
+    // computes the service fee + Pro waiver against the live total and writes
+    // the client secret; we then mount the Stripe Element.
+    if (inv && !piRequested && ["sent", "viewed", "overdue"].includes(inv.status)) {
+      piRequested = true;
+      await initPaymentIntent();
     }
   });
 });
+
+async function initPaymentIntent() {
+  try {
+    const res = await createInvoicePaymentIntent(invoiceId.value);
+    serviceFee.value = res.serviceFee;
+    clientSecretRef.value = res.clientSecret;
+    if (!elementMounted) await tryMountElement();
+  } catch (err) {
+    // Tradesperson hasn't finished payout setup, or the invoice isn't
+    // payable. Surface it and lean on the offline option below.
+    initError.value = humanizeError(err);
+  }
+}
 
 onBeforeUnmount(() => {
   unsub?.();
@@ -101,7 +120,7 @@ onBeforeUnmount(() => {
 // the first subscribe callback may fire before Vue's nextTick paints the
 // payment element container. This re-tries mounting on every state change
 // that could newly enable it.
-watch([invoice, paymentElementRef], () => {
+watch([invoice, paymentElementRef, clientSecretRef], () => {
   if (!elementMounted) void tryMountElement();
 });
 
@@ -109,10 +128,9 @@ async function tryMountElement() {
   if (elementMounted) return;
   const inv = invoice.value;
   if (!inv) return;
-  const clientSecret = inv.payment?.clientSecret ?? null;
+  const clientSecret = clientSecretRef.value ?? inv.payment?.clientSecret ?? null;
   if (!clientSecret) {
-    initError.value =
-      "This invoice isn't ready for online payment. Ask the tradesperson to re-send it from their dashboard.";
+    // No secret yet — initPaymentIntent is in flight or errored (initError set).
     return;
   }
   if (!STRIPE_PUBLISHABLE_KEY) {
@@ -223,7 +241,7 @@ const lastFailureMessage = computed(
           Pay invoice {{ invoice.invoiceNumber }}
         </h1>
         <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
-          {{ fmtMoney(invoice.total, invoice.currency) }} due
+          {{ fmtMoney(serviceFee ? serviceFee.chargeTotalCents : invoice.total, invoice.currency) }} due
         </p>
       </div>
 
@@ -257,12 +275,39 @@ const lastFailureMessage = computed(
             <span>Tax</span>
             <span class="tabular-nums">{{ fmtMoney(invoice.taxTotal, invoice.currency) }}</span>
           </div>
-          <div class="flex justify-between font-semibold text-base pt-1">
-            <span>Total</span>
+          <div class="flex justify-between">
+            <span>Invoice total</span>
             <span class="tabular-nums">{{ fmtMoney(invoice.total, invoice.currency) }}</span>
           </div>
+          <div v-if="serviceFee" class="flex justify-between">
+            <span>Blue Seal service fee</span>
+            <span class="tabular-nums">{{ fmtMoney(serviceFee.totalFeeCents, invoice.currency) }}</span>
+          </div>
+          <div class="flex justify-between font-semibold text-base pt-1">
+            <span>Total to pay</span>
+            <span class="tabular-nums">{{
+              fmtMoney(serviceFee ? serviceFee.chargeTotalCents : invoice.total, invoice.currency)
+            }}</span>
+          </div>
         </div>
+        <p v-if="serviceFee" class="mt-2 text-xs text-[color:var(--bs-muted)]">
+          The service fee covers secure card processing and payment protection
+          through Blue Seal.
+        </p>
       </div>
+
+      <!-- Offline alternative — always one tap away, never a fee. -->
+      <Message severity="secondary" :closable="false" class="mb-4">
+        Prefer e-transfer or cash? That's <strong>fee-free</strong> — arrange it
+        with your tradesperson and they'll mark the invoice paid.
+        <RouterLink
+          v-if="invoice.jobId"
+          :to="`/jobs/${invoice.jobId}`"
+          class="font-medium underline"
+        >
+          Open the job
+        </RouterLink>
+      </Message>
 
       <Message
         v-if="lastFailureMessage"

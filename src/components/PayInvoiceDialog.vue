@@ -61,8 +61,8 @@ async function onConfirm() {
   try {
     await clientMarkPaid(props.jobId);
     toast.success(
-      "Payment confirmed",
-      "Marked paid. The tradesperson has been notified.",
+      "Thanks — your tradesperson has been notified",
+      "They'll confirm they've received it, which completes the job and sends your receipt.",
     );
     emit("paid");
     emit("update:visible", false);
@@ -86,16 +86,17 @@ function close() {
     :closable="!confirming"
     :dismissable-mask="!confirming"
     :draggable="false"
-    header="Pay invoice"
+    header="Paid by e-transfer or cash?"
     :style="{ width: '32rem', maxWidth: '92vw' }"
     @update:visible="(v) => emit('update:visible', v)"
   >
     <div v-if="loading" class="text-sm text-[color:var(--bs-muted)]">Loading…</div>
     <template v-else-if="invoice">
       <p class="text-sm text-[color:var(--bs-muted)] mb-3">
-        Pay the tradesperson directly using the instructions below. Once
-        you've sent the payment, confirm here to close out the job and
-        receive a receipt.
+        Paying by e-transfer or cash is fee-free. Pay the tradesperson directly
+        using the instructions below, then let them know here — they'll confirm
+        receipt, which completes the job and sends your receipt. Prefer to pay by
+        card instead? Close this and choose <strong>Pay by card</strong>.
       </p>
 
       <!-- Total to pay — bold, can't be missed. -->
@@ -139,9 +140,8 @@ function close() {
         :closable="false"
         class="text-xs mb-3"
       >
-        Card payments aren't enabled yet on Blue Seal — payment happens
-        directly between you and the tradesperson. Only confirm once
-        you've actually sent it.
+        Only confirm once you've actually sent the payment. Your tradesperson
+        confirms receipt before the job is marked complete.
       </Message>
 
       <label class="flex items-start gap-2 text-sm cursor-pointer">
@@ -149,7 +149,7 @@ function close() {
         <span>
           I've sent
           <span class="font-semibold">{{ money(invoice.total) }}</span>
-          to the tradesperson and want to mark this invoice paid.
+          to the tradesperson by e-transfer or cash.
         </span>
       </label>
     </template>
