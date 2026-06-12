@@ -105,6 +105,13 @@ const noteToClient = ref("");
 
 const submitting = ref(false);
 
+// Fixed-price jobs don't bill receipts — they're cost-tracking only, mirroring
+// the server's rollUpExpenses gate. Out-of-scope materials ride a change order.
+// Declared up here on purpose: FINISH_STEPS reads it, and the watch(FINISH_STEPS)
+// below evaluates eagerly during setup — a later declaration is a use-before-init
+// crash (the whole setup throws, so the sheet never opens).
+const costTrackingOnly = computed(() => props.billingType === "fixed");
+
 // Guided walkthrough: reveal the wrap-up one section at a time, ending on the
 // full form (summary + send). Skippable for tradies who just want the form.
 // Sections are v-show'd, so nothing typed is lost moving back and forth.
@@ -309,9 +316,7 @@ const timeRollup = computed(() => {
   return map;
 });
 
-// Fixed-price jobs don't bill receipts — they're cost-tracking only, mirroring
-// the server's rollUpExpenses gate. Out-of-scope materials ride a change order.
-const costTrackingOnly = computed(() => props.billingType === "fixed");
+// (costTrackingOnly is declared near the top — FINISH_STEPS needs it early.)
 const billableExpenses = computed(() =>
   costTrackingOnly.value
     ? []
