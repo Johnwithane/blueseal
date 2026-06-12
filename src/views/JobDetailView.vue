@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter, RouterLink } from "vue-router";
 import Button from "primevue/button";
 import Tag from "primevue/tag";
@@ -585,14 +585,13 @@ async function loadJobDependents(j: WithId<JobDoc>) {
   }
 }
 
-onMounted(load);
-
-// Subscribe to the mutual-review pair as soon as we know the jobId.
-// JobDetailView owns this (not InvoiceTab) so the top-of-page banner
-// can react to pair state even when the user is on a different tab.
-// The watch starts immediately on first load and re-binds if the
-// route changes to a different job (rare but possible via in-app
-// navigation).
+// Single source of truth for "which job are we looking at". This watch owns
+// the full (re)load: the main job subscription (via load()) AND the dependent
+// subscriptions below. `immediate: true` covers the cold mount; re-running on
+// route.params.id change is what makes in-app navigation between jobs work —
+// e.g. clicking a notification for job B while already viewing job A. Without
+// the re-run, Vue reuses this component instance, load() never fires again,
+// and job.value (hence the chat overlay's chatId) stays stuck on the old job.
 watch(
   () => route.params.id,
   (id) => {
@@ -609,6 +608,8 @@ watch(
     unsubscribeSessions = null;
     sessions.value = [];
     if (typeof id !== "string" || !id) return;
+    // (Re)subscribe the main job doc + reload its dependents for this id.
+    void load();
     unsubscribeReviewPair = subscribeReviewPair(id, (p) => {
       reviewPair.value = p;
     });
