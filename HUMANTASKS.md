@@ -248,6 +248,66 @@ See `PROFESSIONAL_TASKS.md` for the parallel lawyer + accountant work that gates
 
 ---
 
+## Blue Seal Pro + payment service fee — Stripe setup (added 2026-06-11)
+
+This rolls out BOTH monetization layers (MONETIZATION.md): the client-paid
+service fee on card payments (5%, $2 floor, capped $99/job, waived for Pro) and
+the **Blue Seal Pro** subscription ($29 CAD/mo or $290 CAD/yr, 30-day
+card-required trial). Most of the Stripe-side wiring is automated by
+[`functions/scripts/stripe-setup.mjs`](functions/scripts/stripe-setup.mjs) —
+the steps below are only what genuinely needs your account/identity/dashboard
+access. **Do the whole thing in TEST mode first; only do the LIVE-mode tasks
+once the sandbox passes end-to-end.** The code ships behind these secrets — until
+they're set, the Stripe callables throw "not configured" and the rest of the app
+(offline payments, the free app) keeps working.
+
+### Stage 0 — Sandbox account (do first; blocks the Pro 3 deploy)
+
+#### [ ] Create the Stripe account + enable Connect (test mode)
+- **What:** Sign up at [dashboard.stripe.com](https://dashboard.stripe.com) (country **Canada**). No activation/KYC needed yet — test mode works immediately. Then, in test mode: **Connect → Get started → Express**, accept the Platform & Connected Account agreements. (If you already created the prod account for the earlier Connect task, just stay in **Test mode** via the dashboard toggle.)
+- **Verify:** The dashboard shows Test mode; Connect → Settings is reachable.
+
+#### [ ] Hand the test keys to Claude (or set them yourself)
+- **What:** Dashboard → Developers → API keys (Test mode). Then:
+  ```
+  firebase functions:secrets:set STRIPE_SECRET_KEY        # paste sk_test_…
+  firebase functions:secrets:set STRIPE_WEBHOOK_SECRET    # paste any placeholder for now (e.g. whsec_placeholder)
+  ```
+  And in `.env.local`: `VITE_STRIPE_PUBLISHABLE_KEY=pk_test_…`
+- **Why:** The deploy needs both secrets to *exist* (the functions bind them); the real webhook secret is set after the endpoint is registered (next stage).
+
+### Stage 1 — Automated (Claude runs these once the test key is set)
+
+These are scripted, listed here so you know what's happening:
+1. `STRIPE_SECRET_KEY=sk_test_… node functions/scripts/stripe-setup.mjs` → creates the **Blue Seal Pro** product, the **$29/mo + $290/yr CAD** prices, and the **Customer Portal** config (cancel-at-period-end, update card, switch monthly↔annual). Prints `STRIPE_PRICE_PRO_MONTHLY` / `STRIPE_PRICE_PRO_ANNUAL` → set as functions runtime **env params** (not secrets).
+2. Deploy the functions (this is the Pro 3 / Pro 5 deploy that un-comments the Stripe exports), then re-run the script with `WEBHOOK_URL=<deployed stripeWebhook URL>` → registers the **one** webhook endpoint with the full event set (Connect + payment-intent + charge/dispute/payout + `checkout.session.completed` + `customer.subscription.*` + `invoice.payment_failed`) and prints the signing secret → `firebase functions:secrets:set STRIPE_WEBHOOK_SECRET` → redeploy `stripeWebhook`.
+3. Run the existing `backfillPayoutsField` migration (see the Connect section above).
+
+#### [ ] Configure subscription lifecycle (dashboard-only — you do this once)
+- **What:** Dashboard → Settings → Billing → **Subscriptions and emails**: turn **Smart Retries** ON, and set "after all retries fail" → **Cancel subscription**. (This is what ends our `past_due` grace window — the resulting `customer.subscription.deleted` webhook flips the tradesperson out of Pro.) Optionally enable the trial-ending reminder email.
+- **Verify:** The retry schedule shows "then cancel".
+
+### Stage 2 — Go live (only after the full sandbox matrix passes)
+
+#### [ ] Activate the Stripe account for live payments
+- **What:** Complete business details + KYC; add Blue Seal's bank account (this is where the service-fee + subscription revenue settles); set the platform **statement descriptor** to `BLUESEAL` (Settings → Business → Public details) so card statements read `BLUESEAL* <tradie>`. Complete the **live-mode** Connect platform profile + agreements.
+- **Verify:** Dashboard shows "Payments: active" and Connect "Live: Yes".
+
+#### [ ] Swap to live keys + re-run the script in live mode
+- **What:** Hand Claude the live keys (`sk_live_…` → `STRIPE_SECRET_KEY` secret; `pk_live_…` → `.env.production` `VITE_STRIPE_PUBLISHABLE_KEY`). Claude re-runs `stripe-setup.mjs` against the live key (product/prices/portal/webhook) and sets the live env params + webhook secret, then deploys functions + hosting.
+- **Verify:** A small real card payment ($2–5 invoice) clears end-to-end and refunds from the dashboard; a real Pro checkout on your own card starts a trial ($0 charged) and cancels cleanly in the portal.
+
+#### [ ] Legal sign-off (gates public LAUNCH, not the code) — see PROFESSIONAL_TASKS / MONETIZATION.md Phase 0
+- GST/PST treatment of the service fee + the $29 subscription (BC: 5% GST + 7% PST — is the platform a marketplace facilitator obligated to collect?).
+- ToS update: in-app-payment + capped service-fee disclosure (fee-payer + that it's avoidable via offline payment), subscription auto-renewal terms (BC consumer rules), 30-day trial terms, and the "Featured" paid-placement disclosure.
+- FINTRAC/MSB comfort: Stripe Connect holds the funds (not Blue Seal) — defensible "not an MSB", but get the fintech/AML lawyer's confirmation in writing.
+
+#### [ ] Run the founding-member comp grants (after Pro 5 ships, before the AI gate in Pro 7)
+- **What:** Admin console → user search → each verified Okanagan tradesperson → **Blue Seal Pro (founding comp) → Grant 3 months**. (Backed by the `adminGrantFoundingPro` callable; sets `proCompUntil` with no Stripe involved.) Message them "Founding Tradesperson — 3 months of Blue Seal Pro on us." Do this BEFORE the AI gate deploys so nobody loses the assistant.
+- **Verify:** The granted tradesperson's `tradespeople/{uid}.isPro` is `true`; their AI assistant stays unlocked after Pro 7.
+
+---
+
 ## AI assistant chatbot (added 2026-05-22)
 
 Floating-panel assistant for tradespeople + admins. Backend lives in [functions/src/ai/chat.ts](functions/src/ai/chat.ts), conversations persist under `assistantConversations/{id}/messages/`. Runs on Vertex AI Gemini 2.5 Flash (same auth path as the existing `aiDiagnose` tools — no API keys needed once the API is enabled).
