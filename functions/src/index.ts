@@ -142,6 +142,9 @@ export { scheduledProspectExpiry } from "./prospects/scheduledProspectExpiry";
 // Messaging (WhatsApp Cloud API queue processor)
 export { processWhatsAppMessage } from "./messaging/processWhatsAppMessage";
 
+// Diagnostics — client-side error telemetry for in-app admin visibility.
+export { reportClientError } from "./diagnostics/reportClientError";
+
 // Google Business Profile — opt-in OAuth connect for verified tradespeople to
 // surface their Google reviews on their public profile. Degrades gracefully:
 // the callables throw "not configured" and the scheduled sync no-ops until the

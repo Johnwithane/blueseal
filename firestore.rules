@@ -823,13 +823,19 @@ service cloud.firestore {
         || isAdmin()
       );
       // Identity fields locked post-create so a party can't boot the other side.
+      // awayAlertAt is the server-managed email/push debounce (onMessageCreated,
+      // admin SDK) — pin it so a party can't suppress the other side's
+      // out-of-app alerts. `.get(…, null)` defaults legacy chats without it.
       allow update: if isSignedIn()
         && (resource.data.clientId == uid()
             || resource.data.tradespersonId == uid()
             || isAdmin())
         && request.resource.data.clientId == resource.data.clientId
         && request.resource.data.tradespersonId == resource.data.tradespersonId
-        && request.resource.data.jobId == resource.data.jobId;
+        && request.resource.data.jobId == resource.data.jobId
+        && (isAdmin()
+            || request.resource.data.get('awayAlertAt', null)
+                == resource.data.get('awayAlertAt', null));
       allow create: if isSignedIn()
         && (request.resource.data.clientId == uid()
             || request.resource.data.tradespersonId == uid());
@@ -1182,6 +1188,16 @@ service cloud.firestore {
     match /auditLog/{entryId} {
       allow read: if isAdmin();
       allow create, update, delete: if false;
+    }
+
+    // ---------- client error telemetry (write via the reportClientError
+    // callable using the Admin SDK; admin read; admin may only toggle the
+    // `resolved` flag — no client create/delete) ----------
+    match /errorLogs/{errorId} {
+      allow read: if isAdmin();
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['resolved']);
+      allow create, delete: if false;
     }
 
     // ---------- mail (Firebase Trigger Email extension; server-only) ----------

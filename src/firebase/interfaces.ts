@@ -1863,6 +1863,28 @@ export interface AuditLogDoc {
 }
 
 // ---------------------------------------------------------------------------
+// errorLogs/{errorId} — client-side error telemetry. Written only by the
+// reportClientError callable (Admin SDK); admins read the queue and may toggle
+// `resolved`. Gives admins in-app visibility into errors users actually hit
+// (e.g. a failed form submit) instead of only Cloud Functions logs buried in
+// the GCP console. uid is null for errors that fired before sign-in.
+// ---------------------------------------------------------------------------
+export type ErrorLogSource = "vue" | "window" | "unhandledrejection" | "manual";
+
+export interface ErrorLogDoc {
+  uid: string | null;
+  message: string;
+  stack: string | null;
+  source: ErrorLogSource;
+  context: string | null;
+  route: string | null;
+  userAgent: string | null;
+  appVersion: string | null;
+  resolved: boolean;
+  createdAt: Timestamp;
+}
+
+// ---------------------------------------------------------------------------
 // siteContent/{docId} — admin-editable site copy. World-readable, admin-only
 // write. Today this holds homepage testimonials; future content blocks
 // (banner copy, FAQ entries, etc.) get added as new fields on the same

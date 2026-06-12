@@ -199,6 +199,9 @@ onMounted(async () => {
       <RouterLink to="/admin/support">
         <Button label="Support" icon="pi pi-question-circle" outlined size="small" />
       </RouterLink>
+      <RouterLink to="/admin/errors">
+        <Button label="Errors" icon="pi pi-flag" outlined size="small" />
+      </RouterLink>
     </Teleport>
 
     <div class="grid sm:grid-cols-3 gap-4 mb-6">
