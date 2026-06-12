@@ -14,10 +14,17 @@
 // behavior changes into already-running code.
 
 import Stripe from "stripe";
-import { defineSecret } from "firebase-functions/params";
+import { defineSecret, defineString } from "firebase-functions/params";
 
 export const STRIPE_SECRET_KEY = defineSecret("STRIPE_SECRET_KEY");
 export const STRIPE_WEBHOOK_SECRET = defineSecret("STRIPE_WEBHOOK_SECRET");
+
+// Blue Seal Pro price ids (the Stripe Price objects created by
+// functions/scripts/stripe-setup.mjs). Non-secret config — set on the functions
+// runtime (functions/.env locally; the deploy bakes them in). These are
+// account-specific, so they differ between the test and live Stripe accounts.
+export const STRIPE_PRICE_PRO_MONTHLY = defineString("STRIPE_PRICE_PRO_MONTHLY");
+export const STRIPE_PRICE_PRO_ANNUAL = defineString("STRIPE_PRICE_PRO_ANNUAL");
 
 // NOTE: the old flat 12% commission (PLATFORM_FEE_BPS) is gone. The platform
 // take is now the Blue Seal service fee — 5% of the invoice, $2 floor, capped

@@ -39,6 +39,11 @@ import {
 } from "./handlers/upfrontFee";
 import { handleChargeRefunded } from "./handlers/chargeRefunded";
 import {
+  handleCheckoutSessionCompleted,
+  handleSubscriptionChanged,
+  handleSubscriptionInvoicePaymentFailed,
+} from "./handlers/subscription";
+import {
   handleChargeDisputeClosed,
   handleChargeDisputeCreated,
 } from "./handlers/chargeDispute";
@@ -50,10 +55,13 @@ import {
 import type {
   StripeAccount,
   StripeCharge,
+  StripeCheckoutSession,
   StripeDispute,
   StripeEvent,
+  StripeInvoice,
   StripePaymentIntent,
   StripePayout,
+  StripeSubscription,
 } from "./handlers/shared";
 
 export const stripeWebhook = onRequest(
@@ -194,6 +202,22 @@ export const stripeWebhook = onRequest(
             event.data.object as StripePayout,
             event.account ?? null,
             event.id,
+          );
+          break;
+        // Blue Seal Pro subscription lifecycle.
+        case "checkout.session.completed":
+          await handleCheckoutSessionCompleted(
+            event.data.object as StripeCheckoutSession,
+          );
+          break;
+        case "customer.subscription.created":
+        case "customer.subscription.updated":
+        case "customer.subscription.deleted":
+          await handleSubscriptionChanged(event.data.object as StripeSubscription);
+          break;
+        case "invoice.payment_failed":
+          await handleSubscriptionInvoicePaymentFailed(
+            event.data.object as StripeInvoice,
           );
           break;
         default:

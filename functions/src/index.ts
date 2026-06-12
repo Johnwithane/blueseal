@@ -111,6 +111,9 @@ export { createConnectLoginLink } from "./payments/createConnectLoginLink";
 export { stripeWebhook } from "./payments/stripeWebhook";
 export { createInvoicePaymentIntent } from "./payments/createInvoicePaymentIntent";
 export { createUpfrontFeePaymentIntent } from "./payments/createUpfrontFeePaymentIntent";
+// Blue Seal Pro subscription (Stripe Billing).
+export { createSubscriptionCheckout } from "./payments/createSubscriptionCheckout";
+export { createBillingPortalSession } from "./payments/createBillingPortalSession";
 export { backfillPayoutsField } from "./payments/backfillPayoutsField";
 // Blue Seal Pro — flips tradespeople/{uid}.isPro back when a founding-member
 // comp (subscription.proCompUntil) lapses. No Stripe binding; safe to deploy

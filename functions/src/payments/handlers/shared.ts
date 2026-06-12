@@ -82,6 +82,38 @@ export interface StripePayout {
   metadata?: Record<string, string> | null;
 }
 
+// Blue Seal Pro subscription slices.
+export interface StripeSubscriptionItemPrice {
+  id: string;
+  recurring?: { interval?: string | null } | null;
+}
+
+export interface StripeSubscription {
+  id: string;
+  status: string; // trialing | active | past_due | canceled | unpaid | incomplete | incomplete_expired
+  customer: string | { id: string };
+  cancel_at_period_end?: boolean | null;
+  current_period_end?: number | null; // unix seconds
+  trial_end?: number | null; // unix seconds
+  items?: { data: Array<{ price: StripeSubscriptionItemPrice }> } | null;
+  metadata?: Record<string, string> | null;
+}
+
+export interface StripeCheckoutSession {
+  id: string;
+  mode?: string | null;
+  customer?: string | { id: string } | null;
+  subscription?: string | { id: string } | null;
+  metadata?: Record<string, string> | null;
+}
+
+export interface StripeInvoice {
+  id: string;
+  customer?: string | { id: string } | null;
+  subscription?: string | { id: string } | null;
+  billing_reason?: string | null;
+}
+
 export interface StripeEvent {
   id: string;
   type: string;
