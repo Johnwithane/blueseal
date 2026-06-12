@@ -9,9 +9,13 @@ const router = useRouter();
 
 onMounted(async () => {
   if (!auth.ready) await auth.init();
-  if (auth.isAdmin) router.replace({ name: "AdminDashboard" });
-  else if (auth.isTradie) router.replace({ name: "TradieDashboard" });
-  else if (auth.isClient) router.replace({ name: "ClientDashboard" });
+  // Forward the query so deep links survive the role redirect — e.g. the
+  // side-panel "Clients" button hits /dashboard?view=clients, and the tradie
+  // dashboard needs ?view=clients to open on the Clients tab.
+  const query = router.currentRoute.value.query;
+  if (auth.isAdmin) router.replace({ name: "AdminDashboard", query });
+  else if (auth.isTradie) router.replace({ name: "TradieDashboard", query });
+  else if (auth.isClient) router.replace({ name: "ClientDashboard", query });
   else router.replace({ name: "Home" });
 });
 </script>
