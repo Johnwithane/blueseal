@@ -9,7 +9,7 @@ import StepPanels from "primevue/steppanels";
 import StepPanel from "primevue/steppanel";
 import Textarea from "primevue/textarea";
 import InputText from "primevue/inputtext";
-import InputNumber from "primevue/inputnumber";
+import NumberField from "@/components/NumberField.vue";
 import Select from "primevue/select";
 import MultiSelect from "primevue/multiselect";
 import ToggleSwitch from "primevue/toggleswitch";
@@ -1145,7 +1145,7 @@ async function withdrawForEdits() {
                 <label class="text-sm font-medium">Years of experience</label>
                 <div v-for="t in trades()" :key="t" class="flex items-center gap-3">
                   <span class="w-32 text-sm">{{ TRADES.find((x) => x.key === t)?.label ?? t }}</span>
-                  <InputNumber
+                  <NumberField
                     v-model="yearsByTrade[t]"
                     :min="0"
                     :max="80"
@@ -1188,7 +1188,7 @@ async function withdrawForEdits() {
               </div>
               <div v-if="pricingModel !== 'quote'" data-field="hourlyRate">
                 <label class="text-sm font-medium">Hourly rate (CAD)</label>
-                <InputNumber
+                <NumberField
                   v-model="hourlyRateDollars"
                   mode="currency"
                   currency="CAD"
@@ -1202,7 +1202,7 @@ async function withdrawForEdits() {
                   Travel rate (CAD)
                   <span class="bs-label-optional">Optional</span>
                 </label>
-                <InputNumber
+                <NumberField
                   v-model="travelRateDollars"
                   mode="currency"
                   currency="CAD"

@@ -2,7 +2,7 @@
 import { onMounted, ref } from "vue";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
-import InputNumber from "primevue/inputnumber";
+import NumberField from "@/components/NumberField.vue";
 import Select from "primevue/select";
 import Tag from "primevue/tag";
 import Message from "primevue/message";
@@ -230,7 +230,7 @@ async function onWsibFile(e: Event) {
           <div class="bs-form mt-3 grid sm:grid-cols-2 gap-2">
             <InputText v-model="insurer" placeholder="Insurer (e.g. Zensurance, APOLLO)" />
             <InputText v-model="policyNumber" placeholder="Policy number" />
-            <InputNumber
+            <NumberField
               v-model="coverageAmount"
               :min="100_000_000"
               :max="1_000_000_000"

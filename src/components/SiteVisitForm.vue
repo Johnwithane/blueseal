@@ -6,7 +6,7 @@
 // fee line ($0 = free visit), an optional proposed date and an optional note.
 import { computed, ref, watch } from "vue";
 import InputText from "primevue/inputtext";
-import InputNumber from "primevue/inputnumber";
+import NumberField from "@/components/NumberField.vue";
 import Textarea from "primevue/textarea";
 
 export interface SiteVisitFormState {
@@ -60,7 +60,7 @@ watch(
     <div class="grid grid-cols-2 gap-3">
       <div>
         <label class="block text-sm font-medium mb-1">Visit fee</label>
-        <InputNumber
+        <NumberField
           v-model="amountDollars"
           mode="currency"
           currency="CAD"
@@ -75,7 +75,7 @@ watch(
       </div>
       <div>
         <label class="block text-sm font-medium mb-1">Tax %</label>
-        <InputNumber
+        <NumberField
           v-model="taxPercent"
           :min="0"
           :max="50"

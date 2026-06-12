@@ -2,7 +2,7 @@
 import { computed } from "vue";
 import InputText from "primevue/inputtext";
 import Textarea from "primevue/textarea";
-import InputNumber from "primevue/inputnumber";
+import NumberField from "@/components/NumberField.vue";
 import Select from "primevue/select";
 import MultiSelect from "primevue/multiselect";
 import SelectButton from "primevue/selectbutton";
@@ -63,7 +63,7 @@ function booleanValue(v: unknown): boolean | undefined {
       </template>
 
       <template v-else-if="f.type === 'number'">
-        <InputNumber
+        <NumberField
           :model-value="safe[f.key] as number"
           :disabled="props.readonly"
           class="mt-1 w-full"

@@ -3,7 +3,7 @@ import { onMounted, onUnmounted, ref, watch, computed } from "vue";
 import { useRouter } from "vue-router";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
-import InputNumber from "primevue/inputnumber";
+import NumberField from "@/components/NumberField.vue";
 import Textarea from "primevue/textarea";
 import Select from "primevue/select";
 import DatePicker from "primevue/datepicker";
@@ -580,7 +580,7 @@ async function submit() {
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
           <div>
             <label class="text-xs">Min</label>
-            <InputNumber
+            <NumberField
               v-model="budgetMin"
               mode="currency"
               currency="CAD"
@@ -593,7 +593,7 @@ async function submit() {
           </div>
           <div>
             <label class="text-xs">Max</label>
-            <InputNumber
+            <NumberField
               v-model="budgetMax"
               mode="currency"
               currency="CAD"
