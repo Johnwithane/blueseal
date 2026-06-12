@@ -723,6 +723,13 @@ const faqs: FaqItem[] = [
     audience: "tradesperson",
   },
   {
+    question: "Can I hide my profile or take myself out of search?",
+    answer:
+      "Yes. Go to **Account → Privacy & account → Profile visibility** and turn off **Show my profile in search**. While it's off, clients won't find you in the Find a tradesperson search or browse, and your profile won't be indexed by Google. Your current jobs, invoices, and any direct profile link you've already shared keep working normally — and your verification is untouched, so you're not sent back for review. Switch it back on anytime to be listed again. Your profile is public by default.",
+    categoryId: "for-tradespeople",
+    audience: "tradesperson",
+  },
+  {
     question: "How do jobs reach me?",
     answer:
       "Two ways: **direct requests** from clients who find your profile, and the **job board**, where you browse postings in your trade and area and apply. Track everything you've applied to under My applications.",

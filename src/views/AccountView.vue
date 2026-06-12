@@ -38,6 +38,7 @@ import {
   getTradesperson,
   getTradespersonContact,
   setContactInfo,
+  setDiscoverable,
   setLocation,
 } from "@/firebase/services/tradespeople";
 import { setInvoiceNumbering } from "@/firebase/services/billing";
@@ -210,6 +211,37 @@ async function onPushToggle(value: unknown) {
   }
 }
 
+// Profile visibility (tradesperson). Owner-controlled "show me in search"
+// switch — applies immediately (like push) rather than via a Save button, so
+// hiding/relisting is one tap. `true` = listed/public (the default); reflects
+// tradie.discoverable where `undefined` means listed. Independent of vetting:
+// turning this off doesn't change isVisible or pull the profile back into
+// review. Optimistically updates the toggle + cached doc, reverting on error.
+const discoverableOn = ref(true);
+const savingDiscoverable = ref(false);
+
+async function onDiscoverableToggle(value: unknown) {
+  if (!auth.fbUser || savingDiscoverable.value) return;
+  const next = value === true;
+  savingDiscoverable.value = true;
+  try {
+    await setDiscoverable(auth.fbUser.uid, next);
+    discoverableOn.value = next;
+    if (tradie.value) tradie.value.discoverable = next;
+    toast.success(
+      next ? "Profile is public" : "Profile hidden",
+      next
+        ? "Clients can find you in search again."
+        : "You're hidden from search. Existing jobs and shared links still work.",
+    );
+  } catch (e) {
+    discoverableOn.value = !next;
+    toast.error("Couldn't update profile visibility", humanizeError(e));
+  } finally {
+    savingDiscoverable.value = false;
+  }
+}
+
 // Tab navigation. The active tab is persisted in the URL (?tab=) so reloads
 // and shared links return to the same place. The Tradesperson tab is only
 // shown to users with the tradesperson role; if a non-tradie lands on it via
@@ -371,6 +403,8 @@ onMounted(async () => {
     if (t) {
       companyName.value = t.companyName ?? "";
       languages.value = Array.isArray(t.languages) ? [...t.languages] : [];
+      // `undefined` (pre-cutover docs) counts as listed/public.
+      discoverableOn.value = t.discoverable !== false;
       companyLogoUrl.value = t.companyLogoUrl ?? null;
       invoicePrefix.value = t.invoicePrefix ?? "INV";
       quotePrefix.value = t.quotePrefix ?? "Q";
@@ -1545,6 +1579,45 @@ async function grantAllTrades() {
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- Profile visibility (tradesperson) — owner-controlled listing switch.
+           Distinct from vetting/isVisible: hiding here just removes you from
+           client search, it doesn't pull you back into review. -->
+      <div v-if="auth.hasTradieRole" class="bs-card mt-4 p-5">
+        <h2 class="text-lg font-semibold">Profile visibility</h2>
+        <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
+          Choose whether clients can find your profile when they search or
+          browse for tradespeople. Public is the default.
+        </p>
+
+        <div
+          class="mt-4 flex items-start justify-between gap-3 rounded-lg border border-[color:var(--bs-border)] p-3"
+        >
+          <div>
+            <div class="font-medium">Show my profile in search</div>
+            <p class="text-xs text-[color:var(--bs-muted)] mt-0.5">
+              When this is off, you won't appear in the Find&nbsp;a&nbsp;tradesperson
+              search or browse, and your profile is hidden from Google. Your
+              current jobs, invoices and any direct link you've already shared
+              keep working — and you can switch back on anytime.
+            </p>
+          </div>
+          <ToggleSwitch
+            v-model="discoverableOn"
+            :disabled="savingDiscoverable"
+            aria-label="Show my profile in search"
+            @update:model-value="onDiscoverableToggle"
+          />
+        </div>
+
+        <p
+          v-if="!discoverableOn"
+          class="mt-2 flex items-center gap-2 text-xs font-medium text-[color:var(--bs-muted)]"
+        >
+          <i class="pi pi-eye-slash"></i>
+          Your profile is hidden — clients can't find you in search right now.
+        </p>
       </div>
 
       <!-- Password -->

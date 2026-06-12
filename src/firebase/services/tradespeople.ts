@@ -162,6 +162,10 @@ export async function createOrUpdateDraft(
     vettingStatus: "draft",
     vettingNotes: "",
     isVisible: false,
+    // Owner-controlled listing switch — public by default. Independent of
+    // isVisible (the server eligibility gate); see TradespersonDoc.discoverable
+    // and setDiscoverable below.
+    discoverable: true,
     weeklyAvailability: emptyAvailability(),
     nextInvoiceNumber: 1,
     nextQuoteNumber: 1,
@@ -246,6 +250,16 @@ export async function setWeeklyAvailability(
   await updateDoc(doc(db, "tradespeople", uid), { weeklyAvailability: availability });
 }
 
+// Owner-controlled "show me in search" switch. `false` takes the tradesperson
+// out of the Find-a-tradesperson search/browse (searchTradespeople filters it
+// out) and marks the public profile noindex — without touching vetting state
+// or the server-managed isVisible gate. Flip it back to `true` to relist.
+// firestore.rules leaves `discoverable` owner-writable (it's not in the
+// server-managed field-lock list), so this is a plain client write.
+export async function setDiscoverable(uid: string, discoverable: boolean): Promise<void> {
+  await updateDoc(doc(db, "tradespeople", uid), { discoverable });
+}
+
 // Capped at 12 in the editor UI — the public profile renders them in a
 // 4-column grid which starts to look crowded above that. Bump if the
 // design changes.
@@ -317,6 +331,14 @@ export async function searchTradespeople(
       if (seen.has(d.id)) continue;
       seen.add(d.id);
       const data = d.data();
+      // Owner has hidden themselves from search (discoverable === false).
+      // Filtered client-side (not in the Firestore query) so a MISSING field
+      // on pre-cutover docs counts as discoverable — `where("discoverable",
+      // "==", true)` would instead drop every un-backfilled tradie. Not a
+      // security boundary (the doc is still readable by direct link); it's the
+      // listing preference, matching the read-gate split documented on
+      // TradespersonDoc.discoverable.
+      if (data.discoverable === false) continue;
       const distKm = distanceBetween(center, [
         data.locationApprox.latitude,
         data.locationApprox.longitude,

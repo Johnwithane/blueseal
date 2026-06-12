@@ -216,6 +216,37 @@ describe("tradespeople — server-managed field locks", () => {
     const fs = env.unauthenticatedContext().firestore();
     await assertSucceeds(getDoc(doc(fs, "tradespeople", TRADIE_UID)));
   });
+
+  // `discoverable` is the owner's "show me in search" switch — deliberately
+  // NOT in the server-managed lock list, so the owner can hide/relist freely.
+  it("owner can hide their profile from search (set discoverable false)", async () => {
+    await seedTradie();
+    const fs = env.authenticatedContext(TRADIE_UID, TRADIE_CLAIMS).firestore();
+    await assertSucceeds(
+      updateDoc(doc(fs, "tradespeople", TRADIE_UID), { discoverable: false }),
+    );
+  });
+
+  it("owner can relist their profile (set discoverable true)", async () => {
+    await seedTradie();
+    const fs = env.authenticatedContext(TRADIE_UID, TRADIE_CLAIMS).firestore();
+    await assertSucceeds(
+      updateDoc(doc(fs, "tradespeople", TRADIE_UID), { discoverable: true }),
+    );
+  });
+
+  // The discoverable switch must NOT become a backdoor onto the server-managed
+  // isVisible gate — flipping isVisible alongside it still has to fail.
+  it("owner cannot ride discoverable to flip isVisible", async () => {
+    await seedTradie();
+    const fs = env.authenticatedContext(TRADIE_UID, TRADIE_CLAIMS).firestore();
+    await assertFails(
+      updateDoc(doc(fs, "tradespeople", TRADIE_UID), {
+        discoverable: false,
+        isVisible: false,
+      }),
+    );
+  });
 });
 
 // tradespeople/{uid}/private/contact — the exact location + (home) address.

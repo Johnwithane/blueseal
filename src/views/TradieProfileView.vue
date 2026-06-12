@@ -133,7 +133,11 @@ const isOwnProfile = computed(
 // or a real person's name on an empty page — in search/LLM results.
 useSeo(() => {
   const t = tradie.value;
-  if (!t || !t.isVisible) {
+  // noindex unless the profile is both eligible (isVisible) AND the owner
+  // hasn't hidden it from search (discoverable !== false). A hidden profile
+  // still renders for someone with the direct link, but we never surface the
+  // person's name in search/LLM results while they're opted out.
+  if (!t || !t.isVisible || t.discoverable === false) {
     return { title: "Tradesperson profile", noindex: true };
   }
   const primaryTrade = tradeLabel(t.trades[0] ?? "");

@@ -281,6 +281,19 @@ export interface TradespersonDoc {
   vettingStatus: VettingStatus;
   vettingNotes: string;
   isVisible: boolean;
+  // OWNER-CONTROLLED listing toggle, distinct from the SERVER-MANAGED
+  // `isVisible` above. `isVisible` is the eligibility gate (true only once the
+  // tradesperson is vetting-approved + ID + cert verified; flipped solely by
+  // the maybeMarkVisible trigger and locked immutable for owners in
+  // firestore.rules). `discoverable` is the tradesperson's own "show me in
+  // search" switch — flip it off to take the profile out of the Find-a-
+  // tradesperson search/browse without touching vetting state. Optional for
+  // back-compat: pre-existing docs lack it, and BOTH the search filter and
+  // readers treat `undefined` as discoverable (public), so no backfill is
+  // needed and the missing field never silently drops a tradie from search.
+  // Hiding only removes you from in-app discovery + search-engine indexing;
+  // a direct profile link you've already shared still resolves.
+  discoverable?: boolean;
   weeklyAvailability: WeeklyAvailability;
   nextInvoiceNumber: number;
   // Mirrors nextInvoiceNumber for the quotes collection. Lazily backfilled
