@@ -464,12 +464,24 @@ export async function markUpfrontFeePaid(jobId: string): Promise<{ ok: true }> {
   return res.data;
 }
 
-/** Client-side "I've paid the upfront fee" signal — same effect as the tradesperson path. */
+/** Client-side "I've paid the upfront fee" nudge — pings the tradesperson to confirm receipt. */
 export async function clientMarkUpfrontFeePaid(jobId: string): Promise<{ ok: true }> {
   const fn = httpsCallable<{ jobId: string }, { ok: true }>(
     functions,
     "clientMarkUpfrontFeePaid",
   );
+  const res = await fn({ jobId });
+  return res.data;
+}
+
+/** Create (or refresh) the Stripe PaymentIntent to pay a job's upfront fee by card. */
+export async function createUpfrontFeePaymentIntent(
+  jobId: string,
+): Promise<{ clientSecret: string | null; serviceFee: { totalFeeCents: number; chargeTotalCents: number; baseAmountCents: number; waived: boolean } }> {
+  const fn = httpsCallable<
+    { jobId: string },
+    { clientSecret: string | null; serviceFee: { totalFeeCents: number; chargeTotalCents: number; baseAmountCents: number; waived: boolean } }
+  >(functions, "createUpfrontFeePaymentIntent");
   const res = await fn({ jobId });
   return res.data;
 }

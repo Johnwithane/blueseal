@@ -296,6 +296,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import("@/views/invoices/InvoiceReceiptView.vue"),
     meta: { requiresAuth: true, role: "any", layout: "app", title: "Receipt" },
   },
+  {
+    path: "/jobs/:id/upfront/pay",
+    name: "UpfrontFeePay",
+    component: () => import("@/views/jobs/UpfrontFeePayView.vue"),
+    meta: { requiresAuth: true, role: "any", layout: "app", title: "Pay upfront fee" },
+  },
 
   // Job-board marketplace
   {

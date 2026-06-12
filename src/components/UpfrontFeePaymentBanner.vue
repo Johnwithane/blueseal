@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { RouterLink } from "vue-router";
 import Button from "primevue/button";
 import { clientMarkUpfrontFeePaid, markUpfrontFeePaid } from "@/firebase/services/jobs";
 import type { JobDoc, WithId } from "@/firebase/interfaces";
@@ -82,15 +83,37 @@ async function onMarkPaid() {
       </p>
     </template>
     <template #actions>
+      <!-- Tradesperson: confirm offline receipt (authoritative). -->
       <Button
-        :label="isTradie ? `Mark received — ${money(amountCents)}` : `I've paid — mark as sent`"
-        :icon="isTradie ? 'pi pi-check' : 'pi pi-send'"
+        v-if="isTradie"
+        :label="`Mark received — ${money(amountCents)}`"
+        icon="pi pi-check"
         severity="success"
         class="w-full"
         :loading="submitting"
         :disabled="submitting || amountCents <= 0"
         @click="onMarkPaid"
       />
+      <!-- Client: pay by card (primary) or report an offline payment. -->
+      <template v-else>
+        <RouterLink :to="`/jobs/${job.id}/upfront/pay`" class="block">
+          <Button
+            :label="`Pay by card — ${money(amountCents)}`"
+            icon="pi pi-credit-card"
+            severity="success"
+            class="w-full"
+            :disabled="amountCents <= 0"
+          />
+        </RouterLink>
+        <button
+          type="button"
+          class="mt-2 w-full text-center text-xs text-[color:var(--bs-muted)] underline"
+          :disabled="submitting"
+          @click="onMarkPaid"
+        >
+          Paid by e-transfer or cash? Let your tradesperson know — no fee
+        </button>
+      </template>
     </template>
   </StatusBanner>
 </template>
