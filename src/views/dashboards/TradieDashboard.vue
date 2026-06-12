@@ -321,27 +321,37 @@ const awaitingVerificationMessage = computed(() => {
       />
     </div>
 
-    <!-- New job (bring your own client) + completed-view toggle, list-view
-         only. New job is vetted-tradie-only — same gate as the callable. -->
+    <!-- New job (bring your own client) + Reports ride the shell's title-row
+         action slot — the same top-of-page spot as the client's "Post a job"
+         — instead of taking a row under the tabs. Vetted-tradie-only (same
+         gate as the New-job callable). Shown across all dashboard views, like
+         the client button, rather than just the list view. -->
+    <Teleport
+      v-if="tradie?.isVisible"
+      defer
+      to="#app-shell-header-action"
+    >
+      <Button
+        label="New job"
+        icon="pi pi-plus"
+        size="small"
+        @click="router.push('/jobs/new')"
+      />
+      <Button
+        label="Reports"
+        icon="pi pi-chart-bar"
+        size="small"
+        text
+        @click="router.push('/reports')"
+      />
+    </Teleport>
+
+    <!-- Completed-view toggle, list view only. Right-aligned on its own row,
+         matching the client dashboard's toggle placement. -->
     <div
       v-if="view === 'list' && tradie?.isVisible"
-      class="mb-3 flex items-center justify-between gap-2"
+      class="mb-3 flex items-center justify-end"
     >
-      <div class="flex items-center gap-2">
-        <Button
-          label="New job"
-          icon="pi pi-plus"
-          size="small"
-          @click="router.push('/jobs/new')"
-        />
-        <Button
-          label="Reports"
-          icon="pi pi-chart-bar"
-          size="small"
-          text
-          @click="router.push('/reports')"
-        />
-      </div>
       <Button
         :label="showCompleted ? 'Back to active jobs' : 'View completed'"
         :icon="showCompleted ? 'pi pi-arrow-left' : 'pi pi-check-circle'"

@@ -37,7 +37,8 @@ function prefix(path: string) {
 // Excludes /jobs/post and /jobs/browse, which have their own nav items.
 function jobsMatcher(r: RouteLocationNormalizedLoaded): boolean {
   if (r.path === "/dashboard" || r.path.startsWith("/dashboard/")) return true;
-  if (r.path === "/jobs/post" || r.path === "/jobs/browse") return false;
+  if (r.path === "/jobs/post" || r.path === "/jobs/browse" || r.path === "/jobs/new")
+    return false;
   return r.path.startsWith("/jobs/");
 }
 
@@ -83,6 +84,17 @@ export function useNavItems(): {
           mobile: true,
           matches: jobsMatcher,
         },
+        // Bring-your-own-client job creation. Mirrors the title-row "New job"
+        // button on the dashboard; desktop side-panel only (`mobile: false`)
+        // so the mobile bottom bar stays Jobs → Browse → Alerts → Profile.
+        {
+          key: "new-job",
+          label: "New job",
+          icon: "pi-plus",
+          to: "/jobs/new",
+          mobile: false,
+          matches: exact("/jobs/new"),
+        },
         {
           key: "browse",
           label: "Browse jobs",
@@ -116,6 +128,16 @@ export function useNavItems(): {
           to: "/account/recommendations",
           mobile: false,
           matches: exact("/account/recommendations"),
+        },
+        // Earnings / job reports. Desktop side-panel only, like the dashboard
+        // header button it mirrors.
+        {
+          key: "reports",
+          label: "Reports",
+          icon: "pi-chart-bar",
+          to: "/reports",
+          mobile: false,
+          matches: exact("/reports"),
         },
         // Account + Payouts moved into ProfileMenu (avatar at bottom of side
         // panel / Profile tab on mobile). The standalone /account and
