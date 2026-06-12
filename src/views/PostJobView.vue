@@ -18,6 +18,7 @@ import { firstMissingRequired, pickIntakeAnswers } from "@/utils/intake";
 import { uploadFile } from "@/firebase/services/storage";
 import { createJobPost } from "@/firebase/services/jobPosts";
 import { useGoogleMaps } from "@/composables/useGoogleMaps";
+import { useFormErrors } from "@/composables/useFormErrors";
 import { useToast } from "@/composables/useToast";
 import { usePushPrompt } from "@/composables/usePushPrompt";
 import { humanizeError } from "@/utils/errors";
@@ -27,6 +28,7 @@ import type { IntakeField, Urgency } from "@/firebase/interfaces";
 import type { TradeSuggestion } from "@/data/tradeKeywords";
 import TradeDescribeBox from "@/components/TradeDescribeBox.vue";
 import FormErrorBanner from "@/components/FormErrorBanner.vue";
+import FieldError from "@/components/FieldError.vue";
 import IntakeFormRenderer from "@/components/IntakeFormRenderer.vue";
 import RebateMatchPanel from "@/components/RebateMatchPanel.vue";
 import { useSeo } from "@/composables/useSeo";
@@ -43,6 +45,17 @@ const router = useRouter();
 const auth = useAuthStore();
 const toast = useToast();
 const { maybePromptForPush } = usePushPrompt();
+
+// Field-level validation errors (rendered under each field) + scroll-to-first.
+// `error` (above) stays for general submit/network failures shown by the banner.
+const {
+  errors,
+  clear: clearErrors,
+  set: setError,
+  setFromZod,
+  has: hasErrors,
+  focusFirst,
+} = useFormErrors();
 
 const DRAFT_KEY = "jobPostDraft";
 
@@ -303,16 +316,21 @@ const previewBudget = computed(() => {
   return `${fmt(budgetMin.value)}–${fmt(budgetMax.value)}`;
 });
 
+// On-screen order of the fields, so focusFirst() always jumps to the topmost
+// problem after a failed submit.
+const FIELD_ORDER = ["trade", "title", "description", "intake", "budget", "address", "photos"];
+
 // Coordinates normally come from picking a Google suggestion. But browser
 // autofill — and typing/editing the fields by hand — fills the address text
 // without ever firing `place_changed`, so lat/lng stay null even though the
 // address looks complete. Geocode the typed address as a fallback before
-// blocking submit, so a saved/autofilled address still maps the job.
-async function ensureCoordinates(): Promise<boolean> {
-  if (lat.value != null && lng.value != null) return true;
+// blocking submit, so a saved/autofilled address still maps the job. Sets the
+// "address" field error (not a banner) if it can't resolve a point.
+async function ensureCoordinates(): Promise<void> {
+  if (lat.value != null && lng.value != null) return;
   if (!addressLine1.value.trim() || !city.value.trim()) {
-    error.value = "Enter your street address and city so we can map your job.";
-    return false;
+    setError("address", "Enter your street address and city so we can map your job.");
+    return;
   }
   geocoding.value = true;
   try {
@@ -322,13 +340,14 @@ async function ensureCoordinates(): Promise<boolean> {
       .join(", ");
     const geo = await useGoogleMaps().geocodeAddress(full);
     if (!geo) {
-      error.value =
-        "We couldn't pinpoint that address. Double-check it, or start typing it and pick from the suggestions.";
-      return false;
+      setError(
+        "address",
+        "We couldn't pinpoint that address. Double-check it, or start typing it and pick from the suggestions.",
+      );
+      return;
     }
     lat.value = geo.lat;
     lng.value = geo.lng;
-    return true;
   } finally {
     geocoding.value = false;
   }
@@ -336,24 +355,31 @@ async function ensureCoordinates(): Promise<boolean> {
 
 async function submit() {
   error.value = null;
+  clearErrors();
   if (submitting.value || geocoding.value) return;
-  if (photos.value.length === 0) {
-    error.value = "Add at least one photo of the job or area.";
-    return;
-  }
-  if (!(await ensureCoordinates())) return;
-  // ensureCoordinates guarantees both are set on success; this also narrows
-  // lat/lng from `number | null` to `number` for the payload below.
-  if (lat.value == null || lng.value == null) return;
-  if (budgetMin.value == null || budgetMax.value == null) {
-    error.value = "Enter a budget range.";
-    return;
-  }
+
+  // Collect every field problem first, then jump the user to the topmost one
+  // (errors render under their own field, not in one banner up top).
+  if (!trade.value) setError("trade", "Pick the trade you need.");
+  if (!title.value.trim()) setError("title", "Add a title.");
+  if (!description.value.trim()) setError("description", "Add a description.");
   const missingDetail = firstMissingRequired(intakeFields.value, intakeData.value);
-  if (missingDetail) {
-    error.value = `Please answer: "${missingDetail}"`;
+  if (missingDetail) setError("intake", `Please answer: "${missingDetail}"`);
+  if (budgetMin.value == null || budgetMax.value == null) {
+    setError("budget", "Enter a budget range.");
+  } else if (budgetMax.value < budgetMin.value) {
+    setError("budget", "Max budget must be at least the min.");
+  }
+  if (photos.value.length === 0) setError("photos", "Add at least one photo of the job or area.");
+  await ensureCoordinates();
+
+  if (hasErrors()) {
+    await focusFirst(FIELD_ORDER);
     return;
   }
+  // No address error means coordinates resolved; this also narrows lat/lng to
+  // `number` for the payload below.
+  if (lat.value == null || lng.value == null) return;
 
   // Auth gate: if not signed in, draft is already persisted — bounce to sign-in.
   // Photos are NOT in the draft (Files don't survive JSON.stringify), so say so
@@ -419,7 +445,15 @@ async function submit() {
 
     const parsed = createJobPostSchema.safeParse(payload);
     if (!parsed.success) {
-      error.value = parsed.error.issues[0]?.message ?? "Check the form for errors.";
+      // Route each Zod issue to its on-screen field, then jump to the first.
+      setFromZod(parsed.error, (path) => {
+        const head = String(path[0] ?? "form");
+        if (head === "addressPublic" || head === "addressPrivate") return "address";
+        if (head === "intakeFormData") return "intake";
+        return head;
+      });
+      submitting.value = false;
+      await focusFirst(FIELD_ORDER);
       return;
     }
 
@@ -477,7 +511,7 @@ async function submit() {
 
       <div class="bs-describe-divider my-1"><span>or fill it in yourself</span></div>
 
-      <div>
+      <div data-field="trade">
         <label class="text-sm font-medium">What trade do you need?</label>
         <Select
           v-model="trade"
@@ -486,20 +520,24 @@ async function submit() {
           option-value="value"
           placeholder="Choose a trade"
           class="mt-1 w-full"
+          :invalid="!!errors.trade"
         />
+        <FieldError :message="errors.trade" />
       </div>
 
-      <div>
+      <div data-field="title">
         <label class="text-sm font-medium">Job title</label>
         <InputText
           v-model="title"
           placeholder="e.g. Replace dripping kitchen tap"
           maxlength="100"
           class="mt-1 w-full"
+          :invalid="!!errors.title"
         />
+        <FieldError :message="errors.title" />
       </div>
 
-      <div>
+      <div data-field="description">
         <label class="text-sm font-medium">Describe the job</label>
         <Textarea
           v-model="description"
@@ -507,22 +545,25 @@ async function submit() {
           maxlength="2000"
           placeholder="Anticipate what tradespeople will need to know to quote: what's wrong, when it started, anything you've tried…"
           class="mt-1 w-full"
+          :invalid="!!errors.description"
         />
         <div class="text-xs text-[color:var(--bs-muted)] mt-1">
           {{ description.length }} / 2000
         </div>
+        <FieldError :message="errors.description" />
       </div>
 
       <!-- Trade-specific questionnaire. Appears once a trade with a defined
            schema is chosen; the answers ride along on the post so applicants
            can quote accurately without back-and-forth. -->
-      <fieldset v-if="intakeFields.length">
+      <fieldset v-if="intakeFields.length" data-field="intake">
         <legend class="text-sm font-medium">{{ tradeLabel(trade) }} details</legend>
         <p class="text-xs text-[color:var(--bs-muted)] mt-1">
           Answer these so tradespeople can quote accurately. Required fields are marked
           <span class="text-[color:var(--bs-danger)]">*</span>.
         </p>
         <IntakeFormRenderer v-model="intakeData" :fields="intakeFields" class="mt-3" />
+        <FieldError :message="errors.intake" />
       </fieldset>
 
       <!-- Government / utility rebates that may apply to this kind of work.
@@ -531,7 +572,7 @@ async function submit() {
            eligibility; each program links to its official source. -->
       <RebateMatchPanel v-if="trade" :trade="trade" :region="region" />
 
-      <fieldset>
+      <fieldset data-field="budget">
         <legend class="text-sm font-medium">Budget range (CAD)</legend>
         <div v-if="budgetHint" class="text-xs text-[color:var(--bs-muted)] mt-1">
           <i class="pi pi-info-circle mr-1"></i>{{ budgetHint }}
@@ -564,9 +605,10 @@ async function submit() {
             />
           </div>
         </div>
+        <FieldError :message="errors.budget" />
       </fieldset>
 
-      <fieldset>
+      <fieldset data-field="address">
         <legend class="text-sm font-medium">Address</legend>
         <p class="text-xs text-[color:var(--bs-muted)] mt-1">
           Only the chosen tradesperson sees your exact address — everyone else sees just your city and the first 3 chars of your postal code.
@@ -606,6 +648,7 @@ async function submit() {
             autocomplete="postal-code"
           />
         </div>
+        <FieldError :message="errors.address" />
       </fieldset>
 
       <div>
@@ -633,8 +676,9 @@ async function submit() {
         </div>
       </fieldset>
 
-      <div>
+      <div data-field="photos">
         <label class="text-sm font-medium">Photos (1–8 required)</label>
+        <FieldError :message="errors.photos" />
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
           <div
             v-for="(p, idx) in photos"
