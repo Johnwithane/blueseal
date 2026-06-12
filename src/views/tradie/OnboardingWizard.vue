@@ -212,6 +212,47 @@ const canSubmit = computed(
     stepCompleted.value[5],
 );
 
+// Plain-language list of what's still missing on the Documents step (a cert
+// per trade + government ID). Drives the "Next: Submit" button so a not-ready
+// button explains itself when pressed instead of sitting there greyed out.
+const documentBlockers = computed<string[]>(() => {
+  const out: string[] = [];
+  if (tradesToCert.value.length === 0) {
+    out.push("Pick at least one trade on the Trades step");
+  }
+  for (const t of tradesToCert.value) {
+    if (!certifiedTradeKeys.value.has(t)) {
+      out.push(`Add a certificate for ${tradeLabelFor(t)} (or declare no formal certification)`);
+    }
+  }
+  if (idStatus.value === "none") {
+    out.push("Upload a photo of your government ID");
+  }
+  return out;
+});
+
+// Everything blocking final submission, across every required step. Reuses
+// documentBlockers for the Documents portion so the two never drift.
+const submitBlockers = computed<string[]>(() => {
+  const out: string[] = [];
+  if (!stepCompleted.value[0]) out.push("Add your name and a short bio (Basics step)");
+  if (!stepCompleted.value[1]) out.push("Choose your primary trade (Trades step)");
+  if (!stepCompleted.value[2]) out.push("Set your pricing (Pricing step)");
+  if (!stepCompleted.value[3]) out.push("Set your service area (Area step)");
+  out.push(...documentBlockers.value);
+  return out;
+});
+
+// Advance to the Submit step, or — if the Documents step isn't finished —
+// tell the user exactly what's left rather than silently refusing.
+function tryAdvanceToSubmit(advance: () => void) {
+  if (documentBlockers.value.length > 0) {
+    toast.warn("A few things still needed", documentBlockers.value.join(" · "));
+    return;
+  }
+  advance();
+}
+
 function firstIncompleteStep(): string {
   const idx = stepCompleted.value.slice(0, 6).findIndex((done) => !done);
   // All six editable steps complete → land on Submit.
@@ -677,7 +718,7 @@ async function onIdRemoved() {
 
 async function submitApplication() {
   if (!canSubmit.value) {
-    toast.warn("Finish all required steps first");
+    toast.warn("A few things still needed", submitBlockers.value.join(" · "));
     return;
   }
   submitting.value = true;
@@ -1237,8 +1278,8 @@ async function withdrawForEdits() {
                 label="Next: Submit"
                 icon="pi pi-arrow-right"
                 icon-pos="right"
-                :disabled="!allCertsUploaded || idStatus === 'none'"
-                @click="activateCallback('7')"
+                :severity="documentBlockers.length ? 'secondary' : undefined"
+                @click="tryAdvanceToSubmit(() => activateCallback('7'))"
               />
             </div>
           </div>
@@ -1436,7 +1477,10 @@ async function withdrawForEdits() {
               need to make changes.
             </Message>
             <Message v-else-if="!canSubmit" severity="warn" :closable="false">
-              Some required fields are missing. Tap a section above to fix.
+              <div class="font-medium">Before you can submit, you still need to:</div>
+              <ul class="list-disc pl-5 mt-1 space-y-0.5">
+                <li v-for="b in submitBlockers" :key="b">{{ b }}</li>
+              </ul>
             </Message>
 
             <div class="bs-step-nav flex justify-between">
@@ -1446,7 +1490,7 @@ async function withdrawForEdits() {
                 :label="vettingStatus === 'info_requested' ? 'Resubmit for review' : 'Submit for review'"
                 icon="pi pi-send"
                 :loading="submitting"
-                :disabled="!canSubmit"
+                :severity="canSubmit ? undefined : 'secondary'"
                 @click="submitApplication"
               />
             </div>
