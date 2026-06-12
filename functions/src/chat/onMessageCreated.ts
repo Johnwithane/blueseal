@@ -71,7 +71,10 @@ export const onMessageCreated = onDocumentCreated(
     await notify({
       userId: recipient,
       type: "message_received",
-      title: `New message from ${senderName}`,
+      // "{Name} sent you a message" so the email heading splits cleanly into a
+      // name line + action ("Sarah Chen / Sent you a message"), and the subject
+      // line leads with who it's from.
+      title: `${senderName} sent you a message`,
       body: preview,
       link: `/jobs/${chat.jobId}`,
       jobId: chat.jobId,

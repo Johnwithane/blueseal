@@ -77,18 +77,31 @@ export function brandedEmailHtml(opts: BrandedEmailOpts): string {
         `</td></tr></table>`
       : "";
 
-  // Heading — name gets a distinct colour. If the title already contains the
-  // name, recolour it in place; otherwise surface it on its own line above.
+  // Heading — surface the person's NAME on its own line (distinct colour) and
+  // the action below, so it reads "Sarah Chen / Accepted your quote".
+  //  • "Sarah Chen accepted your quote" (starts with the name) → name above,
+  //    "Accepted your quote" below.
+  //  • "Client accepted your quote" (generic noun) → name above, noun dropped.
+  //  • name sits mid-title and can't be split out → recolour it in place.
   const name = opts.actorName?.trim();
-  let titleInner = esc(opts.title);
+  const cap = (s: string): string => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+  const nameDiv = (n: string): string =>
+    `<div style="font-size:15px;font-weight:800;line-height:1.2;color:${MIDBLUE};margin:0 0 3px;">${esc(n)}</div>`;
+
+  let titleText = opts.title;
   let namePrefix = "";
-  if (name) {
-    const en = esc(name);
-    if (titleInner.includes(en)) {
-      titleInner = titleInner.split(en).join(`<span style="color:${MIDBLUE};">${en}</span>`);
-    } else {
-      namePrefix = `<div style="font-size:15px;font-weight:800;line-height:1.2;color:${MIDBLUE};margin:0 0 3px;">${en}</div>`;
-    }
+  if (name && titleText.startsWith(name)) {
+    namePrefix = nameDiv(name);
+    const rest = titleText.slice(name.length).trim();
+    if (rest) titleText = cap(rest);
+  } else if (name && !titleText.includes(name)) {
+    namePrefix = nameDiv(name);
+    const stripped = titleText.replace(/^(client|the tradesperson|someone)\s+/i, "");
+    if (stripped !== titleText && stripped.length > 0) titleText = cap(stripped);
+  }
+  let titleInner = esc(titleText);
+  if (name && !namePrefix && titleInner.includes(esc(name))) {
+    titleInner = titleInner.split(esc(name)).join(`<span style="color:${MIDBLUE};">${esc(name)}</span>`);
   }
   const titleH1 =
     namePrefix +
