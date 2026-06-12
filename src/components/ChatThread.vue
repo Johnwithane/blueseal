@@ -13,6 +13,7 @@ import { uploadFile, makeStoragePath } from "@/firebase/services/storage";
 import { suggestChatReplies } from "@/firebase/services/assistant";
 import type { MessageDoc, WithId } from "@/firebase/interfaces";
 import { useAuthStore } from "@/stores/auth";
+import { useSubscriptionStore } from "@/stores/subscription";
 import { compressToWebp } from "@/utils/image";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
@@ -28,6 +29,7 @@ const props = defineProps<{
 }>();
 
 const auth = useAuthStore();
+const subscription = useSubscriptionStore();
 const toast = useToast();
 
 const messages = ref<WithId<MessageDoc>[]>([]);
@@ -80,6 +82,9 @@ watch(lastMessageId, () => {
 
 const canSuggest = computed(() => {
   if (!props.enableAiReplies || !props.jobId) return false;
+  // AI reply suggestions are a Blue Seal Pro feature (admins always pass).
+  const isAdmin = (auth.roles ?? []).includes("admin");
+  if (!subscription.isPro && !isAdmin) return false;
   const last = messages.value[messages.value.length - 1];
   if (!last) return false;
   if (last.senderId === myUid.value) return false;

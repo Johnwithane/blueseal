@@ -1,14 +1,28 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { RouterLink } from "vue-router";
 import Button from "primevue/button";
 import { useConfirm } from "primevue/useconfirm";
+import { storeToRefs } from "pinia";
 import { useAssistantStore } from "@/stores/assistant";
+import { useSubscriptionStore } from "@/stores/subscription";
+import { useAuthStore } from "@/stores/auth";
 import AssistantThread from "@/components/assistant/AssistantThread.vue";
 import AssistantComposer from "@/components/assistant/AssistantComposer.vue";
 import AssistantQuickPrompts from "@/components/assistant/AssistantQuickPrompts.vue";
 
 const store = useAssistantStore();
 const confirm = useConfirm();
+const auth = useAuthStore();
+const subscription = useSubscriptionStore();
+const { isPro, loaded: subLoaded } = storeToRefs(subscription);
+
+// The AI assistant is a Blue Seal Pro feature. Show a paywall instead of the
+// thread + composer for non-Pro tradespeople (admins always pass; receipt
+// scanning lives elsewhere and stays free). Wait for the subscription state to
+// load so a Pro user never sees a paywall flash.
+const isAdmin = computed(() => (auth.roles ?? []).includes("admin"));
+const gated = computed(() => subLoaded.value && !isPro.value && !isAdmin.value);
 
 const headerTitle = computed(() => {
   // The current thread's title is shown as a small chip below the assistant
@@ -85,9 +99,28 @@ function clearThread() {
       </div>
     </header>
 
-    <AssistantThread class="flex-1 min-h-0" />
-    <AssistantQuickPrompts />
-    <AssistantComposer />
+    <!-- Pro paywall (non-Pro tradespeople) — the FAB stays visible because
+         this panel IS the conversion surface. -->
+    <div v-if="gated" class="flex-1 min-h-0 overflow-auto p-6 flex flex-col items-center justify-center text-center">
+      <i class="pi pi-lock text-3xl text-[color:var(--bs-blue)]"></i>
+      <h3 class="mt-3 text-lg font-semibold">Blue Seal AI is part of Pro</h3>
+      <p class="mt-2 text-sm text-[color:var(--bs-muted)] max-w-xs">
+        Diagnose problems, draft quotes and invoice notes, and summarize jobs —
+        plus a service-fee waiver for your clients and featured placement.
+      </p>
+      <RouterLink to="/pricing" class="mt-5 w-full max-w-xs">
+        <Button label="Start 30-day free trial" icon="pi pi-star" class="w-full" />
+      </RouterLink>
+      <p class="mt-3 text-xs text-[color:var(--bs-muted)]">
+        Receipt scanning stays free — find it on a job's expenses.
+      </p>
+    </div>
+
+    <template v-else>
+      <AssistantThread class="flex-1 min-h-0" />
+      <AssistantQuickPrompts />
+      <AssistantComposer />
+    </template>
   </aside>
 </template>
 

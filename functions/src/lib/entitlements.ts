@@ -1,17 +1,20 @@
 /**
- * Single seam for AI feature entitlement.
+ * Single seam for AI feature entitlement (Blue Seal Pro — MONETIZATION.md).
  *
- * ALL AI features (assistant chat, reply suggestions, receipt OCR, quote /
- * invoice drafting) are slated to become part of a paid subscription
- * (Blue Seal Pro — MONETIZATION.md §3.3, founder-approved 2026-06-03 but NOT
- * yet live). Until it ships, every caller passes — this is deliberately a
- * no-op so launching the plan is a one-file change: look up the caller's
- * subscription here and throw HttpsError("permission-denied", …) per feature.
+ * Gating is LIVE: every AI feature except receipt OCR requires an active Pro
+ * subscription (trialing / active / past_due grace) or an unexpired founding
+ * comp. Receipt OCR stays free forever — it's the free-tier hook. Admins hold
+ * every entitlement. The feature key lets us flip any single feature's tier
+ * later without touching call sites. EVERY AI callable routes through this.
  *
- * The feature key exists so the gate can be flipped per-feature (e.g. receipt
- * OCR may stay on the free tier longer than the drafting tools — that call is
- * made at flip time, not here). EVERY AI callable must route through this.
+ * Throws with the stable `BLUESEAL_PRO_REQUIRED` message token so the client
+ * can tell a paywall from other failed-precondition errors.
  */
+import { HttpsError } from "firebase-functions/v2/https";
+import { Timestamp } from "firebase-admin/firestore";
+import { db } from "./admin";
+import { deriveIsPro, type SubscriptionState } from "./subscription";
+
 export type AiFeature =
   | "chat"
   | "suggestReplies"
@@ -21,10 +24,24 @@ export type AiFeature =
   | "updateJobLog"
   | "legacyTools"; // aiDiagnose/aiQuote/aiSummarize — slated for retirement into chat
 
-export async function requireAiEntitlement(_uid: string, _feature: AiFeature): Promise<void> {
-  // Subscription gating not yet live — see MONETIZATION.md. Intentionally a
-  // no-op; per-call costs are still tracked via the aiUsage collection.
-  return;
+export async function requireAiEntitlement(uid: string, feature: AiFeature): Promise<void> {
+  // Receipt OCR is free for everyone (the time saved is the strongest "aha"
+  // for a free tradesperson evaluating the app). Per-call costs are still
+  // tracked via the rate limiter at the call site.
+  if (feature === "receiptOcr") return;
+
+  const snap = await db.doc(`users/${uid}`).get();
+  const data = snap.data() ?? {};
+  const roles = Array.isArray(data.roles) ? (data.roles as unknown[]) : [];
+  if (roles.includes("admin")) return; // admins hold every entitlement
+
+  const sub = (data.subscription ?? null) as SubscriptionState | null;
+  if (deriveIsPro(sub, Timestamp.now())) return;
+
+  throw new HttpsError(
+    "failed-precondition",
+    "BLUESEAL_PRO_REQUIRED: The AI assistant is part of Blue Seal Pro. Start a free trial to use it.",
+  );
 }
 
 /**
