@@ -3,7 +3,7 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import Dialog from "primevue/dialog";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
-import InputNumber from "primevue/inputnumber";
+import NumberField from "@/components/NumberField.vue";
 import Textarea from "primevue/textarea";
 import SelectButton from "primevue/selectbutton";
 import Message from "primevue/message";
@@ -712,7 +712,7 @@ function close() {
                 maxlength="200"
                 class="w-full text-sm"
               />
-              <InputNumber
+              <NumberField
                 v-model="r.unitPriceDollars"
                 mode="currency"
                 currency="CAD"
@@ -782,7 +782,7 @@ function close() {
               maxlength="200"
               class="finish-sheet-extra-description w-full text-sm"
             />
-            <InputNumber
+            <NumberField
               v-model="r.unitPriceDollars"
               mode="currency"
               currency="CAD"
@@ -822,7 +822,7 @@ function close() {
             <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">
               {{ discountMode === "percent" ? "Percent off" : "Amount off" }}
             </label>
-            <InputNumber
+            <NumberField
               v-model="discountValue"
               :min="0"
               :max="discountMode === 'percent' ? 100 : undefined"

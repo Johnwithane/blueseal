@@ -6,7 +6,7 @@ import { computed, ref, watch } from "vue";
 import Dialog from "primevue/dialog";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
-import InputNumber from "primevue/inputnumber";
+import NumberField from "@/components/NumberField.vue";
 import SelectButton from "primevue/selectbutton";
 import { proposeExtra } from "@/firebase/services/jobExtras";
 import { useFormatters } from "@/composables/useFormatters";
@@ -132,7 +132,7 @@ function close() {
         <label class="mb-1 block text-[11px] text-[color:var(--bs-muted)]" for="co-amount">
           {{ billingType === "hourly" ? "Hourly rate (CAD)" : "Amount (CAD)" }}
         </label>
-        <InputNumber
+        <NumberField
           v-model="amountDollars"
           input-id="co-amount"
           mode="currency"
@@ -148,7 +148,7 @@ function close() {
         <label class="mb-1 block text-[11px] text-[color:var(--bs-muted)]" for="co-est-hours">
           Estimated hours (optional)
         </label>
-        <InputNumber
+        <NumberField
           v-model="estimatedHours"
           input-id="co-est-hours"
           :min="0"

@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
-import InputNumber from "primevue/inputnumber";
+import NumberField from "@/components/NumberField.vue";
 import Tag from "primevue/tag";
 import {
   getInvoice,
@@ -121,7 +121,7 @@ async function setRecurring(freq: RecurringFrequency | "off") {
 // propagate immediately. Null when the tradesperson hasn't uploaded one.
 const tradieLogoUrl = ref<string | null>(null);
 const tradieCompanyName = ref<string | null>(null);
-// UI rows: same shape as LineItem but `unitPrice` is in DOLLARS for InputNumber
+// UI rows: same shape as LineItem but `unitPrice` is in DOLLARS for NumberField
 // currency mode to render correctly. Converted to cents on save. `id` is
 // preserved end-to-end so pulled-in entries/expenses don't get re-pulled
 // on the next pull-billables click.
@@ -497,15 +497,15 @@ async function markPaid() {
               <span v-else>{{ li.description }}</span>
             </td>
             <td class="py-1.5 text-right">
-              <InputNumber v-if="props.canEdit" v-model="li.quantity" :min="0" :max-fraction-digits="2" :input-class="'text-right w-16'" />
+              <NumberField v-if="props.canEdit" v-model="li.quantity" :min="0" :max-fraction-digits="2" :input-class="'text-right w-16'" />
               <span v-else>{{ li.quantity }}</span>
             </td>
             <td class="py-1.5 text-right">
-              <InputNumber v-if="props.canEdit" v-model="li.unitPriceDollars" :min="0" mode="currency" currency="CAD" :input-class="'text-right w-28'" />
+              <NumberField v-if="props.canEdit" v-model="li.unitPriceDollars" :min="0" mode="currency" currency="CAD" :input-class="'text-right w-28'" />
               <span v-else>{{ money(cents(li.unitPriceDollars)) }}</span>
             </td>
             <td class="py-1.5 text-right">
-              <InputNumber v-if="props.canEdit" v-model="li.taxRate" :min="0" :max="0.5" :max-fraction-digits="3" :input-class="'text-right w-16'" />
+              <NumberField v-if="props.canEdit" v-model="li.taxRate" :min="0" :max="0.5" :max-fraction-digits="3" :input-class="'text-right w-16'" />
               <span v-else>{{ (li.taxRate * 100).toFixed(1) }}%</span>
             </td>
             <!-- Line total includes tax (qty × unit × (1 + taxRate)) so
@@ -585,7 +585,7 @@ async function markPaid() {
             <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">
               {{ discountMode === "percent" ? "Percent off" : "Amount off" }}
             </label>
-            <InputNumber
+            <NumberField
               v-model="discountValueDisplay"
               :min="0"
               :max="discountMode === 'percent' ? 100 : undefined"

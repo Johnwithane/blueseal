@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
-import InputNumber from "primevue/inputnumber";
+import NumberField from "@/components/NumberField.vue";
 import Select from "primevue/select";
 import Tag from "primevue/tag";
 import Message from "primevue/message";
@@ -221,7 +221,7 @@ function statusTagSeverity(s: ExpenseDoc["status"]): "info" | "warn" | "success"
         <div class="mt-2" :class="costTrackingOnly ? '' : 'grid grid-cols-2 gap-2'">
           <div>
             <label class="block text-[11px] text-[color:var(--bs-muted)]">You paid</label>
-            <InputNumber
+            <NumberField
               :model-value="(e.totalCost ?? 0) / 100"
               mode="currency"
               currency="CAD"
@@ -234,7 +234,7 @@ function statusTagSeverity(s: ExpenseDoc["status"]): "info" | "warn" | "success"
           </div>
           <div v-if="!costTrackingOnly">
             <label class="block text-[11px] text-[color:var(--bs-muted)]">Markup %</label>
-            <InputNumber
+            <NumberField
               :model-value="e.markupPercent ?? DEFAULT_MARKUP_PERCENT"
               :min="0"
               :max="1000"
@@ -248,7 +248,7 @@ function statusTagSeverity(s: ExpenseDoc["status"]): "info" | "warn" | "success"
         </div>
         <div v-if="!costTrackingOnly" class="mt-2">
           <label class="block text-[11px] text-[color:var(--bs-muted)]">Client pays</label>
-          <InputNumber
+          <NumberField
             :model-value="(e.billedAmount ?? 0) / 100"
             mode="currency"
             currency="CAD"

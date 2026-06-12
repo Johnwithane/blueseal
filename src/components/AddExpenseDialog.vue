@@ -11,7 +11,7 @@ import { computed, ref, watch } from "vue";
 import Dialog from "primevue/dialog";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
-import InputNumber from "primevue/inputnumber";
+import NumberField from "@/components/NumberField.vue";
 import Select from "primevue/select";
 import Message from "primevue/message";
 import {
@@ -288,7 +288,7 @@ async function onCancel() {
           <label class="mb-1 block text-[11px] text-[color:var(--bs-muted)]" for="exp-cost">
             You paid
           </label>
-          <InputNumber
+          <NumberField
             v-model="costDollars"
             input-id="exp-cost"
             mode="currency"
@@ -303,7 +303,7 @@ async function onCancel() {
           <label class="mb-1 block text-[11px] text-[color:var(--bs-muted)]" for="exp-markup">
             Markup %
           </label>
-          <InputNumber
+          <NumberField
             v-model="markupPercent"
             input-id="exp-markup"
             :min="0"
@@ -320,7 +320,7 @@ async function onCancel() {
         <label class="mb-1 block text-[11px] text-[color:var(--bs-muted)]" for="exp-billed">
           Client pays
         </label>
-        <InputNumber
+        <NumberField
           v-model="billedDollars"
           input-id="exp-billed"
           mode="currency"

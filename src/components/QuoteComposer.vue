@@ -7,7 +7,7 @@
 // the editor.
 import { computed, ref, watch, nextTick } from "vue";
 import InputText from "primevue/inputtext";
-import InputNumber from "primevue/inputnumber";
+import NumberField from "@/components/NumberField.vue";
 import Textarea from "primevue/textarea";
 import SelectButton from "primevue/selectbutton";
 import Select from "primevue/select";
@@ -566,7 +566,7 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div>
                 <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">Estimated hours</label>
-                <InputNumber
+                <NumberField
                   v-model="l.hoursInput"
                   :min="0"
                   :max-fraction-digits="2"
@@ -578,7 +578,7 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
               </div>
               <div>
                 <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">Rate</label>
-                <InputNumber
+                <NumberField
                   v-model="l.rateDollars"
                   mode="currency"
                   currency="CAD"
@@ -607,7 +607,7 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
             <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">
               {{ l.kind === "materials" ? "Cost to client" : "Amount" }}
             </label>
-            <InputNumber
+            <NumberField
               v-model="l.amountDollars"
               mode="currency"
               currency="CAD"
@@ -623,7 +623,7 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
             <div>
               <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">Tax rate</label>
-              <InputNumber
+              <NumberField
                 v-model="l.taxRatePercent"
                 :min="0"
                 :max="50"
@@ -715,7 +715,7 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
           <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">
             {{ discountMode === "percent" ? "Percent off" : "Amount off" }}
           </label>
-          <InputNumber
+          <NumberField
             v-model="discountValue"
             :min="0"
             :max="discountMode === 'percent' ? 100 : undefined"
@@ -764,7 +764,7 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
           <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">
             {{ upfrontMode === "percent" ? `Percent (max ${UPFRONT_PERCENT_CAP}%)` : "Amount" }}
           </label>
-          <InputNumber
+          <NumberField
             v-if="upfrontMode === 'percent'"
             v-model="upfrontPercent"
             :min="1"
@@ -774,7 +774,7 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
             :input-class="'text-sm w-full'"
             fluid
           />
-          <InputNumber
+          <NumberField
             v-else
             v-model="upfrontDollars"
             :min="0"
@@ -801,7 +801,7 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
         Valid for
       </label>
       <div class="flex items-center gap-3">
-        <InputNumber
+        <NumberField
           v-model="validUntilDays"
           :min="1"
           :max="180"
