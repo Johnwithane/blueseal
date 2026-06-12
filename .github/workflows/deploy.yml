@@ -14,18 +14,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
-      VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
-      VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
-      VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
-      VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
-      VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
-      VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}
-      # Web Push certificate (public key). Unset → the push toggle stays
-      # hidden in the built app (safe-by-default), so missing secret ≠ broken build.
-      VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
-      VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
-      VITE_STRIPE_PUBLISHABLE_KEY: ${{ secrets.VITE_STRIPE_PUBLISHABLE_KEY }}
+      # Firebase web config is PUBLIC by design: it ships in every browser
+      # bundle and is guarded by Firestore rules + App Check, not by secrecy.
+      # Inlined here (NOT GitHub secrets) so an empty/missing secret can never
+      # again produce a config-less bundle — that was the auth/invalid-api-key
+      # production outage on 2026-06-12. These mirror .env "Firebase (production)".
+      VITE_FIREBASE_API_KEY: AIzaSyBAH4g0acwSAvOO7SFE8j5U4q3RptyjUV8
+      VITE_FIREBASE_AUTH_DOMAIN: blueseal-762af.firebaseapp.com
+      VITE_FIREBASE_PROJECT_ID: blueseal-762af
+      VITE_FIREBASE_STORAGE_BUCKET: blueseal-762af.firebasestorage.app
+      VITE_FIREBASE_MESSAGING_SENDER_ID: "281998435067"
+      VITE_FIREBASE_APP_ID: "1:281998435067:web:3bcae4b11de7937368465e"
+      VITE_FIREBASE_MEASUREMENT_ID: G-5G9KY529JN
+      # Web Push + Maps + Stripe publishable keys are all public (browser-side),
+      # referrer/origin-restricted at the provider. Inlined for the same reason.
+      VITE_FIREBASE_VAPID_KEY: BFOW11nkcu50B2pVe6ehZaGem_MxBWV2TpQAzFl6So4NsTeYLHkx6YS9T0mUuwm548awPAT8PW9iYwKo9aXAnig
+      VITE_GOOGLE_MAPS_API_KEY: AIzaSyDVA_zBuNFC-iRyq8K8fBFuHAFwq6cuDp4
+      VITE_STRIPE_PUBLISHABLE_KEY: pk_test_51ThLyDIcv5XLmJtVzb8IOtjiQcWXCOsDQcPA1nvwVYHIVmj7wAmbiwMehFfC4wVz3iJ2mhsLY0dkfr22fX227t8D00n1RIZ0vz
+      # SENTRY_DSN stays optional (empty today) — harmless if unset.
       VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
       VITE_APP_URL: https://blueseal.app
       VITE_APP_NAME: Blue Seal
