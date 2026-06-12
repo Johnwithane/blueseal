@@ -1,14 +1,16 @@
 <script setup lang="ts">
-// At-a-glance "charges so far" for the Work order tab — the running, pre-tax
-// total of everything added while the job runs (tracked time, billable
-// receipts, approved change orders). Both parties see it; only the tradesperson
-// gets the Create invoice button (which opens the wrap-up sheet, same as the
-// Invoice tab). The figure uses rollUpJobCharges so it agrees with the invoice
-// it previews.
+// At-a-glance "charges so far" for the Work order tab. On a fixed-price job it
+// leads with the agreed quote price and adds approved change orders on top
+// ("fixed price + work order"); on an hourly job it sums the running actuals
+// (time + materials + change orders). Both parties see it; only the
+// tradesperson gets the Create invoice button (opens the wrap-up sheet, same as
+// the Invoice tab). Charges use rollUpJobCharges so the figure agrees with the
+// invoice it previews.
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import Button from "primevue/button";
 import { subscribeJobTimeEntries } from "@/firebase/services/timeEntries";
 import { subscribeJobExpenses } from "@/firebase/services/expenses";
+import { getQuoteByJobId } from "@/firebase/services/quotes";
 import { rollUpJobCharges } from "@/utils/jobCharges";
 import { useFormatters } from "@/composables/useFormatters";
 import type {
@@ -34,10 +36,11 @@ const emit = defineEmits<{
 
 const { money } = useFormatters();
 
+const isFixed = computed(() => props.billingType === "fixed");
+
 // ----- live data: time (both parties) + expenses (tradesperson only) -----
 // Receipts are tradesperson-only by rule, so the client can't subscribe to
-// them — their tally is time + change orders, with a note that materials land
-// on the invoice.
+// them — their tally covers time + change orders.
 const timeEntries = ref<WithId<TimeEntryDoc>[]>([]);
 const expenses = ref<WithId<ExpenseDoc>[]>([]);
 const nowMs = ref(Date.now());
@@ -76,6 +79,27 @@ watch(
   { immediate: true },
 );
 
+// Agreed fixed price (pre-tax, net of any discount) from the accepted quote —
+// the baseline a fixed-price job is built on. Hourly jobs quote an estimate,
+// not a fixed price, so we don't surface it there.
+const fixedPriceCents = ref(0);
+watch(
+  () => [props.job.id, isFixed.value] as const,
+  async ([jobId, fixed]) => {
+    if (!fixed) {
+      fixedPriceCents.value = 0;
+      return;
+    }
+    try {
+      const q = await getQuoteByJobId(jobId);
+      fixedPriceCents.value = q ? Math.max(0, q.subtotal - q.discountAmount) : 0;
+    } catch {
+      fixedPriceCents.value = 0;
+    }
+  },
+  { immediate: true },
+);
+
 // Refresh roughly every 30s so a running clock's accrued cost doesn't sit
 // stale. Per-second precision lives on the TimeTrackerCard below; this is a
 // summary. Only mounted while the Work order tab is open, so no idle interval.
@@ -97,14 +121,9 @@ const tally = computed(() =>
   }),
 );
 
-const hasCharges = computed(() => tally.value.totalCents > 0);
-
-const isFixed = computed(() => props.billingType === "fixed");
-
-// The client can't see receipts here; flag it on hourly jobs so a lower total
-// than the eventual invoice doesn't read as a discrepancy. (Fixed jobs never
-// bill receipts — the fixed-price note covers that instead.)
-const showMaterialsNote = computed(() => props.isClient && !isFixed.value);
+// Fixed jobs: agreed price + change orders. Hourly: the running actuals.
+const grandTotalCents = computed(() => fixedPriceCents.value + tally.value.totalCents);
+const hasAnything = computed(() => grandTotalCents.value > 0);
 
 const showCreateInvoice = computed(
   () => props.isTradie && props.job.status === "in_progress",
@@ -121,32 +140,18 @@ const createInvoiceLabel = computed(() =>
         <i class="pi pi-calculator text-[color:var(--bs-blue)]"></i>
         Charges so far
       </h3>
-      <span class="text-lg font-bold tabular-nums">{{ money(tally.totalCents) }}</span>
+      <span class="text-lg font-bold tabular-nums">{{ money(grandTotalCents) }}</span>
     </header>
 
-    <p class="text-[11px] text-[color:var(--bs-muted)] mt-0.5">
-      A running, pre-tax total of the work added so far. Tax and anything from
-      the original quote are settled when the invoice is built.
-    </p>
-
-    <!-- Fixed-price jobs bill the agreed quote, not tracked time or receipts,
-         so the running total here only moves with approved change orders. Spell
-         that out so an empty/low total reads as "as expected", not "missing". -->
-    <p
-      v-if="isFixed"
-      class="text-[11px] text-[color:var(--bs-muted)] mt-2 flex items-start gap-1.5"
-    >
-      <i class="pi pi-info-circle mt-0.5 text-[color:var(--bs-blue)]"></i>
-      <span>
-        This is a <strong>fixed-price</strong> job — the agreed quote covers the
-        work. Tracked time and receipts are kept for the record but don't add to
-        the total; only client-approved change orders do.
-      </span>
-    </p>
-
-    <!-- Breakdown — only the lines that actually carry a charge, to keep it
-         scannable. -->
-    <dl v-if="hasCharges" class="mt-2 text-sm space-y-1">
+    <dl v-if="hasAnything" class="mt-2 text-sm space-y-1">
+      <!-- Fixed-price baseline — always shown on a fixed job so it's clear what
+           the agreed quote is charging before any extras. -->
+      <div v-if="isFixed" class="flex items-center justify-between gap-2">
+        <dt class="text-[color:var(--bs-muted)] flex items-center gap-1.5">
+          <i class="pi pi-file-check text-xs"></i> Fixed price
+        </dt>
+        <dd class="tabular-nums">{{ money(fixedPriceCents) }}</dd>
+      </div>
       <div v-if="tally.timeCents > 0" class="flex items-center justify-between gap-2">
         <dt class="text-[color:var(--bs-muted)] flex items-center gap-1.5">
           <i class="pi pi-clock text-xs"></i> Time
@@ -167,14 +172,10 @@ const createInvoiceLabel = computed(() =>
       </div>
     </dl>
     <p v-else class="mt-2 text-xs text-[color:var(--bs-muted)]">
-      Nothing billed yet — tracked time, receipts and approved change orders show
-      up here as you add them below.
+      Nothing billed yet — tracked time, receipts and approved change orders add up here.
     </p>
 
-    <p v-if="showMaterialsNote" class="text-[11px] text-[color:var(--bs-muted)] mt-2">
-      Any receipts/materials the tradesperson logs are added when they build your
-      invoice.
-    </p>
+    <p class="text-[11px] text-[color:var(--bs-muted)] mt-2">Pre-tax — tax is added on the invoice.</p>
 
     <Button
       v-if="showCreateInvoice"

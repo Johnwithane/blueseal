@@ -3,11 +3,13 @@ import { entryBillable } from "@/firebase/services/timeEntries";
 
 /** Running "charges so far" on a job, in cents, broken out by source. */
 export interface JobChargesTally {
-  /** Billable tracked time: labour, travel, and hourly change-order time. */
+  /** Billable base time: labour + travel (NOT change-order time). */
   timeCents: number;
   /** Billable receipts/materials — always 0 on a fixed-price job. */
   expenseCents: number;
-  /** Approved FLAT change orders (hourly ones bill through `timeCents`). */
+  /** All approved change-order money: flat extras + hourly change-order time.
+   *  Grouped together so the UI can attribute it to the change order, not to
+   *  generic "Time" — on a fixed-price job this is the only thing that bills. */
   changeOrderCents: number;
   /** Sum of the three above (pre-tax — tax is applied when the invoice is built). */
   totalCents: number;
@@ -43,6 +45,7 @@ export function rollUpJobCharges(args: {
   const { timeEntries, expenses, extras, tradespersonId, billingType, nowMs } = args;
 
   let timeCents = 0;
+  let changeOrderCents = 0;
   for (const e of timeEntries) {
     if (e.invoicedAt != null) continue;
     if (e.tradespersonId !== tradespersonId) continue;
@@ -51,7 +54,10 @@ export function rollUpJobCharges(args: {
     const rate = Math.max(0, Math.floor(e.hourlyRateSnapshot));
     const kind = e.kind ?? "labour";
     if (kind === "labour" && rate === 0 && billingType === "fixed") continue;
-    timeCents += billedAmount;
+    // Hourly change-order time is change-order money — group it with the flat
+    // extras below, not with base labour/travel.
+    if (kind === "extra") changeOrderCents += billedAmount;
+    else timeCents += billedAmount;
   }
 
   let expenseCents = 0;
@@ -63,7 +69,6 @@ export function rollUpJobCharges(args: {
     }
   }
 
-  let changeOrderCents = 0;
   for (const ex of extras) {
     if (ex.status !== "approved" || ex.invoicedAt != null) continue;
     if (ex.billingType !== "flat") continue;

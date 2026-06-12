@@ -73,11 +73,11 @@ const base = {
 } as const;
 
 describe("rollUpJobCharges", () => {
-  it("sums hourly time + expenses + flat change orders", () => {
+  it("sums base time + expenses + flat change orders", () => {
     const r = rollUpJobCharges({
       ...base,
       billingType: "hourly",
-      timeEntries: [time()], // 1h @ $100 = $100
+      timeEntries: [time()], // 1h @ $100 = $100 base labour
       expenses: [expense({ billedAmount: 5000 })],
       extras: [extra({ flatAmountCents: 20000 })],
     });
@@ -85,6 +85,22 @@ describe("rollUpJobCharges", () => {
     expect(r.expenseCents).toBe(5000);
     expect(r.changeOrderCents).toBe(20000);
     expect(r.totalCents).toBe(35000);
+  });
+
+  it("groups hourly change-order time under changeOrderCents, not timeCents", () => {
+    const r = rollUpJobCharges({
+      ...base,
+      billingType: "hourly",
+      timeEntries: [
+        time({ kind: "labour", hourlyRateSnapshot: 10000 }), // 1h base → $100
+        time({ kind: "extra", extraId: "x1", hourlyRateSnapshot: 8000 }), // 1h CO → $80
+      ],
+      expenses: [],
+      extras: [extra({ flatAmountCents: 5000 })], // flat CO → $50
+    });
+    expect(r.timeCents).toBe(10000); // base labour only
+    expect(r.changeOrderCents).toBe(13000); // hourly CO time ($80) + flat CO ($50)
+    expect(r.totalCents).toBe(23000);
   });
 
   it("never bills receipts on a fixed-price job", () => {
@@ -110,7 +126,8 @@ describe("rollUpJobCharges", () => {
       expenses: [],
       extras: [],
     });
-    expect(r.timeCents).toBe(8000);
+    expect(r.timeCents).toBe(0); // base labour dropped on a fixed job
+    expect(r.changeOrderCents).toBe(8000); // hourly change-order time still bills
   });
 
   it("counts a running (un-ended) entry up to now", () => {
