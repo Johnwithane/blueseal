@@ -1653,13 +1653,20 @@ async function grantAllTrades() {
             <div>
               <div class="font-medium">Email</div>
               <p class="text-xs text-[color:var(--bs-muted)] mt-0.5">
-                For most events. Time-critical ones also send WhatsApp if enabled.
+                For new messages, quotes, invoices, and job updates when you're
+                not in the app.
               </p>
             </div>
             <ToggleSwitch v-model="emailEnabled" />
           </div>
 
+          <!-- WhatsApp toggle hidden until the WhatsApp Cloud API is set up
+               (Meta verification + template approval — see HUMANTASKS.md).
+               Deprioritized for the Canadian market; email + push cover it for
+               now. The whatsappEnabled pref + notify() leg stay intact, so this
+               is a one-line `v-if` flip to bring back. -->
           <div
+            v-if="false"
             class="flex items-start justify-between gap-3 rounded-lg border border-[color:var(--bs-border)] p-3"
           >
             <div>
