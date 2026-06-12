@@ -46,11 +46,13 @@ export async function requireAiEntitlement(uid: string, feature: AiFeature): Pro
 
 /**
  * Seam for gating tradesperson-created jobs ("bring your own client" /
- * solo-mode project tracking) behind a future paid tier. Founder decision
- * 2026-06-11: when the gate flips it should cap ACTIVE SOLO-JOB VOLUME (e.g.
- * N free, unlimited on Pro) — never the client invite link itself, because
- * every invite sent to an off-platform client is free user acquisition.
- * No-op until the subscription ships; createInviteJob must route through this.
+ * solo-mode project tracking). Founder decision 2026-06-12: solo / invite jobs
+ * STAY FREE AND UNCAPPED — they're an acquisition tool (every invite sent to an
+ * off-platform client is free user acquisition), so this gate is an intentional
+ * permanent no-op. This supersedes the 2026-06-11 idea of capping active
+ * solo-job volume. Kept as a seam only so createInviteJob has one chokepoint if
+ * that ever changes. (Pro monetization landed elsewhere: AI, fee waiver,
+ * featured placement, reports, and the Clients book + recurring billing.)
  */
 export async function requireInviteJobEntitlement(_uid: string): Promise<void> {
   return;
