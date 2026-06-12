@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
@@ -9,16 +9,47 @@ import DatePicker from "primevue/datepicker";
 import Dialog from "primevue/dialog";
 import Message from "primevue/message";
 import { createInviteJob } from "@/firebase/services/jobs";
+import { getTradesperson } from "@/firebase/services/tradespeople";
 import { inviteJobSchema } from "@/validation/schemas";
-import { TRADES } from "@/data/trades";
+import { TRADES, tradeLabel } from "@/data/trades";
 import type { Urgency } from "@/firebase/interfaces";
+import { useAuthStore } from "@/stores/auth";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 
 const router = useRouter();
+const auth = useAuthStore();
 const toast = useToast();
 
 const trade = ref<string>("");
+
+// The trades this tradesperson is set up for (primary at [0]). The trade
+// dropdown is restricted to these, and the form defaults to the primary one —
+// a tradesperson creating a job for their own client is almost always working
+// in their own trade. Empty until loaded, and stays empty if onboarding never
+// set any, in which case we fall back to the full trade list below.
+const myTrades = ref<string[]>([]);
+
+// Dropdown options: just the tradesperson's own trades (primary first). If we
+// couldn't load any (incomplete profile / read failure), fall back to the full
+// list so they're never blocked from creating a job.
+const tradeOptions = computed(() =>
+  myTrades.value.length
+    ? myTrades.value.map((key) => ({ key, label: tradeLabel(key) }))
+    : TRADES.map((t) => ({ key: t.key, label: t.label })),
+);
+
+onMounted(async () => {
+  if (!auth.fbUser) return;
+  try {
+    const doc = await getTradesperson(auth.fbUser.uid);
+    myTrades.value = doc?.trades ?? [];
+    // Default to the primary trade (don't clobber a value already chosen).
+    if (myTrades.value.length && !trade.value) trade.value = myTrades.value[0];
+  } catch {
+    // Non-fatal — leave myTrades empty so the dropdown falls back to TRADES.
+  }
+});
 const title = ref("");
 const description = ref("");
 const clientName = ref("");
@@ -118,10 +149,10 @@ function openJob() {
         <label class="text-sm font-medium">Trade</label>
         <Select
           v-model="trade"
-          :options="TRADES"
+          :options="tradeOptions"
           option-label="label"
           option-value="key"
-          filter
+          :filter="myTrades.length === 0"
           placeholder="Select a trade"
           class="mt-1 w-full"
         />
