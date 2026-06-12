@@ -67,6 +67,7 @@ import WsibUploadCard from "@/components/WsibUploadCard.vue";
 import LocationPicker, { type LocationValue } from "@/components/LocationPicker.vue";
 import { useToast } from "@/composables/useToast";
 import { useFormatters } from "@/composables/useFormatters";
+import { humanizeError } from "@/utils/errors";
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -280,6 +281,22 @@ function tradeLabelFor(key: string): string {
 }
 
 onMounted(async () => {
+  try {
+    await hydrate();
+  } catch (e) {
+    // A failed hydrate (token refresh, profile / cert / ID fetch) used to
+    // abort silently here, leaving a blank, un-saveable form with no reason.
+    toast.error("Couldn't load your profile", humanizeError(e));
+  } finally {
+    // Enable the form + autosave even if a fetch failed, so the user isn't
+    // stranded — `hydrated` also unblocks the autosave watcher below.
+    hydrated.value = true;
+  }
+});
+
+// Loads the saved draft + verification docs into the form. Throws on any
+// Firebase error; onMounted owns the catch so the form still goes interactive.
+async function hydrate() {
   if (!auth.fbUser) return;
   // Refresh the ID token so the `tradesperson` custom claim (set by the
   // `setRoleOnSignup` Firestore trigger) is on the token used for the
@@ -342,20 +359,26 @@ onMounted(async () => {
   // Jump straight to the first step the user hasn't finished yet so a
   // returning tradesperson doesn't have to click through completed steps.
   step.value = firstIncompleteStep();
-  // Mark hydrated last so the watch below doesn't fire on initial load.
-  hydrated.value = true;
-});
+}
 
 // Re-fetch the verification doc after the user submits/replaces from the
 // upload card. The card emits without payload so we go to the source of
 // truth rather than echoing local state.
 async function reloadInsurance() {
   if (!auth.fbUser) return;
-  insuranceDoc.value = await getInsurance(auth.fbUser.uid);
+  try {
+    insuranceDoc.value = await getInsurance(auth.fbUser.uid);
+  } catch (e) {
+    toast.error("Couldn't refresh insurance status", humanizeError(e));
+  }
 }
 async function reloadWsib() {
   if (!auth.fbUser) return;
-  wsibDoc.value = await getWsib(auth.fbUser.uid);
+  try {
+    wsibDoc.value = await getWsib(auth.fbUser.uid);
+  } catch (e) {
+    toast.error("Couldn't refresh WSIB status", humanizeError(e));
+  }
 }
 
 function trades(): string[] {
@@ -436,7 +459,7 @@ async function saveDraft(opts: { silent?: boolean } = {}): Promise<void> {
     dirty.value = false;
     if (!opts.silent) toast.success("Draft saved");
   } catch (e) {
-    error.value = (e as Error).message;
+    error.value = humanizeError(e);
   } finally {
     saving.value = false;
   }
@@ -467,7 +490,7 @@ async function onPhotoChange(e: Event) {
     scheduleAutoSave();
     toast.success("Photo updated");
   } catch (e) {
-    error.value = (e as Error).message;
+    error.value = humanizeError(e);
   } finally {
     uploadingPhoto.value = false;
     target.value = "";
@@ -557,36 +580,47 @@ async function onCertUploaded(opts: {
   expiresAt: string | null;
 }) {
   if (!auth.fbUser) return;
-  // `file === null` means the tradesperson declared they don't have a
-  // formal certification for this trade — we still write a CertificationDoc
-  // so the vetting admin sees it in the queue, but with an empty fileUrl.
-  let fileUrl = "";
-  if (opts.file) {
-    const path = makeStoragePath({
-      scope: "tradespeople",
-      id: auth.fbUser.uid,
-      bucket: "certs",
-      filename: opts.file.name,
+  try {
+    // `file === null` means the tradesperson declared they don't have a
+    // formal certification for this trade — we still write a CertificationDoc
+    // so the vetting admin sees it in the queue, but with an empty fileUrl.
+    let fileUrl = "";
+    if (opts.file) {
+      const path = makeStoragePath({
+        scope: "tradespeople",
+        id: auth.fbUser.uid,
+        bucket: "certs",
+        filename: opts.file.name,
+      });
+      fileUrl = await uploadFile(path, opts.file);
+    }
+    await createCertification({
+      tradespersonId: auth.fbUser.uid,
+      trade: opts.trade,
+      issuingBody: opts.issuingBody,
+      certNumber: opts.certNumber,
+      expiresAt: opts.expiresAt ? (new Date(opts.expiresAt) as unknown as never) : null,
+      fileUrl,
     });
-    fileUrl = await uploadFile(path, opts.file);
+    existingCerts.value = await listCertsFor(auth.fbUser.uid);
+    toast.success(opts.file ? "Certification uploaded" : "Declaration recorded");
+  } catch (e) {
+    // Storage upload or Firestore write failed (e.g. permission-denied if the
+    // tradesperson role claim hasn't propagated, oversized file, or offline).
+    // Previously this threw into the void and the user saw nothing happen.
+    toast.error("Couldn't save certification", humanizeError(e));
   }
-  await createCertification({
-    tradespersonId: auth.fbUser.uid,
-    trade: opts.trade,
-    issuingBody: opts.issuingBody,
-    certNumber: opts.certNumber,
-    expiresAt: opts.expiresAt ? (new Date(opts.expiresAt) as unknown as never) : null,
-    fileUrl,
-  });
-  existingCerts.value = await listCertsFor(auth.fbUser.uid);
-  toast.success(opts.file ? "Certification uploaded" : "Declaration recorded");
 }
 
 async function onCertDeleted(certId: string) {
   if (!auth.fbUser) return;
-  await deleteCertification(certId);
-  existingCerts.value = await listCertsFor(auth.fbUser.uid);
-  toast.success("Certification removed");
+  try {
+    await deleteCertification(certId);
+    existingCerts.value = await listCertsFor(auth.fbUser.uid);
+    toast.success("Certification removed");
+  } catch (e) {
+    toast.error("Couldn't remove certification", humanizeError(e));
+  }
 }
 
 async function onCertUpdated(opts: {
@@ -596,37 +630,49 @@ async function onCertUpdated(opts: {
   expiresAt: string | null;
 }) {
   if (!auth.fbUser) return;
-  await updateCertification(opts.certId, {
-    issuingBody: opts.issuingBody,
-    certNumber: opts.certNumber,
-    expiresAt: opts.expiresAt ? new Date(opts.expiresAt) : null,
-  });
-  existingCerts.value = await listCertsFor(auth.fbUser.uid);
-  toast.success("Certification updated");
+  try {
+    await updateCertification(opts.certId, {
+      issuingBody: opts.issuingBody,
+      certNumber: opts.certNumber,
+      expiresAt: opts.expiresAt ? new Date(opts.expiresAt) : null,
+    });
+    existingCerts.value = await listCertsFor(auth.fbUser.uid);
+    toast.success("Certification updated");
+  } catch (e) {
+    toast.error("Couldn't update certification", humanizeError(e));
+  }
 }
 
 async function onIdUploaded(opts: { file: File; documentType: IdDocType }) {
   if (!auth.fbUser) return;
-  const path = makeStoragePath({
-    scope: "tradespeople",
-    id: auth.fbUser.uid,
-    bucket: "id",
-    filename: opts.file.name,
-  });
-  // ID storage is admin-read-only, so we cannot call `getDownloadURL` after
-  // upload (the owner would 403). Store the storage path instead and let
-  // the admin client resolve a download URL when reviewing.
-  const storagePath = await uploadFileNoUrl(path, opts.file);
-  await submitIdVerification(auth.fbUser.uid, storagePath, opts.documentType);
-  idStatus.value = "pending";
-  toast.success("ID uploaded");
+  try {
+    const path = makeStoragePath({
+      scope: "tradespeople",
+      id: auth.fbUser.uid,
+      bucket: "id",
+      filename: opts.file.name,
+    });
+    // ID storage is admin-read-only, so we cannot call `getDownloadURL` after
+    // upload (the owner would 403). Store the storage path instead and let
+    // the admin client resolve a download URL when reviewing.
+    const storagePath = await uploadFileNoUrl(path, opts.file);
+    await submitIdVerification(auth.fbUser.uid, storagePath, opts.documentType);
+    idStatus.value = "pending";
+    toast.success("ID uploaded");
+  } catch (e) {
+    toast.error("Couldn't upload ID", humanizeError(e));
+  }
 }
 
 async function onIdRemoved() {
   if (!auth.fbUser) return;
-  await deleteIdVerification(auth.fbUser.uid);
-  idStatus.value = "none";
-  toast.success("ID removed");
+  try {
+    await deleteIdVerification(auth.fbUser.uid);
+    idStatus.value = "none";
+    toast.success("ID removed");
+  } catch (e) {
+    toast.error("Couldn't remove ID", humanizeError(e));
+  }
 }
 
 async function submitApplication() {
@@ -646,7 +692,7 @@ async function submitApplication() {
     toast.success("Application submitted", "We'll review within 1–2 business days.");
     router.replace({ name: "TradieDashboard" });
   } catch (e) {
-    error.value = (e as Error).message;
+    error.value = humanizeError(e);
   } finally {
     submitting.value = false;
   }
@@ -665,7 +711,7 @@ async function withdrawForEdits() {
     withdrawConfirmOpen.value = false;
     toast.success("Application withdrawn", "Make your changes and submit again when ready.");
   } catch (e) {
-    error.value = (e as Error).message;
+    error.value = humanizeError(e);
   } finally {
     withdrawing.value = false;
   }
