@@ -1,25 +1,24 @@
-// Send an invoice through Stripe Connect. Replaces the pre-cutover
-// "render PDF + email payment instructions" flow with: create a
-// PaymentIntent on the platform with application_fee_amount +
-// transfer_data.destination, snapshot the fee on the invoice, then
-// render+email the PDF with an in-app pay link.
+// Send an invoice to the client: render + store the PDF, email it with an
+// in-app pay link, flip the invoice to "sent", and notify.
+//
+// NOTE: this no longer talks to Stripe. The PaymentIntent (and the Blue Seal
+// service-fee calculation) is created at PAY time by createInvoicePaymentIntent
+// when the client opens the pay page — so the fee + Pro waiver are evaluated
+// against the live invoice total, not stale at send time, and an invoice edited
+// after sending can't drift from the amount actually charged. sendInvoice just
+// seeds an empty payment skeleton (with the transfer destination) and promises,
+// via the payouts precondition below, that a working pay link will exist.
+//
+// The PDF total is the invoice total — the Blue Seal service fee is the
+// platform's charge to the client at card-checkout, not part of the
+// tradesperson's invoice (keeps their books + any GST treatment clean). The PDF
+// notes that a fee applies when paying online by card.
 //
 // Pre-conditions enforced here (rules can't see Stripe):
 //   - caller is the assigned tradesperson
 //   - invoice is in draft or overdue
 //   - line items present + total > 0
-//   - tradesperson has payouts.payoutsEnabled === true
-//
-// Idempotency: pass the invoiceId as `idempotencyKey` to Stripe so a
-// repeated callable hit (network retry, double-tap) doesn't create a
-// duplicate PaymentIntent. If `invoice.payment.paymentIntentId` is already
-// set we reuse it and skip the Stripe round-trip — re-sending the email
-// shouldn't move money.
-//
-// Fee math: `application_fee_amount = floor(total * PLATFORM_FEE_BPS / 10000)`.
-// Computed on the gross (incl. tax) for simplicity — most invoicing
-// platforms do the same. Snapshotted via `applicationFeeBps` so historical
-// invoices stay auditable when PLATFORM_FEE_BPS changes.
+//   - tradesperson has payouts.payoutsEnabled === true (and not restricted)
 
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { CALLABLE_OPTS } from "../lib/callable";
@@ -30,11 +29,6 @@ import { db, storage } from "../lib/admin";
 import { requireAuth } from "../lib/auth";
 import { enqueueMail } from "../lib/mail";
 import { notify } from "../lib/notify";
-import {
-  PLATFORM_FEE_BPS,
-  STRIPE_SECRET_KEY,
-  getStripe,
-} from "../payments/stripeClient";
 
 const Input = z.object({ invoiceId: z.string().min(1) });
 
@@ -61,11 +55,13 @@ interface InvoiceData {
     paymentIntentId?: string | null;
     clientSecret?: string | null;
     chargeId?: string | null;
-    applicationFeeAmount?: number | null;
-    applicationFeeBps?: number | null;
+    serviceFee?: unknown;
+    transferId?: string | null;
     transferDestination?: string | null;
     refundedAmount?: number | null;
     refunds?: unknown[] | null;
+    disputeId?: string | null;
+    disputeStatus?: string | null;
     lastWebhookEventId?: string | null;
   } | null;
 }
@@ -131,6 +127,13 @@ async function renderPdf(
         link: payLink(invoiceId),
         underline: true,
       });
+    doc
+      .fontSize(9)
+      .fillColor("#666")
+      .text(
+        "A small Blue Seal service fee applies when paying online by card. " +
+          "Paying by e-transfer or cash is fee-free — arrange it with your tradesperson and they'll mark the invoice paid.",
+      );
     doc.fillColor("#000");
     if (inv.paymentInstructions) {
       doc.moveDown();
@@ -144,186 +147,134 @@ async function renderPdf(
   });
 }
 
-export const sendInvoice = onCall(
-  { ...CALLABLE_OPTS, secrets: [STRIPE_SECRET_KEY] },
-  async (req) => {
-    const uid = requireAuth(req);
-    const parsed = Input.safeParse(req.data);
-    if (!parsed.success)
-      throw new HttpsError("invalid-argument", parsed.error.message);
-    const { invoiceId } = parsed.data;
+export const sendInvoice = onCall(CALLABLE_OPTS, async (req) => {
+  const uid = requireAuth(req);
+  const parsed = Input.safeParse(req.data);
+  if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);
+  const { invoiceId } = parsed.data;
 
-    const invRef = db.doc(`invoices/${invoiceId}`);
-    const invSnap = await invRef.get();
-    if (!invSnap.exists)
-      throw new HttpsError("not-found", "Invoice not found.");
-    const inv = invSnap.data() as InvoiceData;
+  const invRef = db.doc(`invoices/${invoiceId}`);
+  const invSnap = await invRef.get();
+  if (!invSnap.exists) throw new HttpsError("not-found", "Invoice not found.");
+  const inv = invSnap.data() as InvoiceData;
 
-    if (inv.tradespersonId !== uid) {
-      throw new HttpsError(
-        "permission-denied",
-        "Only the tradesperson can send this invoice.",
-      );
-    }
-    if (inv.status && !["draft", "overdue"].includes(inv.status)) {
-      throw new HttpsError(
-        "failed-precondition",
-        `Invoice cannot be sent in status "${inv.status}".`,
-      );
-    }
-    if (!inv.lineItems || inv.lineItems.length === 0 || inv.total <= 0) {
-      throw new HttpsError(
-        "failed-precondition",
-        "Invoice has no line items or zero total.",
-      );
-    }
-    // The bill can never come in under the upfront fee already paid — the
-    // credit clamps at $0 due, so the shortfall would silently vanish.
-    // Mirrors submitJobForApproval; this backstop catches drafts whose
-    // totals were edited outside that path.
-    const creditCents = inv.upfrontFeeCredit?.amountCents ?? 0;
-    const totalBeforeCredit = inv.subtotal - (inv.discountAmount ?? 0) + inv.taxTotal;
-    if (creditCents > 0 && totalBeforeCredit < creditCents) {
-      throw new HttpsError(
-        "failed-precondition",
-        `The invoice total ($${(totalBeforeCredit / 100).toFixed(2)}) is less than the upfront ` +
-          `fee already paid ($${(creditCents / 100).toFixed(2)}). Add the remaining work before sending.`,
-      );
-    }
-
-    // Stripe Connect precondition — payouts must be live before we can
-    // route money through the tradie's connected account. The Connect
-    // onboarding UI (/payouts) is the user-actionable next step.
-    const tradieSnap = await db.doc(`tradespeople/${uid}`).get();
-    const payouts = (tradieSnap.data()?.payouts ?? {}) as TradiePayouts;
-    if (!payouts.payoutsEnabled || !payouts.stripeAccountId) {
-      throw new HttpsError(
-        "failed-precondition",
-        "Finish Stripe Connect onboarding at /payouts before sending invoices.",
-      );
-    }
-    // Separately reject `restricted` even when payoutsEnabled briefly
-    // lingers true — Stripe can flip an account to restricted with
-    // requirements outstanding while still leaving payouts_enabled set
-    // for a short window. Sending an invoice in that window creates a
-    // PaymentIntent that fails at capture time, which is a worse UX
-    // than rejecting the send upfront. Message references /payouts
-    // where the requirements list is surfaced.
-    if (payouts.onboardingStatus === "restricted") {
-      throw new HttpsError(
-        "failed-precondition",
-        "Stripe needs more info on your account before you can collect payments. Open /payouts to see what's outstanding.",
-      );
-    }
-
-    const feeBps = Number.parseInt(PLATFORM_FEE_BPS.value(), 10);
-    if (!Number.isFinite(feeBps) || feeBps < 0 || feeBps > 10_000) {
-      throw new HttpsError(
-        "internal",
-        "Platform fee is misconfigured. Contact support.",
-      );
-    }
-    const applicationFeeAmount = Math.floor((inv.total * feeBps) / 10_000);
-
-    const stripe = getStripe();
-    let paymentIntentId = inv.payment?.paymentIntentId ?? null;
-    let clientSecret = inv.payment?.clientSecret ?? null;
-
-    if (!paymentIntentId) {
-      // First send. Idempotency key tied to invoiceId so a retried
-      // callable invocation reuses the same Stripe object instead of
-      // creating a sibling PaymentIntent.
-      const pi = await stripe.paymentIntents.create(
-        {
-          amount: inv.total,
-          currency: inv.currency.toLowerCase(),
-          application_fee_amount: applicationFeeAmount,
-          transfer_data: { destination: payouts.stripeAccountId },
-          automatic_payment_methods: { enabled: true },
-          metadata: {
-            invoiceId,
-            jobId: inv.jobId,
-            tradespersonId: inv.tradespersonId,
-            clientId: inv.clientId,
-            invoiceNumber: inv.invoiceNumber,
-          },
-          description: `Blue Seal invoice ${inv.invoiceNumber}`,
-        },
-        { idempotencyKey: `invoice:${invoiceId}:create` },
-      );
-      paymentIntentId = pi.id;
-      clientSecret = pi.client_secret ?? null;
-    }
-
-    const [tradieUser, clientUser] = await Promise.all([
-      db.doc(`users/${inv.tradespersonId}`).get(),
-      db.doc(`users/${inv.clientId}`).get(),
-    ]);
-    const tradieName =
-      (tradieUser.data() as { displayName?: string })?.displayName ??
-      "Tradesperson";
-    const clientName =
-      (clientUser.data() as { displayName?: string })?.displayName ?? "Client";
-    const clientEmail = (clientUser.data() as { email?: string })?.email;
-
-    const pdf = await renderPdf(inv, tradieName, clientName, invoiceId);
-    const file = storage.bucket().file(`invoices/${invoiceId}.pdf`);
-    await file.save(pdf, { contentType: "application/pdf", resumable: false });
-    const [downloadUrl] = await file.getSignedUrl({
-      action: "read",
-      expires: Date.now() + 1000 * 60 * 60 * 24 * 30,
-    });
-
-    await invRef.set(
-      {
-        status: "sent",
-        sentAt: FieldValue.serverTimestamp(),
-        pdfUrl: downloadUrl,
-        payment: {
-          paymentIntentId,
-          clientSecret,
-          chargeId: inv.payment?.chargeId ?? null,
-          applicationFeeAmount,
-          applicationFeeBps: feeBps,
-          transferId: null,
-          transferDestination: payouts.stripeAccountId,
-          refundedAmount: inv.payment?.refundedAmount ?? 0,
-          refunds: inv.payment?.refunds ?? [],
-          disputeId: null,
-          disputeStatus: null,
-          lastWebhookEventId: inv.payment?.lastWebhookEventId ?? null,
-        },
-      },
-      { merge: true },
+  if (inv.tradespersonId !== uid) {
+    throw new HttpsError(
+      "permission-denied",
+      "Only the tradesperson can send this invoice.",
     );
+  }
+  if (inv.status && !["draft", "overdue"].includes(inv.status)) {
+    throw new HttpsError(
+      "failed-precondition",
+      `Invoice cannot be sent in status "${inv.status}".`,
+    );
+  }
+  if (!inv.lineItems || inv.lineItems.length === 0 || inv.total <= 0) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Invoice has no line items or zero total.",
+    );
+  }
+  // The bill can never come in under the upfront fee already paid — the
+  // credit clamps at $0 due, so the shortfall would silently vanish.
+  const creditCents = inv.upfrontFeeCredit?.amountCents ?? 0;
+  const totalBeforeCredit = inv.subtotal - (inv.discountAmount ?? 0) + inv.taxTotal;
+  if (creditCents > 0 && totalBeforeCredit < creditCents) {
+    throw new HttpsError(
+      "failed-precondition",
+      `The invoice total ($${(totalBeforeCredit / 100).toFixed(2)}) is less than the upfront ` +
+        `fee already paid ($${(creditCents / 100).toFixed(2)}). Add the remaining work before sending.`,
+    );
+  }
 
-    if (clientEmail) {
-      await enqueueMail({
-        to: clientEmail,
-        subject: `Invoice ${inv.invoiceNumber} from ${tradieName}`,
-        text:
-          `Hi ${clientName},\n\n` +
-          `Your invoice for ${fmtMoney(inv.total, inv.currency)} is ready.\n\n` +
-          `Pay online: ${payLink(invoiceId)}\n` +
-          `PDF: ${downloadUrl}\n\n` +
-          (inv.paymentInstructions
-            ? `Notes from ${tradieName}:\n${inv.paymentInstructions}\n\n`
-            : "") +
-          `Thanks,\nBlue Seal`,
-      });
-    }
+  // Payouts must be live before we promise a card pay link — the client's
+  // pay page calls createInvoicePaymentIntent, which needs the connected
+  // account. The Connect onboarding UI (/payouts) is the actionable next step.
+  const tradieSnap = await db.doc(`tradespeople/${uid}`).get();
+  const payouts = (tradieSnap.data()?.payouts ?? {}) as TradiePayouts;
+  if (!payouts.payoutsEnabled || !payouts.stripeAccountId) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Finish Stripe Connect onboarding at /payouts before sending invoices.",
+    );
+  }
+  if (payouts.onboardingStatus === "restricted") {
+    throw new HttpsError(
+      "failed-precondition",
+      "Stripe needs more info on your account before you can collect payments. Open /payouts to see what's outstanding.",
+    );
+  }
 
-    await notify({
-      userId: inv.clientId,
-      type: "invoice_sent",
-      title: `Invoice ${inv.invoiceNumber} from ${tradieName}`,
-      body: `${fmtMoney(inv.total, inv.currency)} due. Tap to pay online.`,
-      link: `/invoices/${invoiceId}/pay`,
-      actorUid: inv.tradespersonId,
-      recipientRole: "client",
-      priority: "low",
+  const [tradieUser, clientUser] = await Promise.all([
+    db.doc(`users/${inv.tradespersonId}`).get(),
+    db.doc(`users/${inv.clientId}`).get(),
+  ]);
+  const tradieName =
+    (tradieUser.data() as { displayName?: string })?.displayName ?? "Tradesperson";
+  const clientName =
+    (clientUser.data() as { displayName?: string })?.displayName ?? "Client";
+  const clientEmail = (clientUser.data() as { email?: string })?.email;
+
+  const pdf = await renderPdf(inv, tradieName, clientName, invoiceId);
+  const file = storage.bucket().file(`invoices/${invoiceId}.pdf`);
+  await file.save(pdf, { contentType: "application/pdf", resumable: false });
+  const [downloadUrl] = await file.getSignedUrl({
+    action: "read",
+    expires: Date.now() + 1000 * 60 * 60 * 24 * 30,
+  });
+
+  await invRef.set(
+    {
+      status: "sent",
+      sentAt: FieldValue.serverTimestamp(),
+      pdfUrl: downloadUrl,
+      // Empty payment skeleton — the PaymentIntent + service-fee snapshot are
+      // created at pay time. Preserve any prior payment state (a re-send from
+      // overdue may already carry an in-flight intent / refund history).
+      payment: {
+        paymentIntentId: inv.payment?.paymentIntentId ?? null,
+        clientSecret: inv.payment?.clientSecret ?? null,
+        chargeId: inv.payment?.chargeId ?? null,
+        serviceFee: inv.payment?.serviceFee ?? null,
+        transferId: inv.payment?.transferId ?? null,
+        transferDestination: payouts.stripeAccountId,
+        refundedAmount: inv.payment?.refundedAmount ?? 0,
+        refunds: inv.payment?.refunds ?? [],
+        disputeId: inv.payment?.disputeId ?? null,
+        disputeStatus: inv.payment?.disputeStatus ?? null,
+        lastWebhookEventId: inv.payment?.lastWebhookEventId ?? null,
+      },
+    },
+    { merge: true },
+  );
+
+  if (clientEmail) {
+    await enqueueMail({
+      to: clientEmail,
+      subject: `Invoice ${inv.invoiceNumber} from ${tradieName}`,
+      text:
+        `Hi ${clientName},\n\n` +
+        `Your invoice for ${fmtMoney(inv.total, inv.currency)} is ready.\n\n` +
+        `Pay online: ${payLink(invoiceId)}\n` +
+        `PDF: ${downloadUrl}\n\n` +
+        (inv.paymentInstructions
+          ? `Notes from ${tradieName}:\n${inv.paymentInstructions}\n\n`
+          : "") +
+        `Thanks,\nBlue Seal`,
     });
+  }
 
-    return { ok: true, pdfUrl: downloadUrl, paymentIntentId, clientSecret };
-  },
-);
+  await notify({
+    userId: inv.clientId,
+    type: "invoice_sent",
+    title: `Invoice ${inv.invoiceNumber} from ${tradieName}`,
+    body: `${fmtMoney(inv.total, inv.currency)} due. Tap to pay online.`,
+    link: `/invoices/${invoiceId}/pay`,
+    actorUid: inv.tradespersonId,
+    recipientRole: "client",
+    priority: "low",
+  });
+
+  return { ok: true, pdfUrl: downloadUrl };
+});

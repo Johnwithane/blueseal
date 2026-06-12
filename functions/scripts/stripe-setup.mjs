@@ -98,10 +98,14 @@ async function ensurePortalConfig(monthly, annual) {
   return stripe.billingPortal.configurations.create(params);
 }
 
-// The full event set the dispatcher (functions/src/payments/stripeWebhook.ts)
-// handles: Connect + payments (service fee) + subscription (Pro).
-const WEBHOOK_EVENTS = [
-  "account.updated",
+// A Connect platform needs TWO webhook endpoints at the same URL:
+//   - platform events (the account's own): destination-charge payment_intents,
+//     charge refunds/disputes, and the Pro subscription events.
+//   - connected-account events (connect: true): account.updated + payouts for
+//     the tradespeople's Express accounts.
+// Each endpoint has its own signing secret; stripeWebhook verifies against
+// either (STRIPE_WEBHOOK_SECRET holds both, comma-separated).
+const PLATFORM_EVENTS = [
   "payment_intent.processing",
   "payment_intent.succeeded",
   "payment_intent.payment_failed",
@@ -109,30 +113,51 @@ const WEBHOOK_EVENTS = [
   "charge.refunded",
   "charge.dispute.created",
   "charge.dispute.closed",
-  "payout.created",
-  "payout.paid",
-  "payout.failed",
   "checkout.session.completed",
   "customer.subscription.created",
   "customer.subscription.updated",
   "customer.subscription.deleted",
   "invoice.payment_failed",
 ];
+const CONNECT_EVENTS = ["account.updated", "payout.created", "payout.paid", "payout.failed"];
 
-async function ensureWebhook(url) {
+async function ensureScopedWebhook(url, { scope, events, connect }) {
   const list = await stripe.webhookEndpoints.list({ limit: 100 });
-  const found = list.data.find((e) => e.url === url);
+  // Clean up any legacy single endpoint at this URL that predates scoping.
+  for (const e of list.data) {
+    if (e.url === url && e.metadata?.blueseal === TAG && !e.metadata?.blueseal_scope) {
+      await stripe.webhookEndpoints.del(e.id);
+    }
+  }
+  const found = list.data.find(
+    (e) => e.url === url && e.metadata?.blueseal_scope === scope,
+  );
   if (found) {
-    await stripe.webhookEndpoints.update(found.id, { enabled_events: WEBHOOK_EVENTS });
+    await stripe.webhookEndpoints.update(found.id, { enabled_events: events });
     return { endpoint: found, secret: null };
   }
   const endpoint = await stripe.webhookEndpoints.create({
     url,
-    enabled_events: WEBHOOK_EVENTS,
-    description: "Blue Seal — payments + subscription",
-    metadata: { blueseal: TAG },
+    enabled_events: events,
+    connect,
+    description: `Blue Seal — ${scope}`,
+    metadata: { blueseal: TAG, blueseal_scope: scope },
   });
   return { endpoint, secret: endpoint.secret };
+}
+
+async function ensureWebhooks(url) {
+  const platform = await ensureScopedWebhook(url, {
+    scope: "platform",
+    events: PLATFORM_EVENTS,
+    connect: false,
+  });
+  const connect = await ensureScopedWebhook(url, {
+    scope: "connect",
+    events: CONNECT_EVENTS,
+    connect: true,
+  });
+  return { platform, connect };
 }
 
 async function main() {
@@ -157,14 +182,15 @@ async function main() {
   const portal = await ensurePortalConfig(monthly, annual);
   console.log(`✔ Customer Portal config: ${portal.id}`);
 
-  let webhook = null;
+  let webhooks = null;
   const url = process.env.WEBHOOK_URL;
   if (url) {
-    webhook = await ensureWebhook(url);
-    console.log(`✔ Webhook endpoint: ${webhook.endpoint.id} → ${url}`);
+    webhooks = await ensureWebhooks(url);
+    console.log(`✔ Platform webhook: ${webhooks.platform.endpoint.id} → ${url}`);
+    console.log(`✔ Connect  webhook: ${webhooks.connect.endpoint.id} → ${url} (connect)`);
   } else {
     console.log(
-      "• WEBHOOK_URL not set — skipping webhook (re-run with it after deploying stripeWebhook).",
+      "• WEBHOOK_URL not set — skipping webhooks (re-run with it after deploying stripeWebhook).",
     );
   }
 
@@ -172,16 +198,20 @@ async function main() {
   console.log("Set these as Cloud Functions runtime env params (NOT secrets):");
   console.log(`  STRIPE_PRICE_PRO_MONTHLY=${monthly.id}`);
   console.log(`  STRIPE_PRICE_PRO_ANNUAL=${annual.id}`);
-  if (webhook?.secret) {
-    console.log("\nSet the webhook signing secret (only shown now, on first creation):");
-    console.log(`  firebase functions:secrets:set STRIPE_WEBHOOK_SECRET   # paste: ${webhook.secret}`);
-  } else if (url) {
-    console.log(
-      "\n• Webhook already existed — Stripe won't re-reveal its signing secret via API.",
-    );
-    console.log(
-      "  If it isn't saved, roll it in the Dashboard (Webhooks → endpoint → Roll secret) and set STRIPE_WEBHOOK_SECRET.",
-    );
+  if (webhooks) {
+    const both = [webhooks.platform.secret, webhooks.connect.secret];
+    if (both.every(Boolean)) {
+      console.log("\nSet the webhook signing secrets (both, comma-separated — only shown on first creation):");
+      console.log(`  firebase functions:secrets:set STRIPE_WEBHOOK_SECRET   # paste: ${both.join(",")}`);
+    } else {
+      console.log(
+        "\n• One or both webhook endpoints already existed — Stripe won't re-reveal their secrets.",
+      );
+      console.log(
+        "  If you don't have them saved, roll each in the Dashboard (Webhooks → endpoint → Roll secret)",
+      );
+      console.log("  and set STRIPE_WEBHOOK_SECRET to the two values comma-separated.");
+    }
   }
   console.log("─────────────────────────────────────────────\n");
 }

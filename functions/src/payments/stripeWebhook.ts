@@ -31,6 +31,12 @@ import {
   handlePaymentIntentProcessing,
   handlePaymentIntentSucceeded,
 } from "./handlers/paymentIntent";
+import {
+  handleUpfrontFeeCanceled,
+  handleUpfrontFeeFailed,
+  handleUpfrontFeeProcessing,
+  handleUpfrontFeeSucceeded,
+} from "./handlers/upfrontFee";
 import { handleChargeRefunded } from "./handlers/chargeRefunded";
 import {
   handleChargeDisputeClosed,
@@ -60,21 +66,26 @@ export const stripeWebhook = onRequest(
       return;
     }
 
-    let event: StripeEvent;
-    try {
-      // `req.rawBody` is the unparsed request body buffer that Firebase
-      // Functions v2 exposes alongside the parsed `req.body`. Stripe's
-      // signature is computed over the raw bytes — parsing it loses
-      // whitespace and rejection becomes inevitable.
-      event = getStripe().webhooks.constructEvent(
-        req.rawBody,
-        sig,
-        STRIPE_WEBHOOK_SECRET.value(),
-      ) as unknown as StripeEvent;
-    } catch (err) {
-      logger.warn("stripeWebhook: signature verification failed", {
-        message: err instanceof Error ? err.message : String(err),
-      });
+    let event: StripeEvent | null = null;
+    // A Connect platform has two endpoints at this URL (platform + connected
+    // accounts), each with its own signing secret. STRIPE_WEBHOOK_SECRET holds
+    // both, comma-separated; try each until one verifies. `req.rawBody` is the
+    // unparsed bytes Stripe signed — parsing loses whitespace and would reject.
+    const secrets = STRIPE_WEBHOOK_SECRET.value()
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const stripe = getStripe();
+    for (const secret of secrets) {
+      try {
+        event = stripe.webhooks.constructEvent(req.rawBody, sig, secret) as unknown as StripeEvent;
+        break;
+      } catch {
+        // try the next secret
+      }
+    }
+    if (!event) {
+      logger.warn("stripeWebhook: signature verification failed against all secrets");
       res.status(400).send("Invalid signature");
       return;
     }
@@ -107,30 +118,45 @@ export const stripeWebhook = onRequest(
         case "account.updated":
           await handleAccountUpdated(event.data.object as StripeAccount);
           break;
-        case "payment_intent.processing":
-          await handlePaymentIntentProcessing(
-            event.data.object as StripePaymentIntent,
-            event.id,
-          );
+        // PaymentIntents are either invoice payments or upfront-fee payments;
+        // metadata.paymentType routes to the right handler set (upfront fees
+        // live on a job's upfrontFee.payment, invoices on the invoice doc).
+        case "payment_intent.processing": {
+          const pi = event.data.object as StripePaymentIntent;
+          if (pi.metadata?.paymentType === "upfront_fee") {
+            await handleUpfrontFeeProcessing(pi, event.id);
+          } else {
+            await handlePaymentIntentProcessing(pi, event.id);
+          }
           break;
-        case "payment_intent.succeeded":
-          await handlePaymentIntentSucceeded(
-            event.data.object as StripePaymentIntent,
-            event.id,
-          );
+        }
+        case "payment_intent.succeeded": {
+          const pi = event.data.object as StripePaymentIntent;
+          if (pi.metadata?.paymentType === "upfront_fee") {
+            await handleUpfrontFeeSucceeded(pi, event.id);
+          } else {
+            await handlePaymentIntentSucceeded(pi, event.id);
+          }
           break;
-        case "payment_intent.payment_failed":
-          await handlePaymentIntentFailed(
-            event.data.object as StripePaymentIntent,
-            event.id,
-          );
+        }
+        case "payment_intent.payment_failed": {
+          const pi = event.data.object as StripePaymentIntent;
+          if (pi.metadata?.paymentType === "upfront_fee") {
+            await handleUpfrontFeeFailed(pi, event.id);
+          } else {
+            await handlePaymentIntentFailed(pi, event.id);
+          }
           break;
-        case "payment_intent.canceled":
-          await handlePaymentIntentCanceled(
-            event.data.object as StripePaymentIntent,
-            event.id,
-          );
+        }
+        case "payment_intent.canceled": {
+          const pi = event.data.object as StripePaymentIntent;
+          if (pi.metadata?.paymentType === "upfront_fee") {
+            await handleUpfrontFeeCanceled(pi, event.id);
+          } else {
+            await handlePaymentIntentCanceled(pi, event.id);
+          }
           break;
+        }
         case "charge.refunded":
           await handleChargeRefunded(
             event.data.object as StripeCharge,

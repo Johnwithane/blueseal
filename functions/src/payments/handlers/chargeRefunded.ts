@@ -26,6 +26,80 @@ function fmtMoney(cents: number, currency: string): string {
   );
 }
 
+// Upfront-fee refund fallback: an upfront fee paid by card lives on the job's
+// upfrontFee.payment, not an invoice. Record the refunded amount + notify; the
+// service fee isn't auto-decremented from the per-job cap (admins adjust the
+// application fee in the dashboard if they refund it). Returns true if it
+// matched a job, so the invoice path knows to stop.
+async function handleUpfrontRefund(charge: StripeCharge, eventId: string): Promise<boolean> {
+  let ref: FirebaseFirestore.DocumentReference | null = null;
+  if (charge.payment_intent) {
+    const q = await db
+      .collection("jobs")
+      .where("upfrontFee.payment.paymentIntentId", "==", charge.payment_intent)
+      .limit(1)
+      .get();
+    if (!q.empty) ref = q.docs[0].ref;
+  }
+  if (!ref) {
+    const q = await db
+      .collection("jobs")
+      .where("upfrontFee.payment.chargeId", "==", charge.id)
+      .limit(1)
+      .get();
+    if (!q.empty) ref = q.docs[0].ref;
+  }
+  if (!ref) return false;
+
+  const jobRef = ref;
+  const parties = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(jobRef);
+    if (!snap.exists) return null;
+    const data = snap.data() ?? {};
+    const payment = (data.upfrontFee?.payment ?? {}) as { lastWebhookEventId?: string | null };
+    if (payment.lastWebhookEventId === eventId) return null;
+    tx.set(
+      jobRef,
+      {
+        upfrontFee: {
+          payment: { refundedAmount: charge.amount_refunded, lastWebhookEventId: eventId },
+        },
+      },
+      { merge: true },
+    );
+    return {
+      tradespersonId: (data.tradespersonId as string) ?? "",
+      clientId: (data.clientId as string) ?? "",
+    };
+  });
+  if (!parties) return true;
+
+  const amount = fmtMoney(charge.amount_refunded, "CAD");
+  await Promise.all([
+    notify({
+      userId: parties.tradespersonId,
+      type: "invoice_refunded",
+      title: "Upfront fee refunded",
+      body: `${amount} of the upfront fee was refunded to the client.`,
+      link: `/jobs/${jobRef.id}`,
+      actorUid: parties.clientId,
+      recipientRole: "tradesperson",
+      priority: "high",
+    }),
+    notify({
+      userId: parties.clientId,
+      type: "invoice_refunded",
+      title: "Upfront fee refunded",
+      body: `${amount} has been refunded to your original payment method.`,
+      link: `/jobs/${jobRef.id}`,
+      actorUid: parties.tradespersonId,
+      recipientRole: "client",
+      priority: "high",
+    }),
+  ]);
+  return true;
+}
+
 export async function handleChargeRefunded(
   charge: StripeCharge,
   eventId: string,
@@ -55,7 +129,9 @@ export async function handleChargeRefunded(
     if (!q.empty) ref = q.docs[0].ref;
   }
   if (!ref) {
-    logger.warn("chargeRefunded: no invoice for charge", {
+    // Not an invoice payment — it may be a job's upfront fee paid by card.
+    if (await handleUpfrontRefund(charge, eventId)) return;
+    logger.warn("chargeRefunded: no invoice or upfront fee for charge", {
       chargeId: charge.id,
       paymentIntentId: charge.payment_intent,
     });

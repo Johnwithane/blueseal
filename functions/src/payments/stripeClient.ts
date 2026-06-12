@@ -14,18 +14,15 @@
 // behavior changes into already-running code.
 
 import Stripe from "stripe";
-import { defineSecret, defineString } from "firebase-functions/params";
+import { defineSecret } from "firebase-functions/params";
 
 export const STRIPE_SECRET_KEY = defineSecret("STRIPE_SECRET_KEY");
 export const STRIPE_WEBHOOK_SECRET = defineSecret("STRIPE_WEBHOOK_SECRET");
 
-// Platform fee in basis points (12% = 1200 bps). Configurable so we can
-// tune the take rate (or run promotional periods) without a code deploy.
-// Snapshot per-invoice in `InvoicePaymentState.applicationFeeBps` at
-// send-time so historical invoices stay auditable when this changes.
-export const PLATFORM_FEE_BPS = defineString("PLATFORM_FEE_BPS", {
-  default: "1200",
-});
+// NOTE: the old flat 12% commission (PLATFORM_FEE_BPS) is gone. The platform
+// take is now the Blue Seal service fee — 5% of the invoice, $2 floor, capped
+// $99 per job, waived for Pro — computed in ./serviceFee.ts and charged to the
+// client on top of the invoice (the tradesperson nets the full invoice total).
 
 // `Stripe.Account` / `Stripe.Event` aren't surfaced through stripe@22's CJS
 // types entrypoint (only the constructor is). `InstanceType<typeof Stripe>`

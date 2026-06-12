@@ -41,6 +41,10 @@ interface InvoiceLookup {
       paymentIntentId?: string | null;
       lastWebhookEventId?: string | null;
       chargeId?: string | null;
+      serviceFee?: {
+        platformPortionCents?: number;
+        chargeTotalCents?: number;
+      } | null;
     } | null;
   };
 }
@@ -82,7 +86,18 @@ function chargeId(pi: StripePaymentIntent): string | null {
 // keeps the side effects (notify, stats increment) in the calling handler
 // so the transaction stays small.
 type TransitionResult =
-  | { changed: true; clientId: string; tradespersonId: string; invoiceNumber: string; jobId: string; total: number; currency: string }
+  | {
+      changed: true;
+      clientId: string;
+      tradespersonId: string;
+      invoiceNumber: string;
+      jobId: string;
+      total: number;
+      currency: string;
+      // The full amount the client was charged (invoice total + service fee).
+      // Falls back to `total` for legacy invoices without a fee snapshot.
+      chargeTotalCents: number;
+    }
   | { changed: false; reason: "missing" | "duplicate-event" | "wrong-status" };
 
 async function applyTransition(
@@ -92,6 +107,10 @@ async function applyTransition(
   toStatus: string,
   pi: StripePaymentIntent,
   patch: Record<string, unknown>,
+  // When true, increment the job's cumulative service-fee cap counter by this
+  // payment's platform portion, inside the same transaction (guarded by the
+  // event-id check, so a duplicate delivery can't double-count).
+  incrementJobCap = false,
 ): Promise<TransitionResult> {
   return await db.runTransaction<TransitionResult>(async (tx: Transaction) => {
     const snap = await tx.get(invoiceRef);
@@ -99,6 +118,7 @@ async function applyTransition(
     const data = snap.data() ?? {};
     const payment = (data.payment ?? {}) as {
       lastWebhookEventId?: string | null;
+      serviceFee?: { platformPortionCents?: number; chargeTotalCents?: number } | null;
     };
     if (payment.lastWebhookEventId === eventId) {
       return { changed: false, reason: "duplicate-event" };
@@ -123,14 +143,25 @@ async function applyTransition(
       },
       { merge: true },
     );
+    const platformPortion = payment.serviceFee?.platformPortionCents ?? 0;
+    const jobId = (data.jobId as string) ?? "";
+    if (incrementJobCap && platformPortion > 0 && jobId) {
+      tx.set(
+        db.doc(`jobs/${jobId}`),
+        { serviceFeeCapUsedCents: FieldValue.increment(platformPortion) },
+        { merge: true },
+      );
+    }
+    const total = data.total ?? 0;
     return {
       changed: true,
       clientId: data.clientId,
       tradespersonId: data.tradespersonId,
       invoiceNumber: data.invoiceNumber ?? "",
-      jobId: data.jobId ?? "",
-      total: data.total ?? 0,
+      jobId,
+      total,
       currency: data.currency ?? "CAD",
+      chargeTotalCents: payment.serviceFee?.chargeTotalCents ?? total,
     };
   });
 }
@@ -150,7 +181,9 @@ export async function handlePaymentIntentProcessing(
   await applyTransition(
     inv.ref,
     eventId,
-    ["sent", "viewed"],
+    // Include "overdue": markInvoiceOverdue flips sent/viewed → overdue daily,
+    // so an overdue invoice paid by card must still be allowed to transition.
+    ["sent", "viewed", "overdue"],
     "processing",
     pi,
     { chargeId: chargeId(pi) },
@@ -168,12 +201,15 @@ export async function handlePaymentIntentSucceeded(
     inv.ref,
     eventId,
     // Some PaymentIntents jump straight from sent → succeeded (card flow
-    // with no async processing window). Accept both source statuses so we
-    // don't get stuck waiting for a `processing` event that never arrives.
-    ["sent", "viewed", "processing"],
+    // with no async processing window). Accept all pre-paid statuses —
+    // including "overdue" — so we don't get stuck waiting for a `processing`
+    // event that never arrives.
+    ["sent", "viewed", "processing", "overdue"],
     "paid",
     pi,
     { chargeId: chargeId(pi) },
+    // Bank the platform portion against the job's $99 cap, atomically.
+    true,
   );
   if (!result.changed) return;
 
@@ -186,6 +222,8 @@ export async function handlePaymentIntentSucceeded(
   // increments (the social-proof badge counts dollars, not just job count).
   // Done outside the invoice transaction because it crosses doc boundaries
   // and the invoice write is the source of truth for refunds / disputes.
+  // Deliberately on invoice.total (the tradesperson's actual earnings) — the
+  // service fee the client paid on top is Blue Seal's, not theirs.
   try {
     await db.doc(`tradespeople/${result.tradespersonId}`).set(
       {
@@ -218,8 +256,10 @@ export async function handlePaymentIntentSucceeded(
     notify({
       userId: result.clientId,
       type: "invoice_paid",
+      // The client's confirmation must match what their card was charged
+      // (invoice total + service fee), not the bare invoice total.
       title: `Payment received: invoice ${result.invoiceNumber}`,
-      body: `Thanks — your ${fmtMoney(result.total, result.currency)} payment cleared.`,
+      body: `Thanks — your ${fmtMoney(result.chargeTotalCents, result.currency)} payment cleared.`,
       link: result.jobId ? `/jobs/${result.jobId}` : null,
       actorUid: result.tradespersonId,
       recipientRole: "client",

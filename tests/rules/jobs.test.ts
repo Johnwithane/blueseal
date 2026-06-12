@@ -213,3 +213,57 @@ describe("jobs status-transition + change-request gate", () => {
     );
   });
 });
+
+// upfrontFee + serviceFeeCapUsedCents are server-managed (upfront-fee callables
+// + the Stripe webhook). A party must not be able to tamper with the upfront
+// credit that onJobCompleted snapshots, nor zero out the cumulative $99 fee cap
+// counter to dodge the platform fee on later payments.
+describe("jobs — server-managed payment fields", () => {
+  const client = () => env.authenticatedContext(CLIENT_UID, CLIENT_CLAIMS).firestore();
+  const tradie = () => env.authenticatedContext(TRADIE_UID, TRADIE_CLAIMS).firestore();
+  const admin = () => env.authenticatedContext(ADMIN_UID, ADMIN_CLAIMS).firestore();
+
+  const upfront = {
+    amountCents: 20_000,
+    source: "fixed",
+    paymentMethod: "manual",
+    paidAt: null,
+    paidBy: null,
+    appliedInvoiceId: null,
+  };
+
+  it("client cannot tamper with upfrontFee.amountCents", async () => {
+    await seedJob({ status: "awaiting_upfront_payment", upfrontFee: upfront });
+    await assertFails(
+      updateDoc(doc(client(), "jobs", JOB_ID), {
+        upfrontFee: { ...upfront, amountCents: 1 },
+      }),
+    );
+  });
+
+  it("tradesperson cannot set serviceFeeCapUsedCents", async () => {
+    await seedJob({ status: "in_progress" });
+    await assertFails(
+      updateDoc(doc(tradie(), "jobs", JOB_ID), { serviceFeeCapUsedCents: 0 }),
+    );
+  });
+
+  it("admin can write upfrontFee + serviceFeeCapUsedCents", async () => {
+    await seedJob({ status: "in_progress", upfrontFee: upfront });
+    await assertSucceeds(
+      updateDoc(doc(admin(), "jobs", JOB_ID), {
+        upfrontFee: { ...upfront, paidBy: "stripe" },
+        serviceFeeCapUsedCents: 9900,
+      }),
+    );
+  });
+
+  it("a party can still edit an unrelated field with the payment fields unchanged", async () => {
+    await seedJob({ status: "in_progress" });
+    await assertSucceeds(
+      updateDoc(doc(tradie(), "jobs", JOB_ID), {
+        tradespersonArchivedAt: serverTimestamp(),
+      }),
+    );
+  });
+});

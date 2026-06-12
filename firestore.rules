@@ -446,6 +446,18 @@ service cloud.firestore {
         && (isAdmin()
             || request.resource.data.get('billingType', null)
                 == resource.data.get('billingType', null))
+        // upfrontFee + serviceFeeCapUsedCents are server-managed (the upfront-fee
+        // callables + the Stripe webhook, admin SDK). Pinning upfrontFee also
+        // closes a tamper gap: a party could otherwise rewrite the amount/paidAt
+        // that onJobCompleted snapshots as the final-invoice credit.
+        // serviceFeeCapUsedCents is the cumulative per-job $99 fee counter — a
+        // party setting it could zero out the platform fee on later payments.
+        && (isAdmin()
+            || request.resource.data.get('upfrontFee', null)
+                == resource.data.get('upfrontFee', null))
+        && (isAdmin()
+            || request.resource.data.get('serviceFeeCapUsedCents', null)
+                == resource.data.get('serviceFeeCapUsedCents', null))
         // Direct (non-admin) status writes are limited to the two pre-commitment
         // client paths: marketplace intake advance (accepted→requested) and the
         // instant pre-commitment cancel (cancelJob, only from accepted/requested/
