@@ -35,16 +35,19 @@ interface Row {
   description: string;
   quantity: number;
   unitPriceDollars: number;
-  taxRate: number;
 }
 const rows = reactive<Row[]>([]);
+// One tax rate for the whole charge (GST/PST %) — recurring charges are simple;
+// per-line tax can still be tweaked on the drafted invoice before sending.
+const taxPercent = ref(0);
 
 function blankRow(): Row {
-  return { description: "", quantity: 1, unitPriceDollars: 0, taxRate: 0 };
+  return { description: "", quantity: 1, unitPriceDollars: 0 };
 }
 function reset() {
   label.value = "";
   frequency.value = "monthly";
+  taxPercent.value = 0;
   rows.splice(0, rows.length, blankRow());
 }
 watch(
@@ -55,10 +58,11 @@ watch(
 );
 
 const cents = (d: number) => Math.round(d * 100);
+const taxRate = computed(() => Math.max(0, Math.min(100, taxPercent.value || 0)) / 100);
 const totalCents = computed(() =>
   rows.reduce((s, r) => {
     const line = cents((r.quantity || 0) * (r.unitPriceDollars || 0));
-    return s + line + Math.round(line * (r.taxRate ?? 0));
+    return s + line + Math.round(line * taxRate.value);
   }, 0),
 );
 const validRows = computed(() =>
@@ -82,7 +86,7 @@ async function save() {
         description: r.description.trim(),
         quantity: r.quantity || 1,
         unitPrice: cents(r.unitPriceDollars),
-        taxRate: r.taxRate ?? 0,
+        taxRate: taxRate.value,
       })),
       discount: null,
     });
@@ -155,6 +159,18 @@ async function save() {
           </div>
         </div>
         <Button label="Add charge" icon="pi pi-plus" text size="small" class="mt-1" @click="rows.push(blankRow())" />
+      </div>
+
+      <div class="flex items-center gap-2">
+        <label class="text-xs text-[color:var(--bs-muted)]">Tax</label>
+        <NumberField
+          v-model="taxPercent"
+          :min="0"
+          :max="100"
+          :max-fraction-digits="3"
+          suffix=" %"
+          :input-class="'w-24 text-right'"
+        />
       </div>
 
       <div class="flex justify-between border-t pt-2 text-sm font-semibold">
