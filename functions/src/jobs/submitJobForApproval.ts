@@ -42,7 +42,7 @@ interface UpfrontFeeOnJob {
 
 interface JobData {
   tradespersonId: string;
-  clientId: string;
+  clientId: string | null;
   title: string;
   status: string;
   chatId: string;
@@ -287,6 +287,12 @@ export const submitJobForApproval = onCall(CALLABLE_OPTS, async (req) => {
     );
   }
 
+  // Solo (bring-your-own-client, unclaimed): there is no client to approve,
+  // so the approval round-trip is meaningless — the job goes straight to
+  // awaiting_payment and the invoice is immediately "sent". The tradesperson
+  // collects offline and records payment via the existing markJobPaid.
+  const solo = job.clientId === null;
+
   // ---------- atomic write ----------
   const batch = db.batch();
 
@@ -324,7 +330,7 @@ export const submitJobForApproval = onCall(CALLABLE_OPTS, async (req) => {
       clientId: job.clientId,
       jobId,
       invoiceNumber,
-      status: "draft",
+      status: solo ? "sent" : "draft",
       lineItems: mergedLines,
       subtotal: totals.subtotal,
       discount,
@@ -334,7 +340,7 @@ export const submitJobForApproval = onCall(CALLABLE_OPTS, async (req) => {
       currency: "CAD",
       issuedAt: FieldValue.serverTimestamp(),
       dueAt: null,
-      sentAt: null,
+      sentAt: solo ? FieldValue.serverTimestamp() : null,
       viewedAt: null,
       paidAt: null,
       pdfUrl: null,
@@ -348,6 +354,7 @@ export const submitJobForApproval = onCall(CALLABLE_OPTS, async (req) => {
       batch.update(jobRef, { "upfrontFee.appliedInvoiceId": invoiceRef.id });
     }
   } else {
+    const existingStatus = (invoiceSnap.data() as { status?: string }).status;
     batch.update(invoiceRef, {
       lineItems: mergedLines,
       subtotal: totals.subtotal,
@@ -358,6 +365,10 @@ export const submitJobForApproval = onCall(CALLABLE_OPTS, async (req) => {
       // Refresh the credit on re-submits so a quote-side change before
       // approval propagates. No-op when nothing changed.
       upfrontFeeCredit,
+      // Solo re-submit: there's no clientApproveJob to flip draft → sent.
+      ...(solo && existingStatus === "draft"
+        ? { status: "sent", sentAt: FieldValue.serverTimestamp() }
+        : {}),
     });
     if (upfrontFeeCredit && !upfrontFee?.appliedInvoiceId) {
       batch.update(jobRef, { "upfrontFee.appliedInvoiceId": invoiceRef.id });
@@ -365,8 +376,8 @@ export const submitJobForApproval = onCall(CALLABLE_OPTS, async (req) => {
   }
 
   batch.update(jobRef, {
-    status: "awaiting_client_approval",
-    clientApprovalRequestedAt: FieldValue.serverTimestamp(),
+    status: solo ? "awaiting_payment" : "awaiting_client_approval",
+    clientApprovalRequestedAt: solo ? null : FieldValue.serverTimestamp(),
     clientApprovedAt: null,
     // Clear any prior "changes requested" signal so the tradesperson-side
     // banner / "Update invoice" CTA disappears once the revised wrap-up
@@ -379,28 +390,35 @@ export const submitJobForApproval = onCall(CALLABLE_OPTS, async (req) => {
 
   // ---------- chat + notification (best-effort, post-commit) ----------
   const tradieName = tradie.displayName?.trim() || "The tradesperson";
-  const messageParts = [
-    `${tradieName} marked the work as done.`,
-    noteToClient.trim() ? `Note: "${noteToClient.trim()}"` : "",
-    `Total: $${(totals.total / 100).toFixed(2)} — review and approve to send the invoice.`,
-  ].filter(Boolean);
+  const messageParts = solo
+    ? [
+        `${tradieName} finalized the invoice ($${(totals.total / 100).toFixed(2)}).`,
+        "Solo job — no client approval step. Record payment when you've been paid.",
+      ]
+    : [
+        `${tradieName} marked the work as done.`,
+        noteToClient.trim() ? `Note: "${noteToClient.trim()}"` : "",
+        `Total: $${(totals.total / 100).toFixed(2)} — review and approve to send the invoice.`,
+      ].filter(Boolean);
 
   if (job.chatId) {
     await postSystemMessage(job.chatId, messageParts.join("\n"));
   }
 
-  await notify({
-    userId: job.clientId,
-    type: "invoice_sent",
-    title: `${tradieName} finished the work`,
-    body: `Review the wrap-up and approve to receive the invoice ($${(totals.total / 100).toFixed(2)}).`,
-    link: `/jobs/${jobId}`,
-    actorUid: uid,
-    jobId,
-    chatId: job.chatId ?? null,
-    recipientRole: "client",
-    priority: "high",
-  });
+  if (!solo) {
+    await notify({
+      userId: job.clientId,
+      type: "invoice_sent",
+      title: `${tradieName} finished the work`,
+      body: `Review the wrap-up and approve to receive the invoice ($${(totals.total / 100).toFixed(2)}).`,
+      link: `/jobs/${jobId}`,
+      actorUid: uid,
+      jobId,
+      chatId: job.chatId ?? null,
+      recipientRole: "client",
+      priority: "high",
+    });
+  }
 
   logger.info("submitJobForApproval", {
     jobId,

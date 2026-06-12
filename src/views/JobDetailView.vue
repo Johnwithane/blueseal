@@ -50,6 +50,7 @@ import { useFormatters } from "@/composables/useFormatters";
 import FinishJobSheet from "@/components/FinishJobSheet.vue";
 import ClientApprovalBanner from "@/components/ClientApprovalBanner.vue";
 import InviteStatusBanner from "@/components/InviteStatusBanner.vue";
+import RecordOfflineAcceptanceBanner from "@/components/RecordOfflineAcceptanceBanner.vue";
 import QuoteSheet from "@/components/QuoteSheet.vue";
 import ClientQuoteApprovalBanner from "@/components/ClientQuoteApprovalBanner.vue";
 import UpfrontFeePaymentBanner from "@/components/UpfrontFeePaymentBanner.vue";
@@ -1229,6 +1230,16 @@ function onReturnToApplicants() {
         :job-id="job.id"
         class="mb-4"
         @decided="load"
+      />
+
+      <!-- Solo (bring-your-own-client) counterpart: no client on Blue Seal to
+           accept the quote, so the tradesperson records the offline acceptance
+           their client gave them. -->
+      <RecordOfflineAcceptanceBanner
+        v-if="isTradie && job.clientId === null && job.status === 'quoted'"
+        :job-id="job.id"
+        class="mb-4"
+        @recorded="load"
       />
 
       <UpfrontFeePaymentBanner

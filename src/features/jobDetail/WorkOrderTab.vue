@@ -55,6 +55,7 @@ const approvedHourlyExtras = computed(() =>
       :is-tradie="isTradie"
       :is-client="isClient"
       :extras="extras"
+      :solo="job.clientId === null"
     />
 
     <!-- Receipts → reimbursable line items. Tradesperson-only (receipts

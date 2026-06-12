@@ -856,6 +856,12 @@ service cloud.firestore {
         && jobDoc(request.resource.data.jobId).data.clientId == uid()
         && jobDoc(request.resource.data.jobId).data.tradespersonId == request.resource.data.tradespersonId
         && jobDoc(request.resource.data.jobId).data.status in ['complete', 'reviewed']
+        // Reputation firewall: a job whose quote acceptance was recorded
+        // offline by the tradesperson (bring-your-own-client solo mode) never
+        // produces public reviews — there was no verified in-app acceptance,
+        // so the "client" here could be the tradesperson's own late-claimed
+        // invite. `.get(…, false)` defaults legacy jobs (no field) to allowed.
+        && jobDoc(request.resource.data.jobId).data.get('acceptedOffline', false) == false
         && (
           // Pair may not exist yet (e.g. pre-cutover job, or the seeder
           // raced) — allow either. If it does exist, it must not be locked.
@@ -883,7 +889,14 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/jobs/$(request.resource.data.jobId))
         && jobDoc(request.resource.data.jobId).data.tradespersonId == uid()
         && jobDoc(request.resource.data.jobId).data.clientId == request.resource.data.clientId
+        // The job must HAVE a client. Without this, an unclaimed invite job
+        // (clientId null) would pass the line above via null == null and let
+        // the tradesperson file a phantom client review on their solo job.
+        && jobDoc(request.resource.data.jobId).data.clientId is string
         && jobDoc(request.resource.data.jobId).data.status in ['complete', 'reviewed']
+        // Same reputation firewall as /reviews — offline-accepted jobs never
+        // produce reviews in either direction.
+        && jobDoc(request.resource.data.jobId).data.get('acceptedOffline', false) == false
         && (
           !exists(/databases/$(database)/documents/reviewPairs/$(request.resource.data.jobId))
           || get(/databases/$(database)/documents/reviewPairs/$(request.resource.data.jobId)).data.locked == false

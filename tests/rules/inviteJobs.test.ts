@@ -226,6 +226,86 @@ describe("invite jobs — server-managed fields are pinned", () => {
   });
 });
 
+describe("invite jobs — reputation firewall on reviews", () => {
+  async function seedCompletedJob(id: string, extras: Record<string, unknown> = {}) {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "jobs", id), {
+        clientId: CLIENT_UID,
+        tradespersonId: TRADIE_UID,
+        chatId: `chat_${id}`,
+        status: "complete",
+        trade: "plumber",
+        createdAt: Timestamp.now(),
+        ...extras,
+      });
+    });
+  }
+
+  it("client cannot review an offline-accepted job (even after claiming)", async () => {
+    await seedCompletedJob("offline_job", { acceptedOffline: true });
+    const client = env.authenticatedContext(CLIENT_UID, CLIENT_CLAIMS).firestore();
+    await assertFails(
+      setDoc(doc(client, "reviews", "rev_offline"), {
+        jobId: "offline_job",
+        clientId: CLIENT_UID,
+        tradespersonId: TRADIE_UID,
+        status: "active",
+        rating: 5,
+        text: "great",
+        createdAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  it("client review on a normal completed job still works (legacy default)", async () => {
+    // No acceptedOffline field at all — the .get(…, false) default must not
+    // lock legacy jobs out (documented failure mode at rules:84-91).
+    await seedCompletedJob("normal_complete_job");
+    const client = env.authenticatedContext(CLIENT_UID, CLIENT_CLAIMS).firestore();
+    await assertSucceeds(
+      setDoc(doc(client, "reviews", "rev_normal"), {
+        jobId: "normal_complete_job",
+        clientId: CLIENT_UID,
+        tradespersonId: TRADIE_UID,
+        status: "active",
+        rating: 5,
+        text: "great",
+        createdAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  it("tradesperson cannot file a phantom client review on a solo job (null == null)", async () => {
+    await seedCompletedJob("solo_complete_job", { clientId: null, acceptedOffline: true });
+    const tradie = env.authenticatedContext(TRADIE_UID, TRADIE_CLAIMS).firestore();
+    await assertFails(
+      setDoc(doc(tradie, "clientReviews", "crev_solo"), {
+        jobId: "solo_complete_job",
+        clientId: null,
+        tradespersonId: TRADIE_UID,
+        rating: 5,
+        text: "fake great client",
+        createdAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  it("tradesperson client-review on a normal completed job still works", async () => {
+    await seedCompletedJob("normal_complete_job2");
+    const tradie = env.authenticatedContext(TRADIE_UID, TRADIE_CLAIMS).firestore();
+    await assertSucceeds(
+      setDoc(doc(tradie, "clientReviews", "crev_normal"), {
+        jobId: "normal_complete_job2",
+        clientId: CLIENT_UID,
+        tradespersonId: TRADIE_UID,
+        rating: 5,
+        text: "good client",
+        createdAt: serverTimestamp(),
+      }),
+    );
+  });
+});
+
 describe("invite jobs — subcollections with null clientId", () => {
   it("tradesperson can book a session on an unclaimed job (row clientId null matches parent)", async () => {
     await seedInviteJob();

@@ -21,7 +21,7 @@ const Input = z.object({
 });
 
 interface JobData {
-  clientId: string;
+  clientId: string | null;
   tradespersonId: string;
   status: string;
   chatId?: string;
@@ -67,6 +67,14 @@ export const proposeSiteVisit = onCall(CALLABLE_OPTS, async (req) => {
       throw new HttpsError(
         "failed-precondition",
         "A site visit can only be requested before the quote is accepted.",
+      );
+    }
+    // Solo (unclaimed invite) jobs: there's no client to agree to the visit —
+    // the tradesperson arranges it with their own client directly.
+    if (job.clientId === null) {
+      throw new HttpsError(
+        "failed-precondition",
+        "This job has no client on Blue Seal yet — arrange the visit with your client directly.",
       );
     }
     // Re-proposing is fine from absent/proposed/declined, but never wipe an

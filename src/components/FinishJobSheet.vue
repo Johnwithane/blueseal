@@ -526,14 +526,23 @@ async function onSubmit() {
       discount: discountForCallable.value,
       noteToClient: noteToClient.value.trim(),
     });
-    toast.success(
-      "Sent to client",
-      "They'll review the work and approve to receive the invoice.",
-    );
+    if (props.clientId === null) {
+      // Solo (bring-your-own-client): no approval round-trip — the invoice is
+      // final immediately and the job is awaiting payment.
+      toast.success(
+        "Invoice finalized",
+        "The job is awaiting payment — record it once your client pays.",
+      );
+    } else {
+      toast.success(
+        "Sent to client",
+        "They'll review the work and approve to receive the invoice.",
+      );
+    }
     emit("submitted");
     emit("update:visible", false);
   } catch (e) {
-    toast.error("Couldn't send for approval", humanizeError(e));
+    toast.error("Couldn't finish the job", humanizeError(e));
   } finally {
     submitting.value = false;
   }
@@ -961,7 +970,7 @@ function close() {
             belowUpfrontFloor
               ? `Must cover the ${money(upfrontCredit)} upfront`
               : totals.total > 0
-                ? `Send for approval — ${money(totals.total)}`
+                ? `${props.clientId === null ? 'Finalize invoice' : 'Send for approval'} — ${money(totals.total)}`
                 : 'Add something to bill first'
           "
           icon="pi pi-send"

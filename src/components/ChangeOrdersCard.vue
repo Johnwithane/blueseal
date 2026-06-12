@@ -16,6 +16,10 @@ const props = defineProps<{
   isTradie: boolean;
   isClient: boolean;
   extras: WithId<JobExtraDoc>[];
+  // Solo (bring-your-own-client, unclaimed) job: there's no client to approve
+  // a change order, so proposing is disabled — extra work bills via a custom
+  // invoice line instead. Mirrors the proposeExtra callable's gate.
+  solo?: boolean;
 }>();
 
 const { money } = useFormatters();
@@ -89,11 +93,17 @@ function withdraw(ex: WithId<JobExtraDoc>) {
       <div class="min-w-0">
         <h3 class="font-semibold text-sm">Change orders</h3>
         <p class="text-xs text-[color:var(--bs-muted)] mt-0.5">
-          Extra work beyond the original quote. The client approves each one before it's billed.
+          <template v-if="solo">
+            Your client isn't on Blue Seal yet — add extra work as a line item
+            when you finish and invoice the job.
+          </template>
+          <template v-else>
+            Extra work beyond the original quote. The client approves each one before it's billed.
+          </template>
         </p>
       </div>
       <Button
-        v-if="isTradie"
+        v-if="isTradie && !solo"
         label="Add"
         icon="pi pi-plus"
         size="small"

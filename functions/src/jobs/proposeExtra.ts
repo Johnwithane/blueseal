@@ -20,7 +20,7 @@ const Input = z.object({
 });
 
 interface JobData {
-  clientId: string;
+  clientId: string | null;
   tradespersonId: string;
   status: string;
   chatId?: string;
@@ -59,6 +59,15 @@ export const proposeExtra = onCall(CALLABLE_OPTS, async (req) => {
       throw new HttpsError(
         "failed-precondition",
         "Change orders can only be added once the job is in progress.",
+      );
+    }
+    // Solo (unclaimed invite) jobs: there's no client to approve a change
+    // order, so a proposal would stall pending forever. Out-of-scope work on
+    // a solo job bills via a custom line item on the invoice instead.
+    if (job.clientId === null) {
+      throw new HttpsError(
+        "failed-precondition",
+        "This job has no client on Blue Seal yet — add extra work as an invoice line item instead.",
       );
     }
 

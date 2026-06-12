@@ -75,6 +75,7 @@ export { respondSiteVisit } from "./jobs/respondSiteVisit";
 // Invite jobs (bring-your-own-client): tradesperson-created jobs for
 // off-platform clients, run solo until the client claims their invite.
 export { createInviteJob } from "./jobs/createInviteJob";
+export { recordOfflineQuoteAcceptance } from "./jobs/recordOfflineQuoteAcceptance";
 
 // Invoicing
 export { onJobCompleted } from "./invoicing/onJobCompleted";

@@ -165,3 +165,17 @@ export async function clientDeclineQuote(
   const res = await fn({ jobId, reason });
   return res.data;
 }
+
+// Solo-mode (bring-your-own-client) only: the tradesperson attests their
+// off-platform client accepted the quote outside Blue Seal. No signature —
+// the quote + job are stamped acceptedOffline, which permanently excludes
+// the job from public reviews. The callable rejects once a client has
+// claimed the invite.
+export async function recordOfflineQuoteAcceptance(jobId: string): Promise<{ ok: true }> {
+  const fn = httpsCallable<{ jobId: string; attestation: true }, { ok: true }>(
+    functions,
+    "recordOfflineQuoteAcceptance",
+  );
+  const res = await fn({ jobId, attestation: true });
+  return res.data;
+}

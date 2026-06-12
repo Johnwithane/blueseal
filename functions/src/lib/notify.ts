@@ -93,7 +93,10 @@ export type NotificationType =
 export type NotifyPriority = "low" | "normal" | "high";
 
 export interface NotifyInput {
-  userId: string;
+  // null is tolerated (and skipped with a warn) so job-flow callsites can
+  // pass job.clientId directly — it's null on unclaimed bring-your-own-client
+  // jobs, where there is simply nobody to notify.
+  userId: string | null;
   type: NotificationType;
   title: string;
   body: string;

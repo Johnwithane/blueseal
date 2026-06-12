@@ -15,9 +15,10 @@ const Input = z.object({
 
 interface JobData {
   tradespersonId: string;
-  clientId: string;
+  clientId: string | null;
   status: string;
   chatId: string;
+  acceptedOffline?: boolean;
 }
 
 interface InvoiceData {
@@ -77,6 +78,7 @@ export const markJobPaid = onCall(CALLABLE_OPTS, async (req) => {
       chatId: job.chatId,
       invoiceNumber: invoice.invoiceNumber,
       total: invoice.total,
+      acceptedOffline: job.acceptedOffline === true,
     };
   });
 
@@ -106,6 +108,16 @@ export const markJobPaid = onCall(CALLABLE_OPTS, async (req) => {
   // the create branch; if the pair already existed (because the client
   // marked paid moments earlier) the partner notification was already
   // sent there.
+  //
+  // Reputation firewall: never seed a pair for a job with no client party
+  // (solo bring-your-own-client) or whose quote acceptance was recorded
+  // offline by the tradesperson — there's no verified counterparty, so a
+  // review here would be fabricable reputation. The reviews create rules
+  // enforce the same gate server-side.
+  if (result.clientId === null || result.acceptedOffline) {
+    logger.info("markJobPaid: review pair skipped (solo/offline-accepted job)", { jobId });
+    return { ok: true };
+  }
   try {
     const { created } = await ensureReviewPair({
       jobId,

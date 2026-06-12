@@ -15,9 +15,10 @@ const Input = z.object({
 
 interface JobData {
   tradespersonId: string;
-  clientId: string;
+  clientId: string | null;
   status: string;
   chatId: string;
+  acceptedOffline?: boolean;
 }
 
 interface InvoiceData {
@@ -84,6 +85,7 @@ export const clientMarkPaid = onCall(CALLABLE_OPTS, async (req) => {
       chatId: job.chatId,
       invoiceNumber: invoice.invoiceNumber,
       total: invoice.total,
+      acceptedOffline: job.acceptedOffline === true,
     };
   });
 
@@ -111,6 +113,15 @@ export const clientMarkPaid = onCall(CALLABLE_OPTS, async (req) => {
   // paid callable). ensureReviewPair is idempotent; we only fire the
   // initial fan-out on the create branch so we don't double-prompt when
   // both callables race.
+  //
+  // Reputation firewall (mirrors markJobPaid): a client who claimed their
+  // invite AFTER the tradesperson recorded an offline quote acceptance can
+  // pay the invoice, but the job never feeds public reviews — the binding
+  // acceptance wasn't made by a verified counterparty in-app.
+  if (result.acceptedOffline) {
+    logger.info("clientMarkPaid: review pair skipped (offline-accepted job)", { jobId });
+    return { ok: true };
+  }
   try {
     const { created } = await ensureReviewPair({
       jobId,
