@@ -36,7 +36,16 @@ export async function resolveFileUrl(fileRef: string): Promise<string> {
 export function makeStoragePath(opts: {
   scope: "users" | "tradespeople" | "jobs" | "chats" | "invoices";
   id: string;
-  bucket?: "profile" | "portfolio" | "logo" | "certs" | "id" | "intake" | "insurance" | "wsib";
+  bucket?:
+    | "profile"
+    | "portfolio"
+    | "logo"
+    | "banner"
+    | "certs"
+    | "id"
+    | "intake"
+    | "insurance"
+    | "wsib";
   filename: string;
 }): string {
   const safe = opts.filename.replace(/[^a-zA-Z0-9._-]/g, "_");

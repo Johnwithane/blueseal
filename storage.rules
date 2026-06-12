@@ -85,6 +85,14 @@ service firebase.storage {
       allow write: if isOwner(tradieId) && smallSizeOk() && isCompressedImage();
     }
 
+    // Tradesperson banner — owner write, world read. Wide letterhead image
+    // shown at the top of branded invoice / quote PDFs (Blue Seal Pro). Same
+    // pipeline as the logo: client compresses to WebP/JPEG before write.
+    match /tradespeople/{tradieId}/banner/{file=**} {
+      allow read: if true;
+      allow write: if isOwner(tradieId) && smallSizeOk() && isCompressedImage();
+    }
+
     // Certifications — owner write, admin + owner read. WebP or PDF.
     match /tradespeople/{tradieId}/certs/{file=**} {
       allow read: if isOwner(tradieId) || isAdmin();

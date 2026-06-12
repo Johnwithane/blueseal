@@ -501,6 +501,11 @@ export interface InvoicePartyInfo {
     name: string;
     companyName: string | null;
     companyLogoUrl: string | null;
+    // Custom branding (Pro) — already gated server-side: these are null unless
+    // the tradesperson is Pro.
+    brandColor: string | null;
+    bannerUrl: string | null;
+    isPro: boolean;
     address: string | null;
     phone: string | null;
     email: string | null;

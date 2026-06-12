@@ -103,6 +103,7 @@ const proCtaLabel = computed(() => {
           <li class="flex gap-2"><i class="pi pi-star-fill text-[color:var(--bs-blue)]"></i> <span><strong>Featured placement</strong> on clients' job posts</span></li>
           <li class="flex gap-2"><i class="pi pi-star-fill text-[color:var(--bs-blue)]"></i> <span><strong>Business reports + CSV export</strong> for tax time</span></li>
           <li class="flex gap-2"><i class="pi pi-star-fill text-[color:var(--bs-blue)]"></i> <span><strong>Clients &amp; recurring billing</strong> — a client book + standing charges Blue Seal drafts for you each period</span></li>
+          <li class="flex gap-2"><i class="pi pi-star-fill text-[color:var(--bs-blue)]"></i> <span><strong>Branded quotes &amp; invoices</strong> — your logo, banner &amp; brand colour on every PDF and on-screen</span></li>
         </ul>
         <Button
           :label="proCtaLabel"

@@ -162,6 +162,7 @@ async function manage() {
         <li><strong>Featured placement</strong> — your applications appear first on clients' job posts.</li>
         <li><strong>Business reports + CSV export</strong> — revenue, tax collected, and an accountant-ready export.</li>
         <li><strong>Clients &amp; recurring billing</strong> — keep a client book and put your regulars on a standing charge Blue Seal drafts for you to review and send each period.</li>
+        <li><strong>Branded quotes &amp; invoices</strong> — your logo, a letterhead banner, and your brand colour on the quotes and invoices clients see (PDF + on-screen).</li>
       </ul>
       <p class="mt-3 text-xs text-[color:var(--bs-muted)]">
         Receipt scanning stays free for everyone. Cancel anytime — you keep Pro until the end of the period you've paid for.

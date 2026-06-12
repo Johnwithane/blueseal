@@ -121,6 +121,9 @@ async function setRecurring(freq: RecurringFrequency | "off") {
 // propagate immediately. Null when the tradesperson hasn't uploaded one.
 const tradieLogoUrl = ref<string | null>(null);
 const tradieCompanyName = ref<string | null>(null);
+// Brand colour (Pro) — tints the company name to match the PDF. Null unless
+// the tradesperson is Pro and has set one.
+const tradieBrandColor = ref<string | null>(null);
 // UI rows: same shape as LineItem but `unitPrice` is in DOLLARS for NumberField
 // currency mode to render correctly. Converted to cents on save. `id` is
 // preserved end-to-end so pulled-in entries/expenses don't get re-pulled
@@ -220,11 +223,16 @@ async function load() {
   if (invoice.value) {
     try {
       const t = await getTradesperson(invoice.value.tradespersonId);
-      tradieLogoUrl.value = t?.companyLogoUrl ?? null;
-      tradieCompanyName.value = t?.companyName ?? null;
+      // All branding is Pro — gate the on-screen header on the tradesperson's
+      // isPro so it matches the (server-gated) PDF.
+      const pro = t?.isPro === true;
+      tradieLogoUrl.value = pro ? (t?.companyLogoUrl ?? null) : null;
+      tradieCompanyName.value = pro ? (t?.companyName ?? null) : null;
+      tradieBrandColor.value = pro ? (t?.brandColor ?? null) : null;
     } catch {
       tradieLogoUrl.value = null;
       tradieCompanyName.value = null;
+      tradieBrandColor.value = null;
     }
   }
   items.value = (invoice.value?.lineItems ?? []).map((li) => ({
@@ -472,7 +480,11 @@ async function markPaid() {
           alt="Company logo"
           class="h-10 w-10 rounded object-contain bg-white"
         />
-        <div v-if="tradieCompanyName" class="text-sm font-semibold">
+        <div
+          v-if="tradieCompanyName"
+          class="text-sm font-semibold"
+          :style="tradieBrandColor ? { color: tradieBrandColor } : undefined"
+        >
           {{ tradieCompanyName }}
         </div>
       </div>

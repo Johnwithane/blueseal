@@ -31,6 +31,11 @@ interface TradespersonData {
   displayName?: string | null;
   companyName?: string | null;
   companyLogoUrl?: string | null;
+  // Custom branding (Pro). Applied only when isPro — gated here so non-Pro
+  // PDFs never even receive the branding.
+  brandColor?: string | null;
+  bannerUrl?: string | null;
+  isPro?: boolean;
 }
 
 // Address + billing contact moved to tradespeople/{uid}/private/contact.
@@ -46,6 +51,9 @@ interface PartyInfoResult {
     name: string;
     companyName: string | null;
     companyLogoUrl: string | null;
+    brandColor: string | null;
+    bannerUrl: string | null;
+    isPro: boolean;
     address: string | null;
     phone: string | null;
     email: string | null;
@@ -130,11 +138,18 @@ export const getInvoicePartyInfo = onCall(
       tradieContact.primaryAddressText?.trim() ||
       null;
 
+    // All custom branding (logo, colour, banner) is Blue Seal Pro — gate it on
+    // the public isPro mirror so non-Pro PDFs fall back to the Blue Seal header.
+    const tradieIsPro = tradieDoc.isPro === true;
+
     return {
       tradesperson: {
         name: tradespersonName,
         companyName: tradieDoc.companyName?.trim() || null,
-        companyLogoUrl: tradieDoc.companyLogoUrl?.trim() || null,
+        companyLogoUrl: tradieIsPro ? tradieDoc.companyLogoUrl?.trim() || null : null,
+        brandColor: tradieIsPro ? tradieDoc.brandColor?.trim() || null : null,
+        bannerUrl: tradieIsPro ? tradieDoc.bannerUrl?.trim() || null : null,
+        isPro: tradieIsPro,
         address: tradieAddress,
         phone: tradieContact.businessPhone?.trim() || tradieUser.phone?.trim() || null,
         email: tradieUser.email?.trim() || null,

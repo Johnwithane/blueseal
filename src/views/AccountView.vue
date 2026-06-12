@@ -55,6 +55,7 @@ import TradieDocsManager from "@/components/TradieDocsManager.vue";
 import VouchesPanel from "@/components/VouchesPanel.vue";
 import PayoutsPanel from "@/components/PayoutsPanel.vue";
 import SubscriptionPanel from "@/components/SubscriptionPanel.vue";
+import BrandingPanel from "@/components/BrandingPanel.vue";
 import GoogleBusinessPanel from "@/components/GoogleBusinessPanel.vue";
 import LocationPicker, { type LocationValue } from "@/components/LocationPicker.vue";
 import TabBar from "@/components/TabBar.vue";
@@ -117,14 +118,8 @@ const serviceLocation = ref<LocationValue>({
 });
 const savingServiceArea = ref(false);
 
-// Company logo — shown at the top of generated invoice + quote PDFs in
-// place of the Blue Seal wordmark. Writes the public download URL to
-// /tradespeople/{uid}.companyLogoUrl; null when the tradesperson hasn't
-// uploaded one (defaults back to the Blue Seal mark on the PDF).
-const companyLogoUrl = ref<string | null>(null);
-const uploadingLogo = ref(false);
-const logoFileInput = ref<HTMLInputElement | null>(null);
-const removingLogo = ref(false);
+// Company logo + banner + brand colour now live in <BrandingPanel> (Pro-gated,
+// self-contained). Removed from here so there's one owner of that state.
 
 // Invoice / quote numbering customisation. Stamp shape is always
 // `${prefix}-${year}-${0001}`; tradies migrating from QuickBooks /
@@ -405,7 +400,6 @@ onMounted(async () => {
       languages.value = Array.isArray(t.languages) ? [...t.languages] : [];
       // `undefined` (pre-cutover docs) counts as listed/public.
       discoverableOn.value = t.discoverable !== false;
-      companyLogoUrl.value = t.companyLogoUrl ?? null;
       invoicePrefix.value = t.invoicePrefix ?? "INV";
       quotePrefix.value = t.quotePrefix ?? "Q";
       nextInvoiceNumber.value = t.nextInvoiceNumber ?? 1;
@@ -596,53 +590,6 @@ async function shareProfile() {
     toast.success("Link copied to clipboard");
   } catch {
     toast.error("Couldn't copy link");
-  }
-}
-
-async function onLogoChange(e: Event) {
-  if (!auth.fbUser) return;
-  const target = e.target as HTMLInputElement;
-  const file = target.files?.[0];
-  if (!file) return;
-  uploadingLogo.value = true;
-  error.value = null;
-  try {
-    // Bigger max dimension than the profile avatar — invoice headers
-    // render the logo at ~38pt on letter-size paper so we want enough
-    // resolution to stay crisp on high-DPI screens / printing.
-    const compressed = await compressToWebp(file, { maxDimension: 1024, quality: 0.92 });
-    const path = makeStoragePath({
-      scope: "tradespeople",
-      id: auth.fbUser.uid,
-      bucket: "logo",
-      filename: compressed.name,
-    });
-    const url = await uploadFile(path, compressed);
-    await createOrUpdateDraft(auth.fbUser.uid, { companyLogoUrl: url });
-    companyLogoUrl.value = url;
-    if (tradie.value) tradie.value.companyLogoUrl = url;
-    toast.success("Company logo updated");
-  } catch (e) {
-    error.value = humanizeError(e);
-  } finally {
-    uploadingLogo.value = false;
-    target.value = "";
-  }
-}
-
-async function removeLogo() {
-  if (!auth.fbUser) return;
-  removingLogo.value = true;
-  error.value = null;
-  try {
-    await createOrUpdateDraft(auth.fbUser.uid, { companyLogoUrl: null });
-    companyLogoUrl.value = null;
-    if (tradie.value) tradie.value.companyLogoUrl = null;
-    toast.success("Company logo removed");
-  } catch (e) {
-    error.value = humanizeError(e);
-  } finally {
-    removingLogo.value = false;
   }
 }
 
@@ -1182,59 +1129,9 @@ async function grantAllTrades() {
               </div>
             </form>
 
-            <!-- Company logo. Lives outside the form because it auto-saves
-                 on file pick (matches the profile photo pattern). -->
-            <div class="mt-4 rounded-lg border border-[color:var(--bs-border)] bg-[color:var(--bs-surface-alt,#f9fafb)] p-3 space-y-3">
-              <div class="flex items-center gap-2">
-                <i class="pi pi-image text-[color:var(--bs-blue)]"></i>
-                <h4 class="text-sm font-semibold m-0">Company logo on invoices</h4>
-              </div>
-              <p class="text-xs text-[color:var(--bs-muted)] -mt-2">
-                Replaces the Blue Seal mark at the top of your invoices and
-                quotes. Square images work best — we'll compress to WebP
-                under 1024px.
-              </p>
-              <div class="flex items-center gap-3">
-                <img
-                  v-if="companyLogoUrl"
-                  :src="companyLogoUrl"
-                  alt="Company logo"
-                  class="h-16 w-16 rounded border border-[color:var(--bs-border)] bg-white object-contain"
-                />
-                <div
-                  v-else
-                  class="h-16 w-16 rounded border border-dashed border-[color:var(--bs-border)] flex items-center justify-center text-[color:var(--bs-muted)] bg-white"
-                >
-                  <i class="pi pi-image text-xl" aria-hidden="true"></i>
-                </div>
-                <div class="flex flex-col gap-2">
-                  <Button
-                    :label="companyLogoUrl ? 'Replace logo' : 'Upload logo'"
-                    icon="pi pi-upload"
-                    outlined
-                    size="small"
-                    :loading="uploadingLogo"
-                    @click="logoFileInput?.click()"
-                  />
-                  <Button
-                    v-if="companyLogoUrl"
-                    label="Remove"
-                    icon="pi pi-times"
-                    severity="danger"
-                    text
-                    size="small"
-                    :loading="removingLogo"
-                    @click="removeLogo"
-                  />
-                  <input
-                    ref="logoFileInput"
-                    type="file"
-                    accept="image/*"
-                    class="hidden"
-                    @change="onLogoChange"
-                  />
-                </div>
-              </div>
+            <!-- Logo + letterhead banner + brand colour (Blue Seal Pro). -->
+            <div class="mt-4">
+              <BrandingPanel />
             </div>
 
             <!-- Invoice / quote numbering. Separate save button since

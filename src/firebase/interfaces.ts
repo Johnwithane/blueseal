@@ -341,6 +341,14 @@ export interface TradespersonDoc {
   // rebrand want their old invoices to look current if a client
   // re-downloads). Optional/null when the tradesperson hasn't uploaded one.
   companyLogoUrl?: string | null;
+  // Custom branding for quotes + invoices — Blue Seal Pro. Only applied (on the
+  // PDF and on-screen) when the tradesperson is Pro; free accounts always get
+  // the default Blue Seal header. `brandColor` is a "#RRGGBB" hex driving the
+  // header band + accents (text contrast is auto-picked). `bannerUrl` is a
+  // wide letterhead image, the public download URL of an upload at
+  // `tradespeople/{uid}/banner/...`. Both null/absent until set.
+  brandColor?: string | null;
+  bannerUrl?: string | null;
   submittedAt: Timestamp | null;
   approvedAt: Timestamp | null;
   // Stripe Connect Express state — mirrored from Stripe via the

@@ -285,6 +285,7 @@ Want an edge? **Blue Seal Pro** features your applications at the top of clients
 - **Featured placement** — your applications appear first on clients' job posts, marked "Featured".
 - **Business reports + CSV export** — revenue and tax-collected summaries plus an accountant-ready export.
 - **Clients & recurring billing** — keep a client book (add or import your existing clients) and put your regulars on a standing charge Blue Seal drafts for you to review and send each period.
+- **Branded quotes & invoices** — put your logo, a letterhead banner, and your brand colour on every quote and invoice, on the PDF and on screen.
 
 **Price:** $29 CAD/month or $290 CAD/year (two months free on annual). Every new subscription starts with a **30-day free trial** — a card is required, but you won't be charged until the trial ends, and you can cancel anytime before then for $0.
 
@@ -564,7 +565,7 @@ const faqs: FaqItem[] = [
   {
     question: "What is Blue Seal Pro and how much does it cost?",
     answer:
-      "Blue Seal Pro is an optional upgrade for tradespeople — $29 CAD/month or $290 CAD/year — with a 30-day free trial. It adds the AI assistant, waives the Blue Seal service fee for your clients on card payments, features your applications at the top of clients' job posts, includes business reports with a CSV export, and gives you a client book with recurring billing for your regulars. The core app stays free.",
+      "Blue Seal Pro is an optional upgrade for tradespeople — $29 CAD/month or $290 CAD/year — with a 30-day free trial. It adds the AI assistant, waives the Blue Seal service fee for your clients on card payments, features your applications at the top of clients' job posts, includes business reports with a CSV export, gives you a client book with recurring billing for your regulars, and lets you brand your quotes and invoices with your own logo, banner, and colour. The core app stays free.",
     categoryId: "for-tradespeople",
     audience: "tradesperson",
   },

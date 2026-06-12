@@ -92,6 +92,10 @@ watch(
             <span class="pw-check"><i class="pi pi-users" aria-hidden="true"></i></span>
             <span><strong>Clients &amp; recurring billing</strong> — a client book + standing charges drafted for you each period</span>
           </li>
+          <li>
+            <span class="pw-check"><i class="pi pi-palette" aria-hidden="true"></i></span>
+            <span><strong>Branded quotes &amp; invoices</strong> — your logo, banner &amp; brand colour</span>
+          </li>
         </ul>
 
         <div class="pw-price">
