@@ -8,6 +8,11 @@ interface MapsLibs {
 
 let loadPromise: Promise<MapsLibs> | null = null;
 
+export interface GeocodeResult {
+  lat: number;
+  lng: number;
+}
+
 export function useGoogleMaps() {
   function load(): Promise<MapsLibs> {
     if (loadPromise) return loadPromise;
@@ -35,5 +40,31 @@ export function useGoogleMaps() {
     return loadPromise;
   }
 
-  return { load };
+  /**
+   * Forward-geocode a free-text address to coordinates. This is the fallback
+   * for when coordinates didn't come from a Places autocomplete pick — e.g. the
+   * user let the browser autofill the address fields (which fills the text but
+   * never fires `place_changed`), or typed/edited the fields by hand. Restricted
+   * to Canada to match the autocomplete. Returns null on no match / failure;
+   * callers surface their own user-facing message.
+   */
+  async function geocodeAddress(address: string): Promise<GeocodeResult | null> {
+    const trimmed = address.trim();
+    if (!trimmed) return null;
+    try {
+      await load();
+      const geocoder = new google.maps.Geocoder();
+      const { results } = await geocoder.geocode({
+        address: trimmed,
+        componentRestrictions: { country: "CA" },
+      });
+      const loc = results?.[0]?.geometry?.location;
+      if (!loc) return null;
+      return { lat: loc.lat(), lng: loc.lng() };
+    } catch {
+      return null;
+    }
+  }
+
+  return { load, geocodeAddress };
 }

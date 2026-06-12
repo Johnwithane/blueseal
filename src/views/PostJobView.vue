@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch, computed } from "vue";
+import { onMounted, onUnmounted, ref, watch, computed, nextTick } from "vue";
 import { useRouter } from "vue-router";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
@@ -74,7 +74,16 @@ const photoInput = ref<HTMLInputElement | null>(null);
 const addressAutocompleteEl = ref<HTMLInputElement | null>(null);
 
 const submitting = ref(false);
+const geocoding = ref(false);
 const error = ref<string | null>(null);
+// The error banner lives right next to the submit button; scroll it into view
+// when it appears so a tap on "Post job" never fails silently off-screen.
+const errorEl = ref<HTMLElement | null>(null);
+watch(error, async (msg) => {
+  if (!msg) return;
+  await nextTick();
+  errorEl.value?.scrollIntoView({ behavior: "smooth", block: "center" });
+});
 
 // "What do you need done?" — the smart entry: describe the job in plain English
 // (or just name the room), tap the suggested trade, and it sets the trade +
@@ -302,17 +311,48 @@ const previewBudget = computed(() => {
   return `${fmt(budgetMin.value)}–${fmt(budgetMax.value)}`;
 });
 
+// Coordinates normally come from picking a Google suggestion. But browser
+// autofill — and typing/editing the fields by hand — fills the address text
+// without ever firing `place_changed`, so lat/lng stay null even though the
+// address looks complete. Geocode the typed address as a fallback before
+// blocking submit, so a saved/autofilled address still maps the job.
+async function ensureCoordinates(): Promise<boolean> {
+  if (lat.value != null && lng.value != null) return true;
+  if (!addressLine1.value.trim() || !city.value.trim()) {
+    error.value = "Enter your street address and city so we can map your job.";
+    return false;
+  }
+  geocoding.value = true;
+  try {
+    const full = [addressLine1.value, city.value, region.value, postalCode.value]
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .join(", ");
+    const geo = await useGoogleMaps().geocodeAddress(full);
+    if (!geo) {
+      error.value =
+        "We couldn't pinpoint that address. Double-check it, or start typing it and pick from the suggestions.";
+      return false;
+    }
+    lat.value = geo.lat;
+    lng.value = geo.lng;
+    return true;
+  } finally {
+    geocoding.value = false;
+  }
+}
+
 async function submit() {
   error.value = null;
-  if (submitting.value) return;
+  if (submitting.value || geocoding.value) return;
   if (photos.value.length === 0) {
     error.value = "Add at least one photo of the job or area.";
     return;
   }
-  if (lat.value == null || lng.value == null) {
-    error.value = "Pick your address from the suggestions so we can map your job.";
-    return;
-  }
+  if (!(await ensureCoordinates())) return;
+  // ensureCoordinates guarantees both are set on success; this also narrows
+  // lat/lng from `number | null` to `number` for the payload below.
+  if (lat.value == null || lng.value == null) return;
   if (budgetMin.value == null || budgetMax.value == null) {
     error.value = "Enter a budget range.";
     return;
@@ -420,8 +460,6 @@ async function submit() {
     <p class="text-[color:var(--bs-muted)]">
       Verified tradespeople in your area will see your post and can apply with a quote. You pick the one you like.
     </p>
-
-    <Message v-if="error" severity="error" :closable="false" class="mt-4">{{ error }}</Message>
 
     <form class="bs-form bs-card p-5 mt-4 space-y-5" @submit.prevent="submit">
       <!-- Smart entry: describe the job (or name the room) → tap a suggested
@@ -542,11 +580,11 @@ async function submit() {
           Only the chosen tradesperson sees your exact address — everyone else sees just your city and the first 3 chars of your postal code.
         </p>
         <!-- Autocomplete input doubles as the addressLine1 source. Picking a
-             Google suggestion overrides with the cleanly-parsed street and
-             also fills city/region/postal + lat/lng; typing without picking
-             still carries the raw text through (but submit blocks on the
-             missing lat/lng since the geocoded point is required to map
-             the job). -->
+             Google suggestion fills city/region/postal + lat/lng from the
+             cleanly-parsed result. Typing or letting the browser autofill the
+             fields carries the raw text through; submit then geocodes that text
+             to coordinates (ensureCoordinates), so a saved/autofilled address
+             still maps the job without needing a suggestion pick. -->
         <input
           ref="addressAutocompleteEl"
           v-model="addressLine1"
@@ -639,12 +677,16 @@ async function submit() {
         </div>
       </div>
 
+      <div ref="errorEl">
+        <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
+      </div>
+
       <div class="pt-2 flex flex-wrap items-center gap-2">
         <Button
           type="submit"
           :label="auth.fbUser ? 'Post job' : 'Sign in and post job'"
           icon="pi pi-send"
-          :loading="submitting"
+          :loading="submitting || geocoding"
           size="large"
         />
         <Button
