@@ -772,6 +772,19 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ---------- expenses (collection group: the tradie's business reports) ----------
+    // listMyExpensesInRange runs collectionGroup('expenses') filtered by
+    // tradespersonId == uid for the Pro reports + CSV export. The nested
+    // /jobs/{jobId}/expenses rule above is per-job (tradie-only) and does NOT
+    // authorize collection-group reads; this recursive-wildcard rule scopes them
+    // to the tradie's own expenses (+ admin). Writes stay on the nested rule;
+    // `write: if false` here is a no-op grant (rules are OR'd).
+    match /{path=**}/expenses/{expenseId} {
+      allow read: if isAdmin()
+        || (resource != null && resource.data.tradespersonId == uid());
+      allow write: if false;
+    }
+
     // ---------- notifications (per-user inbox; writes via Cloud Function) ----------
     // Owner can only flip read/readAt (mark-as-read). Every other field is
     // pinned to its prior value so a compromised client can't rewrite a

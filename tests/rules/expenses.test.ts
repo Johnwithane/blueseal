@@ -14,6 +14,7 @@ import {
 } from "@firebase/rules-unit-testing";
 import {
   collection,
+  collectionGroup,
   deleteDoc,
   doc,
   getDoc,
@@ -108,6 +109,25 @@ function expensesQuery(fs: ReturnType<typeof fsAs>) {
     orderBy("createdAt", "desc"),
   );
 }
+
+// Collection-group read for the Pro business reports (listMyExpensesInRange).
+describe("expenses — collection-group read scoped to own docs", () => {
+  it("a tradesperson can collectionGroup-read their own expenses", async () => {
+    await seed();
+    const fs = fsAs(TRADIE_UID, TRADIE_CLAIMS);
+    await assertSucceeds(
+      getDocs(query(collectionGroup(fs, "expenses"), where("tradespersonId", "==", TRADIE_UID))),
+    );
+  });
+
+  it("a different tradesperson cannot collectionGroup-read someone else's expenses", async () => {
+    await seed();
+    const fs = fsAs(OTHER_TRADIE_UID, TRADIE_CLAIMS);
+    await assertFails(
+      getDocs(query(collectionGroup(fs, "expenses"), where("tradespersonId", "==", TRADIE_UID))),
+    );
+  });
+});
 
 describe("jobs/{jobId}/expenses — read is owner + admin only (cost-sensitive)", () => {
   it("the owning tradesperson can list their expenses", async () => {

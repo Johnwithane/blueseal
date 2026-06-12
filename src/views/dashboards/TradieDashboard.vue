@@ -327,12 +327,21 @@ const awaitingVerificationMessage = computed(() => {
       v-if="view === 'list' && tradie?.isVisible"
       class="mb-3 flex items-center justify-between gap-2"
     >
-      <Button
-        label="New job"
-        icon="pi pi-plus"
-        size="small"
-        @click="router.push('/jobs/new')"
-      />
+      <div class="flex items-center gap-2">
+        <Button
+          label="New job"
+          icon="pi pi-plus"
+          size="small"
+          @click="router.push('/jobs/new')"
+        />
+        <Button
+          label="Reports"
+          icon="pi pi-chart-bar"
+          size="small"
+          text
+          @click="router.push('/reports')"
+        />
+      </div>
       <Button
         :label="showCompleted ? 'Back to active jobs' : 'View completed'"
         :icon="showCompleted ? 'pi pi-arrow-left' : 'pi pi-check-circle'"

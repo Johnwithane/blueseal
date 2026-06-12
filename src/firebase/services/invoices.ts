@@ -19,6 +19,34 @@ import { typedConverter } from "@/firebase/converters";
 const invRef = (id: string) => doc(db, "invoices", id).withConverter(typedConverter<InvoiceDoc>());
 const invCol = () => collection(db, "invoices").withConverter(typedConverter<InvoiceDoc>());
 
+/**
+ * The tradesperson's invoices issued within [from, to] — for the Pro business
+ * reports + CSV export. Filters the date range client-side off the
+ * (tradespersonId, issuedAt) index; the ReportsView aggregates paid revenue +
+ * tax from these.
+ */
+export async function listTradieInvoicesInRange(
+  uid: string,
+  from: Date,
+  to: Date,
+): Promise<WithId<InvoiceDoc>[]> {
+  const q = query(
+    invCol(),
+    where("tradespersonId", "==", uid),
+    orderBy("issuedAt", "desc"),
+    limit(2000),
+  );
+  const snap = await getDocs(q);
+  const fromMs = from.getTime();
+  const toMs = to.getTime();
+  return snap.docs
+    .map((d) => ({ id: d.id, ...d.data() }))
+    .filter((inv) => {
+      const issued = inv.issuedAt?.toMillis?.() ?? null;
+      return issued != null && issued >= fromMs && issued <= toMs;
+    });
+}
+
 export interface InvoiceTotals {
   subtotal: number; // pre-discount sum of line subs (cents)
   discountAmount: number; // cents subtracted; 0 when discount is null

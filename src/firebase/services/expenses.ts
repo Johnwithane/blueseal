@@ -1,6 +1,7 @@
 import {
   addDoc,
   collection,
+  collectionGroup,
   deleteDoc,
   doc,
   getDocs,
@@ -8,6 +9,7 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  Timestamp,
   updateDoc,
   where,
   type FirestoreError,
@@ -24,6 +26,33 @@ const expensesCol = (jobId: string) =>
 const expenseRef = (jobId: string, id: string) => doc(db, "jobs", jobId, "expenses", id);
 
 export const DEFAULT_MARKUP_PERCENT = 15;
+
+/**
+ * All of the tradesperson's expenses created within [from, to], across every
+ * job — for the Pro business reports + CSV export. Uses a collectionGroup query
+ * (authorized by the /{path=**}/expenses rule + the COLLECTION_GROUP index on
+ * tradespersonId + createdAt). The doc id is the expenseId; the jobId is on the
+ * parent path (ref.parent.parent.id) for the CSV.
+ */
+export async function listMyExpensesInRange(
+  uid: string,
+  from: Date,
+  to: Date,
+): Promise<Array<WithId<ExpenseDoc> & { jobId: string }>> {
+  const q = query(
+    collectionGroup(db, "expenses").withConverter(typedConverter<ExpenseDoc>()),
+    where("tradespersonId", "==", uid),
+    where("createdAt", ">=", Timestamp.fromDate(from)),
+    where("createdAt", "<=", Timestamp.fromDate(to)),
+    orderBy("createdAt", "desc"),
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({
+    id: d.id,
+    jobId: d.ref.parent.parent?.id ?? "",
+    ...d.data(),
+  }));
+}
 
 /** Category choices for expense UIs — single source for card + dialog. */
 export const EXPENSE_CATEGORY_OPTIONS: { label: string; value: ExpenseCategory }[] = [
