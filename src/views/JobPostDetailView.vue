@@ -517,11 +517,20 @@ const myUnread = computed(() => {
 // when another applicant was accepted), and declined (the client dismissed
 // them — the card "goes away"). A declined applicant who revises flips back to
 // pending and reappears.
-const visibleApplications = computed(() =>
-  applications.value.filter(
+const visibleApplications = computed(() => {
+  const visible = applications.value.filter(
     (a) => a.status !== "withdrawn" && a.status !== "rejected" && a.status !== "declined",
-  ),
-);
+  );
+  // Blue Seal Pro applicants sort to the top (Array.sort is stable, so within
+  // each group the original application order — createdAt — is preserved).
+  // isPro rides the already-joined applicantTradies doc; order settles once the
+  // lazy tradie loads complete, same as the verification badges popping in.
+  return [...visible].sort((a, b) => {
+    const aPro = applicantTradies.value.get(a.tradespersonId)?.isPro === true ? 1 : 0;
+    const bPro = applicantTradies.value.get(b.tradespersonId)?.isPro === true ? 1 : 0;
+    return bPro - aPro;
+  });
+});
 </script>
 
 <template>

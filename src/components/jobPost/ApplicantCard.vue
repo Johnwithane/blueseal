@@ -47,6 +47,15 @@ const unread = computed(() =>
 );
 const revised = computed(() => !!props.app.revisedAt);
 
+// Blue Seal Pro applicants sort to the top of the client's list; the neutral
+// "Featured" tag + hover disclosure is the paid-placement disclosure (the
+// client FAQ carries the durable version). Deliberately separate from the
+// verification trust badges below — it never implies verification.
+const isPro = computed(() => props.tradie?.isPro === true);
+const featuredTooltip =
+  "This tradesperson subscribes to Blue Seal Pro, which places their application " +
+  "higher in this list. It never affects verification, ratings, or reviews.";
+
 const applyStatusLabel: Record<ApplicationDoc["status"], string> = {
   pending: "Pending",
   selected: "Selected",
@@ -149,6 +158,9 @@ const priceSummary = computed(() => {
       </div>
       <div class="text-right">
         <div class="flex items-center justify-end gap-1.5">
+          <span v-if="isPro" :title="featuredTooltip" class="cursor-help">
+            <Tag value="Featured" severity="secondary" />
+          </span>
           <Tag v-if="revised" value="Revised" severity="info" />
           <span class="font-semibold" :class="isSiteVisit ? 'text-sm' : ''">{{ priceSummary }}</span>
         </div>

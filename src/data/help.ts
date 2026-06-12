@@ -174,6 +174,8 @@ When you pick a trade, we'll ask a few **trade-specific questions** (for tiling,
 
 Your posting is shown to **verified tradespeople** in your trade and region. Each one applies with a **full itemized quote** — line items, taxes, and any upfront fee — so you're comparing real numbers, not vague estimates. On your post you can open each applicant's quote, check their profile, verification, and reviews, then **Accept** the one you want — you'll sign off with a quick finger signature to confirm. Accepting starts the job with that pro straight away and lets the others know you've chosen someone.
 
+Applicants on **Blue Seal Pro** are marked **Featured** and listed first. That's a paid placement affecting the order only — it never changes a tradesperson's verification, ratings, or reviews, and you always compare the actual quotes side by side.
+
 Some applicants may ask to do a **site visit first** instead of quoting blind — shown as "Site visit first" with the visit fee (or "Free site visit"). Agreeing is one tap (no signature); that pro then visits and sends a full quote you accept the usual way.
 
 Others may want to **chat first** — shown as "Wants to chat first". They have questions before pricing the job; tap **Message** on their card to talk it through, and they'll send a full quote when they have what they need. If you accept someone you've been chatting with, the conversation **carries over into the job chat**.
@@ -547,6 +549,13 @@ const faqs: FaqItem[] = [
     question: "What's the difference between requesting a quote and posting a job?",
     answer:
       "Requesting a quote reaches out to one specific pro you've chosen. Posting a job lists the work so multiple verified pros in your area each apply with a full itemized quote — you compare them side by side and accept one.",
+    categoryId: "for-clients",
+    audience: "client",
+  },
+  {
+    question: 'What does the "Featured" tag on an applicant mean?',
+    answer:
+      "It means that tradesperson subscribes to **Blue Seal Pro**. Pro applicants are listed first and marked *Featured* — a paid placement that affects the **order only**. It never changes their verification, ID/insurance badges, ratings, or reviews, and you always compare the actual itemized quotes before choosing. Pick whoever's right for your job.",
     categoryId: "for-clients",
     audience: "client",
   },
