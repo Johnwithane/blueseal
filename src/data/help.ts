@@ -380,6 +380,8 @@ You can return to the **Payouts** screen any time to finish setup or open your p
     ],
     body: `Every active job has a **Work order** tab — the home for the actual work: time, travel, receipts, and any change orders.
 
+**Charges so far.** At the top of the tab is a running, pre-tax total of what's been added to the job — tracked time, billable materials, and any approved change orders — so both sides can see the charges adding up at a glance. Tax and anything from the original quote are settled when the invoice is built, so the final total can differ. The tradesperson sees a **Create invoice** button here too — the same wrap-up as the Invoice tab, reachable from where the work is tracked.
+
 **Clocking time.** The tradesperson taps **Clock in** when they start and **Stop** when they finish. The timer runs live and the client sees it too, so the hours are never a surprise. You can clock in straight from the **Jobs** tab as well. While the clock is running, a bar pinned to the top of the app shows the live timer and the job name from any screen — tap **Clock out** there to stop and jump back to the job. Clocking in on a new job automatically stops a session still running on another — only one clock runs at a time. Forgot to start the timer? Tap **Add time manually** on the Work order tab to log a past session — set the start and end and it bills just like clocked time.
 
 **Hourly vs fixed-price jobs.** How time is billed depends on the job:

@@ -1355,6 +1355,7 @@ function onReturnToApplicants() {
           :is-client="isClient"
           :is-tradie="isTradie"
           :extras="jobExtras"
+          @create-invoice="showFinishSheet = true"
         />
         <InvoiceTab
           v-else-if="activeTab === 'invoice'"

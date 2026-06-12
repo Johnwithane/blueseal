@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import WorkOrderSummaryCard from "@/components/WorkOrderSummaryCard.vue";
 import TimeTrackerCard from "@/components/TimeTrackerCard.vue";
 import ChangeOrdersCard from "@/components/ChangeOrdersCard.vue";
 import ExpensesCard from "@/components/ExpensesCard.vue";
@@ -11,6 +12,11 @@ const props = defineProps<{
   isClient: boolean;
   isTradie: boolean;
   extras: WithId<JobExtraDoc>[];
+}>();
+
+const emit = defineEmits<{
+  /** Tradesperson tapped Create / Update invoice on the summary card. */
+  "create-invoice": [];
 }>();
 
 const billingType = computed(() => jobBillingType(props.job));
@@ -40,6 +46,18 @@ const approvedHourlyExtras = computed(() =>
 
 <template>
   <div class="space-y-4">
+    <!-- Running charges total, top of the tab — both parties see it at a
+         glance. The tradesperson also gets Create invoice here (mirrors the
+         Invoice tab) so the wrap-up is reachable from where the work is tracked. -->
+    <WorkOrderSummaryCard
+      :job="job"
+      :is-tradie="isTradie"
+      :is-client="isClient"
+      :billing-type="billingType"
+      :extras="extras"
+      @create-invoice="emit('create-invoice')"
+    />
+
     <!-- Time tracking — both parties see clocked time (client sees no money on
          fixed-job base labour, per the billing rules). -->
     <TimeTrackerCard
