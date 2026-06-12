@@ -450,9 +450,11 @@ Once installed, Blue Seal opens full-screen like a normal app and updates itself
     keywords: ["notifications", "alerts", "bell", "email", "push", "updates"],
     body: `The **bell** icon shows your in-app notifications — new messages, quote and application updates, and job status changes. Tap one to jump straight to the job it's about.
 
-Outside the app, Blue Seal can reach you by **email**, **WhatsApp** (time-critical events), and **push notifications** — instant alerts on your device even when Blue Seal is closed. We'll offer to switch push on when you create your account, and keep offering when you come back until it's on for the device you're using — but you stay in control: you can turn it on (or off) any time per device from **Account → Notifications**. Your browser asks permission once. On iPhone, add Blue Seal to your home screen first (see "Install Blue Seal"), then enable push from inside the installed app.
+**When you're not in the app, email is how we reach you.** We'll email you about anything that needs your attention — a **new message**, a **quote sent or accepted**, an **invoice sent or paid**, a **job status change**, **application updates**, **verification decisions**, and **job invites**. (For a busy back-and-forth chat we send one "new message" email per lull, not one per line.) There's nothing to set up; just add Blue Seal to your contacts so our emails land in your inbox, not spam.
 
-You can manage all of these from your **Account** settings.`,
+For instant, on-device alerts on those same updates, turn on **push notifications** — they reach you even when Blue Seal is closed. We'll offer to switch push on when you create your account and again when you come back until it's on for the device you're using; you stay in control and can toggle it any time per device from **Account → Notifications**. Your browser asks permission once. On iPhone, add Blue Seal to your home screen first (see "Install Blue Seal"), then enable push from inside the installed app. (We also use **WhatsApp** for a few time-critical events if you've added your phone number.)
+
+Manage email, push, and WhatsApp any time from **Account → Notifications**.`,
   },
   {
     slug: "report-a-problem",
@@ -1004,7 +1006,7 @@ const faqs: FaqItem[] = [
   {
     question: "How do notifications work?",
     answer:
-      "The bell icon shows new messages, quote and application updates, and job status changes — tap one to jump to the job. You can manage your preferences in Account settings.",
+      "The bell shows new messages, quotes, applications, and job status changes inside the app. When you're away, we **email** you about the important stuff — new messages, quotes, invoices, job status changes, verification decisions, and invites — so you don't miss anything even without the app installed. (Busy chat threads are batched: you get one new-message email per lull, not one per line.) You can also turn on **push notifications** in Account settings for instant on-device alerts, and we use WhatsApp for a few time-critical events.",
     categoryId: "account-app",
     audience: "all",
   },

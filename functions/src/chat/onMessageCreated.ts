@@ -1,7 +1,12 @@
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, type Timestamp } from "firebase-admin/firestore";
 import { db } from "../lib/admin";
 import { notify } from "../lib/notify";
+
+// At most one out-of-app alert (email + push) per recipient per chat per this
+// window. The in-app bell still fires on every message; this only debounces the
+// noisy channels so a 10-message burst sends one email, not ten.
+const AWAY_ALERT_WINDOW_MS = 15 * 60 * 1000;
 
 interface MessageLike {
   senderId: string;
@@ -15,6 +20,7 @@ interface ChatLike {
   clientId: string;
   tradespersonId: string;
   jobId: string;
+  awayAlertAt?: Record<string, Timestamp>;
 }
 
 /**
@@ -41,10 +47,22 @@ export const onMessageCreated = onDocumentCreated(
     const chat = chatSnap.data() as ChatLike;
     const recipient = chat.clientId === msg.senderId ? chat.tradespersonId : chat.clientId;
     const preview = msg.photoUrl ? "📷 Photo" : (msg.text ?? "").slice(0, 120);
+
+    // Smart/debounced away-alert: the in-app bell fires on every message
+    // (priority "low" below = inbox only), but the recipient's only out-of-app
+    // signal — email + push — is rate-limited to once per AWAY_ALERT_WINDOW_MS
+    // per chat. Without native push (no app store yet), email is the primary
+    // way an away client/tradesperson learns a new message arrived, so we can't
+    // stay in-app-only — but we also don't want a chatty thread to fan out a
+    // dozen emails. One alert per ~15 min strikes that balance.
+    const lastAlertMs = chat.awayAlertAt?.[recipient]?.toMillis?.() ?? 0;
+    const sendAwayAlert = Date.now() - lastAlertMs > AWAY_ALERT_WINDOW_MS;
+
     await chatRef.update({
       lastMessageAt: FieldValue.serverTimestamp(),
       lastMessagePreview: preview,
       [`unreadCounts.${recipient}`]: FieldValue.increment(1),
+      ...(sendAwayAlert ? { [`awayAlertAt.${recipient}`]: FieldValue.serverTimestamp() } : {}),
     });
     // Pull the sender's display name for a more human notification.
     const senderSnap = await db.doc(`users/${msg.senderId}`).get();
@@ -62,9 +80,9 @@ export const onMessageCreated = onDocumentCreated(
       // Sender is on the chat (clientId or tradespersonId), so the
       // recipient role is the opposite seat at the table.
       recipientRole: recipient === chat.clientId ? "client" : "tradesperson",
-      // Chat is high-volume; in-app + bell badge is enough. Email/SMS on
-      // every line would be unbearable.
-      priority: "low",
+      // "normal" adds push + email (the away alert); "low" is in-app bell only.
+      // The window above keeps the noisy channels to ~one per 15 min per chat.
+      priority: sendAwayAlert ? "normal" : "low",
     });
   },
 );

@@ -140,13 +140,13 @@ The seeded-prospect directory + claim flow ships safe-by-default: leads are
 created, but **no outreach email is sent and no magic-link claim works** until
 the items below are set. Nothing breaks while they're unset.
 
-### [ ] Enable email-link (passwordless) sign-in + authorize the claim domain
+### [x] Enable email-link (passwordless) sign-in + authorize the claim domain — ✅ DONE 2026-06-12
 
 - **Why:** The claim flow uses a Firebase magic sign-in link — clicking it proves the prospect controls their inbox and signs them in with a verified email (`claimProspect` gates on `email_verified`). Without this, `generateSignInWithEmailLink` throws and outreach silently skips the email.
 - **What:** Firebase Console → Authentication → Sign-in method → enable **Email link (passwordless sign-in)**. Then Authentication → Settings → Authorized domains → ensure your app domain (and `localhost` for testing) is listed so the `/claim` continue URL is allowed.
 - **Verify:** Request a seeded prospect as a client (with the env below set) → the outreach email arrives with a "See the request" magic link → clicking it lands on `/claim`, signs you in, and converts the request into a job.
 
-### [ ] Set the CASL outreach env vars on Cloud Functions
+### [x] Set the CASL outreach env vars on Cloud Functions — ✅ DONE 2026-06-12 (`BLUE_SEAL_MAILING_ADDRESS` + `PROSPECT_UNSUB_SECRET` set in `functions/.env`; `BLUE_SEAL_LEGAL_NAME` left at default "Blue Seal")
 
 - **Why:** CASL requires every outreach email to carry the sender's physical mailing address + a working unsubscribe. These are gated: until set, `sendOutreachEmail` returns without sending.
 - **What:** set on the functions runtime:
@@ -353,7 +353,7 @@ Phase 3 wired email + WhatsApp fan-out into the `notify()` helper. The code writ
 
 > **About SMS:** Phase 3 originally shipped with SMS-via-Twilio as the high-priority channel. We swapped to WhatsApp on the same day because WhatsApp's free tier (1,000 conversations/month from Meta) makes it cost-effective at launch. SMS code stays dormant in [functions/src/lib/sms.ts](functions/src/lib/sms.ts) and the `sms/` rule remains in [firestore.rules](firestore.rules) — a future preferences UI can let users pick SMS over WhatsApp without re-introducing the schema.
 
-### [ ] Install "Trigger Email" Firebase extension
+### [x] Install "Trigger Email" Firebase extension — ✅ DONE 2026-06-12 (sender: **Resend**. SMTP `smtps://resend@smtp.resend.com:465`, FROM `Blue Seal <noreply@blueseal.app>`, REPLY-TO `hello@blueseal.app`. Pipeline verified end-to-end: mail/ → extension → Resend → inbox, `delivery.state=SUCCESS`.)
 
 - **Why:** The `notify()` helper writes to `mail/` for every notification with priority `normal` or `high` (defined in [functions/src/lib/notify.ts](functions/src/lib/notify.ts)). Vetting decisions in [functions/src/vetting/decisions.ts](functions/src/vetting/decisions.ts) and invoice sends in [functions/src/invoicing/sendInvoice.ts](functions/src/invoicing/sendInvoice.ts) also rely on it directly via `enqueueMail`. Without the extension, queued docs accumulate and no email is sent.
 - **What:** In the Firebase console → Extensions → install **Trigger Email** (by Firebase). When configuring:
@@ -399,7 +399,7 @@ This is a multi-step setup with a ~1–3 day wait for template approval. Until y
   For staging environments, deploy a separate Firebase project with `APP_BASE_URL = https://staging.blueseal.app` (or whatever your staging domain is).
 - **Verify:** Open the Cloud Functions logs after triggering any normal/high-priority notification. The enqueued mail doc in `mail/` should contain links matching the URL you set.
 
-### [ ] (Optional) Configure SPF / DKIM for your sending domain
+### [x] (Optional) Configure SPF / DKIM for your sending domain — ✅ DONE 2026-06-12 (Resend auto-configured SPF + DKIM on `send.blueseal.app` via Cloudflare. **DMARC still TODO:** add a `TXT` at `_dmarc.blueseal.app` = `v=DMARC1; p=none;`)
 > *Listed under notifications above, repeated here for emphasis since the PIPEDA confirmation + export emails need it most.*
 
 ---

@@ -1281,6 +1281,13 @@ export interface ChatDoc {
   lastMessageAt: Timestamp | null;
   lastMessagePreview: string;
   unreadCounts: Record<string, number>;
+  // Per-recipient timestamp of the last out-of-app "away" alert (email + push)
+  // we sent for this chat. onMessageCreated debounces on it: the in-app bell
+  // fires on every message, but email + push go out at most once per recipient
+  // per ~15 min (a 10-message burst = one alert, not ten). Keyed by recipient
+  // uid. Server-managed — rules pin it so a party can't suppress the other
+  // side's alerts. Optional: pre-existing chats predate the field.
+  awayAlertAt?: Record<string, Timestamp>;
 }
 
 export type MessageType = "text" | "photo" | "system";
