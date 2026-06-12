@@ -59,12 +59,14 @@ function openJob(id: string) {
       at-a-time swipe (Trello-style) rather than a fiddly drag across narrow
       columns. snap-mandatory + scroll-smooth.
     - md+: fixed 15rem columns, snap off, normal multi-column scroll.
-    `-mx-4 px-4` lets the strip bleed to the screen edges inside a padded
-    parent; overscroll-x-contain stops the horizontal swipe from triggering
-    browser back-navigation.
+    The `.kanban-strip` class bleeds past the padded parent to the screen edges
+    on phones, and on desktop further escapes the centred max-width container so
+    the board fills the whole main column (see the scoped style below);
+    overscroll-x-contain stops the horizontal swipe from triggering browser
+    back-navigation.
   -->
   <div
-    class="flex gap-3 overflow-x-auto overscroll-x-contain -mx-4 px-4 pb-2 snap-x snap-mandatory scroll-smooth md:snap-none"
+    class="kanban-strip flex gap-3 overflow-x-auto overscroll-x-contain px-4 pb-2 snap-x snap-mandatory scroll-smooth md:snap-none"
   >
     <section
       v-for="col in columns"
@@ -120,3 +122,28 @@ function openJob(id: string) {
     </section>
   </div>
 </template>
+
+<style scoped>
+/* Phones/tablets: bleed past .bs-container's 1rem padding to the screen edges
+   (the container is full-width below 1200px); the strip's px-4 re-pads cards. */
+.kanban-strip {
+  margin-inline: -1rem;
+}
+
+@media (min-width: 768px) {
+  /* Desktop: also escape the centred max-width:1200px .bs-container so the
+     read-only board fills the entire main column — between the side panel and
+     the right edge — instead of stranding ~200px of gutter on each side.
+     gutter = half the space the container leaves once the main column
+     (viewport minus the side panel, read from the shared
+     --bs-content-left-offset var the app shell exposes) grows past 1200px.
+     max(0px, …) keeps narrower desktops put; the -1rem preserves the bleed
+     past the container's own padding. Safe against a horizontal scrollbar
+     because <body> uses overflow-x: clip. */
+  .kanban-strip {
+    margin-inline: calc(
+      -1rem - max(0px, (100vw - var(--bs-content-left-offset, 0px) - 1200px) / 2)
+    );
+  }
+}
+</style>
