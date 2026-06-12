@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, ref, computed, watch } from "vue";
+import { onMounted, onBeforeUnmount, ref, computed, watch, nextTick } from "vue";
 import { useRouter, onBeforeRouteLeave } from "vue-router";
 import Button from "primevue/button";
 import Stepper from "primevue/stepper";
@@ -67,12 +67,66 @@ import WsibUploadCard from "@/components/WsibUploadCard.vue";
 import LocationPicker, { type LocationValue } from "@/components/LocationPicker.vue";
 import { useToast } from "@/composables/useToast";
 import { useFormatters } from "@/composables/useFormatters";
+import { useFormErrors } from "@/composables/useFormErrors";
+import FieldError from "@/components/FieldError.vue";
 import { humanizeError } from "@/utils/errors";
 
 const auth = useAuthStore();
 const router = useRouter();
 const toast = useToast();
 const { relativeTime } = useFormatters();
+
+// Field-level validation errors (rendered under the field) + scroll-to-first.
+// `error` (below) stays for save/submit failures shown in the top banner.
+const {
+  errors,
+  clear: clearErrors,
+  set: setError,
+  has: hasErrors,
+  focusFirst,
+} = useFormErrors();
+
+// Required fields per step, top-to-bottom, so focusFirst lands on the topmost
+// problem when a step is validated. Steps not listed have no required field
+// gated on "Next" (Hours is optional; Documents validates via its own toast).
+const STEP_FIELDS: Record<string, string[]> = {
+  "1": ["displayName", "bio"],
+  "2": ["primaryTrade"],
+  "3": ["hourlyRate"],
+  "4": ["area"],
+};
+
+// Validate one step, populating field errors. Returns true when the step's
+// required fields are all satisfied.
+function validateStep(s: string): boolean {
+  clearErrors();
+  if (s === "1") {
+    if (!displayName.value.trim()) setError("displayName", "Add your display name.");
+    if (!bio.value.trim()) setError("bio", "Add a short bio so clients know who they're hiring.");
+  } else if (s === "2") {
+    if (!primaryTrade.value) setError("primaryTrade", "Pick your primary trade.");
+  } else if (s === "3") {
+    if (pricingModel.value !== "quote" && !(hourlyRateDollars.value && hourlyRateDollars.value > 0)) {
+      setError("hourlyRate", "Set your hourly rate, or switch to quote-only above.");
+    }
+  } else if (s === "4") {
+    if (location.value.lat == null || location.value.lng == null || !location.value.label) {
+      setError("area", "Search an address or use your location to set your service area.");
+    }
+  }
+  return !hasErrors();
+}
+
+// "Next" gate: validate the current step before advancing. On failure the
+// error shows under the offending field and we scroll to it instead of
+// silently moving on (the autosave still ran from the field edits).
+async function goNext(current: string, next: string, activate: (v: string) => void) {
+  if (!validateStep(current)) {
+    await focusFirst(STEP_FIELDS[current] ?? []);
+    return;
+  }
+  activate(next);
+}
 
 // Track viewport width via matchMedia so we can swap to shorter button
 // labels (and hide the page title) on mobile, where the top bar otherwise
@@ -185,9 +239,9 @@ const STEP_DEFS = [
 ] as const;
 
 const stepCompleted = computed<boolean[]>(() => {
-  // Basics requires: display name + bio. Photo, company, languages,
+  // Basics requires: display name + a non-empty bio. Photo, company, languages,
   // portfolio are all nice-to-haves and don't block the next step.
-  const basicsOk = !!displayName.value.trim() && bio.value.length >= 20;
+  const basicsOk = !!displayName.value.trim() && !!bio.value.trim();
   const tradesOk = !!primaryTrade.value;
   const pricingOk =
     pricingModel.value === "quote" ||
@@ -718,6 +772,13 @@ async function onIdRemoved() {
 
 async function submitApplication() {
   if (!canSubmit.value) {
+    // Jump to the first unfinished step and surface the problem at the field
+    // (the panels are lazy, so activate the step before validating/scrolling).
+    const target = firstIncompleteStep();
+    step.value = target;
+    await nextTick();
+    validateStep(target);
+    await focusFirst(STEP_FIELDS[target] ?? []);
     toast.warn("A few things still needed", submitBlockers.value.join(" · "));
     return;
   }
@@ -943,14 +1004,16 @@ async function withdrawForEdits() {
                 </div>
               </div>
 
-              <div>
+              <div data-field="displayName">
                 <label class="text-sm font-medium">Display name</label>
                 <InputText
                   v-model="displayName"
                   class="mt-1 w-full"
                   autocomplete="name"
                   placeholder="The name clients should see"
+                  :invalid="!!errors.displayName"
                 />
+                <FieldError :message="errors.displayName" />
               </div>
 
               <div>
@@ -986,17 +1049,19 @@ async function withdrawForEdits() {
                 </p>
               </div>
 
-              <div>
+              <div data-field="bio">
                 <label class="text-sm font-medium">Short bio</label>
                 <Textarea
                   v-model="bio"
                   rows="5"
                   class="mt-1"
                   placeholder="What kind of work do you do? How long? What sets you apart?"
+                  :invalid="!!errors.bio"
                 />
                 <p class="mt-1 text-xs text-[color:var(--bs-muted)]">
-                  At least 20 characters — this is what clients read first.
+                  A couple of sentences — this is what clients read first.
                 </p>
+                <FieldError :message="errors.bio" />
               </div>
 
               <div>
@@ -1039,7 +1104,7 @@ async function withdrawForEdits() {
                 label="Next: Trades"
                 icon="pi pi-arrow-right"
                 icon-pos="right"
-                @click="activateCallback('2')"
+                @click="goNext('1', '2', activateCallback)"
               />
             </div>
           </div>
@@ -1050,7 +1115,7 @@ async function withdrawForEdits() {
           <div class="bs-form space-y-4 p-2">
             <fieldset :disabled="isReadOnly" class="bs-fieldset space-y-4">
               <h2 class="bs-section-title">Trades</h2>
-              <div>
+              <div data-field="primaryTrade">
                 <label class="text-sm font-medium">Primary trade</label>
                 <Select
                   v-model="primaryTrade"
@@ -1059,7 +1124,9 @@ async function withdrawForEdits() {
                   option-value="key"
                   placeholder="Pick your primary trade"
                   class="mt-1 w-full"
+                  :invalid="!!errors.primaryTrade"
                 />
+                <FieldError :message="errors.primaryTrade" />
               </div>
               <div>
                 <label class="text-sm font-medium">Secondary trades (up to 3)</label>
@@ -1094,7 +1161,7 @@ async function withdrawForEdits() {
                 label="Next: Pricing"
                 icon="pi pi-arrow-right"
                 icon-pos="right"
-                @click="activateCallback('3')"
+                @click="goNext('2', '3', activateCallback)"
               />
             </div>
           </div>
@@ -1119,14 +1186,16 @@ async function withdrawForEdits() {
                   class="mt-1 w-full"
                 />
               </div>
-              <div v-if="pricingModel !== 'quote'">
+              <div v-if="pricingModel !== 'quote'" data-field="hourlyRate">
                 <label class="text-sm font-medium">Hourly rate (CAD)</label>
                 <InputNumber
                   v-model="hourlyRateDollars"
                   mode="currency"
                   currency="CAD"
                   class="mt-1 w-full"
+                  :invalid="!!errors.hourlyRate"
                 />
+                <FieldError :message="errors.hourlyRate" />
               </div>
               <div v-if="pricingModel !== 'quote'">
                 <label class="text-sm font-medium">
@@ -1172,7 +1241,7 @@ async function withdrawForEdits() {
                 label="Next: Area"
                 icon="pi pi-arrow-right"
                 icon-pos="right"
-                @click="activateCallback('4')"
+                @click="goNext('3', '4', activateCallback)"
               />
             </div>
           </div>
@@ -1186,11 +1255,14 @@ async function withdrawForEdits() {
               <p class="text-sm text-[color:var(--bs-muted)]">
                 Search an address or use your current location to set the centre of your service area.
               </p>
-              <LocationPicker v-model="location" />
+              <div data-field="area">
+                <LocationPicker v-model="location" />
+                <FieldError :message="errors.area" />
+              </div>
             </fieldset>
             <div class="bs-step-nav flex justify-between">
               <Button label="Back" outlined @click="activateCallback('3')" />
-              <Button label="Next: Hours" icon="pi pi-arrow-right" icon-pos="right" @click="activateCallback('5')" />
+              <Button label="Next: Hours" icon="pi pi-arrow-right" icon-pos="right" @click="goNext('4', '5', activateCallback)" />
             </div>
           </div>
         </StepPanel>
