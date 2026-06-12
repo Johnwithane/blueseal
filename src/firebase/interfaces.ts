@@ -848,6 +848,13 @@ export interface JobDoc {
   // review pair and the reviews create rules reject them, so offline-recorded
   // jobs can't be used to fabricate public reputation. Server-managed.
   acceptedOffline?: boolean;
+  // Running total of the Blue Seal PLATFORM service-fee portion (cents) already
+  // collected for this job across its card payments (upfront fee + final
+  // invoice). The $99/job cap is enforced cumulatively against this: each
+  // PaymentIntent's platform portion is min(5%, capRemaining) where
+  // capRemaining = 9900 − this. Incremented server-side inside the webhook
+  // success transaction. Absent/0 until the first card payment settles.
+  serviceFeeCapUsedCents?: number;
 }
 
 // Tradesperson-private job log, stored at jobs/{jobId}/private/notes so it is
@@ -864,6 +871,21 @@ export interface JobPrivateNotes {
   lastAutoUpdateAt: Timestamp | null;
 }
 
+// Stripe-side state for an upfront-fee card payment. Symmetric to
+// InvoicePaymentState but on the job's UpfrontFeeState (upfront fees have no
+// "send" step). Server-managed; created by `createUpfrontFeePaymentIntent`,
+// mutated by the upfront-fee webhook handler. Absent on manual/offline-paid
+// upfront fees (the original flow).
+export interface UpfrontFeePaymentState {
+  paymentIntentId: string | null;
+  clientSecret: string | null;
+  chargeId: string | null;
+  refundedAmount?: number; // cents
+  serviceFee: ServiceFeeSnapshot | null;
+  lastWebhookEventId: string | null;
+  lastFailureMessage?: string | null;
+}
+
 export interface UpfrontFeeState {
   amountCents: number;
   source: "fixed" | "percent";
@@ -871,6 +893,9 @@ export interface UpfrontFeeState {
   paidAt: Timestamp | null;
   paidBy: "tradesperson_marked" | "client_marked" | "stripe" | null;
   appliedInvoiceId: string | null;
+  // Stripe card-payment state when the client pays the upfront fee by card.
+  // Null/absent on manually-marked upfront fees. Server-managed.
+  payment?: UpfrontFeePaymentState | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -1450,20 +1475,41 @@ export interface InvoiceRefund {
   createdAt: Timestamp;
 }
 
+// Snapshot of the Blue Seal service fee computed at PaymentIntent creation and
+// frozen onto the payment for audit. The client pays `chargeTotalCents`; the
+// tradesperson nets `baseAmountCents` (their invoice/upfront amount) exactly.
+// The fee = platformPortion (Blue Seal's 5%, capped $99/job + $2 floor, waived
+// when the tradesperson is Pro) + processingPortion (a gross-up that covers
+// Stripe's 2.9% + 30¢ so the platform's 5% stays whole). See serviceFee.ts
+// (functions + src/utils, kept in sync). `feeModelVersion` lets us evolve the
+// model without re-pricing historical charges. Only ONE line is ever shown to
+// the client ("Blue Seal service fee" = totalFeeCents) — the split is internal.
+export interface ServiceFeeSnapshot {
+  feeModelVersion: number;
+  baseAmountCents: number; // invoice total (post-credit) or upfront amount
+  platformPortionCents: number; // Blue Seal's margin; 0 when waived
+  processingPortionCents: number; // covers Stripe's cut; applies even when waived
+  totalFeeCents: number; // application_fee_amount = platform + processing
+  chargeTotalCents: number; // PaymentIntent.amount the card is charged
+  capApplied: boolean; // the $99/job cap bound the platform portion
+  floorApplied: boolean; // the $2 floor lifted the platform portion
+  waived: boolean; // Pro waiver zeroed the platform portion
+  computedAt: Timestamp;
+}
+
 // All Stripe-side state for a paid (or in-flight) invoice. Server-managed
 // only: the `payment` field is locked against owner writes by /invoices
-// rules. Created by `createInvoicePaymentIntent` / `sendInvoice`, mutated
-// by the Stripe webhook dispatcher. `applicationFeeBps` is the snapshot of
-// the platform fee BPS at send-time so historical invoices stay auditable
-// even if the platform fee changes later. `lastWebhookEventId` lets the
-// dispatcher short-circuit duplicate events at the per-invoice level on
-// top of the global webhookEvents sentinel.
+// rules. Created by `createInvoicePaymentIntent` (pay-time, so the fee + Pro
+// waiver are evaluated against the live invoice total, not stale at send-time)
+// and skeleton-seeded by `sendInvoice`; mutated by the Stripe webhook
+// dispatcher. `serviceFee` is the fee snapshot frozen at PI creation.
+// `lastWebhookEventId` lets the dispatcher short-circuit duplicate events at
+// the per-invoice level on top of the global webhookEvents sentinel.
 export interface InvoicePaymentState {
   paymentIntentId: string | null;
   clientSecret: string | null;
   chargeId: string | null;
-  applicationFeeAmount: number | null; // cents
-  applicationFeeBps: number | null;
+  serviceFee: ServiceFeeSnapshot | null;
   transferId: string | null;
   transferDestination: string | null;
   refundedAmount: number; // cents, running total; 0 if no refunds
