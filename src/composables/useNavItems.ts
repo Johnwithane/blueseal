@@ -108,19 +108,6 @@ export function useNavItems(): {
           mobile: true,
           matches: prefix("/jobs/browse"),
         },
-        // Profile is reachable via the ProfileMenu avatar at the bottom of the
-        // side panel (desktop) and the Profile tab on mobile — it used to be
-        // duplicated as an explicit row here, which no other role had. Removed
-        // so the nav schema is consistent across roles.
-        {
-          key: "notifications",
-          label: "Notifications",
-          mobileLabel: "Alerts",
-          icon: "pi-bell",
-          to: "",
-          mobile: true,
-          matches: () => false,
-        },
         // Applied is no longer its own nav destination — it's a view inside
         // Jobs (the SelectButton in TradieDashboard). The standalone
         // /my-applications route is kept alive for notification deep-links
@@ -157,6 +144,19 @@ export function useNavItems(): {
           to: "/reports",
           mobile: false,
           matches: exact("/reports"),
+        },
+        // Notifications sits LAST in the nav, directly above the Help footer —
+        // a high-frequency utility pinned to the bottom rather than a primary
+        // destination. (mobile: true keeps it in the mobile bottom bar, where
+        // it stays last among the mobile items.)
+        {
+          key: "notifications",
+          label: "Notifications",
+          mobileLabel: "Alerts",
+          icon: "pi-bell",
+          to: "",
+          mobile: true,
+          matches: () => false,
         },
         // Account + Payouts moved into ProfileMenu (avatar at bottom of side
         // panel / Profile tab on mobile). The standalone /account and
