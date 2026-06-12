@@ -44,6 +44,53 @@ export interface UserDoc {
   // the source-of-truth audit log). Missing = default-enabled so legacy
   // users (pre-this-field) keep getting notifications until they opt out.
   notificationPrefs: NotificationPrefs;
+  // Blue Seal Pro subscription state (tradespeople only). SERVER-MANAGED —
+  // mirrored from Stripe Billing via the subscription webhook handlers, or
+  // set by the adminGrantFoundingPro callable for comped founding members.
+  // Locked in firestore.rules: the owner can never write it. Optional/absent
+  // on every doc that predates monetization and on all client accounts;
+  // readers treat undefined as "no subscription" (status "none"). The public
+  // boolean mirror lives on tradespeople/{uid}.isPro for applicant sorting —
+  // this private object is the source of truth (Stripe ids, trial dates).
+  subscription?: SubscriptionState;
+}
+
+// ---------------------------------------------------------------------------
+// Blue Seal Pro subscription (MONETIZATION.md — $29 CAD/mo or $290 CAD/yr,
+// 30-day card-required trial). Lives on users/{uid} because it carries
+// private Stripe identifiers + trial/renewal dates; `users` is owner+admin
+// read only. The entitlement check is `deriveIsPro()` (functions/src/lib/
+// subscription.ts ↔ src/utils/subscription.ts) — keep the two in sync.
+// ---------------------------------------------------------------------------
+export type SubscriptionStatus =
+  | "none" // never subscribed (or fully lapsed past the grace window)
+  | "trialing" // in the 30-day free trial (card on file)
+  | "active" // paid + current
+  | "past_due" // payment failed; Stripe Smart Retries grace — still Pro
+  | "canceled"; // ended (cancel-at-period-end elapsed, or retries exhausted)
+
+export type SubscriptionPlan = "monthly" | "annual";
+
+export interface SubscriptionState {
+  status: SubscriptionStatus;
+  plan: SubscriptionPlan | null;
+  // null unless trialing/recently-trialed. trialEndsAt is the trial's end;
+  // currentPeriodEnd is the next renewal (or, while trialing, when the first
+  // charge lands). cancelAtPeriodEnd true = active but won't renew.
+  trialEndsAt: Timestamp | null;
+  currentPeriodEnd: Timestamp | null;
+  cancelAtPeriodEnd: boolean;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  // Set once when a trial is first granted and never cleared — the server-side
+  // one-trial-per-tradesperson guard (independent of Stripe's per-customer
+  // memory, which a deleted+recreated customer would reset).
+  everTrialedAt: Timestamp | null;
+  // Founding-member comp: free Pro until this date, no Stripe involved. Set by
+  // adminGrantFoundingPro; null for everyone else. deriveIsPro honors it; the
+  // scheduledProCompExpiry sweep flips the public isPro mirror when it lapses.
+  proCompUntil: Timestamp | null;
+  updatedAt: Timestamp;
 }
 
 export interface NotificationPrefs {
@@ -274,6 +321,16 @@ export interface TradespersonDoc {
   // pre-cutover docs don't have it; readers should treat undefined as 0.
   paidJobsCount?: number;
   paidLifetimeCents?: number;
+  // PUBLIC denormalized Blue Seal Pro flag — true while the tradesperson is
+  // trialing/active/past_due (grace) or has an unexpired founding comp. The
+  // authoritative state is the private users/{uid}.subscription object; this
+  // mirror exists so the client's job-post applicant list can sort Pro
+  // applications first + render the "Featured" tag without read access to
+  // users. SERVER-MANAGED (syncSubscriptionMirror / scheduledProCompExpiry);
+  // locked in firestore.rules. Optional/absent until a tradesperson first
+  // subscribes; readers treat undefined as false. Discloses only "subscribes
+  // to Pro", which the Featured tag states anyway.
+  isPro?: boolean;
   // Cached Google Business reviews when the tradesperson has connected their
   // Google Business Profile (opt-in). Server-managed; null/absent when not
   // connected. Shown in a separate, attributed section — never folded into the

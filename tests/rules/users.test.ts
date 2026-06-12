@@ -243,6 +243,49 @@ describe("users — server-managed field locks still enforced", () => {
       updateDoc(doc(fs, "users", CLIENT_UID), { activeRole: "admin" }),
     );
   });
+
+  it("owner cannot self-grant a Blue Seal Pro subscription (fee-waiver + AI dodge)", async () => {
+    await seed(CLIENT_UID, canonicalUser);
+    const fs = env.authenticatedContext(CLIENT_UID, CLIENT_CLAIMS).firestore();
+    await assertFails(
+      updateDoc(doc(fs, "users", CLIENT_UID), {
+        subscription: {
+          status: "active",
+          plan: "annual",
+          trialEndsAt: null,
+          currentPeriodEnd: null,
+          cancelAtPeriodEnd: false,
+          stripeCustomerId: null,
+          stripeSubscriptionId: null,
+          everTrialedAt: null,
+          proCompUntil: null,
+          updatedAt: serverTimestamp(),
+        },
+      }),
+    );
+  });
+
+  it("owner can still edit displayName on a doc already carrying a subscription (legacy-doc trap)", async () => {
+    await seed(CLIENT_UID, {
+      ...canonicalUser,
+      subscription: {
+        status: "active",
+        plan: "monthly",
+        trialEndsAt: null,
+        currentPeriodEnd: null,
+        cancelAtPeriodEnd: false,
+        stripeCustomerId: "cus_x",
+        stripeSubscriptionId: "sub_x",
+        everTrialedAt: null,
+        proCompUntil: null,
+        updatedAt: serverTimestamp(),
+      },
+    });
+    const fs = env.authenticatedContext(CLIENT_UID, CLIENT_CLAIMS).firestore();
+    await assertSucceeds(
+      updateDoc(doc(fs, "users", CLIENT_UID), { displayName: "Renamed" }),
+    );
+  });
 });
 
 describe("users — create-only / duplicate provisioning guard", () => {

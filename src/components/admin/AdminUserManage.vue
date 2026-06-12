@@ -9,7 +9,11 @@ import { useAuthStore } from "@/stores/auth";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 import { TRADES } from "@/data/trades";
-import { adminSetUserRoles, adminSetUserTrades } from "@/firebase/services/admin";
+import {
+  adminGrantFoundingPro,
+  adminSetUserRoles,
+  adminSetUserTrades,
+} from "@/firebase/services/admin";
 import type { Role, TradespersonDoc, UserDoc, WithId } from "@/firebase/interfaces";
 
 const props = defineProps<{
@@ -118,6 +122,50 @@ async function saveTrades() {
     savingTrades.value = false;
   }
 }
+
+// --- Founding Pro comp (tradesperson only) --------------------------------
+// Grants free Blue Seal Pro until a date with no Stripe involved — the
+// 3-months-on-us founding offer (MONETIZATION.md). Local state reflects the
+// last action; the authoritative isPro comes back on the next user reload.
+const savingPro = ref(false);
+const proError = ref<string | null>(null);
+const compUntil = ref<Date | null>(props.user.subscription?.proCompUntil?.toDate() ?? null);
+
+const proStatusLabel = computed(() => {
+  if (props.tradie?.isPro) return "Pro is active";
+  return "Not Pro";
+});
+const compActive = computed(() => !!compUntil.value && compUntil.value.getTime() > Date.now());
+
+async function grantPro(months: number) {
+  savingPro.value = true;
+  proError.value = null;
+  try {
+    const until = new Date();
+    until.setMonth(until.getMonth() + months);
+    const res = await adminGrantFoundingPro({ uid: props.user.id, until: until.toISOString() });
+    compUntil.value = res.data.proCompUntil ? new Date(res.data.proCompUntil) : null;
+    toast.success(`Granted ${months} months of Blue Seal Pro.`);
+  } catch (e) {
+    proError.value = humanizeError(e);
+  } finally {
+    savingPro.value = false;
+  }
+}
+
+async function revokePro() {
+  savingPro.value = true;
+  proError.value = null;
+  try {
+    await adminGrantFoundingPro({ uid: props.user.id, until: null });
+    compUntil.value = null;
+    toast.success("Founding Pro comp revoked.");
+  } catch (e) {
+    proError.value = humanizeError(e);
+  } finally {
+    savingPro.value = false;
+  }
+}
 </script>
 
 <template>
@@ -193,6 +241,37 @@ async function saveTrades() {
           :loading="savingTrades"
           :disabled="!tradesChanged"
           @click="saveTrades"
+        />
+      </div>
+    </div>
+
+    <!-- Founding Pro comp (tradesperson only) --------------------------- -->
+    <div v-if="tradie" class="rounded border border-[color:var(--bs-border)] p-3">
+      <p class="text-sm font-medium mb-1">Blue Seal Pro (founding comp)</p>
+      <p class="text-xs text-[color:var(--bs-muted)]">
+        {{ proStatusLabel }}<template v-if="compActive && compUntil">
+          — comped until {{ compUntil.toLocaleDateString() }}</template>.
+        Grants free Pro (AI + fee waiver) with no Stripe involved.
+      </p>
+      <Message v-if="proError" severity="error" :closable="false" class="mt-2">
+        {{ proError }}
+      </Message>
+      <div class="mt-2 flex flex-wrap gap-2">
+        <Button
+          label="Grant 3 months"
+          icon="pi pi-star"
+          size="small"
+          :loading="savingPro"
+          @click="grantPro(3)"
+        />
+        <Button
+          v-if="compActive"
+          label="Revoke comp"
+          severity="secondary"
+          outlined
+          size="small"
+          :loading="savingPro"
+          @click="revokePro"
         />
       </div>
     </div>

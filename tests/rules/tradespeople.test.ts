@@ -184,6 +184,38 @@ describe("tradespeople — server-managed field locks", () => {
       }),
     );
   });
+
+  it("owner cannot self-grant isPro (would win Featured placement for free)", async () => {
+    await seedTradie();
+    const fs = env.authenticatedContext(TRADIE_UID, TRADIE_CLAIMS).firestore();
+    await assertFails(
+      updateDoc(doc(fs, "tradespeople", TRADIE_UID), { isPro: true }),
+    );
+  });
+
+  it("owner can edit bio on a doc already carrying isPro (legacy-doc trap regression)", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "tradespeople", TRADIE_UID), {
+        ...baselineTradie,
+        isPro: true,
+      });
+    });
+    const fs = env.authenticatedContext(TRADIE_UID, TRADIE_CLAIMS).firestore();
+    await assertSucceeds(
+      updateDoc(doc(fs, "tradespeople", TRADIE_UID), { bio: "still plumbing" }),
+    );
+  });
+
+  it("the public can read isPro on a visible tradie (drives the applicant sort)", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "tradespeople", TRADIE_UID), {
+        ...baselineTradie,
+        isPro: true,
+      });
+    });
+    const fs = env.unauthenticatedContext().firestore();
+    await assertSucceeds(getDoc(doc(fs, "tradespeople", TRADIE_UID)));
+  });
 });
 
 // tradespeople/{uid}/private/contact — the exact location + (home) address.

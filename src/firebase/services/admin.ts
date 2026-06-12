@@ -37,6 +37,15 @@ export const adminSetUserTrades = httpsCallable<
   { ok: boolean; trades: string[] }
 >(functions, "adminSetUserTrades");
 
+/**
+ * Admin-only: grant (or revoke, with `until: null`) a founding-member free
+ * Blue Seal Pro comp. `until` is an ISO 8601 datetime string.
+ */
+export const adminGrantFoundingPro = httpsCallable<
+  { uid: string; until: string | null },
+  { ok: boolean; isPro: boolean; proCompUntil: string | null }
+>(functions, "adminGrantFoundingPro");
+
 export const submitForVetting = httpsCallable<Record<string, never>, { ok: boolean }>(
   functions,
   "submitForVetting",

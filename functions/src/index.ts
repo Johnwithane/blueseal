@@ -38,6 +38,7 @@ export { backfillReviewReviewers } from "./admin/backfillReviewReviewers";
 export { backfillJobPostClient } from "./admin/backfillJobPostClient";
 export { backfillJobPrivateNotes } from "./admin/backfillJobPrivateNotes";
 export { backfillTradieContact } from "./admin/backfillTradieContact";
+export { adminGrantFoundingPro } from "./admin/grantFoundingPro";
 
 // Chat
 export { onMessageCreated } from "./chat/onMessageCreated";
@@ -116,6 +117,10 @@ export { aiDraftInvoiceNote } from "./ai/draftInvoiceNote";
 // export { createConnectLoginLink } from "./payments/createConnectLoginLink";
 // export { stripeWebhook } from "./payments/stripeWebhook";
 export { backfillPayoutsField } from "./payments/backfillPayoutsField";
+// Blue Seal Pro — flips tradespeople/{uid}.isPro back when a founding-member
+// comp (subscription.proCompUntil) lapses. No Stripe binding; safe to deploy
+// before the Stripe secrets are set.
+export { scheduledProCompExpiry } from "./payments/scheduledProCompExpiry";
 
 // Seed + ops
 // NOTE: `ping` is intentionally NOT exported — it was an unauthenticated,

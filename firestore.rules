@@ -113,7 +113,13 @@ service cloud.firestore {
         // deletedAt is server-managed via the requestAccountDeletion callable
         // (admin SDK bypasses rules). Owner cannot grant themselves a
         // deletion or un-do one — keeps the path deliberate and auditable.
-        && request.resource.data.get('deletedAt', null) == resource.data.get('deletedAt', null);
+        && request.resource.data.get('deletedAt', null) == resource.data.get('deletedAt', null)
+        // Blue Seal Pro subscription is server-managed (Stripe Billing webhook
+        // handlers + adminGrantFoundingPro, both admin SDK). The owner can
+        // never write it from the client — that would let a tradesperson fake
+        // Pro to dodge the platform service fee + unlock the AI gate.
+        // `.get(field, null)` so docs predating it (every account) stay editable.
+        && request.resource.data.get('subscription', null) == resource.data.get('subscription', null);
       allow update: if isAdmin();
       allow delete: if isAdmin();
 
@@ -210,6 +216,12 @@ service cloud.firestore {
              == resource.data.get('paidJobsCount', null)
         && request.resource.data.get('paidLifetimeCents', null)
              == resource.data.get('paidLifetimeCents', null)
+        // Public Blue Seal Pro mirror — server-managed (syncSubscriptionMirror
+        // + scheduledProCompExpiry, admin SDK). Owner can't self-grant it to
+        // win Featured placement in applicant lists. `.get(field, null)` for
+        // legacy/pre-monetization docs.
+        && request.resource.data.get('isPro', null)
+             == resource.data.get('isPro', null)
         // Google Business reviews snapshot is server-managed (written only by
         // the google/* Cloud Functions). Owner can't forge or clear it from
         // the client. `.get(field, null)` for safe access on docs predating it.
