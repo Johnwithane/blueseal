@@ -122,8 +122,8 @@ export const idVerificationFormSchema = z.object({
 export const jobRequestSchema = z.object({
   tradespersonId: z.string().min(1).max(128),
   trade: tradeKeyEnum,
-  title: z.string().trim().min(3).max(140),
-  description: z.string().trim().min(10).max(4000),
+  title: z.string().trim().min(1, "Add a title").max(140),
+  description: z.string().trim().min(1, "Add a description").max(4000),
   urgency: z.enum(["flexible", "this_week", "urgent"]),
   address: z.object({
     line1: z.string().trim().min(2).max(200),
@@ -254,8 +254,8 @@ export const budgetRangeSchema = z
 
 export const createJobPostSchema = z.object({
   trade: tradeKeyEnum,
-  title: z.string().trim().min(5, "At least 5 characters").max(100),
-  description: z.string().trim().min(20, "At least 20 characters").max(2000),
+  title: z.string().trim().min(1, "Add a title").max(100),
+  description: z.string().trim().min(1, "Add a description").max(2000),
   photos: z.array(z.string().min(1).max(500)).min(1, "Add at least 1 photo").max(8),
   addressPublic: addressPublicSchema,
   addressPrivate: addressPrivateSchema,

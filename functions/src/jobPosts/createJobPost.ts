@@ -13,8 +13,8 @@ const caFsaRegex = /^[A-Z]\d[A-Z]$/;
 
 const Input = z.object({
   trade: z.string().min(1).max(50),
-  title: z.string().trim().min(5).max(100),
-  description: z.string().trim().min(20).max(2000),
+  title: z.string().trim().min(1).max(100),
+  description: z.string().trim().min(1).max(2000),
   // Storage paths (e.g. "jobPosts/<tempId>/photos/abc.webp") uploaded by the
   // client before the post doc exists. The callable moves them under the
   // permanent post id by writing the post doc; the client's temp upload path
