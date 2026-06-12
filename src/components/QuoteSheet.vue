@@ -330,20 +330,26 @@ function close() {
            (switching paths mid-walkthrough would be disorienting). -->
       <div
         v-if="canRequestVisit && (!inWizard || wizardStep === 0)"
-        class="flex rounded-lg border border-[color:var(--bs-border)] p-1 mb-4 text-sm"
+        role="tablist"
+        aria-label="How you want to respond"
+        class="grid grid-cols-2 gap-1 rounded-xl border border-[color:var(--bs-border)] bg-[color:var(--bs-surface-alt)] p-1 mb-4"
       >
         <button
           type="button"
-          class="flex-1 rounded-md py-2 px-3 font-medium transition-colors"
-          :class="mode === 'quote' ? 'bg-[color:var(--bs-brand)] text-white' : 'text-[color:var(--bs-muted)]'"
+          role="tab"
+          :aria-selected="mode === 'quote'"
+          class="flex min-h-[44px] items-center justify-center rounded-lg px-3 py-2 text-center text-sm font-semibold transition-colors"
+          :class="mode === 'quote' ? 'bg-[color:var(--bs-blue)] text-white shadow-sm' : 'text-[color:var(--bs-muted)] hover:text-[color:var(--bs-text)]'"
           @click="mode = 'quote'"
         >
           Send a quote
         </button>
         <button
           type="button"
-          class="flex-1 rounded-md py-2 px-3 font-medium transition-colors"
-          :class="mode === 'site_visit' ? 'bg-[color:var(--bs-brand)] text-white' : 'text-[color:var(--bs-muted)]'"
+          role="tab"
+          :aria-selected="mode === 'site_visit'"
+          class="flex min-h-[44px] items-center justify-center rounded-lg px-3 py-2 text-center text-sm font-semibold transition-colors"
+          :class="mode === 'site_visit' ? 'bg-[color:var(--bs-blue)] text-white shadow-sm' : 'text-[color:var(--bs-muted)] hover:text-[color:var(--bs-text)]'"
           @click="mode = 'site_visit'"
         >
           Site visit first

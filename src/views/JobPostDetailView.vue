@@ -817,28 +817,40 @@ const visibleApplications = computed(() => {
             }}
           </p>
 
-          <!-- Mode toggle: full quote / site visit first / chat first. -->
-          <div class="flex rounded-lg border border-[color:var(--bs-border)] p-1 text-sm">
+          <!-- Mode toggle: full quote / site visit first / chat first.
+               Segmented control — the active mode is a solid blue pill so it
+               reads unmistakably as the selected tab. -->
+          <div
+            role="tablist"
+            aria-label="How you want to apply"
+            class="grid grid-cols-3 gap-1 rounded-xl border border-[color:var(--bs-border)] bg-[color:var(--bs-surface-alt)] p-1"
+          >
             <button
               type="button"
-              class="flex-1 rounded-md py-2 px-2 font-medium transition-colors"
-              :class="applyMode === 'quote' ? 'bg-[color:var(--bs-brand)] text-white' : 'text-[color:var(--bs-muted)]'"
+              role="tab"
+              :aria-selected="applyMode === 'quote'"
+              class="flex min-h-[44px] items-center justify-center rounded-lg px-2 py-2 text-center text-xs font-semibold leading-tight transition-colors sm:text-sm"
+              :class="applyMode === 'quote' ? 'bg-[color:var(--bs-blue)] text-white shadow-sm' : 'text-[color:var(--bs-muted)] hover:text-[color:var(--bs-text)]'"
               @click="applyMode = 'quote'"
             >
               Send a quote
             </button>
             <button
               type="button"
-              class="flex-1 rounded-md py-2 px-2 font-medium transition-colors"
-              :class="applyMode === 'site_visit' ? 'bg-[color:var(--bs-brand)] text-white' : 'text-[color:var(--bs-muted)]'"
+              role="tab"
+              :aria-selected="applyMode === 'site_visit'"
+              class="flex min-h-[44px] items-center justify-center rounded-lg px-2 py-2 text-center text-xs font-semibold leading-tight transition-colors sm:text-sm"
+              :class="applyMode === 'site_visit' ? 'bg-[color:var(--bs-blue)] text-white shadow-sm' : 'text-[color:var(--bs-muted)] hover:text-[color:var(--bs-text)]'"
               @click="applyMode = 'site_visit'"
             >
               Site visit first
             </button>
             <button
               type="button"
-              class="flex-1 rounded-md py-2 px-2 font-medium transition-colors"
-              :class="applyMode === 'chat' ? 'bg-[color:var(--bs-brand)] text-white' : 'text-[color:var(--bs-muted)]'"
+              role="tab"
+              :aria-selected="applyMode === 'chat'"
+              class="flex min-h-[44px] items-center justify-center rounded-lg px-2 py-2 text-center text-xs font-semibold leading-tight transition-colors sm:text-sm"
+              :class="applyMode === 'chat' ? 'bg-[color:var(--bs-blue)] text-white shadow-sm' : 'text-[color:var(--bs-muted)] hover:text-[color:var(--bs-text)]'"
               @click="applyMode = 'chat'"
             >
               Chat first

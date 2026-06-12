@@ -69,7 +69,7 @@ watch(
           input-class="w-full"
           class="w-full"
         />
-        <p class="text-xs mt-1" :class="isFree ? 'text-[color:var(--bs-brand)] font-medium' : 'text-[color:var(--bs-muted)]'">
+        <p class="text-xs mt-1" :class="isFree ? 'text-[color:var(--bs-blue)] font-medium' : 'text-[color:var(--bs-muted)]'">
           {{ isFree ? "Free visit — no charge" : "Leave at $0 for a free visit" }}
         </p>
       </div>
