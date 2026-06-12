@@ -47,14 +47,15 @@ The MVP runs end-to-end as soon as you:
 
 3. **Install the "Trigger Email" extension** in the Firebase console and point it at `mail` collection. Without it, emails accumulate in Firestore but never send.
 
-4. **Wire Stripe Connect (commission model).** Set secrets:
+4. **Wire Stripe (service fee + Pro subscription).** Set secrets, then run the bootstrap script:
 
    ```bash
    firebase functions:secrets:set STRIPE_SECRET_KEY
-   firebase functions:secrets:set STRIPE_WEBHOOK_SECRET
+   firebase functions:secrets:set STRIPE_WEBHOOK_SECRET   # two endpoints' secrets, comma-separated
+   STRIPE_SECRET_KEY=sk_... node functions/scripts/stripe-setup.mjs   # product, prices, portal, webhooks
    ```
 
-   Revenue comes from a 12% platform fee on each payment via Stripe Connect Express (`application_fee_amount` on the PaymentIntent, `transfer_data.destination = acct_…` on the tradesperson's connected account). Tradespeople onboard via `/payouts`. See `HUMANTASKS.md` for the Connect setup checklist (enable Connect, register the webhook for both platform + Connect events, set `APP_BASE_URL`).
+   Revenue (MONETIZATION.md): a **client-paid service fee** (5% of the invoice, $2 floor, capped $99/job, waived for Pro) rides on `application_fee_amount` of a destination charge (`transfer_data.destination = acct_…`), grossed up so the tradesperson nets the full invoice; plus **Blue Seal Pro** ($29/mo or $290/yr, Stripe Billing). The old 12% commission is gone. Tradespeople onboard payouts via `/payouts`. See `HUMANTASKS.md` for the full sandbox→live Stripe runbook.
 
 5. **Enable Vertex AI for the AI tools.** No API key needed — Cloud Functions authenticate via the project's service account:
 
@@ -134,6 +135,6 @@ All 10 product phases from [`design.md` § 10](./design.md) are scaffolded:
 ## Known scope deferrals (vs. design.md)
 
 - **Map view in discovery** — list view ships now; map can be added by dropping a `GoogleMapLoader` component into `SearchView.vue` (API key is already in `.env`).
-- **Stripe subscription** — code paths and gating live in place; flip the flag (`adminToggleSubscription`) to test AI gates until real Stripe is wired.
+- **Stripe subscription** — SHIPPED (Blue Seal Pro: Checkout + Customer Portal + subscription webhooks). AI is gated behind Pro/trial via `requireAiEntitlement`. Admins grant free founding comps via `adminGrantFoundingPro`.
 - **App Check** — `enforceAppCheck: false` on callables for first deploy. Flip to `true` after registering an App Check provider in console.
 - **FCM push notifications** — v1.1 per design doc.

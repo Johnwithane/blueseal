@@ -308,6 +308,22 @@ These are scripted, listed here so you know what's happening:
 
 ---
 
+## QuickBooks Online sync (Pro fast-follow — added 2026-06-11)
+
+A Pro feature on the roadmap: one-way push of paid invoices (Customer + Invoice
++ Payment) into the tradesperson's QuickBooks Online company. The code is NOT
+built yet — it's a fast-follow after launch — but Intuit's app review has a long
+external lead time, so **start the developer-app approval now** and it'll be
+ready by the time the sync ships.
+
+### [ ] Create the Intuit developer app + submit for production
+- **What:** Sign up at [developer.intuit.com](https://developer.intuit.com), create an app under the **Accounting** API, and capture the **Client ID / Client secret** (sandbox first). Add the OAuth **redirect URI** (`https://blueseal.app/integrations/quickbooks/callback` — final path TBD when the code lands). Then submit the app for **production** review (Intuit assesses security + OAuth handling; this is the slow, external step — days to weeks).
+- **Why:** Production QBO access requires Intuit's approval. Submitting early means the approval runs in parallel with the rest of the launch instead of blocking the fast-follow.
+- **Verify:** The app shows "Development" keys immediately (usable for sandbox testing); "Production" keys unlock after Intuit approves.
+- **Note:** Live QuickBooks *sync* is roadmap-only — don't promise it on the pricing page until it ships. The accountant-ready **CSV export** (Reports → Export) is the launch-version substitute and is already live.
+
+---
+
 ## AI assistant chatbot (added 2026-05-22)
 
 Floating-panel assistant for tradespeople + admins. Backend lives in [functions/src/ai/chat.ts](functions/src/ai/chat.ts), conversations persist under `assistantConversations/{id}/messages/`. Runs on Vertex AI Gemini 2.5 Flash (same auth path as the existing `aiDiagnose` tools — no API keys needed once the API is enabled).

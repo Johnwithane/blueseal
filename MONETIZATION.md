@@ -1,8 +1,16 @@
 # MONETIZATION.md
 
-> **Status:** Proposed model — founder-approved direction (2026-06-03), pending Phase 0 legal sign-off before implementation.
-> **Supersedes:** the 2026-05 "12% Stripe Connect commission" pivot (see `design.md` §5.9, §payments).
-> This doc defines the *business model*. `design.md` defines *what we build*; once this is implemented, `design.md` and `README.md` must be updated to match (see §9).
+> **Status:** SHIPPED to the test-mode Stripe account (2026-06-11). Live launch still gated on Phase 0 legal sign-off (§8). The model below is as-built; deltas from the 2026-06-03 proposal are noted in the box just below.
+> **Supersedes:** the 2026-05 "12% Stripe Connect commission" pivot (see `design.md` §5.9, §payments). The 12% commission is gone from the code.
+> This doc defines the *business model*. `design.md` defines *what we build*.
+
+> **As-built deltas vs the 2026-06-03 proposal (decided 2026-06-11):**
+> - **Trial: 30 days** (not 14) — card-required, via Stripe Checkout. One per tradesperson (guarded by `subscription.everTrialedAt`).
+> - **Pricing: $29 CAD/mo OR $290 CAD/yr** (annual = 2 months free), marketed as a **founding-member rate locked for life** (list can rise to $39 later). Founding Okanagan cohort gets **3 months free** via `adminGrantFoundingPro` (`subscription.proCompUntil`, no Stripe).
+> - **Pro features shipped:** AI assistant (gated), client service-fee waiver, **featured placement** in applicant lists, **business reports + CSV export**, **recurring invoices** (draft-clone, review-and-send). Receipt OCR stays free for everyone.
+> - **Fee structure:** the client also covers Stripe's processing via a gross-up, so the tradesperson nets the full invoice and the platform's 5% stays whole. (The earlier `on_behalf_of` idea is superseded — it's a plain destination charge.)
+> - **Cash/offline stays free** and the tradesperson confirms receipt (the client's "I paid" is a nudge). Card-only for now; PAD/bank-debit for big jobs is the first fast-follow.
+> - **Connect cost to fold into margin:** Express runs ~US$2/active connected account/mo + 0.25% of payout volume.
 
 ---
 
@@ -14,7 +22,7 @@ Blue Seal makes money three ways:
 | --- | --- | --- | --- |
 | **1. Card processing** | Stripe's actual cost, passed through | **Tradesperson** | 2.9% + $0.30 (Stripe CA) |
 | **2. Platform service fee** | Platform margin on in-app payments | **Client** | **5%, capped at $99 CAD**, $2 floor |
-| **3. Blue Seal Pro** | AI assistant + service-fee waiver | **Tradesperson** | **$29 CAD/mo**, 14-day trial |
+| **3. Blue Seal Pro** | AI + fee waiver + featured placement + reports + recurring | **Tradesperson** | **$29 CAD/mo or $290/yr**, 30-day trial |
 
 **The old model (12% commission on every job) is retired.** A percentage cut of job value breaks down on the high-ticket jobs that matter most — 12% of a $10,000 reno is $1,200, which no tradesperson absorbs, so the job goes to cash and leaks off-platform entirely. This model replaces it with a **capped client-side service fee** (so the tradie keeps ~100% on big jobs) plus a **subscription** (predictable MRR + the AI hook).
 
