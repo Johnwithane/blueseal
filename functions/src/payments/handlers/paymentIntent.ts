@@ -25,6 +25,8 @@ import { logger } from "firebase-functions/v2";
 
 import { db } from "../../lib/admin";
 import { notify } from "../../lib/notify";
+import { postSystemMessage } from "../../lib/chatSystemMessage";
+import { seedReviewPairAndNotify } from "../../lib/reviewPair";
 import type { StripePaymentIntent } from "./shared";
 
 interface InvoiceLookup {
@@ -266,6 +268,58 @@ export async function handlePaymentIntentSucceeded(
       priority: "low",
     }),
   ]);
+
+  // Close the loop: a card payment completes the job, exactly like the offline
+  // markJobPaid path. Without this the job sticks at awaiting_payment and the
+  // tradesperson still sees "Mark as paid" after the client has already paid.
+  // Best-effort + guarded so a failure here can't undo the committed payment.
+  if (result.jobId) {
+    try {
+      const jobRef = db.doc(`jobs/${result.jobId}`);
+      // Idempotent + race-safe: only advance FROM awaiting_payment, so a
+      // duplicate webhook — or the tradie marking it paid offline first —
+      // can't double-complete or clobber a later status.
+      const completion = await db.runTransaction(async (tx) => {
+        const snap = await tx.get(jobRef);
+        if (!snap.exists) return null;
+        const job = snap.data() as {
+          status?: string;
+          chatId?: string;
+          acceptedOffline?: boolean;
+        };
+        if (job.status !== "awaiting_payment") return null;
+        tx.update(jobRef, {
+          status: "complete",
+          completedAt: FieldValue.serverTimestamp(),
+        });
+        return {
+          chatId: job.chatId ?? null,
+          acceptedOffline: job.acceptedOffline === true,
+        };
+      });
+      if (completion) {
+        if (completion.chatId) {
+          await postSystemMessage(
+            completion.chatId,
+            `Payment received — invoice ${result.invoiceNumber} paid ` +
+              `(${fmtMoney(result.total, result.currency)}). Job complete.`,
+          );
+        }
+        // Seed the mutual-review loop, same as markJobPaid.
+        await seedReviewPairAndNotify({
+          jobId: result.jobId,
+          clientId: result.clientId,
+          tradespersonId: result.tradespersonId,
+          acceptedOffline: completion.acceptedOffline,
+        });
+      }
+    } catch (err) {
+      logger.error("paymentIntent succeeded: job completion failed", {
+        jobId: result.jobId,
+        err: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
 }
 
 // `payment_intent.canceled` — fires when an unconfirmed PaymentIntent is

@@ -8,7 +8,7 @@ import { requireRole } from "../lib/auth";
 import { postSystemMessage } from "../lib/chatSystemMessage";
 import { enqueueMail } from "../lib/mail";
 import { notify } from "../lib/notify";
-import { ensureReviewPair } from "../lib/reviewPair";
+import { seedReviewPairAndNotify } from "../lib/reviewPair";
 
 function appBaseUrl(): string {
   return (process.env.APP_BASE_URL ?? "https://blueseal.app").replace(/\/$/, "");
@@ -141,60 +141,16 @@ export const markJobPaid = onCall(CALLABLE_OPTS, async (req) => {
     }
   }
 
-  // Mutual-review loop — idempotent. Both this callable and clientMarkPaid
-  // call ensureReviewPair so whichever closes the invoice first seeds the
-  // 14-day window. Only fan the initial "leave a review" prompt out on
-  // the create branch; if the pair already existed (because the client
-  // marked paid moments earlier) the partner notification was already
-  // sent there.
-  //
-  // Reputation firewall: never seed a pair for a job with no client party
-  // (solo bring-your-own-client) or whose quote acceptance was recorded
-  // offline by the tradesperson — there's no verified counterparty, so a
-  // review here would be fabricable reputation. The reviews create rules
-  // enforce the same gate server-side.
-  if (result.clientId === null || result.acceptedOffline) {
-    logger.info("markJobPaid: review pair skipped (solo/offline-accepted job)", { jobId });
-    return { ok: true };
-  }
-  try {
-    const { created } = await ensureReviewPair({
-      jobId,
-      clientId: result.clientId,
-      tradespersonId: uid,
-    });
-    if (created) {
-      const reviewLink = `/jobs/${jobId}`;
-      await Promise.all([
-        notify({
-          userId: uid,
-          type: "review_requested",
-          title: "Leave a review for your client",
-          body: "Reviews stay hidden until both of you submit. You have 14 days.",
-          link: reviewLink,
-          jobId,
-          actorUid: result.clientId,
-          recipientRole: "tradesperson",
-          priority: "normal",
-        }),
-        notify({
-          userId: result.clientId,
-          type: "review_requested",
-          title: "Leave a review for your tradesperson",
-          body: "Reviews stay hidden until both of you submit. You have 14 days.",
-          link: reviewLink,
-          jobId,
-          actorUid: uid,
-          recipientRole: "client",
-          priority: "normal",
-        }),
-      ]);
-    }
-  } catch (err) {
-    // Non-fatal — the job/invoice transition already committed. The
-    // scheduled nudge will fill in for a missed initial fan-out.
-    logger.error("markJobPaid: review-pair seed failed", { jobId, err });
-  }
+  // Mutual-review loop — seed the pair + fan out the initial prompts. Shared
+  // with the in-app card webhook (seedReviewPairAndNotify) so the loop fires the
+  // same way however the invoice got paid. Idempotent + skips solo/offline-
+  // accepted jobs (reputation firewall).
+  await seedReviewPairAndNotify({
+    jobId,
+    clientId: result.clientId,
+    tradespersonId: uid,
+    acceptedOffline: result.acceptedOffline,
+  });
 
   logger.info("markJobPaid", { jobId, tradespersonId: uid, invoiceNumber: result.invoiceNumber });
   return { ok: true };

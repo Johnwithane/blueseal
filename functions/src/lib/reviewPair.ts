@@ -115,6 +115,69 @@ export async function ensureReviewPair(input: {
 }
 
 /**
+ * Seed the review pair for a freshly-paid job and fan the initial "leave a
+ * review" prompts out to both parties. Shared by every paid-path that completes
+ * a job — the offline `markJobPaid` and the in-app card webhook — so the mutual-
+ * review loop fires identically however the invoice got paid.
+ *
+ * Idempotent: `ensureReviewPair` no-ops if the pair already exists, and the
+ * prompts only fan out on the create branch, so a second paid-path firing (or a
+ * duplicate webhook) won't double-notify.
+ *
+ * Reputation firewall: skip jobs with no client party (solo bring-your-own-
+ * client) or whose quote acceptance was recorded offline by the tradesperson —
+ * there's no verified counterparty, so a review would be fabricable reputation.
+ * The reviews create rules enforce the same gate server-side.
+ *
+ * Best-effort: callers invoke this AFTER the job/invoice writes have committed,
+ * so a failure here is logged, never thrown (the scheduled nudge backfills a
+ * missed fan-out).
+ */
+export async function seedReviewPairAndNotify(input: {
+  jobId: string;
+  clientId: string | null;
+  tradespersonId: string;
+  acceptedOffline: boolean;
+}): Promise<void> {
+  const { jobId, clientId, tradespersonId, acceptedOffline } = input;
+  if (clientId === null || acceptedOffline) {
+    logger.info("seedReviewPairAndNotify: skipped (solo/offline-accepted job)", { jobId });
+    return;
+  }
+  try {
+    const { created } = await ensureReviewPair({ jobId, clientId, tradespersonId });
+    if (!created) return;
+    const reviewLink = `/jobs/${jobId}`;
+    await Promise.all([
+      notify({
+        userId: tradespersonId,
+        type: "review_requested",
+        title: "Leave a review for your client",
+        body: "Reviews stay hidden until both of you submit. You have 14 days.",
+        link: reviewLink,
+        jobId,
+        actorUid: clientId,
+        recipientRole: "tradesperson",
+        priority: "normal",
+      }),
+      notify({
+        userId: clientId,
+        type: "review_requested",
+        title: "Leave a review for your tradesperson",
+        body: "Reviews stay hidden until both of you submit. You have 14 days.",
+        link: reviewLink,
+        jobId,
+        actorUid: tradespersonId,
+        recipientRole: "client",
+        priority: "normal",
+      }),
+    ]);
+  } catch (err) {
+    logger.error("seedReviewPairAndNotify: seed failed", { jobId, err });
+  }
+}
+
+/**
  * Stamp the pair when one side submits their review. If the counterparty
  * already submitted, reveal both reviews + run aggregation. Otherwise
  * notify the counterparty so they know the ball's in their court.
