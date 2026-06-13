@@ -240,13 +240,18 @@ export async function pullBillablesFromJob(invoiceId: string): Promise<PullBilla
   return res.data;
 }
 
-// The fee breakdown the client sees: ONE "Blue Seal service fee" line
-// (totalFeeCents) plus the grand total the card is charged (chargeTotalCents).
-// The platform/processing split is internal — not surfaced.
+// The fee breakdown the client sees on the pay screen + receipt: the platform
+// portion (Blue Seal's fee — shown as "Waived" when the tradesperson is Pro)
+// and the processing portion (Stripe's cut, always charged), split out so the
+// waiver is visible. `totalFeeCents` = platform + processing; the card is
+// charged `chargeTotalCents`. These fields are already on the server snapshot
+// (snapshotOf spreads the full ServiceFeeQuote) — this just types them.
 export interface ClientServiceFee {
   totalFeeCents: number;
   chargeTotalCents: number;
   baseAmountCents: number;
+  platformPortionCents: number;
+  processingPortionCents: number;
   waived: boolean;
 }
 

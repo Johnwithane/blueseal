@@ -156,12 +156,24 @@ const totalPaidCents = computed(
             {{ fmtMoney(invoice.total, invoice.currency) }}
           </span>
         </div>
-        <div v-if="serviceFee" class="flex justify-between">
-          <span class="text-[color:var(--bs-muted)]">Blue Seal service fee</span>
-          <span class="tabular-nums">
-            {{ fmtMoney(serviceFee.totalFeeCents, invoice.currency) }}
-          </span>
-        </div>
+        <template v-if="serviceFee">
+          <div class="flex justify-between">
+            <span class="text-[color:var(--bs-muted)]">Blue Seal service fee</span>
+            <span
+              v-if="serviceFee.waived"
+              class="text-[color:var(--bs-success)] font-medium"
+            >Waived</span>
+            <span v-else class="tabular-nums">
+              {{ fmtMoney(serviceFee.platformPortionCents, invoice.currency) }}
+            </span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-[color:var(--bs-muted)]">Card processing</span>
+            <span class="tabular-nums">
+              {{ fmtMoney(serviceFee.processingPortionCents, invoice.currency) }}
+            </span>
+          </div>
+        </template>
         <div class="flex justify-between font-semibold pt-1 border-t border-[color:var(--bs-border)]">
           <span>Total paid</span>
           <span class="tabular-nums">

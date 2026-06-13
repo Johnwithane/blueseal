@@ -1587,8 +1587,9 @@ export interface InvoiceRefund {
 // when the tradesperson is Pro) + processingPortion (a gross-up that covers
 // Stripe's 2.9% + 30¢ so the platform's 5% stays whole). See serviceFee.ts
 // (functions + src/utils, kept in sync). `feeModelVersion` lets us evolve the
-// model without re-pricing historical charges. Only ONE line is ever shown to
-// the client ("Blue Seal service fee" = totalFeeCents) — the split is internal.
+// model without re-pricing historical charges. The pay screen + receipt show
+// the split: "Blue Seal service fee" (platformPortion, or "Waived" on Pro) and
+// "Card processing" (processingPortion).
 export interface ServiceFeeSnapshot {
   feeModelVersion: number;
   baseAmountCents: number; // invoice total (post-credit) or upfront amount

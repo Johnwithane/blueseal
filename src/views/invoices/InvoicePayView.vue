@@ -279,10 +279,24 @@ const lastFailureMessage = computed(
             <span>Invoice total</span>
             <span class="tabular-nums">{{ fmtMoney(invoice.total, invoice.currency) }}</span>
           </div>
-          <div v-if="serviceFee" class="flex justify-between">
-            <span>Blue Seal service fee</span>
-            <span class="tabular-nums">{{ fmtMoney(serviceFee.totalFeeCents, invoice.currency) }}</span>
-          </div>
+          <template v-if="serviceFee">
+            <div class="flex justify-between">
+              <span>Blue Seal service fee</span>
+              <span
+                v-if="serviceFee.waived"
+                class="text-[color:var(--bs-success)] font-medium"
+              >Waived</span>
+              <span v-else class="tabular-nums">{{
+                fmtMoney(serviceFee.platformPortionCents, invoice.currency)
+              }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span>Card processing</span>
+              <span class="tabular-nums">{{
+                fmtMoney(serviceFee.processingPortionCents, invoice.currency)
+              }}</span>
+            </div>
+          </template>
           <div class="flex justify-between font-semibold text-base pt-1">
             <span>Total to pay</span>
             <span class="tabular-nums">{{
@@ -291,8 +305,14 @@ const lastFailureMessage = computed(
           </div>
         </div>
         <p v-if="serviceFee" class="mt-2 text-xs text-[color:var(--bs-muted)]">
-          The service fee covers secure card processing and payment protection
-          through Blue Seal.
+          <template v-if="serviceFee.waived">
+            Your tradesperson is on Blue Seal Pro, so the service fee is waived —
+            you're only covering standard secure card processing.
+          </template>
+          <template v-else>
+            The Blue Seal service fee supports verified tradespeople and payment
+            protection; card processing is the standard secure-card fee.
+          </template>
         </p>
       </div>
 
