@@ -7,6 +7,7 @@ import { db } from "../lib/admin";
 import { requireRole } from "../lib/auth";
 import { postSystemMessage } from "../lib/chatSystemMessage";
 import { enqueueMail } from "../lib/mail";
+import { brandedEmailHtml } from "../lib/emailTemplate";
 import { notify } from "../lib/notify";
 import { seedReviewPairAndNotify } from "../lib/reviewPair";
 
@@ -124,16 +125,31 @@ export const markJobPaid = onCall(CALLABLE_OPTS, async (req) => {
         (tradieUser.data() as { displayName?: string })?.displayName ?? "your tradesperson";
       const pdfUrl = (invSnap.data() as { pdfUrl?: string | null })?.pdfUrl ?? null;
       if (clientEmail) {
+        const amount = `$${(result.total / 100).toFixed(2)}`;
+        const receiptUrl = `${appBaseUrl()}/invoices/${jobId}/receipt`;
         await enqueueMail({
           to: clientEmail,
           subject: `Receipt — invoice ${result.invoiceNumber} paid`,
+          // Plain-text part kept as the multipart fallback for clients that
+          // don't render HTML.
           text:
             `Hi ${clientName},\n\n` +
-            `This confirms your payment of $${(result.total / 100).toFixed(2)} to ${tradieName} ` +
+            `This confirms your payment of ${amount} to ${tradieName} ` +
             `for invoice ${result.invoiceNumber}.\n\n` +
-            `View receipt: ${appBaseUrl()}/invoices/${jobId}/receipt\n` +
+            `View receipt: ${receiptUrl}\n` +
             (pdfUrl ? `Invoice PDF: ${pdfUrl}\n` : "") +
             `\nThanks,\nBlue Seal`,
+          html: brandedEmailHtml({
+            title: `Payment confirmed — invoice ${result.invoiceNumber}`,
+            bodyLines: [
+              `Hi ${clientName},`,
+              `This confirms your payment of ${amount} to ${tradieName} for invoice ${result.invoiceNumber}.`,
+              `Thanks for using Blue Seal — your receipt is ready below.`,
+            ],
+            ctaLabel: "View receipt",
+            ctaUrl: receiptUrl,
+            preheader: `Your ${amount} payment for invoice ${result.invoiceNumber} is confirmed.`,
+          }),
         });
       }
     } catch (err) {
