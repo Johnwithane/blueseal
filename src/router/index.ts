@@ -127,6 +127,15 @@ const routes: RouteRecordRaw[] = [
     meta: { layout: "public" },
   },
 
+  // Private investor / partner pitch. Chromeless (no app or marketing chrome),
+  // password-gated in-view + noindex, and deliberately not linked anywhere.
+  {
+    path: "/pitch",
+    name: "Pitch",
+    component: () => import("@/views/PitchView.vue"),
+    meta: { layout: "chromeless" },
+  },
+
   // Prospect magic-link claim handler (lands here from the outreach email).
   {
     path: "/claim",

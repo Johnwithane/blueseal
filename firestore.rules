@@ -380,6 +380,15 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    // ---------- platformStats (public marketing counts for /pitch) ----------
+    // World-readable COUNTS ONLY (no PII). Written exclusively by the
+    // recomputePlatformStats scheduled function via the Admin SDK (which
+    // bypasses rules) — so all client writes are denied outright.
+    match /platformStats/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // ---------- clients (tradesperson client book / CRM — Blue Seal Pro) ----------
     // A tradesperson-owned contact record (see ClientDoc). Read is
     // ownership-only — a lapsed Pro tradesperson never loses access to their own

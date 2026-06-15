@@ -5,6 +5,21 @@ export type Role = "client" | "tradesperson" | "admin";
 export type WithId<T> = T & { id: string };
 
 // ---------------------------------------------------------------------------
+// platformStats/current — public marketing counts shown on the /pitch deck.
+// World-readable COUNTS ONLY (never any personal data). Written exclusively by
+// the recomputePlatformStats scheduled Cloud Function (Admin SDK).
+// ---------------------------------------------------------------------------
+export interface PlatformStatsDoc {
+  /** Verified, visible tradespeople (vettingStatus "approved" + isVisible). */
+  verifiedPros: number;
+  /** Total jobs created on the platform. */
+  jobs: number;
+  /** Jobs that reached complete/reviewed. */
+  jobsCompleted: number;
+  updatedAt: Timestamp;
+}
+
+// ---------------------------------------------------------------------------
 // users/{uid}
 // ---------------------------------------------------------------------------
 export interface UserDoc {

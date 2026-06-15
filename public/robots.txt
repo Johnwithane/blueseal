@@ -14,6 +14,8 @@ Disallow: /my-applications
 Disallow: /request/
 Disallow: /request-prospect/
 Disallow: /claim
+# Private investor/partner pitch — password-gated + noindex; never indexed.
+Disallow: /pitch
 # Allow the public job-posting landing page while blocking job instances above.
 Allow: /jobs/post
 # Auth pages are crawlable but carry a baked noindex tag (so it's honoured even
