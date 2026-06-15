@@ -1,9 +1,11 @@
 # Blue Seal — Privacy Policy
 
 **Effective date:** 2026-05-21
-**Last updated:** 2026-05-21
+**Last updated:** 2026-06-15
 
-This Privacy Policy explains how **Blue Seal App** ("Blue Seal", "we", "us", "our") collects, uses, discloses, retains and protects personal information when you use the Blue Seal progressive web application, websites under https://blueseal.app, and related services (together, the "**Service**").
+This Privacy Policy explains how **Blue Seal**, a sole proprietorship operated by **[OPERATOR LEGAL NAME]** in British Columbia, Canada ("Blue Seal", "we", "us", "our"), collects, uses, discloses, retains and protects personal information when you use the Blue Seal progressive web application, websites under https://blueseal.app, and related services (together, the "**Service**").
+
+> **[Before publishing: replace `[OPERATOR LEGAL NAME]` here and in § 13 with the registered name the Blue Seal sole proprietorship operates under, and have this reviewed by a lawyer.]**
 
 We are committed to handling personal information in accordance with Canada's *Personal Information Protection and Electronic Documents Act* (PIPEDA) and, for residents of British Columbia, the BC *Personal Information Protection Act* (PIPA BC).
 
@@ -41,7 +43,7 @@ We collect only the information we need to operate the Service, verify users, fa
 - Service address(es) for jobs you post (street address, city, postal code, geolocation)
 - Photos and descriptions you upload when submitting a request (these may incidentally include images of your property, possessions, or other people)
 - Reviews you publish of tradespeople
-- Payment-related information when paying invoices (handled outside the Service for MVP; see § 4)
+- When you pay an invoice **by card** through the Service, your payment is processed by **Stripe** (our payment processor). Blue Seal receives the payment status and the last four digits / card brand from Stripe — **never your full card number** (see § 4)
 
 **Tradespeople — additional**
 - Trade(s), years of experience, bio, pricing, service area and availability
@@ -49,7 +51,7 @@ We collect only the information we need to operate the Service, verify users, fa
 - **Government-issued photo identification** (driver's licence, passport, or provincial ID) used solely to verify your identity for platform safety
 - Portfolio photos
 - Payment instructions / banking information you publish on invoices
-- Stripe customer identifier when you subscribe to AI tools (see § 4)
+- Stripe customer and connected-account identifiers when you subscribe to Blue Seal Pro or set up payouts (see § 4)
 - Private reviews of clients you have worked with
 
 ### 2.2 Information we collect automatically
@@ -64,7 +66,7 @@ When you use the Service we automatically collect:
 ### 2.3 Information from third parties
 
 - **Google Sign-In:** if you sign up using Google, we receive your name, email and profile photo from Google.
-- **Stripe:** when a tradesperson subscribes to AI tools, Stripe shares subscription status, the last four digits of the payment method, and billing country with us. We never receive full card numbers.
+- **Stripe:** when a tradesperson subscribes to Blue Seal Pro, or when a client pays an invoice by card, Stripe shares status (subscription or payment), the last four digits / brand of the payment method, and billing country with us. We never receive full card numbers. When a tradesperson onboards for payouts, Stripe collects their identity and banking details directly and confirms their payout-eligibility status to us.
 
 We do **not** purchase personal information from data brokers.
 
@@ -81,8 +83,9 @@ We collect and use personal information for the purposes set out in this section
 | Display tradesperson profiles publicly | Tradesperson name, photo, bio, trades, service area, ratings, reviews | To let clients evaluate and choose a tradesperson |
 | Verify tradesperson identity and qualifications | Government photo ID, certification documents | To meet our verification commitments to clients and reduce fraud |
 | Facilitate jobs between users | Job descriptions, photos, addresses, chat messages, schedules | To make it possible to coordinate the work |
-| Generate and send invoices | Job and payment data, tradesperson payment instructions | To support tradespeople's billing |
-| Provide AI tools (tradesperson only) | Job chat history, intake form data, intake photos | To produce diagnoses, quote drafts and job summaries on request |
+| Generate and send invoices; process card payments | Job and payment data, tradesperson payment instructions, Stripe identifiers | To support tradespeople's billing and process in-app card payments + payouts via Stripe |
+| Provide the AI assistant (Pro tradespeople) and receipt-scanning (all tradespeople) | Job chat history, intake form data, intake/job photos, receipt images | To produce diagnoses, quote/invoice drafts, summaries and parsed expenses on request |
+| Manage Blue Seal Pro subscriptions | Stripe customer id, subscription status, plan | To provide, bill, renew and cancel the subscription |
 | Operate mutual review system | Job participation, ratings and review text | To maintain trust on both sides of the marketplace |
 | Send essential service communications | Email, account events | To notify you of account activity, requests, bookings, invoices, vetting decisions |
 | Send marketing communications (with consent) | Email | To send product updates and offers — you may unsubscribe at any time |
@@ -120,10 +123,10 @@ We use third-party service providers ("processors") who handle personal informat
 
 | Provider | Purpose | Where they process data |
 |---|---|---|
-| **Google LLC (Firebase)** — Authentication, Firestore database, Cloud Storage, Cloud Functions, Hosting, App Check, AI Logic (Gemini) | Core backend, identity, file storage, AI tools | United States and other Google regions |
+| **Google LLC (Firebase / Google Cloud)** — Authentication, Firestore database, Cloud Storage, Cloud Functions, Hosting, App Check, Vertex AI (Gemini) | Core backend, identity, file storage, AI assistant | United States and other Google regions |
 | **Google LLC (Maps Platform)** | Map display and place search | United States |
-| **Stripe, Inc.** | Subscription billing (tradesperson AI subscription), and in future, in-app payments | United States, Canada |
-| **SendGrid (Twilio) or Mailgun** *(one of)* | Transactional and (where you've consented) marketing email | United States |
+| **Stripe, Inc.** | Blue Seal Pro subscription billing; in-app card payments; tradesperson payouts via Stripe Connect. Connect onboarding collects a tradesperson's identity, business and banking information **directly from the tradesperson** under Stripe's own terms — Blue Seal does not receive or store it. For card payments, Stripe shares payment status and the last four digits / brand of the card; Blue Seal never receives full card numbers. | United States, Canada |
+| **Resend** | Transactional and (where you've consented) marketing email | United States |
 | **Sentry** | Error and performance monitoring | United States |
 | **Cloudflare** *(if used for DNS / CDN)* | Edge delivery, DDoS protection | Global edge |
 
@@ -158,11 +161,11 @@ We do not sell personal information, and we do not share it with third parties f
 
 ## 5. AI features
 
-Tradespeople with an active AI subscription can use three AI tools — **Diagnose**, **Quote Helper**, and **Job Summary** — from inside a job. When a tradesperson uses these tools:
+Tradespeople with an active **Blue Seal Pro** subscription (or trial) can use the AI assistant — to diagnose problems, draft quotes and invoice notes, summarize jobs, and suggest replies — from inside a job. Receipt-scanning (which reads an uploaded receipt image to pre-fill an expense) is available to all tradespeople. When a tradesperson uses these AI features:
 
-- We send the relevant job context (chat messages, intake form answers, and intake photos for that job) to Google's Gemini model through Firebase AI Logic.
+- We send the relevant context (for job-scoped help: chat messages, intake-form answers, and intake/job photos for that job; for receipt-scanning: the receipt image) to Google's Gemini model via **Google Vertex AI**.
 - Google processes this data to generate the response and, under our agreement with Google, **does not use it to train its general models**.
-- We log the tool used, token counts and timestamp for usage limits and abuse prevention (we don't log the raw inputs and outputs beyond what's necessary for support).
+- We log the feature used, token counts and timestamp for usage limits and abuse prevention (we don't log the raw inputs and outputs beyond what's necessary for support).
 
 Clients should be aware that chat messages and photos they send to a tradesperson **may be processed by AI** in this way if the tradesperson uses an AI tool on that job. By using the Service, you consent to this processing for the purpose of producing tools for the tradesperson assigned to your job.
 
@@ -263,7 +266,10 @@ Non-material changes (typos, clarifications, contact updates) may be made withou
 
 For privacy questions, requests under § 7, or complaints:
 
-**Blue Seal App — Privacy Officer**
+**Blue Seal — Privacy Officer** (Blue Seal is operated as a sole proprietorship by **[OPERATOR LEGAL NAME]**)
 **Email:** contact@blueseal.app
+**Mailing address:** 6960 Terazona Drive, Kelowna, BC, Canada V1Z 3R8
 
 For general support questions, the same address works: contact@blueseal.app.
+
+*(Before publishing, replace `[OPERATOR LEGAL NAME]` with the registered name the Blue Seal sole proprietorship operates under.)*

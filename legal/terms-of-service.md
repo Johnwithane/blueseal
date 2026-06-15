@@ -1,11 +1,13 @@
 # Blue Seal — Terms of Service
 
 **Effective date:** 2026-05-21
-**Last updated:** 2026-05-26
+**Last updated:** 2026-06-15
 
-These Terms of Service ("**Terms**") are a binding agreement between you and **Blue Seal App** ("**Blue Seal**", "**we**", "**us**", "**our**"). They govern your access to and use of the Blue Seal progressive web application, websites under https://blueseal.app, and related services (together, the "**Service**").
+These Terms of Service ("**Terms**") are a binding agreement between you and **Blue Seal**, a sole proprietorship operated by **[OPERATOR LEGAL NAME]** in British Columbia, Canada ("**Blue Seal**", "**we**", "**us**", "**our**"). They govern your access to and use of the Blue Seal progressive web application, websites under https://blueseal.app, and related services (together, the "**Service**").
 
-**Please read these Terms carefully.** They include important provisions about how the Service works, what you can and cannot do, our role as a marketplace (and what we are *not* responsible for), payments, the dispute-resolution process and an arbitration clause (§ 17), and limits on our liability (§§ 14–15).
+> **[ACTION REQUIRED before publishing: replace `[OPERATOR LEGAL NAME]` above and in § 21 with the registered name the Blue Seal sole proprietorship operates under, and have this document reviewed by a lawyer. Blue Seal currently operates as a sole proprietorship; if it is later incorporated, update the operating-entity references throughout.]**
+
+**Please read these Terms carefully.** They include important provisions about how the Service works, what you can and cannot do, our role as a marketplace (and what we are *not* responsible for), payments and the Blue Seal service fee, the Blue Seal Pro subscription and its auto-renewal (§ 9), the dispute-resolution process and an arbitration clause (§ 17), and limits on our liability (§§ 14–15).
 
 **By creating an account, ticking the agreement checkbox at signup, or otherwise using the Service, you confirm that you have read, understood and agreed to these Terms and to our [Privacy Policy](./privacy-policy.md).** If you do not agree, do not use the Service.
 
@@ -13,7 +15,7 @@ These Terms of Service ("**Terms**") are a binding agreement between you and **B
 
 ## 1. The Service: what Blue Seal is, and what it is not
 
-Blue Seal is a two-sided marketplace that **introduces** clients ("**Clients**") to verified tradespeople ("**Tradespeople**", or "**Tradies**") and gives them tools to coordinate, document and bill for work. Our revenue comes from a **platform fee on in-app payments** processed through the Service (see § 9). The AI-powered tools available through the Service are included for verified Tradespeople at no additional charge.
+Blue Seal is a two-sided marketplace that **introduces** clients ("**Clients**") to verified tradespeople ("**Tradespeople**", or "**Tradies**") and gives them tools to coordinate, document and bill for work. Our revenue comes from (a) a **Blue Seal service fee** charged to the Client when an invoice is paid by card through the Service, and (b) an optional **Blue Seal Pro** subscription for Tradespeople (both described in § 9). The core Service — searching, quoting, invoicing, scheduling, chat — is free for Clients and Tradespeople; certain features (including the AI assistant) require a Blue Seal Pro subscription, except receipt-scanning, which is free for all Tradespeople.
 
 **We are an introducer and tooling provider — not the contractor.** Specifically:
 
@@ -75,7 +77,7 @@ You agree not to (and not to help anyone else to):
 - use the Service for any illegal purpose, or to violate any law or third party's rights;
 - impersonate another person, or misrepresent your affiliation, qualifications, or trade certifications;
 - post content that is false, misleading, defamatory, abusive, harassing, hateful, sexually explicit, infringing, or that contains personal information about a third party without their consent;
-- attempt to circumvent Blue Seal to avoid platform fees once those apply, or to recruit Tradespeople or Clients away from the Service for the purpose of conducting comparable work off-platform — this restriction applies for **12 months** after a job initiated on the Service;
+- recruit, divert, or solicit a Tradesperson or Client you connected with through the Service away from the Service in order to arrange or conduct comparable work entirely outside it — this restriction applies for **12 months** after a job initiated on the Service. (For clarity: paying for a job by e-transfer or cash and recording it in the Service, which the Service expressly supports and which carries no Blue Seal service fee, is **not** a breach of this section.);
 - send spam, phishing attempts or unsolicited commercial messages through the Service;
 - upload viruses, malware, or anything intended to disrupt the Service;
 - scrape, crawl, harvest, or otherwise extract data from the Service without our written permission;
@@ -179,9 +181,14 @@ Neither party may offer or accept anything of value in exchange for a positive r
 
 ## 7. Payments through the Service
 
-### 7.1 In-app payment is the only sanctioned method
+### 7.1 How payment works
 
-For work formed through the Service, **payment is processed in-app through Stripe Connect**, our third-party payments provider. In-app payment is the only payment method the Service supports for jobs initiated on the Service. Soliciting, collecting, or making payment for such work off-platform breaches § 3 (no circumvention) and may result in suspension, termination, and a claim for the platform fees that would otherwise have applied.
+The Service supports two ways to pay an invoice for work formed through the Service:
+
+- **By card, in-app**, processed through **Stripe Connect**, our third-party payments provider. Card payments are subject to the **Blue Seal service fee** (§ 9), which is added to the Client's total at checkout.
+- **Offline (e-transfer, cash, or another method arranged directly between the Client and the Tradesperson)**, which the Client and Tradesperson settle between themselves and the Tradesperson then records in the Service. **Offline payment carries no Blue Seal service fee.**
+
+Both methods keep a record of the job in the Service. What this section does **not** permit is diverting the working relationship off the Service entirely to avoid using it for comparable future work, as described in § 3.
 
 ### 7.2 Tradesperson onboarding with Stripe
 
@@ -189,7 +196,7 @@ Before a Tradesperson can send a payable invoice through the Service, they must 
 
 ### 7.3 Payment flow
 
-When a Tradesperson sends an invoice for completed work, Stripe creates a payment intent for the **full invoice amount** in Canadian dollars (the only currency the Service supports at this stage). When the Client pays, Stripe charges the Client and, at the time of capture, splits the proceeds: Blue Seal's platform fee (see § 9) is retained as an application fee, and the remainder is transferred to the Tradesperson's connected Stripe account. **Blue Seal does not at any point hold the gross proceeds of any job in its own accounts.** Payouts from the Tradesperson's connected account to their bank are handled by Stripe on Stripe's standard schedule and are governed by the CAA.
+When a Client pays an invoice by card, Stripe charges the Client the **invoice total plus the Blue Seal service fee** (§ 9), in Canadian dollars (the only currency the Service supports at this stage). At the time of capture the charge is split so that the **Tradesperson receives the full invoice amount** in their connected Stripe account, and the **service fee is retained by Blue Seal as an application fee**. (The service fee shown to the Client is a single line and is calculated so that it also covers Stripe's processing cost on the transaction; the Tradesperson is not charged a separate processing fee on these card payments.) **Blue Seal does not at any point hold the gross proceeds of any job in its own accounts.** Payouts from the Tradesperson's connected account to their bank are handled by Stripe on Stripe's standard schedule and are governed by the CAA. The service fee that applies to a payment is the one snapshotted on that payment at the moment it is created; later changes to the fee do not retroactively affect payments already made.
 
 ### 7.4 Limited payment agency
 
@@ -209,7 +216,7 @@ The Service is not a money-services business, a deposit-taking institution, an i
 
 ### 8.1 Refunds
 
-A Tradesperson may issue a full or partial refund on a paid invoice through Stripe. When a refund is issued, Stripe also returns the proportional share of Blue Seal's platform fee to the Client, so Blue Seal does not retain a fee on refunded amounts. **Whether to issue a refund, and on what terms, is a matter between the Client and the Tradesperson.** Blue Seal does not adjudicate refund requests, does not initiate refunds on a Client's behalf, and does not undertake to compel a Tradesperson to issue one. Nothing in this section limits any non-waivable refund or remedy a Client has under applicable consumer-protection law.
+A Tradesperson may issue a full or partial refund on a paid invoice through Stripe. On a **full refund** of a job, the Blue Seal service fee on that payment is also returned to the Client. On a **partial refund**, the refunded amount comes from the Tradesperson's side of the payment and the Blue Seal service fee is **not** returned (the Client paid that fee for the card-payment service Blue Seal provided, which was performed). The unrecoverable card-processing portion of any payment is never returned by the card networks. **Whether to issue a refund, and on what terms, is a matter between the Client and the Tradesperson.** Blue Seal does not adjudicate refund requests, does not initiate refunds on a Client's behalf, and does not undertake to compel a Tradesperson to issue one. Nothing in this section limits any non-waivable refund or remedy a Client has under applicable consumer-protection law.
 
 ### 8.2 Card disputes and chargebacks
 
@@ -224,27 +231,43 @@ To the maximum extent permitted by law, **Blue Seal is not liable to any User fo
 
 ---
 
-## 9. Platform fee, taxes, and changes
+## 9. Fees, the Blue Seal Pro subscription, taxes, and changes
 
-### 9.1 Platform fee
+### 9.1 Blue Seal service fee (Client, on card payments)
 
-Blue Seal currently charges a **platform fee equal to 12% of the invoice total**, deducted from the amount transferred to the Tradesperson's connected Stripe account at the time the Client's payment is captured. The platform fee that applies to each invoice is the fee snapshotted on that invoice at the moment it is sent; changes to the fee do not retroactively affect invoices already sent.
+When a Client pays an invoice **by card** through the Service, Blue Seal charges the **Client** a **Blue Seal service fee**, added to the total at checkout. As of the Effective date the service fee is **5% of the invoice total, with a minimum of CAD $2 and a maximum of CAD $99 per job** (the cap applies cumulatively across all card payments on a single job, including any upfront deposit). The fee covers Blue Seal's service plus the card-processing cost on the transaction. **The Client always sees the exact fee and the total before paying.** Paying **offline** (e-transfer or cash, recorded in the Service) carries **no** Blue Seal service fee. If the Tradesperson has an active **Blue Seal Pro** subscription, the platform portion of the service fee on their Clients' card payments is **waived** (a card-processing portion may still apply).
 
 ### 9.2 Stripe processing fees
 
-Stripe charges its own processing fees on each payment, deducted by Stripe under the CAA. Those fees are separate from Blue Seal's platform fee and are not retained by Blue Seal.
+Stripe charges its own processing fees on each card payment under the CAA. For Client card payments through the Service, that cost is built into the Blue Seal service fee in § 9.1 (so the Tradesperson is not charged a separate processing fee on it). Stripe may charge the Tradesperson's connected account other fees under the CAA (for example, account or payout fees), which are between the Tradesperson and Stripe.
 
-### 9.3 Changes to the platform fee
+### 9.3 Blue Seal Pro subscription (Tradesperson, optional)
 
-We may change the platform fee from time to time. Where we do, we will give Tradespeople **at least 30 days' notice** through the Service or by email; the new fee will apply to invoices sent after the effective date. A Tradesperson who does not accept a fee change may stop using the Service before the effective date.
+**Blue Seal Pro** is an optional paid subscription for Tradespeople. As of the Effective date it costs **CAD $29 per month or CAD $290 per year** (a "founding" rate that may differ from later published rates; we will honour the rate a subscriber signed up at for as long as their subscription remains continuously active, except for tax changes or changes required by law or our payment processor). Pro currently includes the AI assistant, a waiver of the platform service fee for the subscriber's Clients (§ 9.1), featured placement (§ 9.7), business reports and export, a client book with recurring billing, and branded quotes and invoices. **We may add, change, or remove Pro features over time.** Subscriptions are billed and managed through Stripe.
 
-### 9.4 Fee Schedule (when published)
+### 9.4 Free trial
 
-We may publish a separate **Fee Schedule** setting out the platform fee, worked examples, and any further fee mechanics in more detail. Where published, the Fee Schedule forms part of these Terms; in case of conflict between this § 9 and the published Fee Schedule, the Fee Schedule controls.
+New Blue Seal Pro subscriptions may include a **free trial** (as of the Effective date, **30 days**). A valid payment method is required to start a trial. **You will not be charged during the trial. Unless you cancel before the trial ends, your subscription automatically continues as a paid subscription and the first charge is taken at the end of the trial** at the price shown when you signed up. One trial per Tradesperson.
 
-### 9.5 Taxes
+### 9.5 Automatic renewal and cancellation
 
-The Tradesperson is solely responsible for charging, collecting, reporting, and remitting any GST, HST, PST, QST, or other tax that applies to the work they perform, including configuring the correct tax amount on each invoice they send through the Service. **Blue Seal does not calculate, collect, or remit tax on the underlying work performed by a Tradesperson.** Blue Seal handles any tax it itself owes in connection with the platform fee on its own account. **You should consult a tax professional if you are unsure how tax should be set up on your invoices.**
+**Your Blue Seal Pro subscription renews automatically.** At the end of each billing period (monthly or annual, as selected), it renews for another period of the same length and **your payment method is charged the then-current price for your plan automatically, without further action by you, until you cancel.** You may **cancel at any time** from **Account → Blue Seal Pro** (which opens Stripe's secure customer portal). **Cancellation takes effect at the end of the billing period you have already paid for** — you keep Pro until then. Cancelling during a free trial ends it with **no charge**. Except where a refund is required by applicable consumer-protection law, **subscription fees are non-refundable and we do not provide refunds or credits for partial billing periods.** If a renewal payment fails, we may retry it and may suspend or end Pro features if it cannot be collected.
+
+### 9.6 Changes to the service fee and subscription prices
+
+We may change the service fee (§ 9.1) or Blue Seal Pro pricing (§ 9.3) from time to time. For the **service fee**, we will give Tradespeople **at least 30 days' notice** through the Service or by email; the new fee applies to payments made after the effective date. For **subscription price** changes, we will notify affected subscribers in advance and the new price will apply at the **next renewal** after the notice period; if you do not accept it, you may cancel before that renewal under § 9.5.
+
+### 9.7 Featured placement (paid placement disclosure)
+
+On a Client's job posting, applications from Tradespeople with an active Blue Seal Pro subscription are shown **higher in the list and labelled "Featured."** This is a **paid placement** that affects the **order** in which applications appear only. **It does not affect, and is not, a verification, rating, review, or endorsement, and Clients always see and compare the actual quotes before choosing.** Clients are free to choose any applicant.
+
+### 9.8 Fee Schedule (when published)
+
+We may publish a separate **Fee Schedule** setting out the service fee, subscription pricing, worked examples, and any further fee mechanics in more detail. Where published, the Fee Schedule forms part of these Terms; in case of conflict between this § 9 and the published Fee Schedule, the Fee Schedule controls.
+
+### 9.9 Taxes
+
+The Tradesperson is solely responsible for charging, collecting, reporting, and remitting any GST, HST, PST, QST, or other tax that applies to the **work they perform**, including configuring the correct tax amount on each invoice they send through the Service. **Blue Seal does not calculate, collect, or remit tax on the underlying work performed by a Tradesperson.** Blue Seal is responsible for any tax it itself owes on its own service fee and subscription revenue, and any such tax that must be added to the service fee or the subscription price will be shown at the point of payment where required. **You should consult a tax professional if you are unsure how tax should be set up on your invoices.**
 
 ---
 
@@ -274,7 +297,7 @@ On termination, your right to use the Service ends. The following sections survi
 
 ## 11. Third-party services
 
-The Service relies on third-party services (e.g., Google Firebase, Stripe, Google Maps, SendGrid/Mailgun, Sentry) and may link to third-party websites or content. We are not responsible for third-party services or content, and your use of them is governed by **their** terms and privacy policies. If a third-party service becomes unavailable, the related features of the Service may also become unavailable.
+The Service relies on third-party services (e.g., Google Firebase / Google Cloud, Stripe, Google Maps, Google Vertex AI (which powers the AI assistant), Resend (email delivery), and Sentry) and may link to third-party websites or content. We are not responsible for third-party services or content, and your use of them is governed by **their** terms and privacy policies. If a third-party service becomes unavailable, the related features of the Service may also become unavailable.
 
 ---
 
@@ -391,4 +414,9 @@ If you continue to use the Service after the change takes effect, you accept the
 
 ## 21. How to contact us
 
-All questions — terms, support, or privacy: **contact@blueseal.app**
+Blue Seal is operated as a sole proprietorship by **[OPERATOR LEGAL NAME]**.
+
+- **Email** (terms, support, or privacy): **contact@blueseal.app**
+- **Mailing address:** 6960 Terazona Drive, Kelowna, BC, Canada V1Z 3R8
+
+*(Before publishing, replace `[OPERATOR LEGAL NAME]` with the registered name the Blue Seal sole proprietorship operates under.)*
