@@ -31,7 +31,7 @@
 | Incorporation to enter | **Not required** ("Participants are not required to be incorporated") | Pre-incorporation | ✅ Clear |
 | Revenue / stage | No cap; ideation→growth welcome | Pre-revenue, live MVP | ✅ Clear |
 | BC-based | Business "B.C.-based with the majority of its activity in B.C." | Kelowna / Okanagan | ✅ Clear |
-| BC resident | ≥1 team member a **permanent resident of BC** | Founders in Kelowna | ⚠️ **Confirm** PR-of-BC status of at least one founder |
+| BC resident | ≥1 team member a **permanent resident of BC** | **Both founders are BC permanent residents** | ✅ Clear |
 | Company age | Privately held, **not incorporated >5 years** | Not yet incorporated | ✅ Clear (clock hasn't started) |
 | Prior funding | **< $1,000,000** of *non-grant* funding | None | ✅ Clear |
 | Not a consulting/service business | Must commercialize IP via a product | Product marketplace | ✅ Clear |
@@ -39,7 +39,7 @@
 
 **Specialty prizes:** Woman-Led applies only if a co-founder qualifies — with two brothers, treat as **N/A**. Sustainability / Life Sciences are not fits. Target the **placement prizes (1st–3rd)**.
 
-**Homework before 2027:** (1) confirm at least one founder's **BC permanent residency**; (2) decide incorporation timing (not required to enter, but prudent before collecting any prize); (3) sharpen the traction narrative around the live MVP + ~100 verified pros — that traction is exactly what the competition's own Founder's Guide says wins.
+**Homework before 2027:** ✅ BC permanent residency confirmed (both founders). Remaining: (1) decide incorporation timing (not required to enter, but prudent before collecting any prize); (2) sharpen the traction narrative around the live MVP + ~100 verified pros — that traction is exactly what the competition's own Founder's Guide says wins.
 
 ---
 
@@ -91,7 +91,7 @@
 ## Action steps
 
 - [ ] **Set a reminder for ~Feb 2027** (NVBC applications historically open early–mid February). Watch [newventuresbc.com/competition](https://www.newventuresbc.com/competition) and the Innovate BC newsletter.
-- [ ] Confirm **BC permanent residency** of at least one founder (the one gating item).
+- [x] **BC permanent residency confirmed** — both founders. ✓
 - [ ] When it opens: pay the **$200 entry fee**, paste the Round 1 answers above, submit.
 - [ ] Build out the **Round 2 five-pager** from the outline + narrative bank in advance — don't wait for the deadline.
 - [ ] Get **pro-forma financials** drafted with the accountant (needed at Round 3) — reuse for Futurpreneur's cash flow too.

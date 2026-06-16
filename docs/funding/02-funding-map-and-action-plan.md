@@ -16,7 +16,7 @@ For a solo/duo pre-revenue founder, **most marquee grants are gated** and a few 
 
 1. **Incorporate in BC (~$400)** → unlocks SR&ED + nearly everything else.
 2. **Run T4 founder payroll** → makes SR&ED actually worth claiming (~60–65% of R&D salary back).
-3. **Engage Futurpreneur** (if a founder is ≤39) and/or **Community Futures Central Okanagan** → up to $75K + $150K in non-dilutive loans.
+3. **Engage Futurpreneur** (Johnny, 37 — eligible) and/or **Community Futures Central Okanagan** → up to $75K + $150K in non-dilutive loans.
 4. **Start the free NRC IRAP advisor relationship** → advice now, possible funding later.
 5. **Prep the New Ventures BC Competition** entry for **Feb 2027** → $250K+ non-dilutive prize pool, no equity.
 6. **Layer wage subsidies (SWPP / Tech Co-op / IRAP Youth)** once you're ready to hire.
@@ -33,7 +33,7 @@ That stack is realistic, non-dilutive, and mostly free to pursue. The big-ticket
 | --- | --- | --- | --- | --- | --- |
 | **BC Incorporation** | The unlock (not funding itself) | No | — | Do first; ~$400 | `01` |
 | **New Ventures BC Competition** | $250K+ prize pool ($110K/$55K/$30K + three $10K) — cash + services | **No equity** | BC-based, ≥1 BC resident, <5 yrs incorporated, <$1M non-grant funding | **2026 closed (Mar 12); target Feb 2027** | `03` |
-| **Futurpreneur Core Startup** | Up to **$75K** loan ($25K + $50K BDC), 2 yrs mentorship | No (loan) | **Age 18–39** (hard cap — self-check), business plan + 24-mo cash flow | Open; engage now, register before funds land | `05` |
+| **Futurpreneur Core Startup** | Up to **$75K** loan ($25K + $50K BDC), 2 yrs mentorship | No (loan) | Age 18–39 ✅ (Johnny, 37); business plan + 24-mo cash flow | Open; engage now, register before funds land | `05` |
 | **Community Futures Central Okanagan** | Up to **$150K** loan | No (loan) | Central Okanagan resident; can't access traditional financing | Open continuous | `06` |
 
 ### 🟡 TIER 2 — Pursue right after incorporating
@@ -99,7 +99,7 @@ That stack is realistic, non-dilutive, and mostly free to pursue. The big-ticket
 
 ### Now (this month) — no incorporation needed to start
 1. **Incorporate in BC** (`01`) — the gate. ~$400, ~a day of work via Ownr.
-2. **Self-check the Futurpreneur age gate** — is either founder ≤39? If yes, `05` is live; start the business plan + 24-month cash flow.
+2. **Futurpreneur is live** (Johnny, 37 — eligible) — start the business plan + 24-month cash flow (`05`).
 3. **Call Community Futures Central Okanagan** (250-868-2132) to scope a startup loan (`06`).
 4. **Start SR&ED record-keeping today** (`04`) — contemporaneous time tracking + the technical narrative. Even pre-incorporation, begin the discipline; the claimable clock starts at incorporation + payroll.
 

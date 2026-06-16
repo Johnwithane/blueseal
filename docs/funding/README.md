@@ -17,7 +17,7 @@ For a pre-revenue solo/duo founder, most marquee grants are gated and a few head
 
 1. **Incorporate in BC** (~$400) → unlocks SR&ED + most programs. *(`01`)*
 2. **Run T4 founder payroll** → makes **SR&ED** worth ~60–65% of R&D salary back, refundable — your biggest prize. *(`04`)*
-3. **Non-dilutive loans now:** **Futurpreneur** (≤$75K, if a founder is ≤39) + **Community Futures** (≤$150K). *(`05`, `06`)*
+3. **Non-dilutive loans now:** **Futurpreneur** (≤$75K — Johnny, 37, is eligible) + **Community Futures** (≤$150K). *(`05`, `06`)*
 4. **NRC IRAP** free advisor relationship → funding later. *(`06`)*
 5. **New Ventures BC Competition** — $250K+ pool, no equity — prep for **Feb 2027** (2026 closed). *(`03`)*
 6. **Wage subsidies** (SWPP open now / Tech Co-op / IRAP Youth) once you're ready to hire. *(`06`)*
@@ -55,4 +55,4 @@ For a pre-revenue solo/duo founder, most marquee grants are gated and a few head
 - **I can't submit anything for you, and didn't invent your numbers.** Financials, exact dates, ages, and attestations are yours to supply — they're flagged throughout.
 - **Statuses are June 2026 snapshots.** Programs open/close and amounts change. Each pack carries the official URL — re-confirm before filing.
 - **A few specific figures need a direct human check** (noted in-file): Futurpreneur's sole-prop-vs-incorporation rule; Ownr's live BC price + RBC rebate; exact 2027 NVBC dates; the "~64% SR&ED net-back" is a defensible estimate, not a published rate.
-- **Two founder facts gate whole branches** — confirm early: (1) **Futurpreneur age** (≤39?); (2) at least one founder's **BC permanent residency** (for New Ventures BC).
+- **Two founder facts that gate branches are now confirmed:** (1) **Futurpreneur age** — Johnny is 37 (≤39), so he's the named applicant ✅; (2) **BC permanent residency** — both founders ✅, satisfying New Ventures BC. Both branches are unblocked.

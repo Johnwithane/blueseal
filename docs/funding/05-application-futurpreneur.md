@@ -3,11 +3,11 @@
 > **Program:** Futurpreneur Canada — Core Startup. An **equity-free loan up to $75,000 total**
 > ($25K Futurpreneur + $50K BDC co-loan), plus **up to 2 years of 1:1 mentorship.**
 > **Non-dilutive** (it's a loan, not equity).
-> **Fit:** Strong — *if* a founder meets the age cap. Purpose-built for pre-revenue founders.
+> **Fit:** Strong — **eligibility confirmed.** Purpose-built for pre-revenue founders.
 >
-> ⚠️ **GATING QUESTION — confirm before investing time:** the applicant must be **18–39 years old**
-> at application. Both brothers should self-check. If only one is ≤39, **that brother is the
-> applicant.** If neither is ≤39, this program is out — skip to Community Futures (`06`).
+> ✅ **Age gate cleared:** Johnny is **37** (within the 18–39 cap), so **Johnny is the named
+> applicant/borrower.** Futurpreneur eligibility is per-applicant, so the loan goes in the eligible
+> founder's name — James's age is irrelevant to it.
 >
 > *Official: [futurpreneur.ca/en/offering/core-startup](https://futurpreneur.ca/en/offering/core-startup/) ·
 > [eligibility](https://futurpreneur.ca/en/eligibility/). Verified June 2026.*
@@ -22,7 +22,7 @@
 | Structure | Equity-free **loan** (non-dilutive); 5-year term |
 | Interest | Futurpreneur portion: **CIBC prime + 3%** (capped at 9% if CIBC prime > 6%). BDC portion: **BDC floating base rate + 1.65%** |
 | Mentorship | **Up to 2 years** of hand-matched 1:1 mentorship (a real asset — fills the legal/finance/ops gap) |
-| Age | **18–39 at application** (hard cap) |
+| Age | **18–39 at application** (hard cap) — ✅ Johnny is 37 |
 | Citizenship | Canadian citizen or permanent resident |
 | Incorporation | Not required to *start*; **business registration needed before funds disburse** (so register/incorporate before the money lands). *Sole-prop vs must-incorporate not stated on the official page — confirm by phone.* |
 | Required docs | **Complete business plan + 24-month cash flow** |
@@ -60,11 +60,11 @@
 
 ## Action steps
 
-- [ ] **Confirm the age gate** — at least one founder ≤39. *(This determines whether to proceed at all.)*
-- [ ] Identify the **eligible founder as the named applicant.**
+- [x] **Age gate confirmed** — Johnny is 37 (≤39). ✓
+- [x] **Named applicant: Johnny** (the eligible founder).
 - [ ] Call/confirm with Futurpreneur whether a **sole prop qualifies** or incorporation is required before funds land *(plan to register/incorporate regardless — see `01`)*.
 - [ ] Build the **24-month cash flow** with the accountant (shared with NVBC Round 3).
 - [ ] Assemble the **business plan** from the narrative bank.
 - [ ] Submit; expect to be matched with a **mentor** — lean on them for the finance/ops gap.
 
-*If the age gate fails for both founders:* Futurpreneur is out, but **Community Futures Central Okanagan** (`06`) offers up to $150K with no upper age cap on its general fund — make that the loan path instead.
+*Community Futures Central Okanagan* (`06`, up to $150K, no age cap) remains available as a **complement or larger alternative** — you're not limited to one loan path.
