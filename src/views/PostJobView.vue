@@ -8,7 +8,6 @@ import Textarea from "primevue/textarea";
 import Select from "primevue/select";
 import DatePicker from "primevue/datepicker";
 import Dialog from "primevue/dialog";
-import Tag from "primevue/tag";
 import { useAuthStore } from "@/stores/auth";
 import { TRADES, tradeLabel } from "@/data/trades";
 import { intakeFieldsForTrade } from "@/data/intakeSchemas";
@@ -31,6 +30,7 @@ import FormErrorBanner from "@/components/FormErrorBanner.vue";
 import FieldError from "@/components/FieldError.vue";
 import IntakeFormRenderer from "@/components/IntakeFormRenderer.vue";
 import RebateMatchPanel from "@/components/RebateMatchPanel.vue";
+import JobPostPreviewCard from "@/components/jobPost/JobPostPreviewCard.vue";
 import { useSeo } from "@/composables/useSeo";
 
 useSeo({
@@ -293,10 +293,12 @@ function toIsoDate(d: Date | null): string | null {
 
 // ---- Preview: the post exactly as tradespeople will see it on the board.
 // Mirrors BrowseJobsView's card + JobPostDetailView's public fields — street
-// address deliberately absent (only city/region/FSA are ever public).
+// address deliberately absent (only city/region/FSA are ever public). The same
+// card renders inline on the wizard's final "Review" step.
 const showPreview = ref(false);
 
 const previewFsa = computed(() => postalCode.value.trim().slice(0, 3).toUpperCase());
+const photoUrls = computed(() => photos.value.map((p) => p.previewUrl));
 
 function urgencyLabel(u: string): string {
   if (u === "this_week") return "This week";
@@ -316,9 +318,166 @@ const previewBudget = computed(() => {
   return `${fmt(budgetMin.value)}–${fmt(budgetMax.value)}`;
 });
 
-// On-screen order of the fields, so focusFirst() always jumps to the topmost
-// problem after a failed submit.
-const FIELD_ORDER = ["trade", "title", "description", "intake", "budget", "address", "photos"];
+// ---- Wizard ---------------------------------------------------------------
+// Posting a job is a lot of fields for someone who's never done it. Default to
+// a guided, one-thing-per-screen flow (mirrors the invoice wizard in
+// FinishJobSheet): `wizardStep` is the active step index, or `null` once the
+// user taps "fill out the whole form" — then every section shows at once and
+// the bottom submit takes over. Sections use v-show (not v-if) so nothing is
+// destroyed when navigating, and a late submit error can scroll to a field on
+// a step that isn't currently on screen.
+const POST_STEPS = computed<{ key: string; title: string; hint: string }[]>(() => {
+  const steps = [
+    {
+      key: "trade",
+      title: "What do you need done?",
+      hint: "Describe it in your own words, or pick the trade — whatever's easier.",
+    },
+    {
+      key: "describe",
+      title: "Tell us about the job",
+      hint: "A clear title and a few details help tradespeople quote accurately.",
+    },
+  ];
+  // Only trades with a defined questionnaire get a details step.
+  if (intakeFields.value.length) {
+    steps.push({
+      key: "details",
+      title: `${tradeLabel(trade.value)} details`,
+      hint: "A few quick questions so quotes come back accurate — no surprises later.",
+    });
+  }
+  steps.push(
+    {
+      key: "photos",
+      title: "Add a few photos",
+      hint: "Photos of the job or area let tradespeople quote without visiting first.",
+    },
+    {
+      key: "budget",
+      title: "What's your budget?",
+      hint: "A rough range is fine — it helps match you with the right tradespeople.",
+    },
+    {
+      key: "location",
+      title: "Where and when?",
+      hint: "Only the tradesperson you choose ever sees your full address.",
+    },
+    {
+      key: "review",
+      title: "Review and post",
+      hint: "This is exactly what tradespeople will see. Happy with it? Post your job.",
+    },
+  );
+  return steps;
+});
+
+const wizardStep = ref<number | null>(0);
+const inWizard = computed(() => wizardStep.value !== null);
+const currentStepKey = computed(() =>
+  wizardStep.value === null ? null : (POST_STEPS.value[wizardStep.value]?.key ?? null),
+);
+const isLastStep = computed(
+  () => wizardStep.value !== null && wizardStep.value === POST_STEPS.value.length - 1,
+);
+
+// The step list can grow/shrink under the user (the trade-details step appears
+// only for trades with a questionnaire). Clamp so the index never points past
+// the end after a trade change.
+watch(POST_STEPS, (steps) => {
+  if (wizardStep.value !== null && wizardStep.value >= steps.length) {
+    wizardStep.value = steps.length - 1;
+  }
+});
+
+// In wizard mode show only the active step's section; in full-form mode (after
+// "fill out the whole form") show everything.
+function stepShown(key: string): boolean {
+  if (wizardStep.value === null) return true;
+  return currentStepKey.value === key;
+}
+
+// Required fields per step, used to gate "Continue" and to route a field error
+// back to the step that owns it.
+const FIELD_STEP: Record<string, string> = {
+  trade: "trade",
+  title: "describe",
+  description: "describe",
+  intake: "details",
+  photos: "photos",
+  budget: "budget",
+  address: "location",
+};
+
+// On-screen order of the fields, so focusFirst()/goToErrorStep land on the
+// topmost problem after a failed step or submit. Matches the step order above.
+const FIELD_ORDER = ["trade", "title", "description", "intake", "photos", "budget", "address"];
+
+// Validate a single step, populating field errors. Returns true when the step's
+// required fields are satisfied. Optional steps (review) always pass.
+function validateStep(key: string): boolean {
+  clearErrors();
+  if (key === "trade") {
+    if (!trade.value) setError("trade", "Pick the trade you need.");
+  } else if (key === "describe") {
+    if (!title.value.trim()) setError("title", "Add a title.");
+    if (!description.value.trim()) setError("description", "Add a description.");
+  } else if (key === "details") {
+    const missing = firstMissingRequired(intakeFields.value, intakeData.value);
+    if (missing) setError("intake", `Please answer: "${missing}"`);
+  } else if (key === "photos") {
+    if (photos.value.length === 0) {
+      setError("photos", "Add at least one photo of the job or area.");
+    }
+  } else if (key === "budget") {
+    if (budgetMin.value == null || budgetMax.value == null) {
+      setError("budget", "Enter a budget range.");
+    } else if (budgetMax.value < budgetMin.value) {
+      setError("budget", "Max budget must be at least the min.");
+    }
+  } else if (key === "location") {
+    // Coordinates are resolved at submit (ensureCoordinates); here we only
+    // require the typed address so we're not silently letting it through empty.
+    if (!addressLine1.value.trim() || !city.value.trim()) {
+      setError("address", "Enter your street address and city so we can map your job.");
+    }
+  }
+  return !hasErrors();
+}
+
+async function wizardNext() {
+  const i = wizardStep.value;
+  if (i === null) return;
+  const cur = POST_STEPS.value[i];
+  if (cur && !validateStep(cur.key)) {
+    await focusFirst(FIELD_ORDER);
+    return;
+  }
+  clearErrors();
+  wizardStep.value = Math.min(i + 1, POST_STEPS.value.length - 1);
+}
+
+function wizardBack() {
+  clearErrors();
+  if (wizardStep.value && wizardStep.value > 0) wizardStep.value -= 1;
+}
+
+function wizardSkip() {
+  clearErrors();
+  wizardStep.value = null;
+}
+
+// After a final-submit validation failure, jump the wizard to the step that
+// owns the first errored field so the user can actually see/fix it (the field
+// may be on a step that isn't currently rendered).
+function goToFirstErrorStep() {
+  if (wizardStep.value === null) return;
+  const firstField = FIELD_ORDER.find((f) => errors.value[f]);
+  if (!firstField) return;
+  const stepKey = FIELD_STEP[firstField];
+  const idx = POST_STEPS.value.findIndex((s) => s.key === stepKey);
+  if (idx >= 0) wizardStep.value = idx;
+}
 
 // Coordinates normally come from picking a Google suggestion. But browser
 // autofill — and typing/editing the fields by hand — fills the address text
@@ -354,6 +513,10 @@ async function ensureCoordinates(): Promise<void> {
 }
 
 async function submit() {
+  // In wizard mode, only the final "Review" step posts. Guards against an
+  // implicit form submit (e.g. Enter in a field) firing on an earlier step.
+  if (inWizard.value && !isLastStep.value) return;
+
   error.value = null;
   clearErrors();
   if (submitting.value || geocoding.value) return;
@@ -374,6 +537,7 @@ async function submit() {
   await ensureCoordinates();
 
   if (hasErrors()) {
+    goToFirstErrorStep();
     await focusFirst(FIELD_ORDER);
     return;
   }
@@ -453,6 +617,7 @@ async function submit() {
         return head;
       });
       submitting.value = false;
+      goToFirstErrorStep();
       await focusFirst(FIELD_ORDER);
       return;
     }
@@ -488,75 +653,108 @@ async function submit() {
     </p>
 
     <form class="bs-form bs-card p-5 mt-4 space-y-5" @submit.prevent="submit">
-      <!-- Smart entry: describe the job (or name the room) → tap a suggested
-           trade and it sets the trade + pre-fills title/description/urgency. -->
-      <div>
-        <TradeDescribeBox
-          v-model="describe"
-          input-id="describe-job"
-          source="post_job"
-          :active-key="trade"
-          :examples="['Bathroom renovation', 'Leaking kitchen tap', 'Build a fence', 'Furnace not heating']"
-          no-match-hint="No match yet — try different words, or pick a trade below."
-          @select="applyDescribe"
-        />
-        <p
-          v-if="prefilledFromDescribe"
-          class="mt-2 flex items-start gap-1.5 text-xs text-[color:var(--bs-blue-dark)]"
-        >
-          <i class="pi pi-check-circle mt-0.5"></i>
-          <span>Filled in from your description — review and tweak everything below before posting.</span>
-        </p>
-      </div>
-
-      <div class="bs-describe-divider my-1"><span>or fill it in yourself</span></div>
-
-      <div data-field="trade">
-        <label class="text-sm font-medium">What trade do you need?</label>
-        <Select
-          v-model="trade"
-          :options="tradeOptions"
-          option-label="label"
-          option-value="value"
-          placeholder="Choose a trade"
-          class="mt-1 w-full"
-          :invalid="!!errors.trade"
-        />
-        <FieldError :message="errors.trade" />
-      </div>
-
-      <div data-field="title">
-        <label class="text-sm font-medium">Job title</label>
-        <InputText
-          v-model="title"
-          placeholder="e.g. Replace dripping kitchen tap"
-          maxlength="100"
-          class="mt-1 w-full"
-          :invalid="!!errors.title"
-        />
-        <FieldError :message="errors.title" />
-      </div>
-
-      <div data-field="description">
-        <label class="text-sm font-medium">Describe the job</label>
-        <Textarea
-          v-model="description"
-          rows="5"
-          maxlength="2000"
-          placeholder="Anticipate what tradespeople will need to know to quote: what's wrong, when it started, anything you've tried…"
-          class="mt-1 w-full"
-          :invalid="!!errors.description"
-        />
-        <div class="text-xs text-[color:var(--bs-muted)] mt-1">
-          {{ description.length }} / 2000
+      <!-- Wizard chrome: step counter, skip link, title + hint + progress. -->
+      <div v-if="inWizard" class="space-y-2">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-xs font-semibold text-[color:var(--bs-muted)]">
+            Step {{ (wizardStep ?? 0) + 1 }} of {{ POST_STEPS.length }}
+          </span>
+          <button
+            type="button"
+            class="text-xs text-[color:var(--bs-blue)] underline"
+            @click="wizardSkip"
+          >
+            Skip — fill out the whole form
+          </button>
         </div>
-        <FieldError :message="errors.description" />
+        <h2 class="text-lg font-semibold">{{ POST_STEPS[wizardStep!].title }}</h2>
+        <p class="text-sm text-[color:var(--bs-muted)]">{{ POST_STEPS[wizardStep!].hint }}</p>
+        <div class="flex gap-1" aria-hidden="true">
+          <span
+            v-for="(s, i) in POST_STEPS"
+            :key="s.key"
+            class="h-1.5 flex-1 rounded-full"
+            :class="i <= wizardStep! ? 'bg-[color:var(--bs-blue)]' : 'bg-[color:var(--bs-border)]'"
+          ></span>
+        </div>
       </div>
 
-      <!-- Trade-specific questionnaire. Appears once a trade with a defined
-           schema is chosen; the answers ride along on the post so applicants
-           can quote accurately without back-and-forth. -->
-      <fieldset v-if="intakeFields.length" data-field="intake">
+      <!-- Step: trade — smart entry (describe → suggested trade) + manual pick. -->
+      <div v-show="stepShown('trade')" class="space-y-5">
+        <div>
+          <TradeDescribeBox
+            v-model="describe"
+            input-id="describe-job"
+            source="post_job"
+            :active-key="trade"
+            :examples="['Bathroom renovation', 'Leaking kitchen tap', 'Build a fence', 'Furnace not heating']"
+            no-match-hint="No match yet — try different words, or pick a trade below."
+            @select="applyDescribe"
+          />
+          <p
+            v-if="prefilledFromDescribe"
+            class="mt-2 flex items-start gap-1.5 text-xs text-[color:var(--bs-blue-dark)]"
+          >
+            <i class="pi pi-check-circle mt-0.5"></i>
+            <span>Filled in from your description — review and tweak everything below before posting.</span>
+          </p>
+        </div>
+
+        <div class="bs-describe-divider my-1"><span>or fill it in yourself</span></div>
+
+        <div data-field="trade">
+          <label class="text-sm font-medium">What trade do you need?</label>
+          <Select
+            v-model="trade"
+            :options="tradeOptions"
+            option-label="label"
+            option-value="value"
+            placeholder="Choose a trade"
+            class="mt-1 w-full"
+            :invalid="!!errors.trade"
+          />
+          <FieldError :message="errors.trade" />
+        </div>
+      </div>
+
+      <!-- Step: describe — title + description. -->
+      <div v-show="stepShown('describe')" class="space-y-5">
+        <div data-field="title">
+          <label class="text-sm font-medium">Job title</label>
+          <InputText
+            v-model="title"
+            placeholder="e.g. Replace dripping kitchen tap"
+            maxlength="100"
+            class="mt-1 w-full"
+            :invalid="!!errors.title"
+          />
+          <FieldError :message="errors.title" />
+        </div>
+
+        <div data-field="description">
+          <label class="text-sm font-medium">Describe the job</label>
+          <Textarea
+            v-model="description"
+            rows="5"
+            maxlength="2000"
+            placeholder="Anticipate what tradespeople will need to know to quote: what's wrong, when it started, anything you've tried…"
+            class="mt-1 w-full"
+            :invalid="!!errors.description"
+          />
+          <div class="text-xs text-[color:var(--bs-muted)] mt-1">
+            {{ description.length }} / 2000
+          </div>
+          <FieldError :message="errors.description" />
+        </div>
+      </div>
+
+      <!-- Step: details — trade-specific questionnaire. Appears once a trade
+           with a defined schema is chosen; answers ride along on the post so
+           applicants can quote accurately without back-and-forth. -->
+      <fieldset
+        v-show="stepShown('details') && intakeFields.length > 0"
+        data-field="intake"
+      >
         <legend class="text-sm font-medium">{{ tradeLabel(trade) }} details</legend>
         <p class="text-xs text-[color:var(--bs-muted)] mt-1">
           Answer these so tradespeople can quote accurately. Required fields are marked
@@ -566,117 +764,8 @@ async function submit() {
         <FieldError :message="errors.intake" />
       </fieldset>
 
-      <!-- Government / utility rebates that may apply to this kind of work.
-           Self-hides unless the trade (+ province, once entered) matches an
-           active program. Surfaces "may qualify" only — never asserts
-           eligibility; each program links to its official source. -->
-      <RebateMatchPanel v-if="trade" :trade="trade" :region="region" />
-
-      <fieldset data-field="budget">
-        <legend class="text-sm font-medium">Budget range (CAD)</legend>
-        <div v-if="budgetHint" class="text-xs text-[color:var(--bs-muted)] mt-1">
-          <i class="pi pi-info-circle mr-1"></i>{{ budgetHint }}
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
-          <div>
-            <label class="text-xs">Min</label>
-            <NumberField
-              v-model="budgetMin"
-              mode="currency"
-              currency="CAD"
-              :min="5"
-              :max="1000000"
-              :min-fraction-digits="0"
-              :max-fraction-digits="0"
-              class="w-full"
-            />
-          </div>
-          <div>
-            <label class="text-xs">Max</label>
-            <NumberField
-              v-model="budgetMax"
-              mode="currency"
-              currency="CAD"
-              :min="5"
-              :max="1000000"
-              :min-fraction-digits="0"
-              :max-fraction-digits="0"
-              class="w-full"
-            />
-          </div>
-        </div>
-        <FieldError :message="errors.budget" />
-      </fieldset>
-
-      <fieldset data-field="address">
-        <legend class="text-sm font-medium">Address</legend>
-        <p class="text-xs text-[color:var(--bs-muted)] mt-1">
-          Only the chosen tradesperson sees your exact address — everyone else sees just your city and the first 3 chars of your postal code.
-        </p>
-        <!-- Autocomplete input doubles as the addressLine1 source. Picking a
-             Google suggestion fills city/region/postal + lat/lng from the
-             cleanly-parsed result. Typing or letting the browser autofill the
-             fields carries the raw text through; submit then geocodes that text
-             to coordinates (ensureCoordinates), so a saved/autofilled address
-             still maps the job without needing a suggestion pick. -->
-        <input
-          ref="addressAutocompleteEl"
-          v-model="addressLine1"
-          type="text"
-          class="p-inputtext p-component w-full mt-2"
-          placeholder="Start typing your address…"
-          maxlength="200"
-          autocomplete="address-line1"
-        />
-        <div class="grid sm:grid-cols-2 gap-2 mt-2">
-          <InputText
-            v-model="city"
-            placeholder="City"
-            maxlength="100"
-            autocomplete="address-level2"
-          />
-          <InputText
-            v-model="region"
-            placeholder="Province"
-            maxlength="100"
-            autocomplete="address-level1"
-          />
-          <InputText
-            v-model="postalCode"
-            placeholder="Postal code (A1A 1A1)"
-            maxlength="7"
-            autocomplete="postal-code"
-          />
-        </div>
-        <FieldError :message="errors.address" />
-      </fieldset>
-
-      <div>
-        <label class="text-sm font-medium">Urgency</label>
-        <Select
-          v-model="urgency"
-          :options="urgencyOptions"
-          option-label="label"
-          option-value="value"
-          class="mt-1 w-full"
-        />
-      </div>
-
-      <fieldset>
-        <legend class="text-sm font-medium">Preferred date window (optional)</legend>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
-          <div>
-            <label class="text-xs">Start</label>
-            <DatePicker v-model="startDate" date-format="yy-mm-dd" class="w-full" />
-          </div>
-          <div>
-            <label class="text-xs">End</label>
-            <DatePicker v-model="endDate" date-format="yy-mm-dd" class="w-full" />
-          </div>
-        </div>
-      </fieldset>
-
-      <div data-field="photos">
+      <!-- Step: photos (1–8 required). -->
+      <div v-show="stepShown('photos')" data-field="photos">
         <label class="text-sm font-medium">Photos (1–8 required)</label>
         <FieldError :message="errors.photos" />
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
@@ -713,32 +802,206 @@ async function submit() {
         </div>
       </div>
 
+      <!-- Step: budget — range + any matching rebates. -->
+      <div v-show="stepShown('budget')" class="space-y-5">
+        <fieldset data-field="budget">
+          <legend class="text-sm font-medium">Budget range (CAD)</legend>
+          <div v-if="budgetHint" class="text-xs text-[color:var(--bs-muted)] mt-1">
+            <i class="pi pi-info-circle mr-1"></i>{{ budgetHint }}
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+            <div>
+              <label class="text-xs">Min</label>
+              <NumberField
+                v-model="budgetMin"
+                mode="currency"
+                currency="CAD"
+                :min="5"
+                :max="1000000"
+                :min-fraction-digits="0"
+                :max-fraction-digits="0"
+                class="w-full"
+              />
+            </div>
+            <div>
+              <label class="text-xs">Max</label>
+              <NumberField
+                v-model="budgetMax"
+                mode="currency"
+                currency="CAD"
+                :min="5"
+                :max="1000000"
+                :min-fraction-digits="0"
+                :max-fraction-digits="0"
+                class="w-full"
+              />
+            </div>
+          </div>
+          <FieldError :message="errors.budget" />
+        </fieldset>
+
+        <!-- Government / utility rebates that may apply to this kind of work.
+             Self-hides unless the trade (+ province, once entered) matches an
+             active program. Surfaces "may qualify" only — never asserts
+             eligibility; each program links to its official source. -->
+        <RebateMatchPanel v-if="trade" :trade="trade" :region="region" />
+      </div>
+
+      <!-- Step: location — address + urgency + preferred date window. -->
+      <div v-show="stepShown('location')" class="space-y-5">
+        <fieldset data-field="address">
+          <legend class="text-sm font-medium">Address</legend>
+          <p class="text-xs text-[color:var(--bs-muted)] mt-1">
+            Only the chosen tradesperson sees your exact address — everyone else sees just your city and the first 3 chars of your postal code.
+          </p>
+          <!-- Autocomplete input doubles as the addressLine1 source. Picking a
+               Google suggestion fills city/region/postal + lat/lng from the
+               cleanly-parsed result. Typing or letting the browser autofill the
+               fields carries the raw text through; submit then geocodes that text
+               to coordinates (ensureCoordinates), so a saved/autofilled address
+               still maps the job without needing a suggestion pick. -->
+          <input
+            ref="addressAutocompleteEl"
+            v-model="addressLine1"
+            type="text"
+            class="p-inputtext p-component w-full mt-2"
+            placeholder="Start typing your address…"
+            maxlength="200"
+            autocomplete="address-line1"
+          />
+          <div class="grid sm:grid-cols-2 gap-2 mt-2">
+            <InputText
+              v-model="city"
+              placeholder="City"
+              maxlength="100"
+              autocomplete="address-level2"
+            />
+            <InputText
+              v-model="region"
+              placeholder="Province"
+              maxlength="100"
+              autocomplete="address-level1"
+            />
+            <InputText
+              v-model="postalCode"
+              placeholder="Postal code (A1A 1A1)"
+              maxlength="7"
+              autocomplete="postal-code"
+            />
+          </div>
+          <FieldError :message="errors.address" />
+        </fieldset>
+
+        <div>
+          <label class="text-sm font-medium">Urgency</label>
+          <Select
+            v-model="urgency"
+            :options="urgencyOptions"
+            option-label="label"
+            option-value="value"
+            class="mt-1 w-full"
+          />
+        </div>
+
+        <fieldset>
+          <legend class="text-sm font-medium">Preferred date window (optional)</legend>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+            <div>
+              <label class="text-xs">Start</label>
+              <DatePicker v-model="startDate" date-format="yy-mm-dd" class="w-full" />
+            </div>
+            <div>
+              <label class="text-xs">End</label>
+              <DatePicker v-model="endDate" date-format="yy-mm-dd" class="w-full" />
+            </div>
+          </div>
+        </fieldset>
+      </div>
+
+      <!-- Step: review — live preview of the post, then the Post button below.
+           Only shown on the wizard's final step (not in full-form mode, which
+           has its own Preview button). -->
+      <div v-show="currentStepKey === 'review'" class="space-y-3">
+        <JobPostPreviewCard
+          :title="title"
+          :trade-label="trade ? tradeLabel(trade) : ''"
+          :description="description"
+          :urgency-label="urgencyLabel(urgency)"
+          :urgency-tone="URGENCY_TONE[urgency] ?? 'info'"
+          :budget-text="previewBudget"
+          :has-budget="budgetMin != null"
+          :city="city"
+          :region="region"
+          :fsa="previewFsa"
+          :photo-urls="photoUrls"
+        />
+        <p class="text-xs text-[color:var(--bs-muted)]">
+          <i class="pi pi-lock mr-1"></i>
+          Your street address is never shown on the board — tradespeople see only your city and
+          postal area until you choose someone. Use <strong>Back</strong> to change anything.
+        </p>
+      </div>
+
       <FormErrorBanner :message="error" />
 
-      <div class="pt-2 flex flex-wrap items-center gap-2">
-        <Button
-          type="submit"
-          :label="auth.fbUser ? 'Post job' : 'Sign in and post job'"
-          icon="pi pi-send"
-          :loading="submitting || geocoding"
-          size="large"
-        />
-        <Button
-          type="button"
-          label="Preview"
-          icon="pi pi-eye"
-          outlined
-          size="large"
-          :disabled="!title.trim() && !description.trim()"
-          @click="showPreview = true"
-        />
-        <p v-if="!auth.fbUser" class="text-xs text-[color:var(--bs-muted)] mt-2 w-full">
+      <div class="pt-2">
+        <!-- Wizard navigation: Back + Continue, with Post on the final step. -->
+        <div v-if="inWizard" class="flex items-center gap-2">
+          <Button
+            type="button"
+            label="Back"
+            icon="pi pi-arrow-left"
+            text
+            :disabled="wizardStep === 0"
+            @click="wizardBack"
+          />
+          <span class="flex-1"></span>
+          <Button
+            v-if="!isLastStep"
+            type="button"
+            label="Continue"
+            icon="pi pi-arrow-right"
+            icon-pos="right"
+            size="large"
+            @click="wizardNext"
+          />
+          <Button
+            v-else
+            type="submit"
+            :label="auth.fbUser ? 'Post job' : 'Sign in and post job'"
+            icon="pi pi-send"
+            :loading="submitting || geocoding"
+            size="large"
+          />
+        </div>
+
+        <!-- Full-form footer (wizard skipped): submit + preview. -->
+        <div v-else class="flex flex-wrap items-center gap-2">
+          <Button
+            type="submit"
+            :label="auth.fbUser ? 'Post job' : 'Sign in and post job'"
+            icon="pi pi-send"
+            :loading="submitting || geocoding"
+            size="large"
+          />
+          <Button
+            type="button"
+            label="Preview"
+            icon="pi pi-eye"
+            outlined
+            size="large"
+            :disabled="!title.trim() && !description.trim()"
+            @click="showPreview = true"
+          />
+        </div>
+
+        <p v-if="!auth.fbUser" class="text-xs text-[color:var(--bs-muted)] mt-2">
           Your draft is saved as you type. You'll be asked to sign in to post.
         </p>
       </div>
 
-      <!-- Preview: rendered with the same shape as the BrowseJobsView card +
-           the public section of the post detail page. -->
+      <!-- Preview dialog (full-form mode). The wizard's review step shows the
+           same card inline instead. -->
       <Dialog
         v-model:visible="showPreview"
         modal
@@ -746,44 +1009,19 @@ async function submit() {
         class="w-[95vw] max-w-lg"
         :dismissable-mask="true"
       >
-        <div class="bs-card p-5">
-          <div class="flex items-start justify-between gap-3">
-            <div class="min-w-0">
-              <div class="font-semibold truncate">{{ title.trim() || "Untitled job" }}</div>
-              <div class="text-xs text-[color:var(--bs-muted)]">
-                {{ trade ? tradeLabel(trade) : "No trade selected" }} • just now
-              </div>
-            </div>
-            <Tag :value="urgencyLabel(urgency)" :severity="URGENCY_TONE[urgency] ?? 'info'" />
-          </div>
-          <p class="text-sm mt-2 text-[color:var(--bs-muted)] whitespace-pre-line">
-            {{ description.trim() || "No description yet." }}
-          </p>
-          <div v-if="photos.length" class="mt-3 grid grid-cols-4 gap-1.5">
-            <img
-              v-for="p in photos.slice(0, 8)"
-              :key="p.previewUrl"
-              :src="p.previewUrl"
-              alt="Job photo"
-              class="aspect-square w-full rounded object-cover"
-            />
-          </div>
-          <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-            <div>
-              <div class="text-xs text-[color:var(--bs-muted)]">Budget</div>
-              <div class="font-medium">{{ previewBudget }} <span v-if="budgetMin != null">CAD</span></div>
-            </div>
-            <div>
-              <div class="text-xs text-[color:var(--bs-muted)]">Location</div>
-              <div class="font-medium">
-                {{ city.trim() || "City" }}<template v-if="region">, {{ region }}</template>
-                <span v-if="previewFsa.length === 3" class="text-xs text-[color:var(--bs-muted)]">
-                  ({{ previewFsa }})
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
+        <JobPostPreviewCard
+          :title="title"
+          :trade-label="trade ? tradeLabel(trade) : ''"
+          :description="description"
+          :urgency-label="urgencyLabel(urgency)"
+          :urgency-tone="URGENCY_TONE[urgency] ?? 'info'"
+          :budget-text="previewBudget"
+          :has-budget="budgetMin != null"
+          :city="city"
+          :region="region"
+          :fsa="previewFsa"
+          :photo-urls="photoUrls"
+        />
         <p class="mt-3 text-xs text-[color:var(--bs-muted)]">
           <i class="pi pi-lock mr-1"></i>
           Your street address is never shown on the board — tradespeople see only your city and
