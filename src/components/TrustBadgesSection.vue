@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import NumberField from "@/components/NumberField.vue";
@@ -15,6 +15,7 @@ import type {
 import {
   getInsurance,
   submitInsurance,
+  signInsuranceLiabilityRelease,
 } from "@/firebase/services/insuranceVerifications";
 import { getWsib, submitWsib } from "@/firebase/services/wsibVerifications";
 import { uploadFile, makeStoragePath } from "@/firebase/services/storage";
@@ -22,6 +23,7 @@ import { compressOrPassPdf } from "@/utils/image";
 import { useToast } from "@/composables/useToast";
 import { useFormatters } from "@/composables/useFormatters";
 import { humanizeError } from "@/utils/errors";
+import InsuranceLiabilityReleaseDialog from "@/components/InsuranceLiabilityReleaseDialog.vue";
 
 const props = defineProps<{
   tradieUid: string;
@@ -44,6 +46,17 @@ const coverageAmount = ref<number>(200_000_000);
 const insuranceExpiresAt = ref<string>("");
 const insuranceFileInput = ref<HTMLInputElement | null>(null);
 const uploadingInsurance = ref(false);
+// Declaration: is Blue Seal named as an additional insured? null until picked.
+// "No" routes the tradesperson to sign the liability release after upload.
+const blueSealAdditionalInsured = ref<boolean | null>(null);
+const showReleaseDialog = ref(false);
+const signingRelease = ref(false);
+const needsRelease = computed(
+  () =>
+    insurance.value?.status === "pending" &&
+    insurance.value.blueSealAdditionalInsured === false &&
+    !insurance.value.liabilityRelease,
+);
 
 // WSIB form state
 const province = ref<CanadaProvince>("ON");
@@ -98,6 +111,12 @@ async function onInsuranceFile(e: Event) {
     target.value = "";
     return;
   }
+  if (blueSealAdditionalInsured.value == null) {
+    toast.warn("Please answer whether Blue Seal is named as an additional insured.");
+    target.value = "";
+    return;
+  }
+  const additionalInsured = blueSealAdditionalInsured.value;
   uploadingInsurance.value = true;
   try {
     const prepared = await compressOrPassPdf(file);
@@ -114,17 +133,39 @@ async function onInsuranceFile(e: Event) {
       policyNumber: policyNumber.value,
       coverageAmount: coverageAmount.value,
       expiresAt: new Date(insuranceExpiresAt.value),
+      blueSealAdditionalInsured: additionalInsured,
     });
-    toast.success("Insurance submitted", "An admin will review it shortly.");
     insurer.value = "";
     policyNumber.value = "";
     insuranceExpiresAt.value = "";
+    blueSealAdditionalInsured.value = null;
     await load();
+    if (!additionalInsured) {
+      toast.success("Insurance submitted", "One more step — sign the liability release.");
+      showReleaseDialog.value = true;
+    } else {
+      toast.success("Insurance submitted", "We'll verify Blue Seal is named on your certificate.");
+    }
   } catch (err) {
     toast.error("Upload failed", humanizeError(err));
   } finally {
     uploadingInsurance.value = false;
     target.value = "";
+  }
+}
+
+async function onSignRelease(signatureDataUrl: string) {
+  if (signingRelease.value) return;
+  signingRelease.value = true;
+  try {
+    await signInsuranceLiabilityRelease(signatureDataUrl);
+    showReleaseDialog.value = false;
+    toast.success("Release signed", "Thanks — your insurance submission is complete.");
+    await load();
+  } catch (err) {
+    toast.error("Couldn't sign the release", humanizeError(err));
+  } finally {
+    signingRelease.value = false;
   }
 }
 
@@ -208,6 +249,16 @@ async function onWsibFile(e: Event) {
               <dd>${{ (insurance.coverageAmount / 100).toLocaleString("en-CA") }}</dd>
             </div>
             <div><dt class="font-medium">Expires</dt><dd>{{ date(insurance.expiresAt) }}</dd></div>
+            <div v-if="insurance.blueSealAdditionalInsured !== undefined" class="col-span-2">
+              <dt class="font-medium">Blue Seal on policy</dt>
+              <dd v-if="insurance.blueSealAdditionalInsured">
+                Named as additional insured<span v-if="insurance.additionalInsuredConfirmedAt"> · verified</span>
+              </dd>
+              <dd v-else>
+                Not named ·
+                {{ insurance.liabilityRelease ? "liability release signed" : "release pending" }}
+              </dd>
+            </div>
           </dl>
           <a
             :href="insurance.fileUrl"
@@ -215,6 +266,19 @@ async function onWsibFile(e: Event) {
             rel="noopener"
             class="text-xs text-[color:var(--bs-blue)] mt-2 inline-block"
           >View uploaded document →</a>
+          <div v-if="needsRelease" class="mt-2">
+            <Message severity="warn" :closable="false" class="mb-2">
+              Your policy doesn't name Blue Seal — sign the liability release to
+              complete your submission.
+            </Message>
+            <Button
+              icon="pi pi-pencil"
+              label="Sign liability release"
+              severity="warn"
+              size="small"
+              @click="showReleaseDialog = true"
+            />
+          </div>
         </template>
 
         <template v-else>
@@ -246,6 +310,39 @@ async function onWsibFile(e: Event) {
               class="border rounded p-2 text-sm"
             />
           </div>
+
+          <div class="mt-3 rounded-md border border-[color:var(--bs-border)] p-3">
+            <div class="text-sm font-medium">
+              Is Blue Seal named as an additional insured on this policy?
+            </div>
+            <p class="text-xs text-[color:var(--bs-muted)] mt-1">
+              "Additional insured" means your policy actually covers Blue Seal — a
+              "certificate holder" does not. It's automatic on a Blue Seal partner
+              policy. If Blue Seal isn't named, you'll sign a short liability
+              release after uploading.
+            </p>
+            <div class="mt-2 flex flex-col gap-2">
+              <label class="flex items-center gap-2 text-sm">
+                <input
+                  v-model="blueSealAdditionalInsured"
+                  type="radio"
+                  name="bs-additional-insured-trust"
+                  :value="true"
+                />
+                Yes — Blue Seal is named as an additional insured
+              </label>
+              <label class="flex items-center gap-2 text-sm">
+                <input
+                  v-model="blueSealAdditionalInsured"
+                  type="radio"
+                  name="bs-additional-insured-trust"
+                  :value="false"
+                />
+                No / not sure — I'll sign the liability release
+              </label>
+            </div>
+          </div>
+
           <div class="mt-3">
             <Button
               icon="pi pi-upload"
@@ -346,5 +443,11 @@ async function onWsibFile(e: Event) {
         </template>
       </div>
     </template>
+
+    <InsuranceLiabilityReleaseDialog
+      v-model:visible="showReleaseDialog"
+      :busy="signingRelease"
+      @confirm="onSignRelease"
+    />
   </div>
 </template>

@@ -610,6 +610,13 @@ const faqs: FaqItem[] = [
     audience: "client",
   },
   {
+    question: "Why am I asked if Blue Seal is an additional insured on my policy?",
+    answer:
+      "When you upload your own liability policy, we ask whether Blue Seal is named as an **additional insured** — that's what actually extends your coverage to Blue Seal (being a \"certificate holder\" doesn't). It's automatic on a Blue Seal partner policy. If Blue Seal **is** named, an admin confirms it against your certificate. If it **isn't**, you sign a short liability release so everyone's clear that your policy doesn't cover Blue Seal and you're accepting responsibility for your work. You can skip the release any time by adding Blue Seal as an additional insured and uploading the updated certificate.",
+    categoryId: "for-tradespeople",
+    audience: "tradesperson",
+  },
+  {
     question: "Will Blue Seal remind me when my insurance is about to expire?",
     answer:
       "Yes. We track the expiry date on your verified insurance and remind you by email and in-app before it lapses, so your **Insured** badge doesn't quietly disappear. When you renew, upload the new certificate with **Replace** on your insurance card.",

@@ -5,6 +5,7 @@ import Button from "primevue/button";
 import Tag from "primevue/tag";
 import Textarea from "primevue/textarea";
 import Dialog from "primevue/dialog";
+import Checkbox from "primevue/checkbox";
 import { getTradesperson, getTradespersonContact } from "@/firebase/services/tradespeople";
 import { listCertsFor, approveCertification, rejectCertification } from "@/firebase/services/certifications";
 import { getIdVerification, approveId, rejectId } from "@/firebase/services/idVerifications";
@@ -62,6 +63,25 @@ const insurance = ref<WithId<InsuranceVerificationDoc> | null>(null);
 const wsib = ref<WithId<WsibVerificationDoc> | null>(null);
 const loading = ref(true);
 
+// Admin must tick this — confirming the certificate actually names Blue Seal as
+// an additional insured — before approving a submission that declares it does.
+const additionalInsuredConfirmed = ref(false);
+const insDeclaredAdditionalInsured = computed(
+  () => insurance.value?.blueSealAdditionalInsured === true,
+);
+const insReleaseSigned = computed(() => !!insurance.value?.liabilityRelease);
+// Docs predating the additional-insured field: approve as before (no new gate).
+const insLegacy = computed(
+  () => insurance.value != null && insurance.value.blueSealAdditionalInsured === undefined,
+);
+// Approve only once Blue Seal is protected: cert confirmed (declared named) or
+// the liability release is on file (declared not named). Legacy docs pass.
+const canApproveInsurance = computed(() => {
+  if (insLegacy.value) return true;
+  if (insDeclaredAdditionalInsured.value) return additionalInsuredConfirmed.value;
+  return insReleaseSigned.value;
+});
+
 const showRequestInfo = ref(false);
 const showReject = ref(false);
 const notesInput = ref("");
@@ -98,6 +118,7 @@ async function load() {
   certs.value = certList;
   idDoc.value = idData;
   insurance.value = insuranceData;
+  additionalInsuredConfirmed.value = false;
   wsib.value = wsibData;
   idFileUrl.value = idData ? await resolveFileUrl(idData.fileUrl).catch(() => null) : null;
   loading.value = false;
@@ -155,10 +176,22 @@ async function confirmRejectId() {
 }
 
 async function approveInsuranceHere() {
-  if (!auth.fbUser) return;
-  await approveInsurance(uid, auth.fbUser.uid);
+  if (!auth.fbUser || !canApproveInsurance.value) return;
+  await approveInsurance(uid, auth.fbUser.uid, {
+    additionalInsuredConfirmed: insDeclaredAdditionalInsured.value,
+  });
   toast.success("Insurance approved");
   await load();
+}
+
+// Open the server-stored release signature so the admin can verify it's a real
+// signed release before approving a "not named" submission.
+async function viewReleaseSignature() {
+  const path = insurance.value?.liabilityRelease?.signatureStoragePath;
+  if (!path) return;
+  const url = await resolveFileUrl(path).catch(() => null);
+  if (url) openViewer(url, "Liability release signature");
+  else toast.error("Couldn't open the signature");
 }
 
 function openRejectInsurance() {
@@ -410,12 +443,68 @@ const approveBlockerHint = computed(() => {
               class="mt-2"
               @click="openViewer(insurance.fileUrl, 'Insurance — ' + insurance.insurer)"
             />
+
+            <!-- Additional-insured protection: the tradesperson's declaration +
+                 the admin's verification step. -->
+            <div class="mt-3 text-sm">
+              <dt class="font-medium inline">Blue Seal on policy:</dt>
+              <template v-if="insurance.blueSealAdditionalInsured === undefined">
+                — (submitted before this was tracked)
+              </template>
+              <template v-else-if="insurance.blueSealAdditionalInsured">
+                declared as additional insured<span
+                  v-if="insurance.additionalInsuredConfirmedAt"
+                  class="text-[color:var(--bs-success-text)]"
+                >
+                  · verified</span
+                >
+              </template>
+              <template v-else>
+                not named — liability release
+                <span :class="insurance.liabilityRelease ? '' : 'text-[color:var(--bs-danger)]'">
+                  {{ insurance.liabilityRelease ? "signed" : "NOT signed yet" }}
+                </span>
+              </template>
+            </div>
+
+            <!-- Declared "Blue Seal is named" → admin verifies the certificate. -->
+            <label
+              v-if="insurance.status === 'pending' && insurance.blueSealAdditionalInsured === true"
+              class="mt-2 flex items-start gap-2 text-sm"
+            >
+              <Checkbox v-model="additionalInsuredConfirmed" binary />
+              <span>
+                I've checked the certificate — Blue Seal is named as an additional
+                insured on this policy.
+              </span>
+            </label>
+
+            <!-- Declared "not named" → view the signed release before approving. -->
+            <div
+              v-else-if="insurance.status === 'pending' && insurance.blueSealAdditionalInsured === false"
+              class="mt-2"
+            >
+              <Button
+                v-if="insurance.liabilityRelease"
+                icon="pi pi-eye"
+                label="View liability release signature"
+                outlined
+                size="small"
+                @click="viewReleaseSignature"
+              />
+              <p v-else class="text-xs text-[color:var(--bs-danger)]">
+                Liability release not signed yet — can't approve until the
+                tradesperson signs it.
+              </p>
+            </div>
+
             <div v-if="insurance.status === 'pending'" class="flex gap-2 mt-2">
               <Button
                 label="Approve"
                 icon="pi pi-check"
                 severity="success"
                 size="small"
+                :disabled="!canApproveInsurance"
                 @click="approveInsuranceHere"
               />
               <Button

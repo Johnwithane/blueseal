@@ -8,16 +8,21 @@ Tasks are grouped by the phase that introduced them so you can see why each one 
 
 ## Uninsured-work waiver — legal review (added 2026-06-16)
 
-When a tradesperson has no current verified liability insurance, Blue Seal now records explicit acknowledgments before work proceeds: the **client** signs off (at request time and again on the quote-acceptance signature) that they were told the tradesperson is uninsured, and the **tradesperson** signs an in-app waiver before they can clock in (accepting sole liability + releasing Blue Seal). The signed records live in `insuranceWaivers/{jobId}`; the supporting contract language is in **Terms of Service § 4.3** (and §§ 4.2, 14, 15, 16). The code is live.
+Blue Seal now records explicit, signed acknowledgments around insurance so work can proceed safely:
 
-### [ ] Have a lawyer review the waiver + disclosure wording
+1. **No insurance at all.** The **client** signs off (at request time + on the quote-acceptance signature) that they were told the tradesperson is uninsured; the **tradesperson** signs an in-app waiver before they can clock in (sole liability + release). Records live in `insuranceWaivers/{jobId}`.
+2. **Own policy that doesn't name Blue Seal.** When a tradesperson uploads their own liability policy, they declare whether **Blue Seal is an additional insured**. If yes → an admin confirms it against the certificate before approving. If no → the tradesperson signs an in-app **liability release** (stored on `insuranceVerifications/{uid}.liabilityRelease`, signature at `tradespeople/{uid}/signatures/`). Foxquilt (the insurance partner) names Blue Seal automatically, so those answer "yes".
 
-- **Why:** This is the legal shield protecting Blue Seal, clients, and tradespeople when work goes ahead uninsured. The copy was written by Claude, not a lawyer — it needs a real review to be relied on, especially the liability release and the "no assumption of liability by Blue Seal" framing.
+Supporting contract language is in **Terms of Service § 4.3** (and §§ 4.1, 4.2, 14, 15, 16). All code is live.
+
+### [ ] Have a lawyer review the waiver / disclosure / release wording
+
+- **Why:** This is the legal shield protecting Blue Seal, clients, and tradespeople. The copy was written by Claude, not a lawyer — it needs a real review to be relied on, especially the liability releases and the "no assumption of liability by Blue Seal" framing.
 - **What to review:**
   - ToS § 4.3 "Acknowledging and proceeding with an uninsured Tradesperson" — `legal/terms-of-service.md`.
-  - The client disclosure + checkbox copy and the tradesperson waiver copy — `src/data/insuranceWaiver.ts` (`UNINSURED_DISCLOSURE_VERSION`, `clientUninsuredBody`, `TRADIE_WAIVER_POINTS`, etc.).
-- **If wording changes materially:** bump `UNINSURED_DISCLOSURE_VERSION` in **both** `src/data/insuranceWaiver.ts` and `functions/src/lib/insurance.ts` (they must match) so new signatures stamp the new version, then redeploy functions.
-- **Also outstanding (pre-existing):** the `[OPERATOR LEGAL NAME]` placeholder in the ToS (§§ intro, 21) still needs the registered operating name before publishing.
+  - All disclosure / waiver / release copy — `src/data/insuranceWaiver.ts` (`clientUninsuredBody`, `TRADIE_WAIVER_POINTS`, `INSURANCE_RELEASE_POINTS`, etc.).
+- **If wording changes materially:** bump the matching version constant in **both** `src/data/insuranceWaiver.ts` and `functions/src/lib/insurance.ts` (they must stay in sync) so new signatures stamp the new version, then redeploy functions. Two versions: `UNINSURED_DISCLOSURE_VERSION` (per-job uninsured waiver) and `INSURANCE_RELEASE_VERSION` (own-policy release).
+- **Operating legal name (now load-bearing):** for "additional insured" to mean anything, the certificate must name the correct legal entity. Resolve the `[OPERATOR LEGAL NAME]` placeholder in the ToS (§§ intro, 21) and decide the exact entity name tradespeople (and Foxquilt) should put on policies as the additional insured.
 
 ---
 
