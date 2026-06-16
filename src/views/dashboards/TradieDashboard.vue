@@ -9,6 +9,8 @@ import DatePicker from "primevue/datepicker";
 import TabBar from "@/components/TabBar.vue";
 import { useAuthStore } from "@/stores/auth";
 import { getTradesperson, setWeeklyAvailability } from "@/firebase/services/tradespeople";
+import { getInsurance } from "@/firebase/services/insuranceVerifications";
+import { INSURANCE_PARTNER } from "@/data/insurancePartner";
 import { subscribeTradieJobs } from "@/firebase/services/jobs";
 import {
   createBlock,
@@ -27,6 +29,7 @@ import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 import type {
   BookingDoc,
+  InsuranceVerificationDoc,
   JobDoc,
   TradespersonDoc,
   WeeklyAvailability,
@@ -45,6 +48,37 @@ const route = useRoute();
 const toast = useToast();
 const tradie = ref<WithId<TradespersonDoc> | null>(null);
 const jobs = ref<WithId<JobDoc>[]>([]);
+const insuranceDoc = ref<WithId<InsuranceVerificationDoc> | null>(null);
+
+// Dashboard insurance nudge: prompt pros with no proof of insurance on file to
+// get covered, and remind verified pros to renew within 30 days of expiry.
+// Pending uploads (awaiting review) intentionally show nothing.
+const insuranceBanner = computed<{ icon: string; text: string; cta: string } | null>(() => {
+  const doc = insuranceDoc.value;
+  const now = Date.now();
+  const expiresMs = doc?.expiresAt?.toDate?.().getTime() ?? null;
+  const expired = expiresMs != null && expiresMs <= now;
+  if (!doc || doc.status === "rejected" || expired) {
+    return {
+      icon: "pi-shield",
+      text: expired
+        ? "Your insurance on file has expired — renew to keep your Insured badge."
+        : "You're not insured yet. Insured pros win more work — get covered in minutes.",
+      cta: expired ? "Renew now" : "Get covered",
+    };
+  }
+  if (doc.status === "approved" && expiresMs != null) {
+    const days = Math.ceil((expiresMs - now) / 86_400_000);
+    if (days <= 30) {
+      return {
+        icon: "pi-bell",
+        text: `Your insurance expires in ${days} day${days === 1 ? "" : "s"} — renew so your Insured badge doesn't lapse.`,
+        cta: "Renew now",
+      };
+    }
+  }
+  return null;
+});
 // List is the default — jobs-first triage. Board is the renamed kanban
 // (clients of the dashboard don't know the term "kanban"). Calendar is
 // the scheduling/blocking surface. Applied surfaces the job-board
@@ -163,6 +197,11 @@ onMounted(async () => {
   }
   unsub = subscribeTradieJobs(auth.fbUser.uid, (j) => (jobs.value = j));
   unsubBookings = subscribeBookings(auth.fbUser.uid, (b) => (bookings.value = b));
+  try {
+    insuranceDoc.value = await getInsurance(auth.fbUser.uid);
+  } catch {
+    insuranceDoc.value = null;
+  }
 });
 
 onUnmounted(() => {
@@ -322,6 +361,20 @@ const awaitingVerificationMessage = computed(() => {
     </div>
 
     <div class="bs-container pt-4">
+    <a
+      v-if="insuranceBanner"
+      :href="INSURANCE_PARTNER.url"
+      target="_blank"
+      rel="noopener"
+      class="mb-4 flex items-center gap-2 rounded-lg border border-[#f0d8a8] bg-[#fff5e6] px-3 py-2 text-sm font-medium text-[color:var(--bs-text)] no-underline"
+    >
+      <i :class="['pi', insuranceBanner.icon, 'shrink-0 text-[#b45309]']" aria-hidden="true"></i>
+      <span class="min-w-0 flex-1">{{ insuranceBanner.text }}</span>
+      <span class="shrink-0 inline-flex items-center gap-1 font-semibold text-[color:var(--bs-blue-dark)]">
+        {{ insuranceBanner.cta }}
+        <i class="pi pi-external-link text-xs" aria-hidden="true"></i>
+      </span>
+    </a>
     <p class="hidden sm:block text-[color:var(--bs-muted)] text-sm mb-4">
       {{ viewHint }}
     </p>

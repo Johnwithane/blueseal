@@ -16,6 +16,7 @@ import { uploadFile, makeStoragePath } from "@/firebase/services/storage";
 import { compressOrPassPdf } from "@/utils/image";
 import { useToast } from "@/composables/useToast";
 import { useFormatters } from "@/composables/useFormatters";
+import { INSURANCE_PARTNER } from "@/data/insurancePartner";
 import { humanizeError } from "@/utils/errors";
 import { VERIFICATION_SEVERITY } from "@/utils/verificationStatus";
 
@@ -350,6 +351,21 @@ async function saveEdit() {
         </template>
       </p>
 
+      <a
+        v-if="!isEditingExisting"
+        :href="INSURANCE_PARTNER.url"
+        target="_blank"
+        rel="noopener"
+        class="ins-get-covered mt-3"
+      >
+        <i class="pi pi-shield" aria-hidden="true"></i>
+        <span>
+          Don't have coverage yet? Get covered in minutes with
+          {{ INSURANCE_PARTNER.name }}
+        </span>
+        <i class="pi pi-external-link ins-get-covered__ext" aria-hidden="true"></i>
+      </a>
+
       <div class="bs-form space-y-3 mt-3">
         <div>
           <label class="text-sm font-medium">Insurer</label>
@@ -440,3 +456,32 @@ async function saveEdit() {
     </div>
   </details>
 </template>
+
+<style scoped>
+.ins-get-covered {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--bs-blue) 25%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bs-blue) 6%, transparent);
+  color: var(--bs-blue-dark);
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.3;
+  transition: background 0.15s ease;
+}
+.ins-get-covered:hover {
+  background: color-mix(in srgb, var(--bs-blue) 12%, transparent);
+}
+.ins-get-covered .pi-shield {
+  flex: none;
+}
+.ins-get-covered__ext {
+  margin-left: auto;
+  flex: none;
+  font-size: 0.72rem;
+  opacity: 0.7;
+}
+</style>

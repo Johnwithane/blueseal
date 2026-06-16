@@ -249,6 +249,23 @@ Upload clear photos or PDFs of each document in the wizard. Once you submit, our
 If something needs another look, we'll let you know what to re-upload — you won't be left guessing.`,
   },
   {
+    slug: "insurance-and-getting-covered",
+    categoryId: "for-tradespeople",
+    title: "Insurance: getting covered & staying covered",
+    excerpt: "Why insured pros win more work, how to get covered, and renewal reminders.",
+    audience: "tradesperson",
+    keywords: ["insurance", "liability", "coverage", "insured badge", "renew", "renewal", "get covered"],
+    body: `General-liability insurance is **optional** on Blue Seal, but it's one of the strongest trust signals you can carry. When you upload proof and our team verifies it, a verified **Insured** badge appears on your public profile — and most clients look for it.
+
+**Getting covered.** If you don't have a policy yet, you can get a quote and buy online in minutes. Look for **"Get covered in minutes"** in your onboarding insurance step, on your dashboard, and whenever you go to send a quote without proof of insurance on file. It opens our insurance partner in a new tab — come back and finish your bid when you're done.
+
+**Adding your proof.** In the onboarding wizard (or your Trust Badges), open the insurance card and enter your insurer, policy number, coverage amount, and expiry date, then upload the certificate (PDF or image). Our team reviews it and your **Insured** badge goes live once it's approved.
+
+**Before you bid.** If you go to apply for a job or send a quote and we don't have current proof of insurance on file, you'll see a quick reminder. It's only a nudge — you can get covered or continue without it.
+
+**Staying covered.** We track your policy's expiry date and remind you by email and in-app **before it lapses**, so your badge doesn't quietly disappear. When you renew, upload the new certificate with **Replace** on your insurance card.`,
+  },
+  {
     slug: "win-work",
     categoryId: "for-tradespeople",
     title: "Winning work: requests, browsing, and applications",
@@ -566,6 +583,20 @@ const faqs: FaqItem[] = [
     question: "What is Blue Seal Pro and how much does it cost?",
     answer:
       "Blue Seal Pro is an optional upgrade for tradespeople — $29 CAD/month or $290 CAD/year — with a 30-day free trial. It adds the AI assistant, waives the Blue Seal service fee for your clients on card payments, features your applications at the top of clients' job posts, includes business reports with a CSV export, gives you a client book with recurring billing for your regulars, and lets you brand your quotes and invoices with your own logo, banner, and colour. The core app stays free.",
+    categoryId: "for-tradespeople",
+    audience: "tradesperson",
+  },
+  {
+    question: "Do I need insurance to work on Blue Seal?",
+    answer:
+      "No — general-liability insurance is **optional**. But insured pros win more work: uploading proof earns a verified **Insured** badge on your profile, which most clients look for. If you try to bid or quote without proof of insurance on file, we'll show a gentle reminder — you can get covered in minutes or continue without it.",
+    categoryId: "for-tradespeople",
+    audience: "tradesperson",
+  },
+  {
+    question: "Will Blue Seal remind me when my insurance is about to expire?",
+    answer:
+      "Yes. We track the expiry date on your verified insurance and remind you by email and in-app before it lapses, so your **Insured** badge doesn't quietly disappear. When you renew, upload the new certificate with **Replace** on your insurance card.",
     categoryId: "for-tradespeople",
     audience: "tradesperson",
   },

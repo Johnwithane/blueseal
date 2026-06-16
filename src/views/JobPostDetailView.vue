@@ -39,6 +39,7 @@ import { intakeFieldsForTrade } from "@/data/intakeSchemas";
 import IntakeFormRenderer from "@/components/IntakeFormRenderer.vue";
 import { submitApplicationSchema } from "@/validation/schemas";
 import { useToast } from "@/composables/useToast";
+import { useInsuranceGate } from "@/composables/useInsuranceGate";
 import { useFormatters } from "@/composables";
 import { humanizeError } from "@/utils/errors";
 import JobCounterparty from "@/components/JobCounterparty.vue";
@@ -63,6 +64,7 @@ const router = useRouter();
 const auth = useAuthStore();
 const toast = useToast();
 const paywall = usePaywallStore();
+const insuranceGate = useInsuranceGate();
 const confirm = useConfirm();
 const { relativeTime, money } = useFormatters();
 
@@ -364,6 +366,9 @@ async function submitApply() {
     return;
   }
 
+  // Soft nudge: if there's no proof of insurance on file, remind before
+  // bidding — they can get covered or continue.
+  if (!(await insuranceGate.ensureInsuredOrConfirm())) return;
   submittingApply.value = true;
   try {
     await submitApplication(parsed.data);

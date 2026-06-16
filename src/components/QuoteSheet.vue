@@ -15,6 +15,7 @@ import { usePaywallStore } from "@/stores/paywall";
 import { useFormatters } from "@/composables/useFormatters";
 import { useToast } from "@/composables/useToast";
 import { useConfirmAction } from "@/composables/useConfirmAction";
+import { useInsuranceGate } from "@/composables/useInsuranceGate";
 import { humanizeError } from "@/utils/errors";
 import QuoteComposer from "@/components/QuoteComposer.vue";
 import type {
@@ -39,6 +40,7 @@ const { money } = useFormatters();
 const toast = useToast();
 const auth = useAuthStore();
 const paywall = usePaywallStore();
+const insuranceGate = useInsuranceGate();
 
 const submitting = ref(false);
 const loading = ref(false);
@@ -251,6 +253,9 @@ async function onSubmit() {
     );
     return;
   }
+  // Soft nudge: if there's no proof of insurance on file, remind before
+  // sending — they can get covered or continue.
+  if (!(await insuranceGate.ensureInsuredOrConfirm())) return;
   submitting.value = true;
   try {
     await submitQuote({ jobId: props.jobId, ...s.payload });

@@ -9,6 +9,7 @@ import AppFooter from "@/components/AppFooter.vue";
 import TradieStatusBanner from "@/components/TradieStatusBanner.vue";
 import AssistantBubble from "@/components/assistant/AssistantBubble.vue";
 import PaywallDialog from "@/components/PaywallDialog.vue";
+import InsuranceReminderDialog from "@/components/InsuranceReminderDialog.vue";
 import RoleSwitchOverlay from "@/components/RoleSwitchOverlay.vue";
 import AppShell from "@/components/shell/AppShell.vue";
 import ActiveClockBanner from "@/components/ActiveClockBanner.vue";
@@ -191,6 +192,10 @@ function openFromToast(notifId: string) {
     <!-- Global Blue Seal Pro upgrade popup. Any gated AI/Pro action funnels its
          paywall error into the paywall store, which this dialog renders. -->
     <PaywallDialog />
+    <!-- Global insurance reminder popup. A soft nudge when a tradesperson with
+         no proof of insurance on file bids or quotes; driven by the
+         insurancePrompt store (see useInsuranceGate). -->
+    <InsuranceReminderDialog />
     <!-- Global overlay for Airbnb-style role switches. Stays mounted; the
          component shows/hides itself based on the role-switch animation
          store, which `auth.switchActiveRole` drives. -->
