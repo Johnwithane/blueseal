@@ -11,6 +11,7 @@ import AssistantBubble from "@/components/assistant/AssistantBubble.vue";
 import PaywallDialog from "@/components/PaywallDialog.vue";
 import InsuranceReminderDialog from "@/components/InsuranceReminderDialog.vue";
 import RoleSwitchOverlay from "@/components/RoleSwitchOverlay.vue";
+import AppUpdatePrompt from "@/components/AppUpdatePrompt.vue";
 import AppShell from "@/components/shell/AppShell.vue";
 import ActiveClockBanner from "@/components/ActiveClockBanner.vue";
 import { useNotificationsStore } from "@/stores/notifications";
@@ -200,6 +201,11 @@ function openFromToast(notifId: string) {
          component shows/hides itself based on the role-switch animation
          store, which `auth.switchActiveRole` drives. -->
     <RoleSwitchOverlay />
+    <!-- "Update available" banner + critical "Update required" overlay. Driven
+         by useAppUpdate() (also initialised above); shows a tappable update path
+         the moment a new build is detected, so nobody is stuck on a stale build
+         waiting for a hard-refresh. -->
+    <AppUpdatePrompt />
   </div>
 </template>
 

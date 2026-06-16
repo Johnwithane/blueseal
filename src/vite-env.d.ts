@@ -2,6 +2,10 @@
 /// <reference types="vite-plugin-pwa/client" />
 /// <reference types="vite-plugin-pwa/vue" />
 
+// Build id baked in at compile time by vite's `define` (vite.config.ts), polled
+// against /version.json to detect new deploys. See useAppUpdate().
+declare const __APP_VERSION__: string;
+
 interface ImportMetaEnv {
   readonly VITE_FIREBASE_API_KEY: string;
   readonly VITE_FIREBASE_AUTH_DOMAIN: string;

@@ -1103,6 +1103,13 @@ const faqs: FaqItem[] = [
     audience: "all",
   },
   {
+    question: 'Why do I sometimes see an "Update available" banner?',
+    answer:
+      "When we ship an improvement or a fix, Blue Seal checks for it in the background and shows a small **Update** banner at the bottom of the screen. Tap **Update** and the app reloads onto the latest version in a second — no need to clear your cache, hard-refresh, or reinstall. Installed apps usually update themselves quietly; the banner is there for browser tabs and for whenever you'd rather pick the moment. If a fix is important, you may see a full-screen **Update required** prompt instead — just tap **Update now** to continue.",
+    categoryId: "account-app",
+    audience: "all",
+  },
+  {
     question: "How do notifications work?",
     answer:
       "The bell shows new messages, quotes, applications, and job status changes inside the app. When you're away, we **email** you about the important stuff — new messages, quotes, invoices, job status changes, verification decisions, and invites — so you don't miss anything even without the app installed. (Busy chat threads are batched: you get one new-message email per lull, not one per line.) You can also turn on **push notifications** in Account settings for instant on-device alerts, and we use WhatsApp for a few time-critical events.",

@@ -1,13 +1,59 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import vue from "@vitejs/plugin-vue";
 import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
+import { execSync } from "node:child_process";
 import { fileURLToPath, URL } from "node:url";
 
+// Build id baked into the app (__APP_VERSION__) and written to /version.json, so
+// a running client can tell when a newer build has shipped. The git short SHA
+// maps a build to an exact commit; fall back to a timestamp when git isn't
+// available (e.g. a shallow CI checkout with no history).
+function resolveBuildId(): string {
+  try {
+    return execSync("git rev-parse --short HEAD", {
+      stdio: ["ignore", "pipe", "ignore"],
+    })
+      .toString()
+      .trim();
+  } catch {
+    return `t${Date.now()}`;
+  }
+}
+const BUILD_ID = resolveBuildId();
+
+// Set CRITICAL_RELEASE=1 on the build that ships an urgent fix (e.g.
+// `CRITICAL_RELEASE=1 npm run deploy:prod`) → version.json carries critical:true,
+// so any client still on an older build is force-updated via a blocking overlay
+// instead of a dismissable banner. A normal deploy leaves it false.
+const CRITICAL_RELEASE = process.env.CRITICAL_RELEASE === "1";
+
+// Emits dist/version.json — a tiny, always-network-fetched manifest the running
+// app polls (independent of the service worker, so it works even when the SW is
+// wedged) to learn a newer build shipped. Kept out of the Workbox precache (see
+// globIgnores) and served `no-cache` (firebase.json) so it's never stale.
+function versionManifest(): Plugin {
+  return {
+    name: "blueseal-version-manifest",
+    apply: "build",
+    generateBundle() {
+      this.emitFile({
+        type: "asset",
+        fileName: "version.json",
+        source: JSON.stringify({ version: BUILD_ID, critical: CRITICAL_RELEASE }) + "\n",
+      });
+    },
+  };
+}
+
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(BUILD_ID),
+  },
   plugins: [
     vue(),
     tailwindcss(),
+    versionManifest(),
     VitePWA({
       // "prompt" (not "autoUpdate") so a freshly-deployed service worker WAITS
       // instead of force-reloading the tab. useAppUpdate() (src/composables)
@@ -42,7 +88,9 @@ export default defineConfig({
       workbox: {
         // The FCM service worker registers itself (separate scope) — keep it
         // out of the precache so Workbox never serves a stale copy of it.
-        globIgnores: ["firebase-messaging-sw.js"],
+        // version.json MUST always hit the network (it's the freshness probe),
+        // so keep it out of the precache too.
+        globIgnores: ["firebase-messaging-sw.js", "version.json"],
         // SPA navigation: serve the cached app shell for any client-side route
         // so Vue Router can resolve it. Do NOT point this at /offline.html —
         // that swallows every direct navigation (e.g. /onboarding) and shows
