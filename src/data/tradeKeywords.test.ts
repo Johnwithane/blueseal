@@ -278,6 +278,39 @@ describe("suggestTrades", () => {
     expect(concrete.map((s) => s.key)).not.toContain("handyman"); // concrete isn't a handyman job
   });
 
+  it("expands a renovation / build into a broad crew of trades", () => {
+    function keys(q: string): string[] {
+      return suggestTrades(q, 6).map((s) => s.key);
+    }
+    // "renovation" used to surface only the general contractor — now it widens.
+    const reno = suggestTrades("renovation", 6);
+    expect(reno[0]?.key).toBe("general_contractor"); // the specific match still leads
+    expect(reno.length).toBeGreaterThanOrEqual(4);
+    expect(reno.map((s) => s.key)).toContain("carpenter");
+    expect(reno.map((s) => s.key)).toContain("electrician");
+
+    // Inflections + colloquial forms all widen the same way.
+    expect(keys("renovating my house")).toContain("general_contractor");
+    expect(keys("kitchen remodel")).toContain("cabinetry");
+    expect(keys("planning a home addition")).toContain("framer");
+
+    // "building a new house" must lead with the GC + crew — not pest_control
+    // via the "house" → "mouse" one-edit fuzzy slip (regression).
+    const build = suggestTrades("building a new house", 6);
+    expect(build[0]?.key).toBe("general_contractor");
+    expect(build.map((s) => s.key)).toContain("framer");
+    expect(build.map((s) => s.key)).not.toContain("pest_control");
+  });
+
+  it("does not let 'home addition' bleed onto 'additional' wording", () => {
+    // Bare "addition" would prefix-match "additional outlet" — we use the
+    // multi-word term so an electrical job stays an electrical job.
+    const keys = suggestTrades("add an additional outlet").map((s) => s.key);
+    expect(keys).toContain("electrician");
+    expect(keys).not.toContain("framer");
+    expect(keys).not.toContain("foundation");
+  });
+
   it("never offers a generalist for licensed / specialised trades", () => {
     // A generalist must never read as a substitute for permitted work.
     const outlet = suggestTrades("my outlet is dead").map((s) => s.key);

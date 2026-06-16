@@ -52,7 +52,9 @@ const text = computed({
   set: (v) => emit("update:modelValue", v),
 });
 
-const suggestions = computed(() => suggestTrades(props.modelValue));
+// Show a generous spread (up to 6) — a renovation or a room can legitimately
+// involve several trades, and we'd rather over-offer than make the client guess.
+const suggestions = computed(() => suggestTrades(props.modelValue, 6));
 
 // Miss-logging: when the user pauses on a query that matched NO trade, log it
 // (once per distinct term) so real gaps drive what we add to the lexicon. We

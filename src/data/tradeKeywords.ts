@@ -214,7 +214,9 @@ export const TRADE_KEYWORDS: Record<string, string[]> = {
     "basement renovation", "kitchen remodel", "kitchen renovation",
     "kitchen reno", "bathroom remodel", "bathroom renovation", "bathroom reno",
     "main floor reno", "open concept", "in law suite", "permit", "build out",
-    "whole home reno", "new build", "custom home",
+    "whole home reno", "new build", "custom home", "new home", "new house",
+    "build a house", "build a home", "building a house", "building a home",
+    "house build", "home build", "knockdown rebuild", "tear down rebuild",
   ],
   framer: [
     "framer", "framing", "framing crew", "stud", "studs", "stud wall",
@@ -749,8 +751,87 @@ export const PROJECT_AREAS: Record<string, string[]> = {
   "home office": ["electrician", "painter", "network_cabling", "carpenter"],
   nursery: ["painter", "flooring", "electrician", "carpenter"],
   closet: ["cabinetry", "carpenter", "painter"],
-  "whole house": ["general_contractor", "painter", "flooring", "electrician"],
-  "whole home": ["general_contractor", "painter", "flooring", "electrician"],
+  "whole house": [
+    "general_contractor", "painter", "flooring", "electrician", "plumber",
+    "drywall", "hvac", "carpenter",
+  ],
+  "whole home": [
+    "general_contractor", "painter", "flooring", "electrician", "plumber",
+    "drywall", "hvac", "carpenter",
+  ],
+
+  // ── Project TYPES (not rooms) ─────────────────────────────────────────────
+  // A renovation or a build isn't one trade — it's a crew. These widen a
+  // big-project word into the spread of trades it usually pulls in, so
+  // "renovation" surfaces more than just the general contractor. Lead with the
+  // GC (who'd coordinate), then the trades most renovations actually touch.
+  // Collision-safe terms only: "reno" (4-char prefix) already catches
+  // reno / renovation / renovate / renovating, and we use "home addition"
+  // (never bare "addition", which would prefix-match "additional outlet").
+  reno: [
+    "general_contractor", "carpenter", "electrician", "plumber", "painter",
+    "drywall", "flooring", "tiling", "cabinetry", "hvac",
+  ],
+  renovation: [
+    "general_contractor", "carpenter", "electrician", "plumber", "painter",
+    "drywall", "flooring", "tiling", "cabinetry", "hvac",
+  ],
+  remodel: [
+    "general_contractor", "carpenter", "cabinetry", "countertop", "electrician",
+    "plumber", "painter", "drywall", "flooring", "tiling",
+  ],
+  "home addition": [
+    "general_contractor", "framer", "carpenter", "foundation", "electrician",
+    "plumber", "roofer", "drywall", "hvac",
+  ],
+  "room addition": [
+    "general_contractor", "framer", "carpenter", "foundation", "electrician",
+    "plumber", "drywall", "hvac",
+  ],
+  "build an addition": [
+    "general_contractor", "framer", "carpenter", "foundation", "electrician",
+    "plumber", "roofer", "drywall",
+  ],
+  "home extension": [
+    "general_contractor", "framer", "carpenter", "foundation", "electrician",
+    "plumber", "roofer", "drywall",
+  ],
+  "new build": [
+    "general_contractor", "framer", "foundation", "electrician", "plumber",
+    "hvac", "roofer", "carpenter",
+  ],
+  "new home": [
+    "general_contractor", "framer", "foundation", "electrician", "plumber",
+    "hvac", "roofer", "carpenter",
+  ],
+  "new house": [
+    "general_contractor", "framer", "foundation", "electrician", "plumber",
+    "hvac", "roofer", "carpenter",
+  ],
+  "custom home": [
+    "general_contractor", "framer", "foundation", "electrician", "plumber",
+    "hvac", "roofer", "carpenter",
+  ],
+  "build a house": [
+    "general_contractor", "framer", "foundation", "electrician", "plumber",
+    "hvac", "roofer", "carpenter",
+  ],
+  "build a home": [
+    "general_contractor", "framer", "foundation", "electrician", "plumber",
+    "hvac", "roofer", "carpenter",
+  ],
+  "fixer upper": [
+    "general_contractor", "handyman", "carpenter", "painter", "electrician",
+    "plumber", "drywall", "flooring",
+  ],
+  "in law suite": [
+    "general_contractor", "framer", "electrician", "plumber", "drywall",
+    "flooring", "hvac", "carpenter",
+  ],
+  "basement apartment": [
+    "general_contractor", "framer", "electrician", "plumber", "drywall",
+    "flooring", "hvac", "waterproofing",
+  ],
 };
 
 // ---------------------------------------------------------------------------
