@@ -17,6 +17,11 @@ import type { QuoteDoc, WithId } from "@/firebase/interfaces";
 
 const props = defineProps<{
   jobId: string;
+  // Set when the assigned tradesperson has no current liability insurance — the
+  // signature dialog then surfaces the disclosure + requires an acknowledgment,
+  // and we pass acknowledgedUninsured to the accept callable.
+  uninsured?: boolean;
+  tradieName?: string;
 }>();
 
 const emit = defineEmits<{
@@ -80,7 +85,7 @@ async function onSignedAccept(signatureDataUrl: string) {
   if (accepting.value) return;
   accepting.value = true;
   try {
-    await clientAcceptQuote(props.jobId, signatureDataUrl);
+    await clientAcceptQuote(props.jobId, signatureDataUrl, props.uninsured === true);
     toast.success(
       "Quote accepted",
       "Your tradesperson has been notified — they'll reach out to schedule.",
@@ -241,6 +246,8 @@ async function onSubmitDecline() {
     :quote-total="quote?.total"
     :upfront-fee-cents="upfrontFeeCents"
     :busy="accepting"
+    :uninsured="props.uninsured"
+    :tradie-name="props.tradieName"
     @confirm="onSignedAccept"
   />
 </template>

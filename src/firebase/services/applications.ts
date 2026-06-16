@@ -70,12 +70,23 @@ export async function acceptApplicationQuote(
   postId: string,
   applicationId: string,
   signatureDataUrl: string,
+  acknowledgedUninsured = false,
 ): Promise<{ jobId: string; chatId: string }> {
   const callable = httpsCallable<
-    { postId: string; applicationId: string; signatureDataUrl: string },
+    {
+      postId: string;
+      applicationId: string;
+      signatureDataUrl: string;
+      acknowledgedUninsured: boolean;
+    },
     { jobId: string; chatId: string }
   >(functions, "acceptApplicationQuote");
-  const { data } = await callable({ postId, applicationId, signatureDataUrl });
+  const { data } = await callable({
+    postId,
+    applicationId,
+    signatureDataUrl,
+    acknowledgedUninsured,
+  });
   return data;
 }
 

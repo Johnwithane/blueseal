@@ -29,6 +29,7 @@ import {
 import { returnToApplicants } from "@/firebase/services/jobPosts";
 import { updateJobLog } from "@/firebase/services/assistant";
 import { getTradesperson } from "@/firebase/services/tradespeople";
+import { getInsuranceWaiver, signUninsuredWaiver } from "@/firebase/services/insuranceWaivers";
 import { findCollisions, type Collision } from "@/firebase/services/bookings";
 import { useConfirm } from "primevue/useconfirm";
 import { getInvoiceByJobId } from "@/firebase/services/invoices";
@@ -41,12 +42,14 @@ import type {
   JobDoc,
   JobExtraDoc,
   JobStatus,
+  InsuranceWaiverDoc,
   ReviewPairDoc,
   SessionDoc,
   SiteVisitDoc,
   TradespersonDoc,
   WithId,
 } from "@/firebase/interfaces";
+import { isTradieInsured } from "@/utils/insuranceStatus";
 import { useFormatters } from "@/composables/useFormatters";
 import FinishJobSheet from "@/components/FinishJobSheet.vue";
 import ClientApprovalBanner from "@/components/ClientApprovalBanner.vue";
@@ -61,6 +64,7 @@ import JobChangeBanner from "@/components/JobChangeBanner.vue";
 import JobStatusTimeline from "@/components/JobStatusTimeline.vue";
 import ProposedChangeOrderBanner from "@/components/ProposedChangeOrderBanner.vue";
 import ProposedSiteVisitBanner from "@/components/ProposedSiteVisitBanner.vue";
+import UninsuredWaiverDialog from "@/components/UninsuredWaiverDialog.vue";
 import { SEED_INTAKE_SCHEMAS } from "@/data/intakeSchemas";
 import { firstMissingRequired } from "@/utils/intake";
 import { getIntakeSchema } from "@/firebase/services/intakeFormSchemas";
@@ -122,6 +126,13 @@ function formatScheduled(
 
 const job = ref<WithId<JobDoc> | null>(null);
 const tradieInfo = ref<WithId<TradespersonDoc> | null>(null);
+// The tradesperson's OWN doc + this job's uninsured-work waiver, loaded only for
+// the tradesperson viewer. Drive the "sign before you start" gate. `tradieInfo`
+// above is the client-side mirror; this is the owner read of the same fields.
+const myTradieDoc = ref<WithId<TradespersonDoc> | null>(null);
+const waiver = ref<WithId<InsuranceWaiverDoc> | null>(null);
+const showWaiverDialog = ref(false);
+const signingWaiver = ref(false);
 const reviewPair = ref<WithId<ReviewPairDoc> | null>(null);
 // Live subscription to the job's change orders. Owned here so the Work Order
 // tab badge + the client's approval banner react from any tab.
@@ -215,6 +226,12 @@ const clockBtnBusy = ref(false);
 
 async function onHeaderClockIn() {
   if (clockBtnBusy.value || !job.value) return;
+  // Uninsured tradies must sign the waiver first — open it instead of clocking
+  // in. The clockIn callable enforces the same gate server-side.
+  if (needsUninsuredWaiver.value) {
+    showWaiverDialog.value = true;
+    return;
+  }
   clockBtnBusy.value = true;
   try {
     await clockIn(job.value.id);
@@ -223,6 +240,30 @@ async function onHeaderClockIn() {
     toast.error("Couldn't clock in", humanizeError(e));
   } finally {
     clockBtnBusy.value = false;
+  }
+}
+
+// Sign the uninsured-work waiver, then auto-clock-in so signing flows straight
+// into starting the timer (the dialog is reached from the Clock-in button).
+async function onSignWaiver(signatureDataUrl: string) {
+  if (signingWaiver.value || !job.value) return;
+  signingWaiver.value = true;
+  try {
+    await signUninsuredWaiver(job.value.id, signatureDataUrl);
+    waiver.value = await getInsuranceWaiver(job.value.id);
+    showWaiverDialog.value = false;
+    toast.success("Waiver signed", "You're cleared to start. Clocking you in…");
+    try {
+      await clockIn(job.value.id);
+      toast.success("Clocked in");
+    } catch (e) {
+      // Waiver is saved; clock-in is a best-effort follow-on (they can tap again).
+      toast.error("Couldn't clock in", humanizeError(e));
+    }
+  } catch (e) {
+    toast.error("Couldn't sign the waiver", humanizeError(e));
+  } finally {
+    signingWaiver.value = false;
   }
 }
 
@@ -340,11 +381,21 @@ const canRequestPostpone = computed(
 const cancelNeedsApproval = computed(() => canRequestCancel.value);
 
 const now = Date.now();
-const tradieInsuranceLive = computed(() => {
-  if (!tradieInfo.value?.insuranceVerified) return false;
-  const exp = tradieInfo.value.insuranceExpiresAt?.toDate?.().getTime();
-  return exp == null || exp > now;
-});
+// Client-side view of the tradesperson's liability insurance (public mirror).
+// Routed through the shared helper so "insured" means the same everywhere.
+const tradieInsuranceLive = computed(() => isTradieInsured(tradieInfo.value, now));
+
+// Tradesperson gate: their own liability insurance is not current AND they
+// haven't yet signed this job's uninsured-work waiver. Matched by the clockIn
+// callable's server-side guard. Tied to the active state where work happens
+// (in_progress), which is also when the header clock-in button shows.
+const needsUninsuredWaiver = computed(
+  () =>
+    isTradie.value &&
+    job.value?.status === "in_progress" &&
+    !isTradieInsured(myTradieDoc.value, now) &&
+    !waiver.value?.tradesperson,
+);
 const tradieWsibLive = computed(() => {
   if (!tradieInfo.value?.wsibVerified) return false;
   const exp = tradieInfo.value.wsibExpiresAt?.toDate?.().getTime();
@@ -584,6 +635,23 @@ async function loadJobDependents(j: WithId<JobDoc>) {
     }
   } else {
     tradieInfo.value = null;
+  }
+
+  // Tradesperson viewer: load their own doc (own insurance status) + this job's
+  // uninsured-work waiver so the "sign before you start" gate can render.
+  if (isTradie.value) {
+    try {
+      [myTradieDoc.value, waiver.value] = await Promise.all([
+        getTradesperson(j.tradespersonId),
+        getInsuranceWaiver(j.id),
+      ]);
+    } catch {
+      myTradieDoc.value = null;
+      waiver.value = null;
+    }
+  } else {
+    myTradieDoc.value = null;
+    waiver.value = null;
   }
 }
 
@@ -1050,6 +1118,16 @@ function onReturnToApplicants() {
         <!-- Quick clock for the tradie while the job is active. The full
              Work Order tab handles travel + change-order sessions. -->
         <div v-if="isTradie && job.status === 'in_progress'" class="mt-2">
+          <!-- Uninsured-work gate: must sign the waiver before starting. The
+               clock-in button routes to the waiver dialog when this shows. -->
+          <div
+            v-if="needsUninsuredWaiver"
+            class="mb-2 rounded-md border border-[color:var(--bs-warning)] bg-[color:var(--bs-warning-tint)] px-3 py-2 text-xs text-[color:var(--bs-warning-text)]"
+          >
+            <i class="pi pi-shield mr-1"></i>
+            You're not insured for this job. Sign a quick waiver to start —
+            <RouterLink to="/account" class="underline font-medium">or get covered first</RouterLink>.
+          </div>
           <Button
             v-if="clockRunningOn(job.id)"
             :label="`Stop · ${formatElapsed(clockElapsedMs)}`"
@@ -1062,8 +1140,9 @@ function onReturnToApplicants() {
           />
           <Button
             v-else
-            label="Clock in"
-            icon="pi pi-play"
+            :label="needsUninsuredWaiver ? 'Sign waiver & start' : 'Clock in'"
+            :icon="needsUninsuredWaiver ? 'pi pi-pencil' : 'pi pi-play'"
+            :severity="needsUninsuredWaiver ? 'warn' : undefined"
             size="small"
             :loading="clockBtnBusy"
             @click="onHeaderClockIn"
@@ -1237,6 +1316,8 @@ function onReturnToApplicants() {
       <ClientQuoteApprovalBanner
         v-if="isClient && job.status === 'quoted'"
         :job-id="job.id"
+        :uninsured="!tradieInsuranceLive"
+        :tradie-name="resolvedTradespersonName"
         class="mb-4"
         @decided="load"
       />
@@ -1471,6 +1552,13 @@ function onReturnToApplicants() {
       v-model:visible="showQuoteSheet"
       :job-id="job.id"
       @submitted="load"
+    />
+
+    <UninsuredWaiverDialog
+      v-if="job && isTradie"
+      v-model:visible="showWaiverDialog"
+      :busy="signingWaiver"
+      @confirm="onSignWaiver"
     />
 
     <Dialog

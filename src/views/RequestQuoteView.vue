@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted, ref } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
 import { useRoute, useRouter, RouterLink } from "vue-router";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import Textarea from "primevue/textarea";
 import Select from "primevue/select";
 import Message from "primevue/message";
+import Checkbox from "primevue/checkbox";
 import { useAuthStore } from "@/stores/auth";
 import { getTradesperson } from "@/firebase/services/tradespeople";
 import { getIntakeSchema } from "@/firebase/services/intakeFormSchemas";
@@ -25,6 +26,12 @@ import { useGoogleMaps } from "@/composables/useGoogleMaps";
 import { useFormErrors } from "@/composables/useFormErrors";
 import { compressToWebp } from "@/utils/image";
 import { humanizeError } from "@/utils/errors";
+import { isTradieInsured } from "@/utils/insuranceStatus";
+import {
+  CLIENT_UNINSURED_TITLE,
+  CLIENT_UNINSURED_CHECKBOX,
+  clientUninsuredBody,
+} from "@/data/insuranceWaiver";
 import {
   readRequestPrefill,
   clearRequestPrefill,
@@ -66,6 +73,12 @@ const addressAutocompleteEl = ref<HTMLInputElement | null>(null);
 const submitting = ref(false);
 const error = ref<string | null>(null);
 
+// Uninsured-tradesperson awareness gate. When the requested tradesperson has no
+// current liability insurance, the client must tick the disclosure before the
+// request can be sent (and it's recorded on the job).
+const tradieUninsured = computed(() => !!tradie.value && !isTradieInsured(tradie.value));
+const acceptedUninsured = ref(false);
+
 // Field-level validation errors (under each field) + scroll-to-first; `error`
 // stays for general submit/network failures shown by the banner near submit.
 const {
@@ -76,7 +89,7 @@ const {
   has: hasErrors,
   focusFirst,
 } = useFormErrors();
-const FIELD_ORDER = ["trade", "title", "description", "address", "photos", "intake"];
+const FIELD_ORDER = ["trade", "title", "description", "address", "photos", "intake", "uninsured"];
 
 // Page-level load state: the tradie doc + intake schema must arrive before the
 // form is usable. Failures here used to be unhandled (blank form, no clue why).
@@ -215,6 +228,11 @@ async function submit() {
   const missingDetail = firstMissingRequired(intakeFields.value, intakeData.value);
   if (missingDetail) setError("intake", `Please fill: ${missingDetail}`);
 
+  // Block sending until the client acknowledges an uninsured tradesperson.
+  if (tradieUninsured.value && !acceptedUninsured.value) {
+    setError("uninsured", "Please confirm you understand this tradesperson isn't insured.");
+  }
+
   // Use the canonical Zod schema for everything except the not-yet-uploaded
   // photos (we validate the URL list after upload).
   const candidate = {
@@ -294,6 +312,7 @@ async function submit() {
         },
         preferredDateWindow: { start: null, end: null },
         urgency: urgency.value,
+        acknowledgedUninsured: tradieUninsured.value,
       },
       chatId,
     );
@@ -489,6 +508,24 @@ async function submit() {
         <h3 class="font-semibold text-sm mb-2">Trade-specific details</h3>
         <IntakeFormRenderer v-model="intakeData" :fields="intakeFields" />
         <FieldError :message="errors.intake" />
+      </div>
+
+      <div
+        v-if="tradieUninsured"
+        data-field="uninsured"
+        class="rounded-md border border-[color:var(--bs-danger)] bg-[color:var(--bs-danger-tint)] px-3 py-3"
+      >
+        <p class="text-sm font-semibold text-[color:var(--bs-danger-text)]">
+          <i class="pi pi-exclamation-triangle mr-1"></i>{{ CLIENT_UNINSURED_TITLE }}
+        </p>
+        <p class="mt-1 text-xs text-[color:var(--bs-danger-text)]">
+          {{ clientUninsuredBody(tradie?.displayName?.trim() || tradie?.companyName?.trim() || "This tradesperson") }}
+        </p>
+        <label class="mt-2 flex items-start gap-2 text-xs text-[color:var(--bs-danger-text)]">
+          <Checkbox v-model="acceptedUninsured" binary />
+          <span>{{ CLIENT_UNINSURED_CHECKBOX }}</span>
+        </label>
+        <FieldError :message="errors.uninsured" />
       </div>
 
       <FormErrorBanner :message="error" />

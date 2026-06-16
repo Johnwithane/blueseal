@@ -1,20 +1,35 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { ref, watch } from "vue";
 import Dialog from "primevue/dialog";
 import Button from "primevue/button";
+import Checkbox from "primevue/checkbox";
 import { useFormatters } from "@/composables/useFormatters";
-import type SignaturePad from "signature_pad";
+import SignatureCanvas from "@/components/SignatureCanvas.vue";
+import {
+  CLIENT_UNINSURED_TITLE,
+  CLIENT_UNINSURED_CHECKBOX,
+  clientUninsuredBody,
+} from "@/data/insuranceWaiver";
 
-// Reusable, jobId-agnostic signature capture. Pure capture — the parent owns
-// the network call and drives the Confirm button's loading via `busy`. Used by
-// both accept paths (direct-request banner + job-board accept). The client
-// draws with a finger/mouse; on confirm we emit a PNG data URL that the server
-// decodes + stores as the immutable record of agreement.
+// Client quote-acceptance signature capture. Pure capture — the parent owns the
+// network call and drives the Confirm button's loading via `busy`. Used by both
+// accept paths (direct-request banner + job-board accept). The client draws with
+// a finger/mouse; on confirm we emit the signature data URL (WebP, PNG fallback)
+// that the server decodes + stores as the immutable record of agreement.
+//
+// When the assigned tradesperson is NOT insured, we also surface a liability
+// disclosure here and require an explicit acknowledgment checkbox before the
+// signature can be confirmed — the same drawn signature then doubles as the
+// client's recorded uninsured-work acknowledgment (the parent passes
+// `acknowledgedUninsured: true` to the accept callable, which re-checks server-side).
 const props = defineProps<{
   visible: boolean;
   quoteTotal?: number; // cents — echoed for context
   upfrontFeeCents?: number; // cents — echoed if > 0
   busy?: boolean; // parent-owned loading while the accept callable runs
+  // Set when the chosen tradesperson has no current liability insurance.
+  uninsured?: boolean;
+  tradieName?: string;
 }>();
 
 const emit = defineEmits<{
@@ -24,71 +39,28 @@ const emit = defineEmits<{
 
 const { money } = useFormatters();
 
-const canvasRef = ref<HTMLCanvasElement | null>(null);
+const sig = ref<InstanceType<typeof SignatureCanvas> | null>(null);
 const isEmpty = ref(true);
-let pad: SignaturePad | null = null;
-let ro: ResizeObserver | null = null;
+const uninsuredAck = ref(false);
 
-// Scale the canvas backing store to the device pixel ratio — without this the
-// signature is blurry and the pointer coordinates are offset on retina/most
-// phones. Resizing the backing store wipes the drawing, so we only call this on
-// real size/orientation changes and re-arm the empty state afterward.
-function resizeCanvas() {
-  const canvas = canvasRef.value;
-  if (!canvas || !pad) return;
-  const ratio = Math.max(window.devicePixelRatio || 1, 1);
-  canvas.width = canvas.offsetWidth * ratio;
-  canvas.height = canvas.offsetHeight * ratio;
-  canvas.getContext("2d")?.scale(ratio, ratio);
-  pad.clear(); // backing-store resize clears the bitmap; re-sync state
-  isEmpty.value = true;
-}
-
-async function init() {
-  const canvas = canvasRef.value;
-  if (!canvas || pad) return;
-  // Lazy-load signature_pad on first open so it stays off the main bundle.
-  const { default: SignaturePadCtor } = await import("signature_pad");
-  pad = new SignaturePadCtor(canvas, {
-    penColor: "#0f172a",
-    backgroundColor: "rgba(255,255,255,0)", // transparent → composites on white
-  });
-  pad.addEventListener("endStroke", () => {
-    isEmpty.value = pad?.isEmpty() ?? true;
-  });
-  resizeCanvas();
-  ro = new ResizeObserver(() => resizeCanvas());
-  ro.observe(canvas);
-}
-
-// The canvas has zero layout size until the Dialog is actually mounted+visible,
-// so init/fit must wait for the show — never at bare onMounted.
+// Reset the acknowledgment each time the dialog opens so a previous tick can't
+// carry over into a new acceptance.
 watch(
   () => props.visible,
-  async (v) => {
-    if (!v) return;
-    await nextTick();
-    if (!pad) await init();
-    else resizeCanvas();
+  (v) => {
+    if (v) uninsuredAck.value = false;
   },
 );
 
-function clear() {
-  pad?.clear();
-  isEmpty.value = true;
-}
+const tradieName = () => props.tradieName?.trim() || "This tradesperson";
 
 function onConfirm() {
-  if (!pad || pad.isEmpty() || props.busy) return;
-  emit("confirm", pad.toDataURL("image/png"));
+  if (isEmpty.value || props.busy) return;
+  if (props.uninsured && !uninsuredAck.value) return;
+  const dataUrl = sig.value?.extract() ?? "";
+  if (!dataUrl) return;
+  emit("confirm", dataUrl);
 }
-
-onBeforeUnmount(() => {
-  ro?.disconnect();
-  ro = null;
-  pad?.off();
-  pad = null;
-});
 </script>
 
 <template>
@@ -115,9 +87,25 @@ onBeforeUnmount(() => {
       before work begins.
     </div>
 
-    <div class="sign-frame mt-3">
-      <canvas ref="canvasRef" class="sign-canvas"></canvas>
-      <div class="sign-baseline"><span class="mr-1">✕</span>Sign above the line</div>
+    <!-- Uninsured disclosure — only when the chosen tradesperson isn't insured. -->
+    <div
+      v-if="props.uninsured"
+      class="mt-3 rounded-md border border-[color:var(--bs-danger)] bg-[color:var(--bs-danger-tint)] px-3 py-2.5"
+    >
+      <p class="text-sm font-semibold text-[color:var(--bs-danger-text)]">
+        <i class="pi pi-exclamation-triangle mr-1"></i>{{ CLIENT_UNINSURED_TITLE }}
+      </p>
+      <p class="mt-1 text-xs text-[color:var(--bs-danger-text)]">
+        {{ clientUninsuredBody(tradieName()) }}
+      </p>
+      <label class="mt-2 flex items-start gap-2 text-xs text-[color:var(--bs-danger-text)]">
+        <Checkbox v-model="uninsuredAck" binary :disabled="props.busy" />
+        <span>{{ CLIENT_UNINSURED_CHECKBOX }}</span>
+      </label>
+    </div>
+
+    <div class="mt-3">
+      <SignatureCanvas ref="sig" @update:empty="(v) => (isEmpty = v)" />
     </div>
 
     <template #footer>
@@ -127,7 +115,7 @@ onBeforeUnmount(() => {
           text
           icon="pi pi-eraser"
           :disabled="isEmpty || props.busy"
-          @click="clear"
+          @click="sig?.clear()"
         />
         <span class="flex-1"></span>
         <Button label="Cancel" text :disabled="props.busy" @click="emit('update:visible', false)" />
@@ -136,7 +124,7 @@ onBeforeUnmount(() => {
           icon="pi pi-check"
           severity="success"
           :loading="props.busy"
-          :disabled="isEmpty || props.busy"
+          :disabled="isEmpty || props.busy || (props.uninsured && !uninsuredAck)"
           @click="onConfirm"
         />
       </div>
@@ -161,33 +149,5 @@ onBeforeUnmount(() => {
     max-height: 100dvh;
     border-radius: 0;
   }
-}
-</style>
-
-<style scoped>
-.sign-frame {
-  position: relative;
-  border: 1px solid var(--bs-border);
-  border-radius: 8px;
-  background: #fff;
-  overflow: hidden;
-}
-.sign-canvas {
-  display: block;
-  width: 100%;
-  height: 220px;
-  /* The single most important line for mobile: stop a finger drag from
-     scrolling the page instead of drawing. */
-  touch-action: none;
-}
-.sign-baseline {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0.75rem;
-  text-align: center;
-  font-size: 0.7rem;
-  color: var(--bs-muted);
-  pointer-events: none; /* never eat strokes */
 }
 </style>

@@ -51,6 +51,7 @@ import SiteVisitForm from "@/components/SiteVisitForm.vue";
 import type { SiteVisitFormState } from "@/components/SiteVisitForm.vue";
 import QuoteBreakdown from "@/components/QuoteBreakdown.vue";
 import QuoteSignatureDialog from "@/components/QuoteSignatureDialog.vue";
+import { isTradieInsured } from "@/utils/insuranceStatus";
 import ApplicantCard from "@/components/jobPost/ApplicantCard.vue";
 import ApplicationThread from "@/components/jobPost/ApplicationThread.vue";
 import ApplicationThreadOverlay from "@/components/jobPost/ApplicationThreadOverlay.vue";
@@ -100,6 +101,14 @@ const submittingWithdraw = ref(false);
 // pad; acceptApplicationQuote fires from onSignedAcceptQuote.
 const showSignDialog = ref(false);
 const pendingApp = ref<WithId<ApplicationDoc> | null>(null);
+// The chosen applicant's liability-insurance status — drives the uninsured
+// disclosure + acknowledgment in the signature dialog. `applicantTradies`
+// carries the full tradie doc (with the public insurance mirror).
+const pendingAppUninsured = computed(() =>
+  pendingApp.value
+    ? !isTradieInsured(applicantTradies.value.get(pendingApp.value.tradespersonId))
+    : false,
+);
 
 // Quote composer state for the apply form + the tradie's stored hourly rate
 // (passed to the composer so hourly lines default to the profile rate).
@@ -420,7 +429,12 @@ async function onSignedAcceptQuote(signatureDataUrl: string) {
   if (!app || submittingAcceptQuote.value) return;
   submittingAcceptQuote.value = true;
   try {
-    const { jobId } = await acceptApplicationQuote(postId.value, app.id, signatureDataUrl);
+    const { jobId } = await acceptApplicationQuote(
+      postId.value,
+      app.id,
+      signatureDataUrl,
+      pendingAppUninsured.value,
+    );
     showSignDialog.value = false;
     pendingApp.value = null;
     router.push({ name: "JobDetail", params: { id: jobId } });
@@ -954,6 +968,8 @@ const visibleApplications = computed(() => {
       :quote-total="pendingApp?.quote?.total"
       :upfront-fee-cents="pendingApp?.quote?.upfrontFee?.amountCents"
       :busy="submittingAcceptQuote"
+      :uninsured="pendingAppUninsured"
+      :tradie-name="pendingApp ? applicantName(pendingApp) : ''"
       @confirm="onSignedAcceptQuote"
     />
 

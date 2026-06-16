@@ -145,12 +145,13 @@ export async function submitQuote(
 export async function clientAcceptQuote(
   jobId: string,
   signatureDataUrl: string,
+  acknowledgedUninsured = false,
 ): Promise<{ ok: true }> {
-  const fn = httpsCallable<{ jobId: string; signatureDataUrl: string }, { ok: true }>(
-    functions,
-    "clientAcceptQuote",
-  );
-  const res = await fn({ jobId, signatureDataUrl });
+  const fn = httpsCallable<
+    { jobId: string; signatureDataUrl: string; acknowledgedUninsured: boolean },
+    { ok: true }
+  >(functions, "clientAcceptQuote");
+  const res = await fn({ jobId, signatureDataUrl, acknowledgedUninsured });
   return res.data;
 }
 

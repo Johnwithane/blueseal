@@ -27,6 +27,7 @@ import type {
   Urgency,
 } from "@/firebase/interfaces";
 import { typedConverter } from "@/firebase/converters";
+import { UNINSURED_DISCLOSURE_VERSION } from "@/data/insuranceWaiver";
 
 const jobsCol = () => collection(db, "jobs").withConverter(typedConverter<JobDoc>());
 const jobRef = (id: string) => doc(db, "jobs", id).withConverter(typedConverter<JobDoc>());
@@ -49,6 +50,11 @@ export interface NewJobInput {
   address: Omit<JobAddress, "geo"> & { lat?: number; lng?: number };
   preferredDateWindow: { start: Date | null; end: Date | null };
   urgency: Urgency;
+  // Set when the client requested a tradesperson who has no current liability
+  // insurance and ticked the awareness disclosure. Stamps the ack time +
+  // disclosure version on the job (the binding signed acknowledgment comes later
+  // at quote acceptance).
+  acknowledgedUninsured?: boolean;
 }
 
 export async function createJob(input: NewJobInput, chatId: string): Promise<string> {
@@ -92,6 +98,12 @@ export async function createJob(input: NewJobInput, chatId: string): Promise<str
     cancelledBy: null,
     chatId,
     sourcePostId: null,
+    ...(input.acknowledgedUninsured
+      ? {
+          uninsuredAcknowledgedAtRequest: serverTimestamp(),
+          uninsuredDisclosureVersion: UNINSURED_DISCLOSURE_VERSION,
+        }
+      : {}),
   });
   return docRef.id;
 }
