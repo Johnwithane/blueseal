@@ -27,6 +27,9 @@ export {
 } from "./vetting/decisions";
 export { scheduledIdRetention } from "./vetting/scheduledIdRetention";
 
+// Insurance
+export { scheduledInsuranceExpiry } from "./insurance/scheduledInsuranceExpiry";
+
 // Reviews
 export { onReviewCreated } from "./reviews/onReviewCreated";
 export { onClientReviewCreated } from "./reviews/onClientReviewCreated";

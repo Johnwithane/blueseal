@@ -79,7 +79,10 @@ export type NotificationType =
   // Job-board referrals (sendJobReferral / submitApplication conversion hook).
   // Kept in sync with src/firebase/interfaces.ts.
   | "job_referred"
-  | "referral_applied";
+  | "referral_applied"
+  // Daily insurance renewal nudge — fires to a tradesperson 30 and 7 days
+  // before their verified insurance expires (scheduledInsuranceExpiry).
+  | "insurance_expiry_reminder";
 
 /**
  * Channel routing per notification.
@@ -214,6 +217,7 @@ const CTA_BY_TYPE: Record<string, string> = {
   job_change_requested: "Respond on Blue Seal",
   change_order_proposed: "Review the request",
   site_visit_proposed: "Respond on Blue Seal",
+  insurance_expiry_reminder: "Renew your insurance",
 };
 function ctaLabelForType(type: NotificationType): string {
   return CTA_BY_TYPE[type] ?? "Open Blue Seal";

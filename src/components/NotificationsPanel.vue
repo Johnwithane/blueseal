@@ -66,6 +66,7 @@ const ICON: Record<NotificationType, string> = {
   site_visit_declined: "pi pi-times-circle",
   job_referred: "pi pi-share-alt",
   referral_applied: "pi pi-send",
+  insurance_expiry_reminder: "pi pi-shield",
 };
 
 function iconFor(type: NotificationType): string {

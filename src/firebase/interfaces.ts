@@ -2191,7 +2191,10 @@ export type NotificationType =
   // `referral_applied` → referrer (their recipient applied to the post). Both
   // link to /jobs/posted/{postId}.
   | "job_referred"
-  | "referral_applied";
+  | "referral_applied"
+  // Daily insurance renewal nudge — fires to a tradesperson 30 and 7 days
+  // before their verified insurance expires (scheduledInsuranceExpiry).
+  | "insurance_expiry_reminder";
 
 export interface NotificationDoc {
   userId: string;
