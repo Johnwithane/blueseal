@@ -6,6 +6,26 @@ Tasks are grouped by the phase that introduced them so you can see why each one 
 
 ---
 
+## Insurance partner referral (added 2026-06-15)
+
+Blue Seal surfaces a "Get covered" insurance referral throughout the tradesperson experience (onboarding card, dashboard banner, the soft bid/quote reminder dialog) and sends automated renewal reminders before a verified policy lapses. The code is live; the partner CTA currently points at **Zensurance's public site as a placeholder** (`src/data/insurancePartner.ts`).
+
+### [ ] Sign up for the affiliate program and set the referral link
+
+- **Why:** Until the approved affiliate/referral URL is set, the "Get covered" CTAs point at the insurer's generic public site — clicks aren't attributed to Blue Seal, so no referral revenue is tracked.
+- **What:** Complete the affiliate/partner signup (Zensurance via Fintel Connect for the instant flat-referral option; Foxquilt or others via a direct partner deal for recurring economics). When the tracked link is issued, set it in:
+  1. `.env` as `VITE_INSURANCE_PARTNER_URL=...` (local builds).
+  2. GitHub → **Settings → Secrets and variables → Actions** → add `VITE_INSURANCE_PARTNER_URL` (deploy.yml / ci.yml already read the `VITE_*` build env). Then push to main / run the Deploy workflow so hosting rebuilds with it.
+  If you switch partners, also update `name` in `src/data/insurancePartner.ts`.
+- **Verify:** On a tradesperson account, the onboarding insurance card / dashboard banner / bid-without-insurance dialog "Get covered" button opens **your** referral link (not the generic site) in a new tab.
+
+### [ ] (Optional, partner-dependent) Real policy / renewal sync
+
+- **Why:** Renewal reminders currently fire off our **own** verified-insurance expiry date, not the insurer's records. A signed embedded/API partnership (e.g. Foxquilt or APOLLO) could feed real policy status + renewal dates back, so reminders reflect the actual policy and a pro can buy/renew without leaving the app.
+- **What:** Raise this in the partner conversation; if they expose a quote/policy API or webhook, we wire it then. No action until a partnership is signed.
+
+---
+
 ## Web push notifications (added 2026-06-10)
 
 Push notifications (FCM) ship **safe-by-default**: until the key below is set, the
