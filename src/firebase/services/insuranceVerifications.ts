@@ -1,5 +1,6 @@
 import { Timestamp, doc, getDoc, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
-import { db } from "@/firebase/config";
+import { httpsCallable } from "firebase/functions";
+import { db, functions } from "@/firebase/config";
 import type { InsuranceVerificationDoc, WithId } from "@/firebase/interfaces";
 import { typedConverter } from "@/firebase/converters";
 
@@ -14,9 +15,15 @@ export interface SubmitInsuranceInput {
   policyNumber: string;
   coverageAmount: number; // cents
   expiresAt: Date;
+  // The tradesperson's declaration: is Blue Seal named as an additional insured
+  // on this policy? When false, they must then sign the liability release
+  // (signInsuranceLiabilityRelease) before an admin will approve.
+  blueSealAdditionalInsured: boolean;
 }
 
 export async function submitInsurance(uid: string, input: SubmitInsuranceInput): Promise<void> {
+  // setDoc fully overwrites — a fresh submission deliberately clears any prior
+  // liabilityRelease / admin confirmation so review starts clean.
   await setDoc(insuranceRef(uid), {
     fileUrl: input.fileUrl,
     insurer: input.insurer.trim(),
@@ -28,7 +35,27 @@ export async function submitInsurance(uid: string, input: SubmitInsuranceInput):
     reviewedBy: null,
     reviewedAt: null,
     rejectionReason: null,
+    blueSealAdditionalInsured: input.blueSealAdditionalInsured,
+    liabilityRelease: null,
+    additionalInsuredConfirmedBy: null,
+    additionalInsuredConfirmedAt: null,
   });
+}
+
+/**
+ * Tradesperson signs the liability release when their own policy does NOT name
+ * Blue Seal as an additional insured. Server-written (signature stored
+ * server-side) — call after submitInsurance with blueSealAdditionalInsured:false.
+ */
+export async function signInsuranceLiabilityRelease(
+  signatureDataUrl: string,
+): Promise<{ ok: true }> {
+  const fn = httpsCallable<{ signatureDataUrl: string }, { ok: true }>(
+    functions,
+    "signInsuranceLiabilityRelease",
+  );
+  const res = await fn({ signatureDataUrl });
+  return res.data;
 }
 
 export async function getInsurance(
@@ -62,12 +89,24 @@ export async function updateInsurance(
   });
 }
 
-export async function approveInsurance(uid: string, adminUid: string): Promise<void> {
+export async function approveInsurance(
+  uid: string,
+  adminUid: string,
+  opts?: { additionalInsuredConfirmed?: boolean },
+): Promise<void> {
   await updateDoc(doc(db, "insuranceVerifications", uid), {
     status: "approved",
     reviewedBy: adminUid,
     reviewedAt: serverTimestamp(),
     rejectionReason: null,
+    // Stamp the admin's confirmation that the certificate names Blue Seal as an
+    // additional insured (only set when the tradesperson declared it does).
+    ...(opts?.additionalInsuredConfirmed
+      ? {
+          additionalInsuredConfirmedBy: adminUid,
+          additionalInsuredConfirmedAt: serverTimestamp(),
+        }
+      : {}),
   });
 }
 

@@ -648,6 +648,29 @@ export interface InsuranceVerificationDoc {
   reviewedBy: string | null;
   reviewedAt: Timestamp | null;
   rejectionReason: string | null;
+  // ---- Additional-insured protection for Blue Seal ----
+  // The tradesperson's declaration at submission: is Blue Seal named as an
+  // additional insured on this policy (so the policy actually covers Blue Seal)?
+  // Optional/undefined on docs that predate the field. When TRUE, an admin must
+  // confirm the certificate against this before approving (see
+  // additionalInsuredConfirmedAt). When FALSE, the tradesperson signs a
+  // liability release (see liabilityRelease) so Blue Seal is protected anyway.
+  blueSealAdditionalInsured?: boolean;
+  // Present when blueSealAdditionalInsured === false: the tradesperson's signed
+  // release in Blue Seal's favour. Written server-side by
+  // signInsuranceLiabilityRelease (admin SDK). Null/absent until signed (or when
+  // they declared Blue Seal IS named). The signature image is an immutable audit
+  // artifact at tradespeople/{uid}/signatures/insurance-liability-release.*.
+  liabilityRelease?: {
+    signedAt: Timestamp;
+    version: string;
+    signatureStoragePath: string;
+  } | null;
+  // Admin's confirmation (only when blueSealAdditionalInsured === true) that the
+  // uploaded certificate actually names Blue Seal as an additional insured.
+  // Stamped at approval. Rules pin these against owner writes — admin-only.
+  additionalInsuredConfirmedBy?: string | null;
+  additionalInsuredConfirmedAt?: Timestamp | null;
 }
 
 // ---------------------------------------------------------------------------

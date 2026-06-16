@@ -11,6 +11,15 @@ import { Timestamp } from "firebase-admin/firestore";
 export const UNINSURED_DISCLOSURE_VERSION = "1.0";
 
 /**
+ * Version of the liability-release copy a tradesperson signs when they upload
+ * their OWN policy that does NOT name Blue Seal as an additional insured.
+ * Stamped onto insuranceVerifications/{uid}.liabilityRelease. MUST stay in sync
+ * with src/data/insuranceWaiver.ts (INSURANCE_RELEASE_VERSION). Bump on any
+ * material wording change.
+ */
+export const INSURANCE_RELEASE_VERSION = "1.0";
+
+/**
  * PUBLIC liability-insurance mirror fields, as carried on tradespeople/{uid}.
  * Set by the onInsuranceApproved trigger; never written by the owner.
  */
