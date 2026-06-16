@@ -196,6 +196,64 @@ function absoluteUrl(link: string | null | undefined): string | null {
   return `${base}${link.startsWith("/") ? "" : "/"}${link}`;
 }
 
+// Job-detail notifications whose natural next action lives on the Invoice tab
+// (the bell ringing implies "act on this now"). MUST stay in sync with
+// src/utils/notifications.ts → INVOICE_TAB_TYPES.
+const INVOICE_TAB_TYPES = new Set<NotificationType>([
+  "invoice_sent",
+  "invoice_paid",
+  "invoice_payment_failed",
+  "invoice_refunded",
+  "dispute_opened",
+  "review_received",
+  "review_requested",
+  "review_reminder",
+  "review_revealed",
+]);
+
+// Mutual-review notifications also pop the review modal via ?review=1
+// (JobDetailView watches for it). MUST stay in sync with
+// src/utils/notifications.ts → REVIEW_MODAL_TYPES.
+const REVIEW_MODAL_TYPES = new Set<NotificationType>([
+  "review_received",
+  "review_requested",
+  "review_reminder",
+  "review_revealed",
+]);
+
+/**
+ * Server-side mirror of src/utils/notifications.ts → resolveNotificationLink.
+ *
+ * The in-app bell augments the stored link by type when it's clicked (the
+ * Pinia store calls resolveNotificationLink before router.push), so a chat
+ * notification opens the chat overlay, an invoice one lands on the Invoice
+ * tab, a review one pops the review modal, etc. The email + web-push channels
+ * have no such click hook — they navigate to the raw URL — so without this
+ * they'd dump the user on the bare job page (wrong tab, no chat/review
+ * surface). Apply the same resolution here so every channel routes alike.
+ *
+ * Kept as a deliberate copy (not an import) because of the functions/ ↔ src/
+ * package boundary — same reason NotificationType is duplicated above. Keep
+ * the two in lockstep; the client copy carries extra legacy-data repairs
+ * (/jobs/pending) that only apply to old in-app rows, not freshly-sent mail.
+ */
+function augmentNotificationLink(type: NotificationType, link: string | null): string | null {
+  if (!link) return null;
+  // A rejected applicant loses read access to the job post, so the stored
+  // /jobs/posted/:postId link would permission-deny. Send them to their own
+  // applications list (which surfaces the "client chose another" message).
+  if (type === "application_rejected") return "/my-applications";
+  const isJobDetail = link.startsWith("/jobs/") && !link.startsWith("/jobs/posted/");
+  if (!isJobDetail) return link;
+  const [pathname, existingQs = ""] = link.split("?", 2);
+  const qs = new URLSearchParams(existingQs);
+  if (type === "message_received") qs.set("chat", "open");
+  else if (INVOICE_TAB_TYPES.has(type)) qs.set("tab", "invoice");
+  if (REVIEW_MODAL_TYPES.has(type)) qs.set("review", "1");
+  const query = qs.toString();
+  return query ? `${pathname}?${query}` : pathname;
+}
+
 // Per-notification CTA verb for the email button — clearer than a blanket
 // "Open Blue Seal". Keyed by string so it never has to stay exhaustive over
 // the NotificationType union; anything unmapped falls back to the generic.
@@ -279,7 +337,11 @@ export async function notify(input: NotifyInput): Promise<void> {
   if (priority === "low") return;
 
   const contact = await getUserContact(input.userId);
-  const url = absoluteUrl(link);
+  // The in-app row stores the raw `link`; the email + web-push URL gets the
+  // same type-based resolution the in-app bell applies on click, so all
+  // channels deep-link to the same surface (chat overlay, Invoice tab,
+  // review modal) instead of the bare job page.
+  const url = absoluteUrl(augmentNotificationLink(input.type, link));
   const cta = url ? `\n\nOpen Blue Seal: ${url}` : "";
 
   // Web push on normal + high, to every device the user opted in

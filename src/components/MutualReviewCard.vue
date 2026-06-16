@@ -141,22 +141,27 @@ const canStillSubmit = computed(
 );
 
 // Banner-click / notification deep-link auto-open. Signal value
-// represents a "user requested the modal" event; we open exactly once
-// per value, gated on pair load + actually being able to submit.
+// represents a "user requested the reviews" event; we open exactly once
+// per value, once the pair has loaded. Which surface opens depends on
+// state: the "leave a review" dialog if the user can still submit,
+// otherwise the read-only reviews popup once they're revealed (this is
+// what review_revealed notifications deep-link into). Other states
+// (waiting on the counterparty, locked out with nothing to read) just
+// consume the signal so a later state change doesn't replay a stale open.
 const lastHandledSignal = ref<number | undefined>(undefined);
 watch(
-  [() => props.autoOpenSignal, pairLoaded, canStillSubmit],
+  [() => props.autoOpenSignal, pairLoaded, canStillSubmit, isRevealed],
   () => {
     const sig = props.autoOpenSignal;
     if (sig === undefined || sig === 0) return;
     if (sig === lastHandledSignal.value) return;
     if (!pairLoaded.value) return;
-    if (!canStillSubmit.value) {
-      lastHandledSignal.value = sig;
-      return;
-    }
     lastHandledSignal.value = sig;
-    dialogOpen.value = true;
+    if (canStillSubmit.value) {
+      dialogOpen.value = true;
+    } else if (isRevealed.value) {
+      reviewsDialogOpen.value = true;
+    }
   },
   { immediate: true },
 );
