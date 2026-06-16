@@ -51,6 +51,7 @@ export { onJobCreated } from "./jobs/onJobCreated";
 export { onJobCancelled } from "./jobs/onJobCancelled";
 export { onJobUpdated } from "./jobs/onJobUpdated";
 export { clockIn } from "./jobs/clockIn";
+export { signUninsuredWaiver } from "./jobs/signUninsuredWaiver";
 export { clockOut } from "./jobs/clockOut";
 export { addManualTimeEntry } from "./jobs/addManualTimeEntry";
 export { submitJobForApproval } from "./jobs/submitJobForApproval";

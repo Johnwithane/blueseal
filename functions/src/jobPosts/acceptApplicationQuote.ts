@@ -10,6 +10,7 @@ import { postSystemMessage } from "../lib/chatSystemMessage";
 import { notify } from "../lib/notify";
 import { resolveBillingType, type QuoteLineKindLike } from "../lib/billing";
 import { SignatureDataUrl, writeQuoteSignature } from "../lib/signature";
+import { isTradieInsured, UNINSURED_DISCLOSURE_VERSION } from "../lib/insurance";
 import { copyApplicationThreadToChat } from "./applicationThread";
 
 const Input = z.object({
@@ -18,6 +19,10 @@ const Input = z.object({
   // Required: the client signs the quote to accept it. The capture UI is live,
   // so every accept sends one.
   signatureDataUrl: SignatureDataUrl,
+  // True when the client has ticked the uninsured-work disclosure. Only needed
+  // when the chosen tradesperson has no current liability insurance; the server
+  // re-checks insurance, so this is never trusted on its own.
+  acknowledgedUninsured: z.boolean().optional(),
 });
 
 interface PostDoc {
@@ -67,6 +72,8 @@ interface TradespersonData {
   companyName?: string | null;
   nextQuoteNumber?: number;
   quotePrefix?: string;
+  insuranceVerified?: boolean | null;
+  insuranceExpiresAt?: Timestamp | null;
 }
 
 interface UserDoc {
@@ -90,6 +97,7 @@ export const acceptApplicationQuote = onCall(CALLABLE_OPTS, async (req) => {
   const parsed = Input.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);
   const { postId, applicationId, signatureDataUrl } = parsed.data;
+  const acknowledgedUninsured = parsed.data.acknowledgedUninsured === true;
   const ctx = { fn: "acceptApplicationQuote", uid, postId, applicationId };
 
   const postRef = db.doc(`jobPosts/${postId}`);
@@ -164,6 +172,16 @@ export const acceptApplicationQuote = onCall(CALLABLE_OPTS, async (req) => {
         throw new HttpsError(
           "failed-precondition",
           "This tradesperson is no longer available. Their account was suspended or de-listed.",
+        );
+      }
+      // Uninsured-work gate: if the chosen tradesperson has no current liability
+      // insurance, the client must have ticked the disclosure. The acceptance
+      // signature doubles as their recorded acknowledgment (written below).
+      const uninsured = !isTradieInsured(tradie);
+      if (uninsured && !acknowledgedUninsured) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Please acknowledge that this tradesperson isn't currently insured before accepting.",
         );
       }
       const clientUser = clientUserSnap.data() as UserDoc | undefined;
@@ -274,6 +292,26 @@ export const acceptApplicationQuote = onCall(CALLABLE_OPTS, async (req) => {
         clientSignatureStoragePath: signaturePath,
         upfrontFee: upfront,
       });
+
+      // Record the client's uninsured-work acknowledgment. jobRef.id is freshly
+      // allocated so the waiver doc can't pre-exist — a plain set is safe.
+      if (uninsured) {
+        tx.set(db.doc(`insuranceWaivers/${jobRef.id}`), {
+          jobId: jobRef.id,
+          clientId: uid,
+          tradespersonId: app.tradespersonId,
+          disclosureVersion: UNINSURED_DISCLOSURE_VERSION,
+          reason: "no_liability_insurance",
+          client: {
+            acknowledgedAt: FieldValue.serverTimestamp(),
+            byUid: uid,
+            signatureStoragePath: signaturePath,
+          },
+          tradesperson: null,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      }
 
       tx.update(db.doc(`tradespeople/${app.tradespersonId}`), { nextQuoteNumber: seq + 1 });
       tx.update(appRef, { status: "selected", updatedAt: FieldValue.serverTimestamp() });

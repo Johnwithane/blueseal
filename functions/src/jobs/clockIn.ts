@@ -6,6 +6,7 @@ import { z } from "zod";
 import { db } from "../lib/admin";
 import { requireRole } from "../lib/auth";
 import { postSystemMessage } from "../lib/chatSystemMessage";
+import { isTradieInsured } from "../lib/insurance";
 
 const Input = z.object({
   jobId: z.string().min(1).max(128),
@@ -58,6 +59,7 @@ export const clockIn = onCall(CALLABLE_OPTS, async (req) => {
 
   const jobRef = db.doc(`jobs/${jobId}`);
   const tradieRef = db.doc(`tradespeople/${uid}`);
+  const waiverRef = db.doc(`insuranceWaivers/${jobId}`);
   const extraRef = extraId ? jobRef.collection("extras").doc(extraId) : null;
   // Tradie's open sessions across ALL jobs — drives the "already here" guard and
   // the auto-stop-elsewhere behaviour. Needs the COLLECTION_GROUP index on
@@ -69,11 +71,12 @@ export const clockIn = onCall(CALLABLE_OPTS, async (req) => {
 
   const out = await db.runTransaction(async (tx) => {
     // ----- all reads first (Firestore txn rule) -----
-    const [jobSnap, tradieSnap, openSnap, extraSnap] = await Promise.all([
+    const [jobSnap, tradieSnap, openSnap, extraSnap, waiverSnap] = await Promise.all([
       tx.get(jobRef),
       tx.get(tradieRef),
       tx.get(openAcrossJobs),
       extraRef ? tx.get(extraRef) : Promise.resolve(null),
+      tx.get(waiverRef),
     ]);
 
     if (!jobSnap.exists) throw new HttpsError("not-found", "Job not found.");
@@ -94,6 +97,26 @@ export const clockIn = onCall(CALLABLE_OPTS, async (req) => {
     }
     if (!job.clientId) {
       throw new HttpsError("failed-precondition", "Job is missing a client.");
+    }
+
+    // Uninsured-work gate: a tradesperson with no current liability insurance
+    // must sign the per-job waiver (signUninsuredWaiver) before any work is
+    // logged. The UI surfaces the waiver dialog ahead of this; this is the
+    // server backstop so the gate can't be skipped by calling clockIn directly.
+    const tradieInsurance = tradieSnap.exists
+      ? (tradieSnap.data() as {
+          insuranceVerified?: boolean | null;
+          insuranceExpiresAt?: Timestamp | null;
+        })
+      : null;
+    if (!isTradieInsured(tradieInsurance)) {
+      const waiver = waiverSnap.exists ? (waiverSnap.data() as { tradesperson?: unknown }) : null;
+      if (!waiver?.tradesperson) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Sign the uninsured-work waiver before you start this job.",
+        );
+      }
     }
 
     // Partition open sessions: one on THIS job blocks; ones elsewhere get closed.

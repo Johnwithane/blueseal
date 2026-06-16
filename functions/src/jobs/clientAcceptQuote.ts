@@ -9,12 +9,21 @@ import { postSystemMessage } from "../lib/chatSystemMessage";
 import { notify } from "../lib/notify";
 import { resolveBillingType, type QuoteLineKindLike } from "../lib/billing";
 import { SignatureDataUrl, writeQuoteSignature } from "../lib/signature";
+import {
+  isTradieInsured,
+  UNINSURED_DISCLOSURE_VERSION,
+  type InsuranceStatusFields,
+} from "../lib/insurance";
 
 const Input = z.object({
   jobId: z.string().min(1).max(128),
   // Required: the client signs the quote to accept it (the signature IS the
   // acceptance). The capture UI is live, so every accept sends one.
   signatureDataUrl: SignatureDataUrl,
+  // True when the client has ticked the uninsured-work disclosure. Only needed
+  // when the assigned tradesperson has no current liability insurance; the
+  // server re-checks insurance, so this is never trusted on its own.
+  acknowledgedUninsured: z.boolean().optional(),
 });
 
 interface JobData {
@@ -58,9 +67,11 @@ export const clientAcceptQuote = onCall(CALLABLE_OPTS, async (req) => {
   const parsed = Input.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);
   const { jobId, signatureDataUrl } = parsed.data;
+  const acknowledgedUninsured = parsed.data.acknowledgedUninsured === true;
 
   const jobRef = db.doc(`jobs/${jobId}`);
   const quoteRef = db.doc(`quotes/${jobId}`);
+  const waiverRef = db.doc(`insuranceWaivers/${jobId}`);
 
   // Record the signature BEFORE the transaction. If the upload fails we abort
   // (never accept with a signature that didn't land); the inverse order risks
@@ -104,6 +115,24 @@ export const clientAcceptQuote = onCall(CALLABLE_OPTS, async (req) => {
       throw new HttpsError("failed-precondition", "Quote has zero total.");
     }
 
+    // Uninsured-work gate. Re-check the tradesperson's liability insurance from
+    // the public mirror; if they're not currently insured, the client must have
+    // ticked the disclosure. The acceptance signature doubles as the client's
+    // recorded acknowledgment, kept in insuranceWaivers/{jobId}.
+    const [tradieSnap, waiverSnap] = await Promise.all([
+      tx.get(db.doc(`tradespeople/${job.tradespersonId}`)),
+      tx.get(waiverRef),
+    ]);
+    const uninsured = !isTradieInsured(
+      tradieSnap.data() as InsuranceStatusFields | undefined,
+    );
+    if (uninsured && !acknowledgedUninsured) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Please acknowledge that this tradesperson isn't currently insured before accepting.",
+      );
+    }
+
     const upfront = quote.upfrontFee ?? null;
     const requiresUpfrontPayment = upfront != null && upfront.amountCents > 0;
 
@@ -136,6 +165,36 @@ export const clientAcceptQuote = onCall(CALLABLE_OPTS, async (req) => {
       clientSignatureStoragePath: signaturePath,
       declinedReason: null,
     });
+
+    // Record the client's uninsured-work acknowledgment. Create-or-merge so a
+    // tradesperson waiver already on file (rare — they sign at clock-in, which
+    // is after this) is never clobbered.
+    if (uninsured) {
+      const base = waiverSnap.exists
+        ? {}
+        : {
+            jobId,
+            clientId: uid,
+            tradespersonId: job.tradespersonId,
+            disclosureVersion: UNINSURED_DISCLOSURE_VERSION,
+            reason: "no_liability_insurance",
+            tradesperson: null,
+            createdAt: FieldValue.serverTimestamp(),
+          };
+      tx.set(
+        waiverRef,
+        {
+          ...base,
+          client: {
+            acknowledgedAt: FieldValue.serverTimestamp(),
+            byUid: uid,
+            signatureStoragePath: signaturePath,
+          },
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+    }
     return {
       tradespersonId: job.tradespersonId,
       chatId: job.chatId,

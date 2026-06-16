@@ -538,6 +538,16 @@ service cloud.firestore {
         && (isAdmin()
             || request.resource.data.get('recurringPlanId', null)
                 == resource.data.get('recurringPlanId', null))
+        // Uninsured-at-request acknowledgment is written once by the client at
+        // create and frozen thereafter — a party must not be able to add, clear,
+        // or backdate it after the fact. `.get(field, null)` defaults so legacy
+        // jobs (no field) aren't locked out.
+        && (isAdmin()
+            || request.resource.data.get('uninsuredAcknowledgedAtRequest', null)
+                == resource.data.get('uninsuredAcknowledgedAtRequest', null))
+        && (isAdmin()
+            || request.resource.data.get('uninsuredDisclosureVersion', null)
+                == resource.data.get('uninsuredDisclosureVersion', null))
         // Direct (non-admin) status writes are limited to the two pre-commitment
         // client paths: marketplace intake advance (accepted→requested) and the
         // instant pre-commitment cancel (cancelJob, only from accepted/requested/
@@ -1120,6 +1130,27 @@ service cloud.firestore {
         && request.resource.data.total == resource.data.total;
       allow update: if isAdmin();
       allow delete: if isAdmin();
+    }
+
+    // ---------- insuranceWaivers/{jobId} ----------
+    // The signed record that a job is going ahead with an UNINSURED
+    // tradesperson. Keyed by jobId. Written ONLY server-side via the admin SDK
+    // (clientAcceptQuote / acceptApplicationQuote record the client's part;
+    // signUninsuredWaiver records the tradesperson's) — never by clients, so it
+    // can't be forged or cleared. Both job parties + admin may read it back to
+    // see the acknowledgment on the job page.
+    match /insuranceWaivers/{jobId} {
+      // resource == null short-circuit (same pattern as quotes/invoices): the
+      // doc is keyed by jobId and a party probes insuranceWaivers/{jobId},
+      // treating missing as "no waiver". Without the guard the evaluator throws
+      // on resource.data.X and Firestore masks it as permission-denied.
+      allow read: if isSignedIn() && (
+        resource == null
+        || resource.data.clientId == uid()
+        || resource.data.tradespersonId == uid()
+        || isAdmin()
+      );
+      allow create, update, delete: if false;
     }
 
     // ---------- invoices ----------

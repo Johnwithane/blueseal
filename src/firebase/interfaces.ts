@@ -968,6 +968,17 @@ export interface JobDoc {
   // "plan" is jobs/{recurringPlanId} + its recurring template invoice. Null on
   // every non-recurring job.
   recurringPlanId?: string | null;
+  // ---- Uninsured-tradesperson awareness (direct-request flow) ----
+  // Set by the client at request time (RequestQuoteView → createJob) when the
+  // tradesperson they're requesting has no current liability insurance: the
+  // client ticked the "I understand they're not insured" box. The binding,
+  // signed acknowledgment is captured later at quote acceptance (see
+  // insuranceWaivers/{jobId}); this is the earlier awareness checkpoint. Stamps
+  // the disclosure version they saw. Absent when the tradesperson was insured at
+  // request time, and on jobs created before this feature. Server-managed after
+  // create: the rules pin it immutable against later party writes.
+  uninsuredAcknowledgedAtRequest?: Timestamp | null;
+  uninsuredDisclosureVersion?: string | null;
 }
 
 // Tradesperson-private job log, stored at jobs/{jobId}/private/notes so it is
@@ -1835,6 +1846,49 @@ export interface QuoteDoc {
   // joined"). Server-stamped by recordOfflineQuoteAcceptance.
   acceptedOffline?: boolean;
   acceptedRecordedBy?: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// insuranceWaivers/{jobId}
+//
+// The legal record that work on a job is going ahead with an UNINSURED
+// tradesperson (no current liability insurance verified with Blue Seal). One
+// doc per job, written ONLY server-side via the admin SDK (accept callables +
+// signUninsuredWaiver) — clients never write here; rules pin write:false. Read
+// is restricted to the two job parties + admin.
+//
+// Two independently-captured signed parts, keyed to the moment each side
+// commits:
+//   • client       — captured at quote acceptance (the same drawn signature
+//                     that accepts the quote doubles as the acknowledgment).
+//   • tradesperson — captured BEFORE work starts (the clock-in waiver gate).
+// Either can be null until that party has signed.
+// ---------------------------------------------------------------------------
+export interface InsuranceWaiverParty {
+  // The signed instant.
+  acknowledgedAt: Timestamp;
+  // uid of the signer (client uid / tradesperson uid).
+  byUid: string;
+  // Storage path of the drawn signature image (jobs/{jobId}/signatures/...).
+  signatureStoragePath: string;
+}
+
+export interface InsuranceWaiverDoc {
+  jobId: string;
+  clientId: string | null;
+  tradespersonId: string;
+  // Version of the disclosure + waiver copy in force when this was captured —
+  // mirrors UNINSURED_DISCLOSURE_VERSION (functions/src/lib/insurance.ts +
+  // src/data/insuranceWaiver.ts) so a signature ties to exact wording.
+  disclosureVersion: string;
+  // Why the waiver exists. Liability-only at launch (WSIB is out of scope).
+  reason: "no_liability_insurance";
+  // Client's signed acknowledgment, captured at quote acceptance. Null until then.
+  client: InsuranceWaiverParty | null;
+  // Tradesperson's signed waiver, captured before work starts. Null until then.
+  tradesperson: InsuranceWaiverParty | null;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
 }
 
 // ---------------------------------------------------------------------------
