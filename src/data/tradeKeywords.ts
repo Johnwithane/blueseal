@@ -123,7 +123,11 @@ export const TRADE_KEYWORDS: Record<string, string[]> = {
     "caulk", "caulking", "door knob", "doorknob", "fix drawer", "drawer",
     "replace handle", "weatherstrip", "around the house", "honey do",
     "to do list", "punch list", "fix it", "squeaky door", "sticky door",
-    "sticking door",
+    "sticking door", "handy man", "general handyman", "jack of all trades",
+    "small projects", "quick fix", "minor fix", "fix things", "fix stuff",
+    "fix things around the house", "bunch of small jobs", "list of jobs",
+    "list of repairs", "baby proofing", "child proofing", "hang mirror",
+    "mount shelf", "install shelves", "wall anchors", "wall mount",
   ],
   appliance_repair: [
     "appliance", "appliances", "appliance install", "dishwasher",
@@ -182,7 +186,15 @@ export const TRADE_KEYWORDS: Record<string, string[]> = {
     "yellow jacket", "bed bug", "bedbug", "raccoon", "squirrel", "wildlife",
     "spider", "flea", "silverfish", "mole", "skunk", "fruit fly", "moth",
     "beetle", "centipede", "earwig", "mosquito", "tick", "bats", "bat removal",
-    "groundhog", "critter", "pigeon",
+    "groundhog", "critter", "critters", "pigeon",
+    // Generic "animal" phrasing — clients often describe the symptom by the
+    // category ("there's an animal in my attic") rather than the species.
+    "animal", "animals", "wild animal", "wildlife removal", "animal removal",
+    "animal control", "nuisance wildlife", "vermin", "varmint", "possum",
+    "opossum", "racoon", "chipmunk", "gopher", "vole", "nest", "bird nest",
+    "birds nest", "droppings", "scratching in the wall",
+    "scratching in the walls", "scratching in the attic", "noise in the attic",
+    "noises in the attic", "something in the attic", "something in the walls",
   ],
   cleaning: [
     "cleaning", "cleaner", "cleaning service", "need a cleaner", "housekeeping",
@@ -767,6 +779,34 @@ export const SYMPTOM_CLUSTERS: Record<string, string[]> = {
   television: ["av_installer", "handyman", "electrician"],
 };
 
+// ---------------------------------------------------------------------------
+// Generalist "companions" — the two trades that handle a LITTLE of everything.
+//
+// A handyman covers small residential repairs and finishing; a general
+// contractor covers bigger or multi-trade work. For a huge range of home jobs
+// they're a sensible SECOND option even when the client's words point at one
+// specific trade ("paint the hallway" → painter, but a handyman could too).
+// suggestTrades appends them AFTER the specific match (never outranking it) and
+// BEFORE the broad clusters, keyed on the SPECIFIC trade that matched.
+//
+// Keyed by allow-list ON PURPOSE: only home repair/finishing/renovation trades
+// appear here. Licensed or specialised work (plumber, electrician, gas, HVAC,
+// roofing, locksmith…) and everything non-residential (automotive, industrial,
+// food/personal) are intentionally absent — a generalist is not a substitute
+// for permitted or specialised work, and we never want to imply otherwise.
+// ---------------------------------------------------------------------------
+export const HANDYMAN_COMPANION_TRADES = new Set<string>([
+  "carpenter", "painter", "drywall", "tiling", "flooring", "fencing",
+  "deck_builder", "cabinetry", "countertop", "wallpaper", "window_treatments",
+  "gutters", "siding", "garage_door", "window_installer",
+]);
+export const GC_COMPANION_TRADES = new Set<string>([
+  "carpenter", "drywall", "tiling", "flooring", "framer", "concrete",
+  "foundation", "mason", "demolition", "excavation", "siding",
+  "window_installer", "insulation", "waterproofing", "cabinetry",
+  "countertop", "deck_builder", "stucco",
+]);
+
 export interface TradeSuggestion extends TradeOption {
   /** Keywords from the query that drove this suggestion — for the "why" hint. */
   matched: string[];
@@ -925,6 +965,22 @@ export function suggestTrades(query: string, max = 4): TradeSuggestion[] {
     rank(scored);
   }
 
+  // Generalist companions: when the client's words land on a SPECIFIC home
+  // trade, also offer the handyman (small jobs) and/or general contractor
+  // (bigger, multi-trade work) that could take it on. Eligibility is decided
+  // HERE — from the specific matches only, never from cluster fillers below —
+  // so "leak" (plumber, licensed) never pulls in a generalist, and "draft"
+  // (a symptom-only expansion) doesn't either. The actual append happens AFTER
+  // the clusters, so the genuinely-relevant room/symptom trades take the slots
+  // first and the generalist only fills what's left over.
+  const specificKeys = new Set(scored.map((s) => s.key));
+  const wantHandyman =
+    !specificKeys.has("handyman") &&
+    [...specificKeys].some((k) => HANDYMAN_COMPANION_TRADES.has(k));
+  const wantGc =
+    !specificKeys.has("general_contractor") &&
+    [...specificKeys].some((k) => GC_COMPANION_TRADES.has(k));
+
   // Cluster expansions, both ADDITIVE (appended after the keyword matches above,
   // most-relevant first, skipping anything already surfaced — so they widen the
   // net without ever reordering a specific hit):
@@ -951,6 +1007,22 @@ export function suggestTrades(query: string, max = 4): TradeSuggestion[] {
   };
   appendCluster(SYMPTOM_CLUSTERS); // symptoms first — closer to the actual problem
   appendCluster(PROJECT_AREAS); // then the room spread
+
+  // Finally, the generalist companions (eligibility decided above, before the
+  // clusters). They fill only the slots the specific + cluster trades didn't —
+  // so a rich job (a whole room) keeps its real trades, while a simple one
+  // ("repaint the hallway") still surfaces a handyman as a sensible alternative.
+  const companions: Array<{ key: string; why: string }> = [];
+  if (wantHandyman) companions.push({ key: "handyman", why: "small jobs" });
+  if (wantGc) companions.push({ key: "general_contractor", why: "larger projects" });
+  for (const { key, why } of companions) {
+    if (scored.length >= max) break;
+    if (present.has(key)) continue;
+    const trade = TRADE_BY_KEY.get(key);
+    if (!trade) continue;
+    present.add(key);
+    scored.push({ ...trade, matched: [why], score: 0 });
+  }
 
   return scored.slice(0, max);
 }

@@ -256,6 +256,40 @@ describe("suggestTrades", () => {
     expect(suggestTrades("television").map((s) => s.key)).toContain("av_installer");
     expect(suggestTrades("mount my tv on the wall").map((s) => s.key)).toContain("av_installer");
   });
+
+  it("maps generic 'animal' / wildlife phrasing to pest control", () => {
+    expect(topKey("there's an animal in my attic")).toBe("pest_control");
+    expect(topKey("wild animal in the backyard")).toBe("pest_control");
+    expect(topKey("scratching in the walls at night")).toBe("pest_control");
+    expect(suggestTrades("something in the attic").map((s) => s.key)).toContain("pest_control");
+  });
+
+  it("offers a handyman alongside a small residential trade (never ahead of it)", () => {
+    const paint = suggestTrades("repaint the hallway");
+    expect(paint[0]?.key).toBe("painter"); // specific match still leads
+    expect(paint.map((s) => s.key)).toContain("handyman");
+    expect(paint.map((s) => s.key)).not.toContain("general_contractor"); // painting isn't a GC job
+  });
+
+  it("offers a general contractor alongside a structural/multi-trade trade", () => {
+    const concrete = suggestTrades("pour a concrete slab");
+    expect(concrete[0]?.key).toBe("concrete");
+    expect(concrete.map((s) => s.key)).toContain("general_contractor");
+    expect(concrete.map((s) => s.key)).not.toContain("handyman"); // concrete isn't a handyman job
+  });
+
+  it("never offers a generalist for licensed / specialised trades", () => {
+    // A generalist must never read as a substitute for permitted work.
+    const outlet = suggestTrades("my outlet is dead").map((s) => s.key);
+    expect(outlet).toContain("electrician");
+    expect(outlet).not.toContain("handyman");
+    expect(outlet).not.toContain("general_contractor");
+
+    const tap = suggestTrades("fix the leaky faucet").map((s) => s.key);
+    expect(tap).toContain("plumber");
+    expect(tap).not.toContain("handyman");
+    expect(tap).not.toContain("general_contractor");
+  });
 });
 
 describe("SYMPTOM_CLUSTERS integrity", () => {
