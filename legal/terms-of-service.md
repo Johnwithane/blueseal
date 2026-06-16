@@ -1,7 +1,7 @@
 # Blue Seal — Terms of Service
 
 **Effective date:** 2026-05-21
-**Last updated:** 2026-06-15
+**Last updated:** 2026-06-16
 
 These Terms of Service ("**Terms**") are a binding agreement between you and **Blue Seal**, a sole proprietorship operated by **[OPERATOR LEGAL NAME]** in British Columbia, Canada ("**Blue Seal**", "**we**", "**us**", "**our**"). They govern your access to and use of the Blue Seal progressive web application, websites under https://blueseal.app, and related services (together, the "**Service**").
 
@@ -130,6 +130,15 @@ Beyond our verification, Clients should request **current** proof of insurance a
 **You are responsible for satisfying yourself that any Tradesperson you hire is qualified, licensed, and insured for the specific work you need, and you assume all risk arising from a decision to engage a Tradesperson who is not insured, under-insured, or unable to satisfy a judgment for that work — including where the Tradesperson has not uploaded proof of insurance to the Service, where the uploaded proof has expired, been withdrawn, or been rejected, or where the underlying policy or clearance has lapsed, been cancelled, or otherwise ceased to apply since it was reviewed.**
 
 **Blue Seal does not require Tradespeople to carry liability insurance, workers'-compensation coverage, business licences, or any other permits as a condition of using the Service. To the maximum extent permitted by law, Blue Seal is not liable for any injury, death, property damage, economic loss, or other harm caused or contributed to by a Tradesperson's lack of, inadequate, lapsed, cancelled, or otherwise inapplicable insurance, workers'-compensation coverage, licences, or permits — including where Blue Seal has reviewed a related document or displayed a trust badge.**
+
+### 4.3 Acknowledging and proceeding with an uninsured Tradesperson
+
+Where a Tradesperson has not provided Blue Seal with current verified liability insurance, the Service makes that status visible and asks the parties to acknowledge it before work proceeds:
+
+- **Client acknowledgment.** When a Client requests, or accepts a quote from, a Tradesperson who has no current verified liability insurance, the Service records the Client's acknowledgment that they were told the Tradesperson is not insured through Blue Seal and that they accept the risk of proceeding. A quote is accepted by drawing a signature; that signature, together with the acknowledgment, is the Client's informed, recorded agreement to go ahead.
+- **Tradesperson waiver.** Before starting work on a job for which they have no current verified liability insurance, a Tradesperson must sign an in-Service waiver confirming that they are choosing to work uninsured, that they accept sole responsibility and liability for the work, and that they release the Blue Seal Parties from any claim arising from their lack of insurance.
+
+These recorded acknowledgments and waivers form part of the agreement between the Client and the Tradesperson and between each of them and Blue Seal, and are kept as a record of the parties' informed consent. **They do not create, and must not be relied on as, insurance, a guarantee, or any assumption of liability by Blue Seal.** Nothing in this section limits §§ 4.1, 4.2, 14, 15 or 16, or any non-waivable right a Client has under applicable consumer-protection law. A Tradesperson's decision to work without insurance, and a Client's decision to engage a Tradesperson who is not insured, remain entirely their own.
 
 ---
 

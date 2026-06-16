@@ -6,6 +6,21 @@ Tasks are grouped by the phase that introduced them so you can see why each one 
 
 ---
 
+## Uninsured-work waiver — legal review (added 2026-06-16)
+
+When a tradesperson has no current verified liability insurance, Blue Seal now records explicit acknowledgments before work proceeds: the **client** signs off (at request time and again on the quote-acceptance signature) that they were told the tradesperson is uninsured, and the **tradesperson** signs an in-app waiver before they can clock in (accepting sole liability + releasing Blue Seal). The signed records live in `insuranceWaivers/{jobId}`; the supporting contract language is in **Terms of Service § 4.3** (and §§ 4.2, 14, 15, 16). The code is live.
+
+### [ ] Have a lawyer review the waiver + disclosure wording
+
+- **Why:** This is the legal shield protecting Blue Seal, clients, and tradespeople when work goes ahead uninsured. The copy was written by Claude, not a lawyer — it needs a real review to be relied on, especially the liability release and the "no assumption of liability by Blue Seal" framing.
+- **What to review:**
+  - ToS § 4.3 "Acknowledging and proceeding with an uninsured Tradesperson" — `legal/terms-of-service.md`.
+  - The client disclosure + checkbox copy and the tradesperson waiver copy — `src/data/insuranceWaiver.ts` (`UNINSURED_DISCLOSURE_VERSION`, `clientUninsuredBody`, `TRADIE_WAIVER_POINTS`, etc.).
+- **If wording changes materially:** bump `UNINSURED_DISCLOSURE_VERSION` in **both** `src/data/insuranceWaiver.ts` and `functions/src/lib/insurance.ts` (they must match) so new signatures stamp the new version, then redeploy functions.
+- **Also outstanding (pre-existing):** the `[OPERATOR LEGAL NAME]` placeholder in the ToS (§§ intro, 21) still needs the registered operating name before publishing.
+
+---
+
 ## Insurance partner referral (added 2026-06-15)
 
 Blue Seal surfaces a "Get covered" insurance referral throughout the tradesperson experience (onboarding card, dashboard banner, the soft bid/quote reminder dialog) and sends automated renewal reminders before a verified policy lapses. The code is live; the partner CTA currently points at **Zensurance's public site as a placeholder** (`src/data/insurancePartner.ts`).

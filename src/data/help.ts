@@ -263,6 +263,8 @@ If something needs another look, we'll let you know what to re-upload — you wo
 
 **Before you bid.** If you go to apply for a job or send a quote and we don't have current proof of insurance on file, you'll see a quick reminder. It's only a nudge — you can get covered or continue without it.
 
+**Before you start work.** If you're not insured when it's time to begin a job, you'll be asked to **sign a short waiver** first — confirming you're choosing to work uninsured and that you take sole responsibility for the work. You can't clock in until it's signed. It's a one-time step per job, it's kept on file, and it doesn't replace insurance — getting covered removes the step and earns your **Insured** badge.
+
 **Staying covered.** We track your policy's expiry date and remind you by email and in-app **before it lapses**, so your badge doesn't quietly disappear. When you renew, upload the new certificate with **Replace** on your insurance card.`,
   },
   {
@@ -589,9 +591,23 @@ const faqs: FaqItem[] = [
   {
     question: "Do I need insurance to work on Blue Seal?",
     answer:
-      "No — general-liability insurance is **optional**. But insured pros win more work: uploading proof earns a verified **Insured** badge on your profile, which most clients look for. If you try to bid or quote without proof of insurance on file, we'll show a gentle reminder — you can get covered in minutes or continue without it.",
+      "No — general-liability insurance is **optional**. But insured pros win more work: uploading proof earns a verified **Insured** badge on your profile, which most clients look for. If you try to bid or quote without proof of insurance on file, we'll show a gentle reminder. And if you're still not insured when it's time to start a job, you'll be asked to **sign a one-time waiver** before you can clock in — confirming you're choosing to work uninsured. Getting covered removes that step.",
     categoryId: "for-tradespeople",
     audience: "tradesperson",
+  },
+  {
+    question: "What happens when I start a job without insurance?",
+    answer:
+      "Before you can clock in on a job where you're not insured, you'll sign a short in-app waiver: you confirm you're choosing to work uninsured, that you take sole responsibility and liability for the work, and that you release Blue Seal from any claim about your lack of insurance. The client is also told you're not insured and signs off on it when they accept. It's one waiver per job, kept on file — and it isn't insurance. Getting covered removes the waiver step and earns your Insured badge.",
+    categoryId: "for-tradespeople",
+    audience: "tradesperson",
+  },
+  {
+    question: "What if the tradesperson I'm hiring isn't insured?",
+    answer:
+      "Blue Seal doesn't require tradespeople to carry insurance, so some aren't insured through us. When that's the case, we tell you up front and ask you to acknowledge it — when you request the tradesperson and again when you accept their quote (your signature on the quote is that acknowledgment). Going ahead is your choice: if something goes wrong, an uninsured tradesperson may have no insurance to claim against, so you can always ask them for proof of coverage before any work begins.",
+    categoryId: "for-clients",
+    audience: "client",
   },
   {
     question: "Will Blue Seal remind me when my insurance is about to expire?",
