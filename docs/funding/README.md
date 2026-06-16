@@ -35,7 +35,8 @@ For a pre-revenue solo/duo founder, most marquee grants are gated and a few head
 | [`02-funding-map-and-action-plan.md`](./02-funding-map-and-action-plan.md) | **The master map** — every program ranked by fit (now / after incorporation / after revenue / drop), the highest-leverage stack, and the "apply in this order" plan. |
 | [`03-application-new-ventures-bc.md`](./03-application-new-ventures-bc.md) | **Drafted entry** — Round 1 answers written in your voice + Round 2 outline + eligibility checklist. Target Feb 2027. |
 | [`04-application-sred-prep.md`](./04-application-sred-prep.md) | **SR&ED prep** — drafted technical narratives for your real R&D, the records to start now, the payroll requirement, timeline. Highest-dollar item. |
-| [`05-application-futurpreneur.md`](./05-application-futurpreneur.md) | **Drafted loan application** — terms, the age-gate flag, and answers in your voice. ≤$75K, non-dilutive. |
+| [`05-application-futurpreneur.md`](./05-application-futurpreneur.md) | **Drafted loan application** — terms, eligibility (Johnny, 37 ✅), and answers in your voice. ≤$75K, non-dilutive. |
+| [`07-futurpreneur-financials.md`](./07-futurpreneur-financials.md) + [`.csv`](./futurpreneur-cashflow-24mo.csv) + [`.mjs`](./futurpreneur-cashflow-model.mjs) | **24-month cash-flow model** — the required Futurpreneur financials. Reproducible: edit an assumption, re-run the script. Flags the $0-salary-vs-SR&ED tradeoff. |
 | [`06-near-term-programs-playbook.md`](./06-near-term-programs-playbook.md) | **Everything else** — Community Futures, NRC IRAP, wage subsidies (SWPP/Tech Co-op/IRAP Youth), Mitacs, and the deferred grants (Go-To-Market Microgrant, CanExport), each with its one next action. |
 
 ---

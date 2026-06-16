@@ -32,8 +32,8 @@
 ## What you need to submit
 
 1. **Business plan** — assemble from the narrative bank (`00`): company description, problem/solution, market, competition, business model, team, go-to-market, use of funds.
-2. **24-month cash-flow projection** — the piece that needs the accountant. (Reuse it for New Ventures BC Round 3 financials, too — build once.)
-3. **Loan use & repayment narrative** — what the $75K does and how revenue repays it.
+2. **24-month cash-flow projection** — ✅ **drafted**: see [`07-futurpreneur-financials.md`](./07-futurpreneur-financials.md) + the working model [`futurpreneur-cashflow-24mo.csv`](./futurpreneur-cashflow-24mo.csv). Needs your accountant to confirm loan rates + the salary-vs-SR&ED call. (Reuse for New Ventures BC Round 3 financials.)
+3. **Loan use & repayment narrative** — what the $75K does and how revenue repays it (covered in `07`).
 
 ---
 
@@ -63,7 +63,7 @@
 - [x] **Age gate confirmed** — Johnny is 37 (≤39). ✓
 - [x] **Named applicant: Johnny** (the eligible founder).
 - [ ] Call/confirm with Futurpreneur whether a **sole prop qualifies** or incorporation is required before funds land *(plan to register/incorporate regardless — see `01`)*.
-- [ ] Build the **24-month cash flow** with the accountant (shared with NVBC Round 3).
+- [x] **24-month cash flow drafted** (`07` + CSV) — review with accountant; confirm loan rates + the salary/SR&ED call.
 - [ ] Assemble the **business plan** from the narrative bank.
 - [ ] Submit; expect to be matched with a **mentor** — lean on them for the finance/ops gap.
 
