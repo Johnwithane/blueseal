@@ -129,7 +129,7 @@ function fmt(n: number): string {
 
       <!-- TOP BAR -->
       <div class="topbar">
-        <img src="/branding/Horizontal/BlueSeal_Logo-Hor_DarkBlue.png" alt="Blue Seal" />
+        <img src="/branding/Horizontal/BlueSeal_Logo_Hor_White.png" alt="Blue Seal" />
         <div class="tag">Confidential · Partner Brief · June 2026</div>
       </div>
 
@@ -182,7 +182,7 @@ function fmt(n: number): string {
             <p class="quote-text">
               <span class="hand">From the founder:</span> “Building my own home, finding a
               verifiable, genuinely good local pro was the hardest part.”
-              <strong>— James Jansen, Red Seal tradesperson, 20+ years</strong>
+              <span class="attrib"><strong>— James Jansen, Red Seal tradesperson, 20+ years</strong></span>
             </p>
           </div>
         </div>
@@ -246,8 +246,14 @@ function fmt(n: number): string {
             <div class="card center"><img class="char step-char" src="/characters/seal-scene-chat.webp" alt="" /><div class="si">3</div><h3>Do</h3><p>Chat, photos and scheduling on a job kanban board.</p></div>
             <div class="card center"><img class="char step-char" src="/characters/seal-scene-payout.webp" alt="" /><div class="si">4</div><h3>Get paid</h3><p>Auto-invoice, pay by card, mutual review.</p></div>
           </div>
+          <!-- TODO(real assets): swap each .shot-ph for a real <img> of the app. -->
+          <div class="shot-grid cols-3">
+            <figure class="shot"><div class="shot-ph">📱 App screenshot — Search &amp; map of verified pros</div><figcaption>Discovery: map + list, filtered by trade &amp; location.</figcaption></figure>
+            <figure class="shot"><div class="shot-ph">📱 App screenshot — Job kanban + per-job chat</div><figcaption>The live pipeline a tradesperson works each job from.</figcaption></figure>
+            <figure class="shot"><div class="shot-ph">📱 App screenshot — Itemized invoice + card payment</div><figcaption>Auto-generated invoice; pay in-app by card.</figcaption></figure>
+          </div>
           <h3 class="sub-h">What's built</h3>
-          <div class="grid g2 grid-start">
+          <div class="grid g2 eqh">
             <div class="card">
               <h4>For clients</h4>
               <ul class="clean">
@@ -268,11 +274,11 @@ function fmt(n: number): string {
               </ul>
             </div>
           </div>
-          <p class="badges">
-            <span class="pill pill--live">LIVE</span> everything above &nbsp;
-            <span class="pill pill--test">SWITCHING ON</span> live card payouts, push, Google reviews &nbsp;
-            <span class="pill pill--next">NEXT</span> ID automation, financing, app stores
-          </p>
+          <div class="badges">
+            <span><span class="pill pill--live">LIVE</span> everything above</span>
+            <span><span class="pill pill--test">SWITCHING ON</span> live card payouts, push, Google reviews</span>
+            <span><span class="pill pill--next">NEXT</span> ID automation, financing, app stores</span>
+          </div>
         </div>
       </section>
 
@@ -290,6 +296,7 @@ function fmt(n: number): string {
             <div class="card"><h3>Auto job-log <span class="pill pill--pro">PRO</span></h3><p>Catches scope changes in the chat so nothing slips before billing.</p></div>
             <div class="card"><h3>Snap a receipt <span class="pill pill--free">FREE</span></h3><p>Reads vendor, total, date, category — expenses ready for tax time.</p></div>
           </div>
+          <figure class="shot" style="max-width: 780px; margin: 1.4rem auto 0;"><div class="shot-ph">📱 App screenshot — the AI assistant inside a job (diagnose · draft a reply · quote)</div><figcaption>Replace with a real capture of the in-job AI chat.</figcaption></figure>
           <p class="note">Most AI is part of Blue Seal Pro. Receipt scanning is free for every tradesperson — the on-ramp to a paid subscription.</p>
         </div>
       </section>
@@ -331,7 +338,7 @@ function fmt(n: number): string {
               <div class="rm-node rm-done"><div class="rm-dot">✓</div><h4>Idea</h4><p>20 years in the trades; a real, lived problem.</p></div>
               <div class="rm-node rm-done"><div class="rm-dot">✓</div><h4>Design</h4><p>Architecture, brand, and flows.</p></div>
               <div class="rm-node rm-done"><div class="rm-dot">✓</div><h4>Build — full MVP</h4><p>Vetting, marketplace, AI, invoicing, payments.</p></div>
-              <div class="rm-node rm-now"><div class="rm-dot">◉</div><h4>Validate</h4><div class="rm-here">You are here</div><p>~100 verified Okanagan pros · real paid jobs.</p></div>
+              <div class="rm-node rm-now"><div class="rm-dot">◉</div><h4>Validate</h4><p>~100 verified Okanagan pros · real paid jobs.</p><div class="rm-here">You are here</div></div>
               <div class="rm-node"><div class="rm-dot">5</div><h4>Launch &amp; grow</h4><p>Incorporate · payments live · Okanagan marketing.</p></div>
               <div class="rm-node"><div class="rm-dot">6</div><h4>Scale</h4><p>Kamloops → all of BC.</p></div>
               <div class="rm-node"><div class="rm-dot">7</div><h4>Expand</h4><p>Alberta · insurance · enterprise.</p></div>
@@ -362,7 +369,7 @@ function fmt(n: number): string {
         <div class="container reveal">
           <div class="kicker">How we make money</div>
           <h2 class="h-lg">Two simple lines of revenue.</h2>
-          <div class="grid g2 grid-start grid-top">
+          <div class="grid g2 eqh grid-top">
             <div class="card card--mid">
               <h3>1 · Service fee</h3>
               <p class="mb-s">A <strong>5% fee on card payments</strong>, paid by the client, <strong>capped at $99</strong>.</p>
@@ -417,6 +424,12 @@ function fmt(n: number): string {
               that fills our social feed and homepage. Acquisition and marketing in one move.
             </p>
           </div>
+          <!-- TODO(real assets): drop real founder/tradesperson headshots + a social-feed grab here. -->
+          <div class="shot-grid cols-3">
+            <figure class="shot"><div class="shot-ph">📷 Photo — founding tradesperson headshot</div><figcaption>James-shot portrait — drop a real founder headshot here.</figcaption></figure>
+            <figure class="shot"><div class="shot-ph">📷 Photo — headshot + their trade</div><figcaption>The same set that seeds the social feed.</figcaption></figure>
+            <figure class="shot"><div class="shot-ph">📷 Photo — social post / feed grid</div><figcaption>A real Instagram/feed grab once posts are live.</figcaption></figure>
+          </div>
         </div>
       </section>
 
@@ -425,6 +438,7 @@ function fmt(n: number): string {
         <div class="container reveal">
           <div class="kicker">Competition</div>
           <h2 class="h-lg">Tools, or leads, or reviews. Nobody does all three — verified.</h2>
+          <p class="lead">Everyone owns one slice of the job. None of them verify the pro, run the work, and price it fairly.</p>
           <div class="tablewrap grid-top">
             <table>
               <thead><tr><th>Who</th><th>Model</th><th>What's missing</th></tr></thead>
@@ -469,7 +483,7 @@ function fmt(n: number): string {
           <div class="kicker">Where it grows</div>
           <h2 class="h-lg">Three more revenue lines on a base we already own.</h2>
           <p class="lead">Each turns the verified audience we've earned into new revenue — and each has a real benchmark behind it.</p>
-          <div class="grid g3 grid-start grid-top">
+          <div class="grid g3 eqh grid-top">
             <div class="card">
               <div class="bignum">~$135 / pro / yr</div>
               <h3 class="mt-s">Insurance</h3>
@@ -500,11 +514,11 @@ function fmt(n: number): string {
           <h2 class="h-lg">Modest today. The model compounds.</h2>
           <p class="lead">The marketplace alone gets us to ~$2M. Insurance and per-seat enterprise take it toward eight figures.</p>
           <div class="schart grid-top">
-            <div class="sbar"><div class="val">~$225K</div><div class="stack"><div class="seg seg-mkt" style="height:4px"></div></div><div class="lab">Y1<br />Okanagan</div></div>
-            <div class="sbar"><div class="val">~$785K</div><div class="stack"><div class="seg seg-mkt" style="height:13px"></div><div class="seg seg-ins" style="height:2px"></div></div><div class="lab">Y2<br />+Kamloops</div></div>
-            <div class="sbar"><div class="val">~$2.7M</div><div class="stack"><div class="seg seg-mkt" style="height:37px"></div><div class="seg seg-ins" style="height:3px"></div><div class="seg seg-ent" style="height:7px"></div></div><div class="lab">Y3<br />+BC</div></div>
-            <div class="sbar"><div class="val">~$6.5M</div><div class="stack"><div class="seg seg-mkt" style="height:84px"></div><div class="seg seg-ins" style="height:6px"></div><div class="seg seg-ent" style="height:20px"></div></div><div class="lab">Y4<br />BC+AB</div></div>
-            <div class="sbar"><div class="val">~$13.8M</div><div class="stack"><div class="seg seg-mkt" style="height:169px"></div><div class="seg seg-ins" style="height:13px"></div><div class="seg seg-ent" style="height:48px"></div></div><div class="lab">Y5<br />BC+AB</div></div>
+            <div class="sbar"><div class="val">~$225K</div><div class="stack"><div class="seg seg-mkt" style="height:32px"></div></div><div class="lab">Y1<br />Okanagan</div></div>
+            <div class="sbar"><div class="val">~$785K</div><div class="stack"><div class="seg seg-mkt" style="height:54px"></div><div class="seg seg-ins" style="height:6px"></div></div><div class="lab">Y2<br />+Kamloops</div></div>
+            <div class="sbar"><div class="val">~$2.7M</div><div class="stack"><div class="seg seg-mkt" style="height:89px"></div><div class="seg seg-ins" style="height:6px"></div><div class="seg seg-ent" style="height:16px"></div></div><div class="lab">Y3<br />+BC</div></div>
+            <div class="sbar"><div class="val">~$6.5M</div><div class="stack"><div class="seg seg-mkt" style="height:132px"></div><div class="seg seg-ins" style="height:9px"></div><div class="seg seg-ent" style="height:32px"></div></div><div class="lab">Y4<br />BC+AB</div></div>
+            <div class="sbar"><div class="val">~$13.8M</div><div class="stack"><div class="seg seg-mkt" style="height:183px"></div><div class="seg seg-ins" style="height:14px"></div><div class="seg seg-ent" style="height:53px"></div></div><div class="lab">Y5<br />BC+AB</div></div>
           </div>
           <div class="legend">
             <span><i class="i-mkt"></i>Marketplace</span><span><i class="i-ins"></i>Insurance</span><span><i class="i-ent"></i>Enterprise (per-seat)</span>
@@ -560,7 +574,7 @@ function fmt(n: number): string {
         <div class="container reveal">
           <div class="kicker">The ask</div>
           <h2 class="h-lg">$150,000 for an equal third.</h2>
-          <div class="grid split grid-start grid-top">
+          <div class="grid split eqh grid-top">
             <div class="card">
               <ul class="clean">
                 <li><strong>$150,000</strong> for a <strong>33% stake</strong></li>
@@ -587,8 +601,8 @@ function fmt(n: number): string {
       <!-- VISION -->
       <section class="band band--sky">
         <div class="container reveal center">
-          <img class="char vision-char" src="/characters/seal-pose-success.webp" alt="" />
           <div class="kicker kicker-center">The vision</div>
+          <img class="char vision-char" src="/characters/seal-pose-success.webp" alt="" />
           <h2 class="h-lg vision-h">The trusted name for verified trades in Canada.</h2>
           <p class="lead vision-lead">Okanagan → BC → Alberta → Canada. Same playbook every market: verify the best local pros, hand them the tools, earn the homeowner's trust.</p>
           <div class="cta-row cta-center">
@@ -639,18 +653,22 @@ function fmt(n: number): string {
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
 }
-.pitch-root :deep(h1),
-.pitch-root h1,
-.pitch-root h2,
-.pitch-root h3,
-.pitch-root h4 {
+/* Bare (scoped) element selectors on purpose: keeping these low-specificity so
+   component classes like .note / .fine / .vision-h / .lead-top can override
+   margins (incl. margin-inline:auto for centering). A higher-specificity
+   .pitch-root prefix here silently clobbered those margins. */
+h1,
+h2,
+h3,
+h4 {
   font-family: var(--display);
   color: var(--bs-dark-blue);
   line-height: 1.1;
   margin: 0 0 0.35em;
   font-weight: 600;
+  text-wrap: balance;
 }
-.pitch-root p {
+p {
   margin: 0 0 0.9rem;
 }
 .m0 {
@@ -723,12 +741,12 @@ function fmt(n: number): string {
   justify-content: space-between;
   gap: 1rem;
   padding: 0.6rem clamp(1rem, 4vw, 2.5rem);
-  background: rgba(250, 249, 246, 0.88);
+  background: rgba(34, 49, 78, 0.82);
   backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--bs-border);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 }
 .topbar img {
-  height: 30px;
+  height: 28px;
   width: auto;
   display: block;
 }
@@ -736,7 +754,7 @@ function fmt(n: number): string {
   font-size: 0.68rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--bs-muted);
+  color: rgba(255, 255, 255, 0.62);
   text-align: right;
 }
 
@@ -813,7 +831,7 @@ function fmt(n: number): string {
 }
 .h-lg {
   font-size: clamp(1.7rem, 4.5vw, 2.5rem);
-  max-width: 20ch;
+  max-width: 26ch;
 }
 .h-lg.tight {
   margin-bottom: 0.5rem;
@@ -840,10 +858,23 @@ function fmt(n: number): string {
   gap: 1.2rem;
 }
 .grid-top {
-  margin-top: 1.8rem;
+  margin-top: 1.4rem;
 }
 .grid-start {
   align-items: start;
+}
+/* Equal-height card rows: stretch + flex column so card bottoms align and a
+   trailing .src pins to a shared baseline. */
+.grid.eqh {
+  align-items: stretch;
+}
+.eqh > .card {
+  display: flex;
+  flex-direction: column;
+}
+.eqh > .card .src {
+  margin-top: auto;
+  padding-top: 0.6rem;
 }
 @media (min-width: 740px) {
   .g2 {
@@ -927,10 +958,10 @@ function fmt(n: number): string {
   margin: 0 auto 0.5rem;
 }
 .brand-char {
-  height: 150px;
+  height: clamp(150px, 20vw, 220px);
 }
 .quote-char {
-  height: 96px;
+  height: 112px;
   flex: 0 0 auto;
 }
 .vision-char {
@@ -1103,8 +1134,8 @@ tbody tr:last-child td {
 .schart {
   display: flex;
   align-items: flex-end;
-  gap: clamp(0.7rem, 4vw, 2.4rem);
-  height: 262px;
+  gap: clamp(0.7rem, 3vw, 1.6rem);
+  height: 300px;
   padding-top: 1.6rem;
 }
 .sbar {
@@ -1117,7 +1148,7 @@ tbody tr:last-child td {
 }
 .sbar .stack {
   width: 100%;
-  max-width: 80px;
+  max-width: 110px;
   display: flex;
   flex-direction: column-reverse;
   border-radius: 8px 8px 0 0;
@@ -1125,7 +1156,7 @@ tbody tr:last-child td {
 }
 .sbar .seg {
   width: 100%;
-  min-height: 2px;
+  min-height: 6px;
 }
 .seg-mkt {
   background: var(--bs-dark-blue);
@@ -1206,7 +1237,8 @@ tbody tr:last-child td {
   margin-bottom: 0;
 }
 .ask-note {
-  margin-top: 0.9rem;
+  margin-top: auto;
+  padding-top: 0.9rem;
   font-size: 0.9rem;
 }
 
@@ -1241,7 +1273,7 @@ ul.clean li::before {
   color: var(--bs-muted);
   border-left: 3px solid var(--bs-border);
   padding: 0.15rem 0 0.15rem 0.9rem;
-  margin: 1rem 0 0;
+  margin: 1.25rem 0 0;
 }
 .note-tight {
   margin-top: 0.9rem;
@@ -1270,11 +1302,21 @@ ul.clean li::before {
   margin-bottom: 0.6rem;
 }
 .sub-h {
-  margin-top: 2.4rem;
+  margin-top: clamp(2.5rem, 5vw, 3.5rem);
+  padding-top: 1.6rem;
+  border-top: 1px solid var(--bs-border);
 }
 .badges {
-  margin-top: 1rem;
+  margin-top: 1.4rem;
   font-size: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.badges span {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .btn {
@@ -1330,10 +1372,16 @@ ul.clean li::before {
 }
 
 .quote-card {
-  margin-top: 1.2rem;
+  margin-top: 1.4rem;
   display: flex;
-  gap: 1rem;
-  align-items: center;
+  gap: 1.1rem;
+  align-items: flex-start;
+}
+@media (max-width: 639px) {
+  .quote-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 .quote-text {
   margin: 0;
@@ -1365,6 +1413,7 @@ ul.clean li::before {
 }
 .seat-card {
   margin-top: 1.1rem;
+  padding: 1.6rem;
   border-left: 4px solid var(--bs-light-blue);
 }
 @media (max-width: 639px) {
@@ -1376,15 +1425,19 @@ ul.clean li::before {
 }
 
 .trade-row {
-  margin-top: 1.6rem;
+  margin: 1.6rem auto 1.4rem;
+  max-width: 760px;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.9rem;
   justify-content: center;
+  align-items: flex-end;
   opacity: 0.95;
 }
 .trade-char {
-  height: 74px;
+  height: 64px;
+  width: 64px;
+  object-fit: contain;
 }
 
 .vision-h {
@@ -1392,7 +1445,8 @@ ul.clean li::before {
   margin: 0 auto;
 }
 .vision-lead {
-  margin: 1rem auto 0;
+  margin: 1.1rem auto 0;
+  max-width: 38ch;
 }
 .vision-foot {
   margin-top: 1rem;
@@ -1476,6 +1530,7 @@ ul.clean li::before {
   font-size: 0.8rem;
   color: var(--bs-muted);
   margin: 0;
+  min-height: 3.2em;
 }
 .rm-here {
   display: inline-block;
@@ -1484,7 +1539,7 @@ ul.clean li::before {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--bs-red);
-  margin-bottom: 0.3rem;
+  margin-top: 0.5rem;
 }
 
 .reveal {
@@ -1501,25 +1556,27 @@ ul.clean li::before {
 
 .deck-footer {
   background: var(--bs-deep);
-  color: #b7c6e6;
-  padding: 2.6rem 0;
+  color: #c7d4ec;
+  padding: clamp(3rem, 5vw, 4rem) 0 clamp(2.5rem, 4vw, 3rem);
   text-align: center;
-  font-size: 0.84rem;
+  font-size: 0.88rem;
+  line-height: 1.7;
 }
 .deck-footer img {
-  height: 54px;
-  margin-bottom: 1rem;
+  height: 52px;
+  margin: 0 auto 1.5rem;
 }
 .deck-footer strong {
   color: #fff;
 }
 .fine {
-  margin-top: 1.2rem;
-  font-size: 0.74rem;
-  opacity: 0.7;
-  max-width: 60ch;
-  margin-left: auto;
-  margin-right: auto;
+  margin: 2rem auto 0;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.72rem;
+  line-height: 1.65;
+  opacity: 0.6;
+  max-width: 56ch;
 }
 
 .gate {
@@ -1565,5 +1622,81 @@ ul.clean li::before {
 }
 .gate-btn {
   width: 100%;
+}
+
+/* Roadmap connector spine on the stacked (mobile) layout */
+@media (max-width: 859px) {
+  .rm-line {
+    position: relative;
+  }
+  .rm-line::before {
+    content: "";
+    position: absolute;
+    top: 20px;
+    bottom: 20px;
+    left: 50%;
+    width: 3px;
+    background: var(--bs-border);
+    transform: translateX(-50%);
+    z-index: 0;
+  }
+}
+
+/* Centered pillar/step card body — tidy the measure so centered text doesn't rag */
+.card.center p {
+  max-width: 26ch;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Founder-quote attribution on its own line */
+.attrib {
+  display: block;
+  margin-top: 0.4rem;
+}
+
+/* Screenshot / photo placeholder slots — replace .shot-ph with a real <img>. */
+.shot {
+  margin: 0;
+}
+.shot-ph {
+  border: 2px dashed var(--bs-border);
+  border-radius: var(--r-lg);
+  background: repeating-linear-gradient(45deg, #fff, #fff 12px, #f3f1ec 12px, #f3f1ec 24px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--bs-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 1.2rem;
+  aspect-ratio: 16 / 10;
+}
+.shot figcaption {
+  font-size: 0.72rem;
+  color: var(--bs-muted);
+  margin-top: 0.5rem;
+  text-align: center;
+}
+.band--navy .shot-ph,
+.band--deep .shot-ph {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.05);
+  color: #b7c6e6;
+}
+.band--navy .shot figcaption,
+.band--deep .shot figcaption {
+  color: #b7c6e6;
+}
+.shot-grid {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.4rem;
+}
+@media (min-width: 740px) {
+  .shot-grid.cols-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 </style>
