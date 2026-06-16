@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter, RouterLink } from "vue-router";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
@@ -36,7 +36,6 @@ import {
   readRequestPrefill,
   clearRequestPrefill,
   deriveTitle,
-  deriveUrgency,
 } from "@/utils/requestPrefill";
 import { jobRequestSchema } from "@/validation/schemas";
 
@@ -79,6 +78,10 @@ const error = ref<string | null>(null);
 const tradieUninsured = computed(() => !!tradie.value && !isTradieInsured(tradie.value));
 const acceptedUninsured = ref(false);
 
+const tradieName = computed(
+  () => tradie.value?.displayName?.trim() || tradie.value?.companyName?.trim() || "this tradesperson",
+);
+
 // Field-level validation errors (under each field) + scroll-to-first; `error`
 // stays for general submit/network failures shown by the banner near submit.
 const {
@@ -89,27 +92,34 @@ const {
   has: hasErrors,
   focusFirst,
 } = useFormErrors();
-const FIELD_ORDER = ["trade", "title", "description", "address", "photos", "intake", "uninsured"];
+// Top-to-bottom field order (matches the step order) so focusFirst /
+// goToFirstErrorStep always land on the topmost problem.
+const FIELD_ORDER = ["trade", "title", "description", "intake", "photos", "address", "uninsured"];
 
 // Page-level load state: the tradie doc + intake schema must arrive before the
 // form is usable. Failures here used to be unhandled (blank form, no clue why).
 const pageLoading = ref(true);
 const loadError = ref<string | null>(null);
 
-// True when we seeded the form from the search-box description, so we can show
-// a "review this" note. Dismissible — the note, not the values.
+// True when we seeded the title from the search-box text, so we can show a
+// "review this" note. Dismissible — the note, not the value.
 const prefilledFromSearch = ref(false);
 
-// Seed title/description/urgency from what the client typed in search (if
-// fresh). Only fills empty fields, so it never clobbers anything the user
-// already touched. All values stay fully editable.
+// Seed ONLY the title from what the client typed in search (if fresh), and
+// consume it immediately so a search seeds a form exactly once — right after
+// the search. Two deliberate choices vs. the old behaviour:
+//   • Title only. The search string makes a poor brief; the client should
+//     describe the actual problem themselves, so we never touch `description`.
+//   • Consume-on-read (clearRequestPrefill below). Without this the text lingers
+//     in localStorage for up to 2h and re-pre-fills unrelated request forms on
+//     later visits — the "it remembers my old search" bug.
+// Only fills an empty title, so it never clobbers anything already typed.
 function applySearchPrefill() {
   const text = readRequestPrefill();
+  clearRequestPrefill();
   if (!text) return;
-  if (!description.value) description.value = text;
   if (!title.value) title.value = deriveTitle(text);
-  if (urgency.value === "flexible") urgency.value = deriveUrgency(text);
-  prefilledFromSearch.value = true;
+  prefilledFromSearch.value = !!title.value;
 }
 
 async function loadPage() {
@@ -214,7 +224,165 @@ function removePhoto(idx: number) {
   photos.value = [...photos.value];
 }
 
+function urgencyLabel(u: string): string {
+  if (u === "this_week") return "This week";
+  if (u === "urgent") return "Urgent";
+  return "Flexible";
+}
+
+// ---- Wizard ---------------------------------------------------------------
+// Requesting a quote is a lot of fields for someone who's never hired a
+// tradesperson. Default to a guided, one-thing-per-screen flow (mirrors the
+// invoice + post-a-job wizards): `wizardStep` is the active step index, or
+// `null` once the user taps "fill out the whole form" — then every section
+// shows at once and the bottom submit takes over. Sections use v-show (not
+// v-if) so nothing is destroyed when navigating, and a late submit error can
+// scroll to a field on a step that isn't on screen.
+const REQUEST_STEPS = computed<{ key: string; title: string; hint: string }[]>(() => {
+  const steps: { key: string; title: string; hint: string }[] = [];
+  // Only ask which trade when this tradesperson offers more than one.
+  if (tradie.value && tradie.value.trades.length > 1) {
+    steps.push({
+      key: "trade",
+      title: "Which trade?",
+      hint: `${tradieName.value} offers a few — pick the one you need.`,
+    });
+  }
+  steps.push({
+    key: "describe",
+    title: "Tell us about the job",
+    hint: "A clear title and a few details help you get an accurate quote.",
+  });
+  if (intakeFields.value.length) {
+    steps.push({
+      key: "details",
+      title: "A few quick details",
+      hint: "Answering these helps the tradesperson quote without back-and-forth.",
+    });
+  }
+  steps.push(
+    {
+      key: "photos",
+      title: "Add a few photos",
+      hint: "Photos of the issue or area let the tradesperson quote without visiting first.",
+    },
+    {
+      key: "location",
+      title: "When and where",
+      hint: "Your address stays private until you and the tradesperson agree to go ahead.",
+    },
+    {
+      key: "review",
+      title: "Review and send",
+      hint: "Check it over, then send your request.",
+    },
+  );
+  return steps;
+});
+
+const wizardStep = ref<number | null>(0);
+const inWizard = computed(() => wizardStep.value !== null);
+const currentStepKey = computed(() =>
+  wizardStep.value === null ? null : (REQUEST_STEPS.value[wizardStep.value]?.key ?? null),
+);
+const isLastStep = computed(
+  () => wizardStep.value !== null && wizardStep.value === REQUEST_STEPS.value.length - 1,
+);
+
+// The step list can grow/shrink (the trade step depends on the loaded
+// tradesperson; the details step on the loaded intake schema). Clamp so the
+// index never points past the end after it changes.
+watch(REQUEST_STEPS, (steps) => {
+  if (wizardStep.value !== null && wizardStep.value >= steps.length) {
+    wizardStep.value = steps.length - 1;
+  }
+});
+
+function stepShown(key: string): boolean {
+  if (wizardStep.value === null) return true;
+  return currentStepKey.value === key;
+}
+
+// Which step owns each field, so a late submit error jumps back to it.
+const FIELD_STEP: Record<string, string> = {
+  trade: "trade",
+  title: "describe",
+  description: "describe",
+  intake: "details",
+  photos: "photos",
+  address: "location",
+  uninsured: "review",
+};
+
+// Validate one step, populating field errors. Returns true when the step's
+// required fields are satisfied.
+function validateStep(key: string): boolean {
+  clearErrors();
+  if (key === "trade") {
+    if (!selectedTrade.value) setError("trade", "Pick the trade you need.");
+  } else if (key === "describe") {
+    if (!title.value.trim()) setError("title", "Add a title.");
+    if (!description.value.trim()) setError("description", "Add a description.");
+  } else if (key === "details") {
+    const missing = firstMissingRequired(intakeFields.value, intakeData.value);
+    if (missing) setError("intake", `Please fill: ${missing}`);
+  } else if (key === "photos") {
+    if (photos.value.length === 0) {
+      setError("photos", "Upload at least one photo of the issue or area.");
+    }
+  } else if (key === "location") {
+    if (
+      !addressLine1.value.trim() ||
+      !city.value.trim() ||
+      !region.value.trim() ||
+      !postalCode.value.trim()
+    ) {
+      setError("address", "Enter your full address so the tradesperson can quote.");
+    }
+  } else if (key === "review") {
+    if (tradieUninsured.value && !acceptedUninsured.value) {
+      setError("uninsured", "Please confirm you understand this tradesperson isn't insured.");
+    }
+  }
+  return !hasErrors();
+}
+
+async function wizardNext() {
+  const i = wizardStep.value;
+  if (i === null) return;
+  const cur = REQUEST_STEPS.value[i];
+  if (cur && !validateStep(cur.key)) {
+    await focusFirst(FIELD_ORDER);
+    return;
+  }
+  clearErrors();
+  wizardStep.value = Math.min(i + 1, REQUEST_STEPS.value.length - 1);
+}
+
+function wizardBack() {
+  clearErrors();
+  if (wizardStep.value && wizardStep.value > 0) wizardStep.value -= 1;
+}
+
+function wizardSkip() {
+  clearErrors();
+  wizardStep.value = null;
+}
+
+function goToFirstErrorStep() {
+  if (wizardStep.value === null) return;
+  const firstField = FIELD_ORDER.find((f) => errors.value[f]);
+  if (!firstField) return;
+  const stepKey = FIELD_STEP[firstField];
+  const idx = REQUEST_STEPS.value.findIndex((s) => s.key === stepKey);
+  if (idx >= 0) wizardStep.value = idx;
+}
+
 async function submit() {
+  // In wizard mode, only the final "Review" step sends. Guards against an
+  // implicit form submit (e.g. Enter in a field) firing on an earlier step.
+  if (inWizard.value && !isLastStep.value) return;
+
   error.value = null;
   clearErrors();
   if (submitting.value) return;
@@ -262,6 +430,7 @@ async function submit() {
   }
 
   if (hasErrors()) {
+    goToFirstErrorStep();
     await focusFirst(FIELD_ORDER);
     return;
   }
@@ -353,8 +522,6 @@ async function submit() {
       text: `New request: ${parsed.data.title}`,
     });
 
-    // Request submitted — the carried-over search description has done its job.
-    clearRequestPrefill();
     toast.success("Request sent", "We'll let the tradesperson know.");
     // First time a client requests work, offer push so they hear back fast.
     void maybePromptForPush({
@@ -389,7 +556,7 @@ async function submit() {
       class="mt-4"
       @close="prefilledFromSearch = false"
     >
-      We filled in the title, details and urgency from your search — please review and tweak before sending.
+      We started a title from your search — review and edit it, then add the details below.
     </Message>
 
     <div v-if="pageLoading" class="bs-card p-5 mt-4 text-sm text-[color:var(--bs-muted)]">
@@ -402,9 +569,40 @@ async function submit() {
     </div>
 
     <form v-else class="bs-form bs-card p-5 mt-4 space-y-4" @submit.prevent="submit">
-      <div v-if="tradie && tradie.trades.length > 1" data-field="trade">
+      <!-- Wizard chrome: step counter, skip link, title + hint + progress. -->
+      <div v-if="inWizard" class="space-y-2">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-xs font-semibold text-[color:var(--bs-muted)]">
+            Step {{ (wizardStep ?? 0) + 1 }} of {{ REQUEST_STEPS.length }}
+          </span>
+          <button
+            type="button"
+            class="text-xs text-[color:var(--bs-blue)] underline"
+            @click="wizardSkip"
+          >
+            Skip — fill out the whole form
+          </button>
+        </div>
+        <h2 class="text-lg font-semibold">{{ REQUEST_STEPS[wizardStep!].title }}</h2>
+        <p class="text-sm text-[color:var(--bs-muted)]">{{ REQUEST_STEPS[wizardStep!].hint }}</p>
+        <div class="flex gap-1" aria-hidden="true">
+          <span
+            v-for="(s, i) in REQUEST_STEPS"
+            :key="s.key"
+            class="h-1.5 flex-1 rounded-full"
+            :class="i <= wizardStep! ? 'bg-[color:var(--bs-blue)]' : 'bg-[color:var(--bs-border)]'"
+          ></span>
+        </div>
+      </div>
+
+      <!-- Step: trade (only when the tradesperson offers more than one). -->
+      <div
+        v-show="stepShown('trade') && tradie && tradie.trades.length > 1"
+        data-field="trade"
+      >
         <label class="text-sm font-medium">Which trade?</label>
         <Select
+          v-if="tradie"
           v-model="selectedTrade"
           :options="tradie.trades.map((k) => ({ key: k, label: tradeLabel(k) }))"
           option-label="label"
@@ -416,63 +614,39 @@ async function submit() {
         <FieldError :message="errors.trade" />
       </div>
 
-      <div data-field="title">
-        <label class="text-sm font-medium">Title</label>
-        <InputText
-          v-model="title"
-          placeholder="Short summary of the job"
-          maxlength="140"
-          class="mt-1"
-          :invalid="!!errors.title"
-        />
-        <FieldError :message="errors.title" />
-      </div>
-
-      <div data-field="description">
-        <label class="text-sm font-medium">Describe the issue</label>
-        <Textarea v-model="description" rows="4" maxlength="4000" :invalid="!!errors.description" />
-        <FieldError :message="errors.description" />
-      </div>
-
-      <div>
-        <label class="text-sm font-medium">Urgency</label>
-        <Select
-          v-model="urgency"
-          :options="[
-            { label: 'Flexible', value: 'flexible' },
-            { label: 'This week', value: 'this_week' },
-            { label: 'Urgent', value: 'urgent' },
-          ]"
-          option-label="label"
-          option-value="value"
-          class="mt-1 w-full"
-        />
-      </div>
-
-      <fieldset data-field="address">
-        <legend class="text-sm font-medium mb-2">Address</legend>
-        <!-- Autocomplete input doubles as the addressLine1 source. Picking a
-             Google suggestion overrides with the cleanly-parsed street and
-             also fills city/region/postal; typing without picking still
-             carries the raw text through to submission. -->
-        <input
-          ref="addressAutocompleteEl"
-          v-model="addressLine1"
-          type="text"
-          class="p-inputtext p-component w-full"
-          placeholder="Start typing your address…"
-          maxlength="200"
-          autocomplete="address-line1"
-        />
-        <div class="grid sm:grid-cols-2 gap-2 mt-2">
-          <InputText v-model="city" placeholder="City" maxlength="100" autocomplete="address-level2" />
-          <InputText v-model="region" placeholder="Province" maxlength="100" autocomplete="address-level1" />
-          <InputText v-model="postalCode" placeholder="Postal code (A1A 1A1)" maxlength="7" autocomplete="postal-code" />
+      <!-- Step: describe — title + description. -->
+      <div v-show="stepShown('describe')" class="space-y-4">
+        <div data-field="title">
+          <label class="text-sm font-medium">Title</label>
+          <InputText
+            v-model="title"
+            placeholder="Short summary of the job"
+            maxlength="140"
+            class="mt-1"
+            :invalid="!!errors.title"
+          />
+          <FieldError :message="errors.title" />
         </div>
-        <FieldError :message="errors.address" />
-      </fieldset>
 
-      <div data-field="photos">
+        <div data-field="description">
+          <label class="text-sm font-medium">Describe the issue</label>
+          <Textarea v-model="description" rows="4" maxlength="4000" :invalid="!!errors.description" />
+          <FieldError :message="errors.description" />
+        </div>
+      </div>
+
+      <!-- Step: details — trade-specific questionnaire (if any). -->
+      <div
+        v-show="stepShown('details') && intakeFields.length > 0"
+        data-field="intake"
+      >
+        <h3 class="font-semibold text-sm mb-2">Trade-specific details</h3>
+        <IntakeFormRenderer v-model="intakeData" :fields="intakeFields" />
+        <FieldError :message="errors.intake" />
+      </div>
+
+      <!-- Step: photos (1–8 required). -->
+      <div v-show="stepShown('photos')" data-field="photos">
         <label class="text-sm font-medium">Photos (1–8 required)</label>
         <FieldError :message="errors.photos" />
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
@@ -504,14 +678,84 @@ async function submit() {
         <input ref="photoInput" type="file" accept="image/*" multiple class="hidden" @change="onPhotos" />
       </div>
 
-      <div v-if="intakeFields.length" data-field="intake">
-        <h3 class="font-semibold text-sm mb-2">Trade-specific details</h3>
-        <IntakeFormRenderer v-model="intakeData" :fields="intakeFields" />
-        <FieldError :message="errors.intake" />
+      <!-- Step: location — urgency + address. -->
+      <div v-show="stepShown('location')" class="space-y-4">
+        <div>
+          <label class="text-sm font-medium">Urgency</label>
+          <Select
+            v-model="urgency"
+            :options="[
+              { label: 'Flexible', value: 'flexible' },
+              { label: 'This week', value: 'this_week' },
+              { label: 'Urgent', value: 'urgent' },
+            ]"
+            option-label="label"
+            option-value="value"
+            class="mt-1 w-full"
+          />
+        </div>
+
+        <fieldset data-field="address">
+          <legend class="text-sm font-medium mb-2">Address</legend>
+          <p class="text-xs text-[color:var(--bs-muted)] mb-2">
+            Your exact address stays private — it's shared with {{ tradieName }} only once you both agree to go ahead.
+          </p>
+          <!-- Autocomplete input doubles as the addressLine1 source. Picking a
+               Google suggestion overrides with the cleanly-parsed street and
+               also fills city/region/postal; typing without picking still
+               carries the raw text through to submission. -->
+          <input
+            ref="addressAutocompleteEl"
+            v-model="addressLine1"
+            type="text"
+            class="p-inputtext p-component w-full"
+            placeholder="Start typing your address…"
+            maxlength="200"
+            autocomplete="address-line1"
+          />
+          <div class="grid sm:grid-cols-2 gap-2 mt-2">
+            <InputText v-model="city" placeholder="City" maxlength="100" autocomplete="address-level2" />
+            <InputText v-model="region" placeholder="Province" maxlength="100" autocomplete="address-level1" />
+            <InputText v-model="postalCode" placeholder="Postal code (A1A 1A1)" maxlength="7" autocomplete="postal-code" />
+          </div>
+          <FieldError :message="errors.address" />
+        </fieldset>
       </div>
 
+      <!-- Step: review — summary (wizard only) + the uninsured gate (always). -->
+      <div v-show="currentStepKey === 'review'" class="rounded-lg border border-[color:var(--bs-border)] p-4">
+        <p class="text-xs text-[color:var(--bs-muted)]">Sending to</p>
+        <p class="font-semibold">{{ tradieName }} <span class="font-normal text-[color:var(--bs-muted)]">· {{ tradeLabel(selectedTrade) }}</span></p>
+        <dl class="mt-3 space-y-2 text-sm">
+          <div>
+            <dt class="text-xs text-[color:var(--bs-muted)]">Job</dt>
+            <dd class="font-medium">{{ title.trim() || "Untitled" }}</dd>
+          </div>
+          <div v-if="description.trim()">
+            <dt class="text-xs text-[color:var(--bs-muted)]">Details</dt>
+            <dd class="whitespace-pre-line text-[color:var(--bs-muted)]">{{ description.trim() }}</dd>
+          </div>
+          <div class="flex gap-6">
+            <div>
+              <dt class="text-xs text-[color:var(--bs-muted)]">Urgency</dt>
+              <dd class="font-medium">{{ urgencyLabel(urgency) }}</dd>
+            </div>
+            <div>
+              <dt class="text-xs text-[color:var(--bs-muted)]">Location</dt>
+              <dd class="font-medium">{{ city.trim() || "—" }}<template v-if="region">, {{ region }}</template></dd>
+            </div>
+            <div>
+              <dt class="text-xs text-[color:var(--bs-muted)]">Photos</dt>
+              <dd class="font-medium">{{ photos.length }}</dd>
+            </div>
+          </div>
+        </dl>
+      </div>
+
+      <!-- Uninsured-tradesperson acknowledgement. A required gate, so it shows
+           on the review step (wizard) and always in full-form mode. -->
       <div
-        v-if="tradieUninsured"
+        v-show="stepShown('review') && tradieUninsured"
         data-field="uninsured"
         class="rounded-md border border-[color:var(--bs-danger)] bg-[color:var(--bs-danger-tint)] px-3 py-3"
       >
@@ -530,7 +774,37 @@ async function submit() {
 
       <FormErrorBanner :message="error" />
 
-      <div class="flex justify-end">
+      <!-- Wizard navigation: Back + Continue, with Send on the final step. -->
+      <div v-if="inWizard" class="flex items-center gap-2">
+        <Button
+          type="button"
+          label="Back"
+          icon="pi pi-arrow-left"
+          text
+          :disabled="wizardStep === 0"
+          @click="wizardBack"
+        />
+        <span class="flex-1"></span>
+        <Button
+          v-if="!isLastStep"
+          type="button"
+          label="Continue"
+          icon="pi pi-arrow-right"
+          icon-pos="right"
+          @click="wizardNext"
+        />
+        <Button
+          v-else
+          type="submit"
+          label="Send request"
+          icon="pi pi-send"
+          :loading="submitting"
+          :disabled="submitting"
+        />
+      </div>
+
+      <!-- Full-form footer (wizard skipped). -->
+      <div v-else class="flex justify-end">
         <Button type="submit" label="Send request" icon="pi pi-send" :loading="submitting" :disabled="submitting" />
       </div>
     </form>
