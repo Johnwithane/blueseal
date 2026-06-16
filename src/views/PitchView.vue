@@ -276,7 +276,7 @@ function fmt(n: number): string {
           </div>
           <div class="badges">
             <span><span class="pill pill--live">LIVE</span> everything above</span>
-            <span><span class="pill pill--test">SWITCHING ON</span> live card payouts, push, Google reviews</span>
+            <span><span class="pill pill--test">SWITCHING ON</span> live card payouts, push, Google reviews, insurance placement</span>
             <span><span class="pill pill--next">NEXT</span> ID automation, financing, app stores</span>
           </div>
         </div>
@@ -339,9 +339,9 @@ function fmt(n: number): string {
               <div class="rm-node rm-done"><div class="rm-dot">✓</div><h4>Design</h4><p>Architecture, brand, and flows.</p></div>
               <div class="rm-node rm-done"><div class="rm-dot">✓</div><h4>Build — full MVP</h4><p>Vetting, marketplace, AI, invoicing, payments.</p></div>
               <div class="rm-node rm-now"><div class="rm-dot">◉</div><h4>Validate</h4><p>~100 verified Okanagan pros · real paid jobs.</p><div class="rm-here">You are here</div></div>
-              <div class="rm-node"><div class="rm-dot">5</div><h4>Launch &amp; grow</h4><p>Incorporate · payments live · Okanagan marketing.</p></div>
+              <div class="rm-node"><div class="rm-dot">5</div><h4>Launch &amp; grow</h4><p>Incorporate · payments live · insurance partner · Okanagan marketing.</p></div>
               <div class="rm-node"><div class="rm-dot">6</div><h4>Scale</h4><p>Kamloops → all of BC.</p></div>
-              <div class="rm-node"><div class="rm-dot">7</div><h4>Expand</h4><p>Alberta · insurance · enterprise.</p></div>
+              <div class="rm-node"><div class="rm-dot">7</div><h4>Expand</h4><p>Alberta · enterprise · new verticals.</p></div>
             </div>
           </div>
           <p class="note">Steps 5–7 are what the $150K funds. The product risk is behind us — this is a go-to-market raise, not a build raise.</p>
@@ -482,28 +482,28 @@ function fmt(n: number): string {
         <div class="container reveal">
           <div class="kicker">Where it grows</div>
           <h2 class="h-lg">Three more revenue lines on a base we already own.</h2>
-          <p class="lead">Each turns the verified audience we've earned into new revenue — and each has a real benchmark behind it.</p>
+          <p class="lead">Each turns the verified audience we've earned into new revenue, with a real benchmark behind it. We're building the first — insurance — right now.</p>
           <div class="grid g3 eqh grid-top">
             <div class="card">
               <div class="bignum">~$135 / pro / yr</div>
-              <h3 class="mt-s">Insurance</h3>
-              <p>Solo trades pay ~$900/yr for liability cover. We already verify it — next we place it, at ~15% commission (or a ~$45 flat affiliate fee). 10% of 15,000 Okanagan pros ≈ a six-figure line locally; BC is ~12× larger.</p>
-              <p class="src">Run in Canada today by Zensurance, Foxquilt, APOLLO.</p>
+              <h3 class="mt-s">Insurance <span class="pill pill--test">IN BUILD NOW</span></h3>
+              <p>Solo trades pay ~$900/yr for liability cover. We already verify it — and we're setting up placement right now, earning ~15% commission (or a ~$45 flat affiliate fee). 10% of 15,000 Okanagan pros ≈ a six-figure line locally; BC is ~12× larger.</p>
+              <p class="src">Live this year. Run in Canada today by Zensurance, Foxquilt, APOLLO.</p>
             </div>
             <div class="card">
               <div class="bignum">$40 / seat / mo</div>
-              <h3 class="mt-s">Enterprise &amp; dispatch</h3>
+              <h3 class="mt-s">Enterprise &amp; dispatch <span class="pill pill--next">NEXT</span></h3>
               <p>Team accounts billed per seat — a 5-person shop is ~$2,400/yr. We bill in CAD and undercut the incumbents' US-dollar pricing.</p>
               <p class="src">ServiceTitan: ~$245–398/tech/mo · $961M revenue · 70% margin (public).</p>
             </div>
             <div class="card">
               <div class="bignum">52,600 needed</div>
-              <h3 class="mt-s">Apprenticeship pathway</h3>
+              <h3 class="mt-s">Apprenticeship pathway <span class="pill pill--pro">MISSION</span></h3>
               <p>BC needs ~52,600 more tradespeople this decade. We pair journeymen with apprentices toward their Red &amp; Blue Seal — our future supply, and a moat.</p>
               <p class="src">SkilledTradesBC: ~47,000 apprentices registered.</p>
             </div>
           </div>
-          <p class="note">Insurance + enterprise are modelled into the projection below; apprenticeship is a supply/mission play (revenue later). Sources: BC Construction Association / SkilledTradesBC 2024; ServiceTitan FY26 filing; Canadian insurtech affiliate benchmarks.</p>
+          <p class="note"><strong>Insurance is in build now</strong> (live this year) and is modelled into the projection below alongside enterprise; apprenticeship is a supply/mission play (revenue later). Sources: BC Construction Association / SkilledTradesBC 2024; ServiceTitan FY26 filing; Canadian insurtech affiliate benchmarks.</p>
         </div>
       </section>
 
@@ -535,7 +535,7 @@ function fmt(n: number): string {
               </tbody>
             </table>
           </div>
-          <p class="note">For scale: ServiceTitan does ~$961M revenue at ~70% margin (public, ~$6.6B market cap); Housecall Pro ~$600M ARR; Thumbtack ~$400M — the category supports eight–nine figures, and this is a fraction of that ceiling. Assumptions (illustrative): 30% Pro conversion; insurance from Y2 (~10% of pros, ~$120/insured/yr, moving affiliate → embedded, needs a brokerage licence); enterprise per-seat from Y3 (~$40/seat/mo, teams a minority of accounts); ~70% gross margin. Swap in live figures before any meeting.</p>
+          <p class="note">For scale: ServiceTitan does ~$961M revenue at ~70% margin (public, ~$6.6B market cap); Housecall Pro ~$600M ARR; Thumbtack ~$400M — the category supports eight–nine figures, and this is a fraction of that ceiling. Assumptions (illustrative): 30% Pro conversion; insurance in build now, modelled conservatively from Y2 (~10% of pros, ~$120/insured/yr, affiliate → embedded, needs a brokerage licence); enterprise per-seat from Y3 (~$40/seat/mo, teams a minority of accounts); ~70% gross margin. Swap in live figures before any meeting.</p>
         </div>
       </section>
 
