@@ -71,6 +71,10 @@ export const clientApproveJob = onCall(CALLABLE_OPTS, async (req) => {
     tx.update(jobRef, {
       status: "awaiting_payment",
       clientApprovedAt: FieldValue.serverTimestamp(),
+      // Start each payment cycle clean — clears any stale "client reported
+      // paid" nudge from a previous awaiting_payment round (e.g. after a
+      // request-changes + re-invoice).
+      clientReportedPaidAt: null,
     });
     // Mark the invoice sent only if still in draft — guard against a late
     // sendInvoice call having already moved it forward.

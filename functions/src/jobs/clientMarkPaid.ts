@@ -1,5 +1,6 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { CALLABLE_OPTS } from "../lib/callable";
+import { FieldValue } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { z } from "zod";
 import { db } from "../lib/admin";
@@ -46,6 +47,13 @@ export const clientMarkPaid = onCall(CALLABLE_OPTS, async (req) => {
       `Job must be awaiting payment. Current status: ${job.status}.`,
     );
   }
+
+  // Record the nudge on the job so BOTH invoice cards can reflect it
+  // persistently (client: "marked sent · awaiting confirmation"; tradesperson:
+  // "client says they paid · confirm receipt"). NON-authoritative — does not
+  // change status; markJobPaid still completes the job. Reset on the next
+  // entry to awaiting_payment (clientApproveJob).
+  await jobSnap.ref.update({ clientReportedPaidAt: FieldValue.serverTimestamp() });
 
   if (job.chatId) {
     await postSystemMessage(

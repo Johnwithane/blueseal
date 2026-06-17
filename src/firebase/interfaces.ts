@@ -919,6 +919,15 @@ export interface JobDoc {
   // Optional because pre-existing jobs may not have the field.
   clientChangesRequestedAt?: Timestamp | null;
   clientChangesRequestedReason?: string | null;
+  // Set by clientMarkPaid when the client reports they've sent OFFLINE payment
+  // (e-transfer/cash). NON-authoritative — it does NOT complete the job; the
+  // tradesperson's markJobPaid still does. It exists purely to surface the
+  // nudge on the invoice card for BOTH parties ("payment marked sent · awaiting
+  // confirmation" client-side; "client says they paid · confirm receipt"
+  // tradesperson-side). Reset to null on each entry to awaiting_payment
+  // (clientApproveJob) so a re-invoiced cycle starts clean. Optional — older
+  // jobs predate it.
+  clientReportedPaidAt?: Timestamp | null;
   cancelledAt: Timestamp | null;
   cancelledReason: string | null;
   // uid of the party who cancelled — used by onJobCancelled trigger to pick

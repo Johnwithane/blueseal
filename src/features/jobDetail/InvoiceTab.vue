@@ -86,11 +86,18 @@ const lockedStatuses = new Set<JobDoc["status"]>([
     >
       <h3 class="font-semibold text-sm mb-1 flex items-center gap-2">
         <i class="pi pi-wallet text-[color:var(--bs-success)]"></i>
-        Payment received?
+        {{ job.clientReportedPaidAt ? "Client says they've paid — confirm receipt" : "Payment received?" }}
       </h3>
       <p class="text-xs text-[color:var(--bs-muted)] mb-3">
-        Mark the invoice paid to close out the job. The client gets a receipt
-        and the review prompt appears.
+        <template v-if="job.clientReportedPaidAt">
+          {{ resolvedClientName || "The client" }} marked this invoice as paid.
+          Confirm you've actually received it to close out the job — they get a
+          receipt and the review prompt appears.
+        </template>
+        <template v-else>
+          Mark the invoice paid to close out the job. The client gets a receipt
+          and the review prompt appears.
+        </template>
       </p>
       <Button
         label="Mark as paid"

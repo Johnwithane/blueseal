@@ -214,7 +214,24 @@ async function openPdfPreview() {
            tradesperson can accept it; the fee-free offline path is always
            available as a secondary option. -->
       <div v-else-if="job.status === 'awaiting_payment'" class="mt-4">
-        <template v-if="invoicePayable">
+        <!-- The client has reported sending offline payment — the nudge is
+             logged and the tradesperson notified. Show a waiting state instead
+             of the (re-clickable) pay button so the action visibly "took". -->
+        <div
+          v-if="job.clientReportedPaidAt"
+          class="rounded-lg border border-[color:var(--bs-success)] p-3 flex items-start gap-2"
+          style="background: color-mix(in srgb, var(--bs-success) 8%, transparent);"
+        >
+          <i class="pi pi-clock text-[color:var(--bs-success)] mt-0.5"></i>
+          <div class="text-sm">
+            <p class="font-medium">Payment marked as sent</p>
+            <p class="text-xs text-[color:var(--bs-muted)] mt-0.5">
+              We've let the tradesperson know. Once they confirm they've received
+              it, the job is complete and your receipt is issued.
+            </p>
+          </div>
+        </div>
+        <template v-else-if="invoicePayable">
           <RouterLink :to="`/invoices/${invoiceId}/pay`" class="block">
             <Button label="Pay by card" icon="pi pi-credit-card" severity="success" class="w-full" />
           </RouterLink>
