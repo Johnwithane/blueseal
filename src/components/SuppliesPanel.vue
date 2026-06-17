@@ -25,10 +25,17 @@ import {
   type SupplyPartner,
 } from "@/data/supplyPartners";
 import { track } from "@/utils/analytics";
+import { sendAssistantMessage } from "@/firebase/services/assistant";
+import { usePaywallStore } from "@/stores/paywall";
+import { useToast } from "@/composables/useToast";
+import { humanizeError } from "@/utils/errors";
 
 const props = defineProps<{
   job: WithId<JobDoc>;
 }>();
+
+const paywall = usePaywallStore();
+const toast = useToast();
 
 const emit = defineEmits<{
   // Open the Add-expense dialog pre-filled (handled by the parent → ExpensesCard).
@@ -96,6 +103,76 @@ function logItem(item: SupplyItem) {
     jobId: props.job.id,
   });
   emit("log-expense", { vendor: partner.name, description: item.label, category: "materials" });
+}
+
+// ----- AI shopping list (Blue Seal Pro) -----
+// Reuses the existing Pro-gated assistant (aiChat). Asks for a clean bulleted
+// list of buyable materials for this job, parsed into shoppable rows. The
+// server runs requireAiEntitlement first, so non-Pro tradies get the paywall
+// (no inference spent); the client just funnels the error.
+const AI_SHOPPING_PROMPT =
+  "List the parts, materials and consumables I should buy for this job. " +
+  "Reply with ONLY a simple bulleted list — one item per line starting with " +
+  "'- ', each naming the item with a typical size or spec where it matters " +
+  "(e.g. '- 1/2\" copper pipe, type L'). Keep it to what's likely needed, not " +
+  "exhaustive. No preamble, no headings, no tools-only section. This is " +
+  "read-only — do not call any tools or change anything on the job.";
+
+const aiLoading = ref(false);
+const aiItems = ref<string[]>([]);
+// Reused across refreshes so repeated generations don't spawn new threads.
+const aiConversationId = ref<string | undefined>(undefined);
+
+function parseShoppingList(reply: string): string[] {
+  return reply
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => /^[-*•]\s+/.test(l))
+    .map((l) => l.replace(/^[-*•]\s+/, "").replace(/\*\*/g, "").trim())
+    .filter((l) => l.length > 0)
+    .slice(0, 25);
+}
+
+async function generateAiList() {
+  aiLoading.value = true;
+  try {
+    const res = await sendAssistantMessage({
+      scope: "job",
+      jobId: props.job.id,
+      conversationId: aiConversationId.value,
+      message: AI_SHOPPING_PROMPT,
+      hidden: true,
+    });
+    aiConversationId.value = res.conversationId;
+    aiItems.value = parseShoppingList(res.reply);
+    void track("supply_ai_list", {
+      trade: props.job.trade,
+      jobId: props.job.id,
+      count: aiItems.value.length,
+    });
+    if (!aiItems.value.length) {
+      toast.info("Nothing to show", "The assistant didn't return a clear list — try the chat for detail.");
+    }
+  } catch (e) {
+    if (paywall.fromError(e)) return;
+    toast.error("Couldn't generate list", humanizeError(e));
+  } finally {
+    aiLoading.value = false;
+  }
+}
+
+function shopAiItem(text: string) {
+  trackClick(searchPartner.value, "ai");
+  openExternal(buildSearchUrl(searchPartner.value, text));
+}
+function logAiItem(text: string) {
+  void track("supply_expense_prefill", {
+    partnerId: searchPartner.value.id,
+    category: "materials",
+    trade: props.job.trade,
+    jobId: props.job.id,
+  });
+  emit("log-expense", { vendor: searchPartner.value.name, description: text, category: "materials" });
 }
 
 // ----- category-filtered tiles -----
@@ -179,6 +256,53 @@ function logFromSearch() {
         :disabled="!query.trim()"
         @click="logFromSearch"
       />
+    </div>
+
+    <!-- AI shopping list (Blue Seal Pro) — a job-specific list from the brief. -->
+    <div class="mt-3">
+      <Button
+        :label="aiItems.length ? 'Refresh AI list' : 'Ask AI what to bring'"
+        icon="pi pi-sparkles"
+        size="small"
+        outlined
+        class="w-full"
+        :loading="aiLoading"
+        @click="generateAiList"
+      />
+      <div
+        v-if="aiItems.length"
+        class="mt-2 rounded-lg border border-[color:var(--bs-border)] p-3"
+      >
+        <div class="text-[11px] font-medium uppercase tracking-wide text-[color:var(--bs-muted)]">
+          AI suggestions for this job
+        </div>
+        <ul class="mt-1 divide-y divide-[color:var(--bs-border)]">
+          <li
+            v-for="(item, i) in aiItems"
+            :key="i"
+            class="flex items-center gap-2 py-1.5"
+          >
+            <span class="flex-1 min-w-0 text-sm">{{ item }}</span>
+            <Button
+              label="Shop"
+              icon="pi pi-external-link"
+              size="small"
+              text
+              @click="shopAiItem(item)"
+            />
+            <Button
+              icon="pi pi-plus"
+              size="small"
+              text
+              aria-label="Log as expense"
+              @click="logAiItem(item)"
+            />
+          </li>
+        </ul>
+        <p class="mt-2 text-[11px] text-[color:var(--bs-muted)]">
+          AI-generated from the job details — double-check quantities and specs before you buy.
+        </p>
+      </div>
     </div>
 
     <!-- Per-trade quick-picks — what this trade usually needs, one tap to shop

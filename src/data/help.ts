@@ -413,7 +413,7 @@ You can return to the **Payouts** screen any time to finish setup or open your p
 
 **Receipts & expenses.** The tradesperson can upload receipts (materials, fuel, disposal) on the Work order tab — we auto-read the total, vendor and date, and the receipt itself stays private to the tradesperson. Materials supplied from the tradesperson's own stock can be **added manually too — no receipt needed** — and bill the same way. On an **hourly** job each expense becomes a billable line with an optional markup. On a **fixed-price** job expenses are **for the tradesperson's records only and aren't billed** — the agreed price already covers materials. To charge for a material that was genuinely outside the original scope, the tradesperson proposes a **change order** the client approves, rather than adding it as an expense.
 
-**Finding supplies.** Right above the receipts is a **Supplies** panel — search a vetted Canadian supplier (Home Depot, RONA, Amazon.ca and more) for the parts, tools, rental gear or workwear a job needs. Tap **Log expense** on anything you buy and it drops into your receipts pre-filled, so it bills through without re-typing. It's there to save you time on the supply run — it's tradesperson-only (your client never sees it), shopping through the links helps fund Blue Seal, and we only list suppliers we'd use ourselves.`,
+**Finding supplies.** Right above the receipts is a **Supplies** panel — search a vetted Canadian supplier (Home Depot, RONA, Amazon.ca and more) for the parts, tools, rental gear or workwear a job needs, with quick-picks for your trade built in. With **Blue Seal Pro**, an **AI list** reads the job details and suggests exactly what to bring. Tap **Log expense** on anything you buy and it drops into your receipts pre-filled, so it bills through without re-typing. It's there to save you time on the supply run — it's tradesperson-only (your client never sees it), shopping through the links helps fund Blue Seal, and we only list suppliers we'd use ourselves.`,
   },
   {
     slug: "bring-your-own-client",
@@ -629,7 +629,7 @@ const faqs: FaqItem[] = [
   {
     question: "Where do I find supplies for a job?",
     answer:
-      "Open the job's **Work order** tab — the **Supplies** panel (just above your receipts) lets you search a vetted Canadian supplier for the parts, tools, rental gear or workwear the job needs. Tap **Log expense** on anything you buy and it's added to your receipts pre-filled, so it bills through without re-typing. It's a tradesperson tool — your client never sees it.",
+      "Open the job's **Work order** tab — the **Supplies** panel (just above your receipts) lets you search a vetted Canadian supplier for the parts, tools, rental gear or workwear the job needs, with quick-picks for your trade and, on **Blue Seal Pro**, an AI list that suggests what to bring. Tap **Log expense** on anything you buy and it's added to your receipts pre-filled, so it bills through without re-typing. It's a tradesperson tool — your client never sees it.",
     categoryId: "for-tradespeople",
     audience: "tradesperson",
   },
