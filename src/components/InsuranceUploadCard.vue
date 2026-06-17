@@ -425,10 +425,7 @@ async function saveEdit() {
         class="ins-get-covered mt-3"
       >
         <i class="pi pi-shield" aria-hidden="true"></i>
-        <span>
-          Don't have coverage yet? Get covered in minutes with
-          {{ INSURANCE_PARTNER.name }}
-        </span>
+        <span>Don't have coverage yet? Get covered in minutes</span>
         <i class="pi pi-external-link ins-get-covered__ext" aria-hidden="true"></i>
       </a>
 

@@ -44,16 +44,16 @@ Supporting contract language is in **Terms of Service § 4.3** (and §§ 4.1, 4.
 
 ## Insurance partner referral (added 2026-06-15)
 
-Blue Seal surfaces a "Get covered" / "Get insured" insurance referral throughout the tradesperson experience (onboarding card, dashboard banner, the soft bid/quote reminder dialog, and the uninsured-work waiver) and sends automated renewal reminders before a verified policy lapses. **Partner: Foxquilt** — a Foxquilt policy names Blue Seal as an additional insured, which also satisfies the additional-insured check on upload. The code is live; the CTA currently points at **Foxquilt's public site as a placeholder** (`src/data/insurancePartner.ts`).
+Blue Seal surfaces a partner-agnostic "Get covered" / "Get insured in minutes" insurance referral throughout the tradesperson experience (onboarding card, dashboard banner — which also has an "Upload my insurance" popup — the soft bid/quote reminder dialog, and the uninsured-work waiver) and sends automated renewal reminders before a verified policy lapses. **Partner: Foxquilt** — a Foxquilt policy names Blue Seal as an additional insured, which also satisfies the additional-insured check on upload. The CTAs deliberately don't name the partner. The code is live; the CTA currently points at **Foxquilt's public site as a placeholder** (`src/data/insurancePartner.ts`).
 
-### [ ] Sign up for the Foxquilt partner program and set the tracked referral link
+### [ ] Get the Foxquilt embeddable quote widget (preferred) — or, interim, a tracked link
 
-- **Why:** Until the approved partner/referral URL is set, the "Get insured" CTAs point at Foxquilt's generic public site — clicks aren't attributed to Blue Seal, so no referral revenue is tracked.
-- **What:** Complete the Foxquilt partner signup and get the tracked referral link. When it's issued, set it in:
+- **Foxquilt is providing an embeddable HTML quote widget once fully signed up.** That's the better integration: pros get a quote / buy in-app instead of being bounced to an external site.
+  - **When you have the embed snippet, ping Claude** — I'll swap the external "Get insured" links for an in-app embed (iframe in a dialog), reusing the same CTA buttons. Small change.
+- **Interim (until the embed is ready):** set the tracked referral link so clicks are attributed:
   1. `.env` as `VITE_INSURANCE_PARTNER_URL=...` (local builds).
   2. GitHub → **Settings → Secrets and variables → Actions** → add `VITE_INSURANCE_PARTNER_URL` (deploy.yml / ci.yml already read the `VITE_*` build env). Then push to main / run the Deploy workflow so hosting rebuilds with it.
-  If you switch partners, also update `name` in `src/data/insurancePartner.ts`.
-- **Verify:** On a tradesperson account, the onboarding insurance card / dashboard banner / bid-without-insurance dialog "Get covered" button opens **your** referral link (not the generic site) in a new tab.
+- **Verify:** On a tradesperson account, the dashboard banner / bid-without-insurance dialog / waiver "Get insured" button opens **your** link (not the generic site) in a new tab.
 
 ### [ ] (Optional, partner-dependent) Real policy / renewal sync
 

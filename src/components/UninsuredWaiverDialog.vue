@@ -82,7 +82,7 @@ function onConfirm() {
       class="mt-3 flex items-center gap-2 rounded-md border border-[color:var(--bs-blue)] px-3 py-2 text-sm font-semibold text-[color:var(--bs-blue-dark)]"
     >
       <i class="pi pi-shield" aria-hidden="true"></i>
-      <span>Get insured in minutes with {{ INSURANCE_PARTNER.name }}</span>
+      <span>Get insured in minutes</span>
       <i class="pi pi-external-link ml-auto text-[0.72rem] opacity-70" aria-hidden="true"></i>
     </a>
 

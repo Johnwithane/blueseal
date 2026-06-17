@@ -62,7 +62,7 @@ function getCovered() {
           </li>
           <li>
             <span class="ir-check"><i class="pi pi-bolt" aria-hidden="true"></i></span>
-            <span>Quote and buy online in minutes with {{ INSURANCE_PARTNER.name }}</span>
+            <span>Quote and buy online in minutes</span>
           </li>
           <li>
             <span class="ir-check"><i class="pi pi-bell" aria-hidden="true"></i></span>
@@ -76,7 +76,7 @@ function getCovered() {
           <i class="pi pi-external-link ir-cta-ext" aria-hidden="true"></i>
         </button>
         <p class="ir-hint">
-          Opens {{ INSURANCE_PARTNER.name }} in a new tab — come back to finish.
+          Opens in a new tab — come back to finish.
         </p>
 
         <div class="ir-foot">
