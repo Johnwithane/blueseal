@@ -8,6 +8,7 @@ import type { Testimonial } from "@/firebase/interfaces";
 import { HELP_CONTENT_SEED } from "@/data/help";
 import SealCharacter from "@/components/SealCharacter.vue";
 import BlueSealMark from "@/components/brand/BlueSealMark.vue";
+import MarkdownProse from "@/components/help/MarkdownProse.vue";
 import { useGoogleMaps } from "@/composables/useGoogleMaps";
 import { useSeo } from "@/composables/useSeo";
 import { homeSeo } from "@/seo/content";
@@ -517,7 +518,7 @@ onMounted(async () => {
               ></i>
             </button>
             <div v-if="openFaq === i" class="px-5 pb-4 text-sm text-[color:var(--bs-muted)]">
-              {{ f.answer }}
+              <MarkdownProse :source="f.answer" />
             </div>
           </div>
         </div>
