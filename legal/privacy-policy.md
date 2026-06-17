@@ -3,7 +3,7 @@
 **Effective date:** 2026-05-21
 **Last updated:** 2026-06-15
 
-This Privacy Policy explains how **Blue Seal**, a sole proprietorship operated by **[OPERATOR LEGAL NAME]** in British Columbia, Canada ("Blue Seal", "we", "us", "our"), collects, uses, discloses, retains and protects personal information when you use the Blue Seal progressive web application, websites under https://blueseal.app, and related services (together, the "**Service**").
+This Privacy Policy explains how **Blue Seal**, a sole proprietorship operated by **James Jansen** in British Columbia, Canada ("Blue Seal", "we", "us", "our"), collects, uses, discloses, retains and protects personal information when you use the Blue Seal progressive web application, websites under https://blueseal.app, and related services (together, the "**Service**").
 
 > **[Before publishing: replace `[OPERATOR LEGAL NAME]` here and in § 13 with the registered name the Blue Seal sole proprietorship operates under, and have this reviewed by a lawyer.]**
 
@@ -266,7 +266,7 @@ Non-material changes (typos, clarifications, contact updates) may be made withou
 
 For privacy questions, requests under § 7, or complaints:
 
-**Blue Seal — Privacy Officer** (Blue Seal is operated as a sole proprietorship by **[OPERATOR LEGAL NAME]**)
+**Blue Seal — Privacy Officer** (Blue Seal is operated as a sole proprietorship by **James Jansen**)
 **Email:** contact@blueseal.app
 **Mailing address:** 6960 Terazona Drive, Kelowna, BC, Canada V1Z 3R8
 

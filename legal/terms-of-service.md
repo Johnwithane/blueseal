@@ -3,7 +3,7 @@
 **Effective date:** 2026-05-21
 **Last updated:** 2026-06-16
 
-These Terms of Service ("**Terms**") are a binding agreement between you and **Blue Seal**, a sole proprietorship operated by **[OPERATOR LEGAL NAME]** in British Columbia, Canada ("**Blue Seal**", "**we**", "**us**", "**our**"). They govern your access to and use of the Blue Seal progressive web application, websites under https://blueseal.app, and related services (together, the "**Service**").
+These Terms of Service ("**Terms**") are a binding agreement between you and **Blue Seal**, a sole proprietorship operated by **James Jansen** in British Columbia, Canada ("**Blue Seal**", "**we**", "**us**", "**our**"). They govern your access to and use of the Blue Seal progressive web application, websites under https://blueseal.app, and related services (together, the "**Service**").
 
 > **[ACTION REQUIRED before publishing: replace `[OPERATOR LEGAL NAME]` above and in § 21 with the registered name the Blue Seal sole proprietorship operates under, and have this document reviewed by a lawyer. Blue Seal currently operates as a sole proprietorship; if it is later incorporated, update the operating-entity references throughout.]**
 
@@ -424,7 +424,7 @@ If you continue to use the Service after the change takes effect, you accept the
 
 ## 21. How to contact us
 
-Blue Seal is operated as a sole proprietorship by **[OPERATOR LEGAL NAME]**.
+Blue Seal is operated as a sole proprietorship by **James Jansen**.
 
 - **Email** (terms, support, or privacy): **contact@blueseal.app**
 - **Mailing address:** 6960 Terazona Drive, Kelowna, BC, Canada V1Z 3R8
