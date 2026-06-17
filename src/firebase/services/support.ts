@@ -17,8 +17,10 @@ import {
   serverTimestamp,
   updateDoc,
 } from "firebase/firestore";
-import { auth as fbAuth, db } from "@/firebase/config";
+import { httpsCallable } from "firebase/functions";
+import { auth as fbAuth, db, functions } from "@/firebase/config";
 import type {
+  SupportReplyDoc,
   SupportTicketDoc,
   SupportTicketStatus,
   WithId,
@@ -75,4 +77,45 @@ export async function setSupportTicketStatus(
     handledBy: uid,
     updatedAt: serverTimestamp() as never,
   });
+}
+
+/** Admin private triage notes (client write; allowed by the widened update rule). */
+export async function setSupportInternalNotes(id: string, notes: string): Promise<void> {
+  await updateDoc(ticketRef(id), {
+    internalNotes: notes,
+    updatedAt: serverTimestamp() as never,
+  });
+}
+
+/** Admin: the replies already sent on a ticket (newest first). */
+export async function listSupportReplies(ticketId: string): Promise<WithId<SupportReplyDoc>[]> {
+  const snap = await getDocs(
+    query(collection(db, "supportTickets", ticketId, "replies"), orderBy("sentAt", "desc")),
+  );
+  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as SupportReplyDoc) }));
+}
+
+/** AI: draft 3 reply options for a ticket (admin-only Vertex callable). */
+export async function aiDraftSupportReply(ticketId: string): Promise<string[]> {
+  const callable = httpsCallable<{ ticketId: string }, { ok: boolean; suggestions: string[] }>(
+    functions,
+    "aiDraftSupportReply",
+  );
+  const res = await callable({ ticketId });
+  return res.data.suggestions ?? [];
+}
+
+/**
+ * Send a branded reply to the customer + record it on the ticket. mode "reply"
+ * sets a monitored Reply-To; "noreply" is one-way. Optionally moves the status
+ * (defaults to resolved server-side).
+ */
+export async function sendSupportTicketReply(input: {
+  ticketId: string;
+  body: string;
+  mode: "reply" | "noreply";
+  status?: SupportTicketStatus;
+}): Promise<void> {
+  const callable = httpsCallable<typeof input, { ok: boolean }>(functions, "sendSupportTicketReply");
+  await callable(input);
 }

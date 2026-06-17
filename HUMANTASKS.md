@@ -6,6 +6,31 @@ Tasks are grouped by the phase that introduced them so you can see why each one 
 
 ---
 
+## Support desk — monitored reply inbox (added 2026-06-17)
+
+Admins can now reply to Help Center tickets from `/admin/support` (AI-drafted +
+branded send). When sent in **"reply"** mode, the email's **Reply-To** is set to
+`hello@blueseal.app` (override via the `SUPPORT_REPLY_TO` env var on the Cloud
+Functions runtime) so the customer's reply reaches a human. The branded email is
+sent **From** the verified no-reply sender via the Trigger Email extension; we do
+NOT ingest inbound email — replies land in that mailbox and are read manually.
+
+### [ ] Stand up `hello@blueseal.app` as a real, monitored mailbox
+
+- **Why:** Customer replies to support emails go there. If it doesn't exist (or
+  isn't watched), replies bounce / are lost.
+- **What:**
+  1. Create/route `hello@blueseal.app` (a real inbox or a forward to wherever
+     support is read), and confirm the `blueseal.app` domain can RECEIVE mail
+     (MX records). Sending already works via the verified domain.
+  2. (Optional) If you'd rather use a different reply address, set
+     `SUPPORT_REPLY_TO=<address>` on the Functions runtime and redeploy
+     `sendSupportTicketReply`.
+- **Verify:** Send yourself a reply from `/admin/support` in "reply" mode, hit
+  reply in your mail client → it arrives at the monitored inbox.
+
+---
+
 ## QA toolkit — disable before public launch (added 2026-06-16)
 
 A self-serve QA toolkit shipped so the QA team can stand up their own test state without admin power: a new **`qa`** role (admin-granted only, via Admin → Users), a `/qa` view to provision an approved tradesperson on any trade + toggle their own Pro + reset their own data, a global **Report a bug** button (`bugReports` + `/admin/bug-reports` triage), and QA read/resolve access to the existing `errorLogs`. The two *fabrication* callables (`qaProvisionSelfTradesperson`, `qaSetSelfPro`) are env-gated by **`QA_TOOLKIT_ENABLED`**, currently **`true`** in `functions/.env.blueseal-762af` (safe pre-launch — no live users). Provisioned QA tradesperson profiles are tagged `tradespeople/{uid}.isQa = true`.

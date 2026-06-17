@@ -6,11 +6,8 @@
 import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import Button from "primevue/button";
-import Tag from "primevue/tag";
-import Select from "primevue/select";
 import SelectButton from "primevue/selectbutton";
-import { listSupportTickets, setSupportTicketStatus } from "@/firebase/services/support";
-import { useFormatters } from "@/composables/useFormatters";
+import { listSupportTickets } from "@/firebase/services/support";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 import type {
@@ -19,15 +16,14 @@ import type {
   WithId,
 } from "@/firebase/interfaces";
 import LoadingState from "@/components/LoadingState.vue";
+import AdminSupportTicketCard from "@/components/admin/AdminSupportTicketCard.vue";
 
-const { relativeTime } = useFormatters();
 const toast = useToast();
 
 const tickets = ref<WithId<SupportTicketDoc>[]>([]);
 const loading = ref(true);
 const errored = ref(false);
 const filter = ref<SupportTicketStatus | "all">("open");
-const updatingId = ref<string | null>(null);
 
 const STATUS_OPTIONS: { label: string; value: SupportTicketStatus }[] = [
   { label: "Open", value: "open" },
@@ -37,13 +33,6 @@ const STATUS_OPTIONS: { label: string; value: SupportTicketStatus }[] = [
 ];
 
 const filterOptions = [{ label: "All", value: "all" }, ...STATUS_OPTIONS];
-
-function statusSeverity(s: SupportTicketStatus): "info" | "warn" | "success" | "secondary" {
-  if (s === "open") return "info";
-  if (s === "in_progress") return "warn";
-  if (s === "resolved") return "success";
-  return "secondary";
-}
 
 function statusLabel(s: SupportTicketStatus): string {
   return STATUS_OPTIONS.find((o) => o.value === s)?.label ?? s;
@@ -68,27 +57,6 @@ async function refresh() {
 }
 
 onMounted(refresh);
-
-async function changeStatus(ticket: WithId<SupportTicketDoc>, status: SupportTicketStatus) {
-  if (status === ticket.status) return;
-  updatingId.value = ticket.id;
-  const prev = ticket.status;
-  ticket.status = status; // optimistic
-  try {
-    await setSupportTicketStatus(ticket.id, status);
-    toast.success("Updated", `Marked ${statusLabel(status).toLowerCase()}.`);
-  } catch (e) {
-    ticket.status = prev;
-    toast.error("Couldn't update", humanizeError(e));
-  } finally {
-    updatingId.value = null;
-  }
-}
-
-function replyHref(t: WithId<SupportTicketDoc>): string {
-  const subject = `Re: [Support] ${t.topic}`;
-  return `mailto:${t.email}?subject=${encodeURIComponent(subject)}`;
-}
 </script>
 
 <template>
@@ -137,39 +105,8 @@ function replyHref(t: WithId<SupportTicketDoc>): string {
     </div>
 
     <ul v-else class="space-y-3">
-      <li v-for="t in visible" :key="t.id" class="bs-card p-4">
-        <div class="flex flex-wrap items-start justify-between gap-3">
-          <div class="min-w-0">
-            <div class="flex flex-wrap items-center gap-2">
-              <span class="font-semibold text-[color:var(--bs-blue-dark)]">{{ t.name }}</span>
-              <Tag :severity="statusSeverity(t.status)" :value="statusLabel(t.status)" />
-              <span class="bs-pill text-[11px]">{{ t.topic }}</span>
-            </div>
-            <div class="mt-0.5 text-xs text-[color:var(--bs-muted)]">
-              {{ t.email }} · {{ relativeTime(t.createdAt) }}
-            </div>
-          </div>
-          <a :href="replyHref(t)" class="no-underline">
-            <Button label="Reply" icon="pi pi-reply" size="small" outlined />
-          </a>
-        </div>
-
-        <p class="mt-3 whitespace-pre-wrap rounded-lg bg-[color:var(--bs-surface-alt)] p-3 text-sm text-[color:var(--bs-text)]">
-          {{ t.message }}
-        </p>
-
-        <div class="mt-3 flex items-center gap-2">
-          <label class="text-xs font-medium text-[color:var(--bs-muted)]">Status</label>
-          <Select
-            :model-value="t.status"
-            :options="STATUS_OPTIONS"
-            option-label="label"
-            option-value="value"
-            :loading="updatingId === t.id"
-            class="w-44"
-            @update:model-value="(s: SupportTicketStatus) => changeStatus(t, s)"
-          />
-        </div>
+      <li v-for="t in visible" :key="t.id">
+        <AdminSupportTicketCard :ticket="t" @patch="(p) => Object.assign(t, p)" />
       </li>
     </ul>
   </section>
