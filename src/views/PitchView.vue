@@ -3,6 +3,10 @@ import { ref, onMounted, onBeforeUnmount, nextTick } from "vue";
 import { useSeo } from "@/composables/useSeo";
 import { getPlatformStats } from "@/firebase/services/platformStats";
 import type { PlatformStatsDoc } from "@/firebase/interfaces";
+import MockSearch from "@/components/pitch/MockSearch.vue";
+import MockKanban from "@/components/pitch/MockKanban.vue";
+import MockInvoice from "@/components/pitch/MockInvoice.vue";
+import MockAiChat from "@/components/pitch/MockAiChat.vue";
 
 useSeo({
   title: "Partner Brief",
@@ -246,11 +250,11 @@ function fmt(n: number): string {
             <div class="card center"><img class="char step-char" src="/characters/seal-scene-chat.webp" alt="" /><div class="si">3</div><h3>Do</h3><p>Chat, photos and scheduling on a job kanban board.</p></div>
             <div class="card center"><img class="char step-char" src="/characters/seal-scene-payout.webp" alt="" /><div class="si">4</div><h3>Get paid</h3><p>Auto-invoice, pay by card, mutual review.</p></div>
           </div>
-          <!-- TODO(real assets): swap each .shot-ph for a real <img> of the app. -->
+          <!-- Branded UI mockups (static mock data) standing in for real app captures. -->
           <div class="shot-grid cols-3">
-            <figure class="shot"><div class="shot-ph">📱 App screenshot — Search &amp; map of verified pros</div><figcaption>Discovery: map + list, filtered by trade &amp; location.</figcaption></figure>
-            <figure class="shot"><div class="shot-ph">📱 App screenshot — Job kanban + per-job chat</div><figcaption>The live pipeline a tradesperson works each job from.</figcaption></figure>
-            <figure class="shot"><div class="shot-ph">📱 App screenshot — Itemized invoice + card payment</div><figcaption>Auto-generated invoice; pay in-app by card.</figcaption></figure>
+            <figure class="shot"><MockSearch /><figcaption>Discovery: map + list, filtered by trade &amp; location.</figcaption></figure>
+            <figure class="shot"><MockKanban /><figcaption>The live pipeline a tradesperson works each job from.</figcaption></figure>
+            <figure class="shot"><MockInvoice /><figcaption>Auto-generated invoice; pay in-app by card.</figcaption></figure>
           </div>
           <h3 class="sub-h">What's built</h3>
           <div class="grid g2 eqh">
@@ -296,7 +300,7 @@ function fmt(n: number): string {
             <div class="card"><h3>Auto job-log <span class="pill pill--pro">PRO</span></h3><p>Catches scope changes in the chat so nothing slips before billing.</p></div>
             <div class="card"><h3>Snap a receipt <span class="pill pill--free">FREE</span></h3><p>Reads vendor, total, date, category — expenses ready for tax time.</p></div>
           </div>
-          <figure class="shot" style="max-width: 780px; margin: 1.4rem auto 0;"><div class="shot-ph">📱 App screenshot — the AI assistant inside a job (diagnose · draft a reply · quote)</div><figcaption>Replace with a real capture of the in-job AI chat.</figcaption></figure>
+          <figure class="shot" style="max-width: 360px; margin: 1.4rem auto 0;"><MockAiChat /><figcaption>The in-job AI: diagnose, draft a reply, build the quote.</figcaption></figure>
           <p class="note">Most AI is part of Blue Seal Pro. Receipt scanning is free for every tradesperson — the on-ramp to a paid subscription.</p>
         </div>
       </section>
@@ -424,11 +428,10 @@ function fmt(n: number): string {
               that fills our social feed and homepage. Acquisition and marketing in one move.
             </p>
           </div>
-          <!-- TODO(real assets): drop real founder/tradesperson headshots + a social-feed grab here. -->
           <div class="shot-grid cols-3">
-            <figure class="shot"><div class="shot-ph">📷 Photo — founding tradesperson headshot</div><figcaption>James-shot portrait — drop a real founder headshot here.</figcaption></figure>
-            <figure class="shot"><div class="shot-ph">📷 Photo — headshot + their trade</div><figcaption>The same set that seeds the social feed.</figcaption></figure>
-            <figure class="shot"><div class="shot-ph">📷 Photo — social post / feed grid</div><figcaption>A real Instagram/feed grab once posts are live.</figcaption></figure>
+            <figure class="shot"><img class="shot-photo" src="https://images.unsplash.com/photo-1731168273756-e02cae42265b?q=80&amp;w=800&amp;auto=format&amp;fit=crop" alt="Founding tradesperson portrait" loading="lazy" /><figcaption>James-shot portrait.</figcaption></figure>
+            <figure class="shot"><img class="shot-photo" src="https://images.unsplash.com/photo-1621905251189-08b45d6a269e?q=80&amp;w=800&amp;auto=format&amp;fit=crop" alt="Tradesperson at work" loading="lazy" /><figcaption>The same set that seeds the social feed.</figcaption></figure>
+            <figure class="shot"><img class="shot-photo" src="https://images.unsplash.com/photo-1505798577917-a65157d3320a?q=80&amp;w=800&amp;auto=format&amp;fit=crop" alt="Tradesperson portrait" loading="lazy" /><figcaption>A real Instagram/feed grab once posts are live.</figcaption></figure>
           </div>
         </div>
       </section>
@@ -1655,9 +1658,24 @@ ul.clean li::before {
   margin-top: 0.4rem;
 }
 
-/* Screenshot / photo placeholder slots — replace .shot-ph with a real <img>. */
+/* Screenshot / photo slots. .shot-ph is the dashed placeholder; .shot-photo is
+   a real square image (founder headshots); app screens use the Mock* phone
+   components, which size themselves. */
 .shot {
   margin: 0;
+}
+.shot-photo {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  object-position: center;
+  border-radius: var(--r-lg);
+  display: block;
+  box-shadow: var(--sh-md);
+}
+.band--navy .shot-photo,
+.band--deep .shot-photo {
+  box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.5);
 }
 .shot-ph {
   border: 2px dashed var(--bs-border);
