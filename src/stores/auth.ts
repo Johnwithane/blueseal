@@ -150,6 +150,12 @@ export const useAuthStore = defineStore("auth", {
 
   getters: {
     isAuthenticated: (s) => !!s.fbUser,
+    // Whether the signed-in user's email is confirmed. Google / magic-link
+    // accounts are verified at sign-in; email+password signups start false
+    // until they click the verification link. Drives VerifyEmailBanner and the
+    // submit-for-vetting gate. Reflects the cached token, so it flips to true on
+    // the next page load after the user verifies.
+    isEmailVerified: (s) => !!s.fbUser?.emailVerified,
     // "Currently viewing as X" — strictly follows activeRole so DashboardEntry
     // and other view-mode-driven UI behave correctly when an admin switches
     // into client or tradesperson view.
@@ -531,6 +537,16 @@ export const useAuthStore = defineStore("auth", {
     async changeEmail(newEmail: string) {
       if (!this.fbUser) throw new Error("Sign-in required");
       await callRequestEmailChange(newEmail);
+    },
+
+    /**
+     * Re-send the branded verification email for the current account (e.g. from
+     * VerifyEmailBanner when the first one was missed or landed in spam). Throws
+     * on rate-limit / transient errors so the caller can surface a message.
+     */
+    async resendVerificationEmail() {
+      if (!this.fbUser) throw new Error("Sign-in required");
+      await callSendVerificationEmail();
     },
 
     async refreshClaims() {

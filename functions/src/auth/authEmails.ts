@@ -82,8 +82,11 @@ export const sendVerificationEmail = onCall(CALLABLE_OPTS, async (req) => {
     "Too many verification emails. Please try again tomorrow.",
   );
 
+  // After verifying, a signed-in user (the common same-device case) lands on
+  // their dashboard. (A cross-device click where they're not signed in bounces
+  // to Home via the auth guard — still no 404.)
   const link = await adminAuth.generateEmailVerificationLink(email, {
-    url: `${appBaseUrl()}/login`,
+    url: `${appBaseUrl()}/dashboard`,
   });
 
   await deliver({
@@ -131,7 +134,7 @@ export const requestPasswordReset = onCall(CALLABLE_OPTS, async (req) => {
 
   try {
     const link = await adminAuth.generatePasswordResetLink(email, {
-      url: `${appBaseUrl()}/login`,
+      url: `${appBaseUrl()}/sign-in`,
     });
     await deliver({
       to: email,

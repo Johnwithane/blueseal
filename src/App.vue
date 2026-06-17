@@ -15,6 +15,7 @@ import RoleSwitchOverlay from "@/components/RoleSwitchOverlay.vue";
 import AppUpdatePrompt from "@/components/AppUpdatePrompt.vue";
 import AppShell from "@/components/shell/AppShell.vue";
 import ActiveClockBanner from "@/components/ActiveClockBanner.vue";
+import VerifyEmailBanner from "@/components/VerifyEmailBanner.vue";
 import { useNotificationsStore } from "@/stores/notifications";
 import { useSubscriptionStore } from "@/stores/subscription";
 import { useAuthStore } from "@/stores/auth";
@@ -140,6 +141,10 @@ function openFromToast(notifId: string) {
          viewport — a tradesperson can stop their running clock from anywhere,
          not just the job's own page. Renders nothing unless a clock is running. -->
     <ActiveClockBanner />
+    <!-- Global "confirm your email" nudge for signed-in, unverified accounts.
+         Above the layout switch so it spans every chrome; self-hides when
+         verified or signed out. -->
+    <VerifyEmailBanner />
     <!-- Fade between chrome systems so crossing the public↔app boundary
          (sign-in, or a visitor→member transition on a hybrid route) is a
          smooth crossfade rather than an abrupt swap. Keyed on `layout` so

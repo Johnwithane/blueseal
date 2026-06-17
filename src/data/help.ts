@@ -798,7 +798,7 @@ const faqs: FaqItem[] = [
   {
     question: "How do I become a verified tradesperson?",
     answer:
-      "Sign up as a tradesperson and complete the onboarding wizard — it walks you through uploading your **government ID**, **trade certification**, **insurance**, and **WSIB/workers' comp** where it applies. Our team reviews it and you're notified when you go live.",
+      "Sign up as a tradesperson and complete the onboarding wizard — it walks you through uploading your **government ID**, **trade certification**, **insurance**, and **WSIB/workers' comp** where it applies. **Confirm your email** first (we send a link when you sign up) — your profile can't be submitted for review until it's verified. Our team reviews it and you're notified when you go live.",
     categoryId: "for-tradespeople",
     audience: "tradesperson",
   },
@@ -812,7 +812,7 @@ const faqs: FaqItem[] = [
   {
     question: "Can I work before I'm verified?",
     answer:
-      "You can finish setting up your profile, portfolio, and availability while you wait, but you can't take jobs or appear in search until your verification is approved. That gate is what makes the badges mean something.",
+      "You can finish setting up your profile, portfolio, and availability while you wait, but you can't take jobs or appear in search until your verification is approved. You'll also need to **confirm your email** before you can submit your profile for review — we send a verification link when you sign up, and there's a Resend button in the banner if it didn't arrive. That gate is what makes the badges mean something.",
     categoryId: "for-tradespeople",
     audience: "tradesperson",
   },

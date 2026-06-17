@@ -6,6 +6,16 @@ import { requireRole } from "../lib/auth";
 
 export const submitForVetting = onCall(CALLABLE_OPTS, async (req) => {
   const uid = requireRole(req, "tradesperson");
+  // A tradesperson can't enter the vetting queue (and therefore can't be
+  // approved / go public) until their email is verified. This is the single
+  // chokepoint to going live, so gating here is sufficient — no rules change.
+  // Clients are unaffected; they never call this.
+  if (req.auth?.token?.email_verified !== true) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Verify your email before submitting your profile for review.",
+    );
+  }
   const tradieRef = db.doc(`tradespeople/${uid}`);
   const idRef = db.doc(`idVerifications/${uid}`);
   const certsSnap = await db
