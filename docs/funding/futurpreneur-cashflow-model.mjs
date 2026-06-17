@@ -237,5 +237,6 @@ console.log(`Ending cash (M24): $${closing[MONTHS - 1]}`);
 console.log(`Lowest cash point: $${minCash} (month ${minMonth})`);
 console.log(`Operational break-even (rev >= opex ex-loan): month ${breakeven || "not within 24mo"}`);
 console.log(`Loan principal remaining after 24 mo: $${remainingBalanceAfter(MONTHS)}`);
+console.log(`Total interest paid (24 mo): $${round(interest24)}`);
 console.log(`Pro subscribers M24: ${rows["Pro subscribers (count)"][MONTHS - 1]} of ${rows["Verified pros (count)"][MONTHS - 1]} verified pros`);
 console.log(`CSV written: ${outPath}`);
