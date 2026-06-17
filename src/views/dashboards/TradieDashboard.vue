@@ -41,6 +41,7 @@ import JobList from "@/components/JobList.vue";
 import AvailabilityEditor from "@/components/AvailabilityEditor.vue";
 import MyApplicationsList from "@/components/MyApplicationsList.vue";
 import ClientsPanel from "@/components/clients/ClientsPanel.vue";
+import InsuranceUploadCard from "@/components/InsuranceUploadCard.vue";
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -49,6 +50,18 @@ const toast = useToast();
 const tradie = ref<WithId<TradespersonDoc> | null>(null);
 const jobs = ref<WithId<JobDoc>[]>([]);
 const insuranceDoc = ref<WithId<InsuranceVerificationDoc> | null>(null);
+// "Upload my insurance" popup (the full upload card incl. the additional-insured
+// declaration + release flow) reached from the dashboard nudge banner.
+const showInsuranceUpload = ref(false);
+
+async function refreshInsurance() {
+  if (!auth.fbUser) return;
+  try {
+    insuranceDoc.value = await getInsurance(auth.fbUser.uid);
+  } catch {
+    insuranceDoc.value = null;
+  }
+}
 
 // Dashboard insurance nudge: prompt pros with no proof of insurance on file to
 // get covered, and remind verified pros to renew within 30 days of expiry.
@@ -197,11 +210,7 @@ onMounted(async () => {
   }
   unsub = subscribeTradieJobs(auth.fbUser.uid, (j) => (jobs.value = j));
   unsubBookings = subscribeBookings(auth.fbUser.uid, (b) => (bookings.value = b));
-  try {
-    insuranceDoc.value = await getInsurance(auth.fbUser.uid);
-  } catch {
-    insuranceDoc.value = null;
-  }
+  await refreshInsurance();
 });
 
 onUnmounted(() => {
@@ -361,20 +370,50 @@ const awaitingVerificationMessage = computed(() => {
     </div>
 
     <div class="bs-container pt-4">
-    <a
+    <div
       v-if="insuranceBanner"
-      :href="INSURANCE_PARTNER.url"
-      target="_blank"
-      rel="noopener"
-      class="mb-4 flex items-center gap-2 rounded-lg border border-[#f0d8a8] bg-[#fff5e6] px-3 py-2 text-sm font-medium text-[color:var(--bs-text)] no-underline"
+      class="mb-4 rounded-lg border border-[#f0d8a8] bg-[#fff5e6] px-3 py-2 text-sm font-medium text-[color:var(--bs-text)]"
     >
-      <i :class="['pi', insuranceBanner.icon, 'shrink-0 text-[#b45309]']" aria-hidden="true"></i>
-      <span class="min-w-0 flex-1">{{ insuranceBanner.text }}</span>
-      <span class="shrink-0 inline-flex items-center gap-1 font-semibold text-[color:var(--bs-blue-dark)]">
-        {{ insuranceBanner.cta }}
-        <i class="pi pi-external-link text-xs" aria-hidden="true"></i>
-      </span>
-    </a>
+      <div class="flex items-start gap-2">
+        <i :class="['pi', insuranceBanner.icon, 'shrink-0 text-[#b45309] mt-0.5']" aria-hidden="true"></i>
+        <span class="min-w-0 flex-1">{{ insuranceBanner.text }}</span>
+      </div>
+      <div class="mt-2 flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+        <button
+          type="button"
+          class="inline-flex items-center gap-1.5 font-semibold text-[color:var(--bs-blue-dark)]"
+          @click="showInsuranceUpload = true"
+        >
+          <i class="pi pi-upload text-xs" aria-hidden="true"></i>
+          {{ insuranceBanner.cta === "Renew now" ? "Upload renewal" : "Upload my insurance" }}
+        </button>
+        <a
+          :href="INSURANCE_PARTNER.url"
+          target="_blank"
+          rel="noopener"
+          class="inline-flex items-center gap-1 font-semibold text-[color:var(--bs-blue-dark)] no-underline"
+        >
+          {{ insuranceBanner.cta }}
+          <i class="pi pi-external-link text-xs" aria-hidden="true"></i>
+        </a>
+      </div>
+    </div>
+
+    <Dialog
+      v-model:visible="showInsuranceUpload"
+      modal
+      dismissable-mask
+      header="Your insurance"
+      :style="{ width: '92vw', maxWidth: '640px' }"
+    >
+      <InsuranceUploadCard
+        v-if="auth.fbUser"
+        :tradesperson-id="auth.fbUser.uid"
+        :existing="insuranceDoc"
+        @submitted="refreshInsurance"
+        @updated="refreshInsurance"
+      />
+    </Dialog>
     <p class="hidden sm:block text-[color:var(--bs-muted)] text-sm mb-4">
       {{ viewHint }}
     </p>
