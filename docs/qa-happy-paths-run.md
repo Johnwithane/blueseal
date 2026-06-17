@@ -47,3 +47,9 @@ _none yet_
   `tradieqa` = tradesperson + admin + qa; tradie provisions via `/qa`; `/dashboard/tradie` renders
   after provisioning. (Confirmed the un-provisioned tradie correctly redirects to `/onboarding` —
   not a bug.)
+- Phase 1 flagship leg 1 (client posts → tradie sees on board): **GREEN, 0 errors.** Notes (not
+  bugs): every trade carries a required intake questionnaire (driver fills it generically) and
+  budget is required; Firestore `Listen/channel` `ERR_ABORTED` on navigation is benign listener
+  teardown (filtered as noise). Built `helpers/jobs.ts` (postJob + generic fillIntake),
+  `helpers/uploads.ts`, `helpers/walk.ts` (console/network capture + noise filter), and a reusable
+  `_explore.spec.ts` to learn selectors from the rendered DOM.
