@@ -14,6 +14,8 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:e2e": "playwright test",
+    "test:e2e:happy": "playwright test --config e2e/happy-paths/playwright.happy.config.ts",
+    "test:e2e:happy:smoke": "playwright test --config e2e/happy-paths/playwright.happy.config.ts 00-smoke",
     "test:rules": "firebase --project demo-blueseal-rules emulators:exec --only firestore \"vitest run --config vitest.rules.config.ts\"",
     "functions:build": "cd functions && npm run build",
     "functions:deploy": "firebase deploy --only functions",

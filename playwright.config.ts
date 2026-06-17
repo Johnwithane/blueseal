@@ -7,6 +7,10 @@ const PORT = 4173;
 
 export default defineConfig({
   testDir: "./e2e",
+  // The happy-paths harness drives the DEPLOYED test-mode site with real auth
+  // and owns its own config (e2e/happy-paths/playwright.happy.config.ts) — keep
+  // it out of this local-dist SEO smoke run. Use `npm run test:e2e:happy`.
+  testIgnore: ["**/happy-paths/**"],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
