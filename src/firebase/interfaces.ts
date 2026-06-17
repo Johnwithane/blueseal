@@ -2210,6 +2210,10 @@ export interface BugReportDoc {
   url: string; // window.location.href at file time
   route: string; // router fullPath / name
   activeRole: Role; // the reporter's activeRole when they filed it
+  // Preformatted multi-line dump of device/environment info captured at file
+  // time (user agent, platform, screen + viewport, pixel ratio, timezone,
+  // language, online/PWA state, app build, etc.) so triage has full context.
+  environment: string;
   severity: BugSeverity;
   title: string;
   stepsToReproduce: string;

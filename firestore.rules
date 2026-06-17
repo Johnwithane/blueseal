@@ -1260,10 +1260,12 @@ service cloud.firestore {
       allow read: if isAdmin() || (isSignedIn() && resource.data.reporterUid == uid());
       allow create: if (isQa() || isAdmin())
         && request.resource.data.keys().hasOnly([
-             'reporterUid', 'reporterName', 'url', 'route', 'activeRole', 'severity',
-             'title', 'stepsToReproduce', 'expected', 'actual', 'screenshotPaths',
+             'reporterUid', 'reporterName', 'url', 'route', 'activeRole', 'environment',
+             'severity', 'title', 'stepsToReproduce', 'expected', 'actual', 'screenshotPaths',
              'area', 'appVersion', 'status', 'triagedBy', 'notes', 'createdAt', 'updatedAt'])
         && request.resource.data.reporterUid == uid()
+        && request.resource.data.environment is string
+           && request.resource.data.environment.size() <= 4000
         && request.resource.data.status == 'open'
         && request.resource.data.triagedBy == null
         && request.resource.data.notes == ''

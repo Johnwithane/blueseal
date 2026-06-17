@@ -140,6 +140,48 @@ onBeforeUnmount(() => {
   for (const s of shots.value) URL.revokeObjectURL(s.previewUrl);
 });
 
+// Capture as much device/environment context as the browser exposes, as a
+// preformatted block stored on the report so triage has full reproduction info.
+function captureEnvironment(): string {
+  const lines: string[] = [];
+  const push = (k: string, v: unknown) =>
+    lines.push(`${k}: ${v === undefined || v === null || v === "" ? "—" : v}`);
+  try {
+    push("URL", typeof location !== "undefined" ? location.href : "—");
+    push("Route", typeof route.name === "string" ? route.name : route.fullPath);
+    push("Active role", auth.activeRole ?? "—");
+    push("Roles", auth.roles.join(", "));
+    push("User", `${auth.user?.displayName ?? "—"} (${auth.fbUser?.uid ?? "—"})`);
+    push("App version", import.meta.env.VITE_APP_VERSION || "—");
+    const nav = typeof navigator !== "undefined" ? navigator : undefined;
+    if (nav) {
+      push("User agent", nav.userAgent);
+      const uaData = (nav as Navigator & { userAgentData?: { platform?: string } }).userAgentData;
+      push("Platform", uaData?.platform ?? nav.platform);
+      push("Language", nav.language);
+      push("Online", nav.onLine);
+      push("Cookies enabled", nav.cookieEnabled);
+      push("CPU cores", nav.hardwareConcurrency);
+      const mem = (nav as Navigator & { deviceMemory?: number }).deviceMemory;
+      if (mem != null) push("Device memory (GB)", mem);
+    }
+    if (typeof window !== "undefined") {
+      push("Viewport", `${window.innerWidth}×${window.innerHeight}`);
+      push("Pixel ratio", window.devicePixelRatio);
+      push("PWA standalone", window.matchMedia?.("(display-mode: standalone)").matches ?? false);
+    }
+    if (typeof screen !== "undefined") {
+      push("Screen", `${screen.width}×${screen.height}`);
+      push("Color depth", screen.colorDepth);
+    }
+    push("Timezone", Intl.DateTimeFormat().resolvedOptions().timeZone);
+    push("Referrer", typeof document !== "undefined" ? document.referrer || "—" : "—");
+  } catch {
+    /* best-effort capture — never block a bug report on environment detection */
+  }
+  return lines.join("\n").slice(0, 4000);
+}
+
 async function submit() {
   error.value = null;
   if (title.value.trim().length < 3) {
@@ -153,6 +195,7 @@ async function submit() {
       activeRole: auth.activeRole ?? "client",
       url: typeof location !== "undefined" ? location.href : "",
       route: typeof route.name === "string" ? route.name : route.fullPath,
+      environment: captureEnvironment(),
     };
     await submitBugReport(
       {
@@ -199,7 +242,8 @@ async function submit() {
         <p class="text-xs text-[color:var(--bs-muted)]">
           Filing from <strong>{{ route.name || route.path }}</strong> as
           <strong>{{ auth.activeRole }}</strong>. Paste a screenshot anywhere in
-          this dialog (Ctrl/⌘ + V).
+          this dialog (Ctrl/⌘ + V). Your device + page details are attached
+          automatically.
         </p>
 
         <div>
@@ -299,8 +343,10 @@ async function submit() {
 <style scoped>
 .report-bug-fab {
   position: fixed;
-  right: 1rem;
-  bottom: 5rem; /* clear of the mobile bottom nav + AssistantBubble */
+  /* Mobile: bottom-left, lifted ABOVE the fixed bottom nav (56px bar + safe
+     area) so it sits over it on the y-axis rather than behind it. */
+  left: 1rem;
+  bottom: calc(56px + env(safe-area-inset-bottom) + 0.5rem);
   z-index: 60;
   display: inline-flex;
   align-items: center;
@@ -308,15 +354,24 @@ async function submit() {
   padding: 0.55rem 0.85rem;
   border: 0;
   border-radius: 999px;
-  background: var(--bs-blue-dark, #1e3a8a);
+  background: var(--bs-red); /* brand red */
   color: #fff;
   font-size: 0.8125rem;
   font-weight: 600;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.25);
+  box-shadow: 0 2px 8px rgba(140, 43, 48, 0.35);
   cursor: pointer;
 }
 .report-bug-fab:hover {
-  filter: brightness(1.08);
+  background: var(--bs-red-dark);
+}
+/* Desktop (matches the shell's 768px breakpoint + 260px side panel): sit just
+   to the RIGHT of the side panel, right at the bottom, so it never overlaps the
+   sidebar. The bottom nav is hidden here. */
+@media (min-width: 768px) {
+  .report-bug-fab {
+    left: calc(260px + 0.75rem);
+    bottom: 1rem;
+  }
 }
 .report-bug-fab__text {
   display: none;

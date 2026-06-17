@@ -57,6 +57,7 @@ function validBug(uid: string) {
     url: "https://app.example/jobs/abc",
     route: "JobDetail",
     activeRole: "client",
+    environment: "UA: test\nViewport: 375x667",
     severity: "high",
     title: "Quote button does nothing",
     stepsToReproduce: "1. open job 2. click Quote",

@@ -21,6 +21,7 @@ import { tradeLabel } from "@/data/trades";
 import { STATUS_LABEL, STATUS_SEVERITY } from "@/utils/jobStatus";
 import LoadingState from "@/components/LoadingState.vue";
 import AdminUserManage from "@/components/admin/AdminUserManage.vue";
+import AdminRoleEditor from "@/components/admin/AdminRoleEditor.vue";
 import type { Role } from "@/firebase/interfaces";
 
 const { dateTime, relativeTime, money, date } = useFormatters();
@@ -43,6 +44,9 @@ interface ExpandedState {
   tradieAddress: string | null;
   clientJobs: WithId<JobDoc>[];
   tradieJobs: WithId<JobDoc>[];
+  // Job lists are collapsed by default so they don't bury the admin actions.
+  showClientJobs: boolean;
+  showTradieJobs: boolean;
 }
 const expanded = ref<Record<string, ExpandedState>>({});
 
@@ -64,9 +68,10 @@ async function runSearch() {
   }
 }
 
-function roleSeverity(role: string): "info" | "success" | "warn" {
+function roleSeverity(role: string): "info" | "success" | "warn" | "danger" {
   if (role === "admin") return "warn";
   if (role === "tradesperson") return "success";
+  if (role === "qa") return "danger";
   return "info";
 }
 
@@ -84,7 +89,7 @@ async function toggleExpand(user: WithId<UserDoc>) {
     delete expanded.value[user.id];
     return;
   }
-  const state: ExpandedState = {
+  expanded.value[user.id] = {
     loading: true,
     loaded: false,
     error: null,
@@ -92,8 +97,13 @@ async function toggleExpand(user: WithId<UserDoc>) {
     tradieAddress: null,
     clientJobs: [],
     tradieJobs: [],
+    showClientJobs: false,
+    showTradieJobs: false,
   };
-  expanded.value[user.id] = state;
+  // Read the stored value back so we mutate the REACTIVE proxy, not the raw
+  // literal. Mutating the raw object bypasses reactivity, so the post-await
+  // `loading = false` never re-rendered and the panel stuck on "Loading…".
+  const state = expanded.value[user.id]!;
 
   const isTradie = (user.roles ?? []).includes("tradesperson");
   const isClient = (user.roles ?? []).includes("client");
@@ -275,6 +285,14 @@ function onTradesUpdated(user: WithId<UserDoc>, trades: string[]) {
                 {{ relativeTime(u.deletedAt) }}
               </div>
             </dl>
+
+            <!-- Roles editable right here by name — no need to expand + scroll. -->
+            <div class="mt-2 rounded-lg bg-[color:var(--bs-surface-alt)] p-2">
+              <AdminRoleEditor
+                :user="u"
+                @roles-updated="(roles, activeRole) => onRolesUpdated(u, roles, activeRole)"
+              />
+            </div>
           </div>
 
           <div class="flex flex-col gap-2 flex-none">
@@ -355,6 +373,17 @@ function onTradesUpdated(user: WithId<UserDoc>, trades: string[]) {
                 <span class="font-medium">Bio:</span> {{ u.bio }}
               </p>
             </section>
+
+            <!-- Admin actions (trades + Pro) — only for tradespeople, placed high
+                 so it isn't buried under the job lists. Roles are edited at the
+                 top of the row. -->
+            <AdminUserManage
+              v-if="(u.roles ?? []).includes('tradesperson')"
+              class="border-t border-[color:var(--bs-border)] pt-4"
+              :user="u"
+              :tradie="expanded[u.id].tradie"
+              @trades-updated="(trades) => onTradesUpdated(u, trades)"
+            />
 
             <!-- Tradesperson profile snapshot (only if the user has the role). -->
             <section v-if="expanded[u.id].tradie">
@@ -437,11 +466,19 @@ function onTradesUpdated(user: WithId<UserDoc>, trades: string[]) {
               </dl>
             </section>
 
+            <!-- Jobs as client — collapsed by default. -->
             <section v-if="expanded[u.id].clientJobs.length">
-              <h3 class="text-xs font-semibold uppercase tracking-wide text-[color:var(--bs-muted)] mb-2">
-                Jobs as client ({{ expanded[u.id].clientJobs.length }}{{ expanded[u.id].clientJobs.length === RECENT_JOBS_LIMIT ? "+" : "" }})
-              </h3>
-              <ul class="space-y-2">
+              <button
+                type="button"
+                class="flex w-full items-center justify-between gap-2 text-left"
+                @click="expanded[u.id].showClientJobs = !expanded[u.id].showClientJobs"
+              >
+                <h3 class="text-xs font-semibold uppercase tracking-wide text-[color:var(--bs-muted)]">
+                  Jobs as client ({{ expanded[u.id].clientJobs.length }}{{ expanded[u.id].clientJobs.length === RECENT_JOBS_LIMIT ? "+" : "" }})
+                </h3>
+                <i :class="['pi', expanded[u.id].showClientJobs ? 'pi-chevron-up' : 'pi-chevron-down', 'text-xs text-[color:var(--bs-muted)]']"></i>
+              </button>
+              <ul v-if="expanded[u.id].showClientJobs" class="space-y-2 mt-2">
                 <li
                   v-for="job in expanded[u.id].clientJobs"
                   :key="job.id"
@@ -468,11 +505,19 @@ function onTradesUpdated(user: WithId<UserDoc>, trades: string[]) {
               </ul>
             </section>
 
+            <!-- Jobs as tradesperson — collapsed by default. -->
             <section v-if="expanded[u.id].tradieJobs.length">
-              <h3 class="text-xs font-semibold uppercase tracking-wide text-[color:var(--bs-muted)] mb-2">
-                Jobs as tradesperson ({{ expanded[u.id].tradieJobs.length }}{{ expanded[u.id].tradieJobs.length === RECENT_JOBS_LIMIT ? "+" : "" }})
-              </h3>
-              <ul class="space-y-2">
+              <button
+                type="button"
+                class="flex w-full items-center justify-between gap-2 text-left"
+                @click="expanded[u.id].showTradieJobs = !expanded[u.id].showTradieJobs"
+              >
+                <h3 class="text-xs font-semibold uppercase tracking-wide text-[color:var(--bs-muted)]">
+                  Jobs as tradesperson ({{ expanded[u.id].tradieJobs.length }}{{ expanded[u.id].tradieJobs.length === RECENT_JOBS_LIMIT ? "+" : "" }})
+                </h3>
+                <i :class="['pi', expanded[u.id].showTradieJobs ? 'pi-chevron-up' : 'pi-chevron-down', 'text-xs text-[color:var(--bs-muted)]']"></i>
+              </button>
+              <ul v-if="expanded[u.id].showTradieJobs" class="space-y-2 mt-2">
                 <li
                   v-for="job in expanded[u.id].tradieJobs"
                   :key="job.id"
@@ -505,14 +550,6 @@ function onTradesUpdated(user: WithId<UserDoc>, trades: string[]) {
             >
               No jobs on file for this account.
             </div>
-
-            <AdminUserManage
-              class="border-t border-[color:var(--bs-border)] pt-4"
-              :user="u"
-              :tradie="expanded[u.id].tradie"
-              @roles-updated="(roles, activeRole) => onRolesUpdated(u, roles, activeRole)"
-              @trades-updated="(trades) => onTradesUpdated(u, trades)"
-            />
           </template>
         </div>
       </li>

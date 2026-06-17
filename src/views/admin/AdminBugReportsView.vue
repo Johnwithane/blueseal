@@ -189,6 +189,21 @@ async function save(r: WithId<BugReportDoc>) {
           </div>
         </dl>
 
+        <details v-if="r.environment || r.url" class="mt-3 text-xs">
+          <summary class="cursor-pointer text-[color:var(--bs-muted)]">Device &amp; environment</summary>
+          <pre
+            v-if="r.environment"
+            class="mt-1 max-h-60 overflow-auto whitespace-pre-wrap rounded bg-[color:var(--bs-surface-alt)] p-2"
+          >{{ r.environment }}</pre>
+          <a
+            v-if="r.url"
+            :href="r.url"
+            target="_blank"
+            rel="noopener"
+            class="mt-1 inline-block break-all text-[color:var(--bs-blue)] underline"
+          >{{ r.url }}</a>
+        </details>
+
         <div v-if="r.screenshotPaths?.length" class="mt-3 flex flex-wrap gap-2">
           <a
             v-for="path in r.screenshotPaths"

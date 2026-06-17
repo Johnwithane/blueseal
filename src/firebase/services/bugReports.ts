@@ -35,6 +35,7 @@ export interface BugReportContext {
   activeRole: Role;
   url: string; // window.location.href
   route: string; // router fullPath or name
+  environment: string; // preformatted device/env dump (capped at 4000 chars)
 }
 
 /**
@@ -55,6 +56,7 @@ export async function submitBugReport(
     url: ctx.url,
     route: ctx.route,
     activeRole: ctx.activeRole,
+    environment: ctx.environment.slice(0, 4000),
     severity: data.severity,
     title: data.title,
     stepsToReproduce: data.stepsToReproduce,
