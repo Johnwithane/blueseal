@@ -15,6 +15,10 @@ const props = defineProps<{
   visible: boolean;
   jobId: string;
   invoiceId: string;
+  // Whether the tradesperson can actually accept card payments (Stripe payouts
+  // enabled). Drives whether we point the client at the "Pay by card" option —
+  // otherwise that button doesn't exist and the reference is a dead end.
+  invoicePayable: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -95,8 +99,11 @@ function close() {
       <p class="text-sm text-[color:var(--bs-muted)] mb-3">
         Paying by e-transfer or cash is fee-free. Pay the tradesperson directly
         using the instructions below, then let them know here — they'll confirm
-        receipt, which completes the job and sends your receipt. Prefer to pay by
-        card instead? Close this and choose <strong>Pay by card</strong>.
+        receipt, which completes the job and sends your receipt.<template
+          v-if="invoicePayable"
+        >
+          Prefer to pay by card instead? Close this and choose
+          <strong>Pay by card</strong>.</template>
       </p>
 
       <!-- Total to pay — bold, can't be missed. -->

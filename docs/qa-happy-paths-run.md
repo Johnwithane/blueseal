@@ -52,7 +52,11 @@ _none yet_
   writes and that both views read it. (Worth a code check of the callable + the invoice-status
   rendering.)
 
-### PAY-1 — Offline-payment dialog points to a "Pay by card" option that isn't there — **open**
+### PAY-1 — Offline-payment dialog points to a "Pay by card" option that isn't there — **fixed (pending hosting deploy + live re-verify)**
+- **Fix:** `PayInvoiceDialog.vue` now takes an `invoicePayable` prop (threaded from
+  `ClientInvoiceCard.vue`, same flag that gates the real "Pay by card" button) and only shows the
+  "Prefer to pay by card…" sentence when card pay is actually available. Lint + build green.
+  Client-only display change — no Firebase deploy. Re-verify after the next hosting deploy.
 - **Where:** the "Paid by e-transfer or cash?" dialog (offline path), when the tradesperson hasn't
   connected Stripe payouts.
 - **Evidence:** the dialog body reads "Prefer to pay by card instead? Close this and choose **Pay

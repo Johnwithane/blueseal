@@ -294,6 +294,7 @@ async function openPdfPreview() {
       v-model:visible="showPayDialog"
       :job-id="job.id"
       :invoice-id="invoiceId"
+      :invoice-payable="invoicePayable"
       @paid="emit('paid')"
     />
 
