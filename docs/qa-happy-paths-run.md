@@ -142,6 +142,15 @@ _none yet_
   fields to `PlaceAutocompleteElement`. Non-trivial (touches every address input) — flagged for a
   deliberate change, not a mid-QA hotfix.
 
+### L1b — CSP `img-src` blocks GTM beacon images (`www.googletagmanager.com/a?…`) — **fixed (pending hosting deploy)**
+- **Where:** every page; 5 console errors on load (surfaced by the e2e smoke spec's raw console
+  capture — the harness `walk.ts` noise filter already ignores it).
+- **Evidence:** GTM fires an `img` beacon to `https://www.googletagmanager.com/a?id=G-…` but
+  `img-src` whitelisted `www.googletagmanager.com` only for `script-src`/`connect-src`, not
+  `img-src`. Same benign-GA-noise family as L1.
+- **Fix:** added `https://www.googletagmanager.com` to `img-src` in `firebase.json`. Takes effect
+  on the next hosting deploy.
+
 ### L1 — CSP blocks Google Analytics (`www.google.com`) on every page — **verified**
 - Re-run after the hosting deploy: console errors went **4/11 → 0/0** on both accounts.
 - **Where:** every page; console on load.
