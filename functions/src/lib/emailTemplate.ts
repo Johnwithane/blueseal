@@ -50,6 +50,14 @@ export interface BrandedEmailOpts {
    * your quote" still shows WHO).
    */
   actorName?: string;
+  /**
+   * Optional pre-built HTML block dropped into the white card BETWEEN the
+   * body paragraphs and the CTA button. Must be table-based + inline-styled
+   * (email clients strip <style>/flexbox) and must already have any
+   * user-supplied text escaped — it is injected verbatim, NOT escaped here.
+   * Used for the itemized quote/invoice breakdown (see lib/emailBreakdown.ts).
+   */
+  contentHtml?: string;
 }
 
 /**
@@ -136,6 +144,7 @@ export function brandedEmailHtml(opts: BrandedEmailOpts): string {
     `<tr><td style="background:#ffffff;border:1px solid ${BORDER};border-radius:14px;padding:28px 28px 24px;">` +
     heading +
     paras +
+    (opts.contentHtml ?? "") +
     cta +
     `</td></tr>` +
     // footer

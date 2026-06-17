@@ -112,6 +112,16 @@ export interface NotifyInput {
   chatId?: string | null;
   actorUid?: string | null;
   priority?: NotifyPriority;
+  // Optional pre-built HTML block injected into the email card between the
+  // body line and the CTA button — used for the itemized quote/invoice
+  // breakdown (lib/emailBreakdown.ts). Email-only; the in-app row, web push
+  // and WhatsApp still use the short `body`. Must be email-safe + escaped.
+  emailContentHtml?: string | null;
+  // Override the email CTA button label (otherwise derived from `type` via
+  // ctaLabelForType). Lets callsites that reuse a generic `type` — e.g.
+  // quotes piggy-backing on "invoice_sent" — say "Review & approve" instead
+  // of the type's default "View the invoice".
+  ctaLabel?: string | null;
   // The role the recipient should be viewing as for the link to make
   // sense. The in-app notifications-bell handler reads this and flips
   // the user's activeRole before navigating, so multi-role accounts
@@ -399,8 +409,13 @@ export async function notify(input: NotifyInput): Promise<void> {
         text: `${body}${cta}`,
         html: brandedEmailHtml({
           title,
-          bodyLines: [body],
-          ctaLabel: url ? ctaLabelForType(input.type) : undefined,
+          // When a breakdown is embedded, it already carries the total — so
+          // drop the one-line `body` summary from the EMAIL to avoid showing
+          // the price twice. `body` still feeds in-app/push/WhatsApp, which
+          // have no breakdown and need the at-a-glance figure.
+          bodyLines: input.emailContentHtml ? [] : [body],
+          contentHtml: input.emailContentHtml ?? undefined,
+          ctaLabel: url ? (input.ctaLabel ?? ctaLabelForType(input.type)) : undefined,
           ctaUrl: url ?? undefined,
           preheader: body,
           // Avatar + name of whoever triggered this (chat sender, the client

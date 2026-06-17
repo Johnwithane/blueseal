@@ -28,6 +28,8 @@ import PDFDocument from "pdfkit";
 import { db, storage } from "../lib/admin";
 import { requireAuth } from "../lib/auth";
 import { enqueueMail } from "../lib/mail";
+import { brandedEmailHtml } from "../lib/emailTemplate";
+import { breakdownHtml } from "../lib/emailBreakdown";
 import { notify } from "../lib/notify";
 
 const Input = z.object({ invoiceId: z.string().min(1) });
@@ -250,6 +252,32 @@ export const sendInvoice = onCall(CALLABLE_OPTS, async (req) => {
   );
 
   if (clientEmail) {
+    // Transactional: the invoice email always sends (it's a bill, not a
+    // marketing notification), so it goes direct via enqueueMail rather than
+    // through notify() — which gates on the email opt-out and runs at "low"
+    // priority (in-app only) for invoices. The itemized breakdown is embedded
+    // in the body; the branded shell + PDF link mirror the in-app pay page.
+    // No dollar figure here — the embedded breakdown's Total carries it, so
+    // repeating it in the greeting just reads as the price twice. The card-fee
+    // disclosure lives on the pay page (and PDF), shown at the actual point of
+    // payment — no need to lead with it in the email.
+    const readyLine = `Hi ${clientName}, your invoice is ready.`;
+    const invoiceBreakdown = breakdownHtml({
+      kind: "invoice",
+      number: inv.invoiceNumber,
+      currency: inv.currency,
+      lineItems: inv.lineItems.map((li) => ({
+        description: li.description,
+        quantity: li.quantity,
+        unitPrice: li.unitPrice,
+      })),
+      subtotal: inv.subtotal,
+      discountAmount: inv.discountAmount ?? 0,
+      taxTotal: inv.taxTotal,
+      total: inv.total,
+      paymentInstructions: inv.paymentInstructions,
+      pdfUrl: downloadUrl,
+    });
     await enqueueMail({
       to: clientEmail,
       subject: `Invoice ${inv.invoiceNumber} from ${tradieName}`,
@@ -262,6 +290,14 @@ export const sendInvoice = onCall(CALLABLE_OPTS, async (req) => {
           ? `Notes from ${tradieName}:\n${inv.paymentInstructions}\n\n`
           : "") +
         `Thanks,\nBlue Seal`,
+      html: brandedEmailHtml({
+        title: `Invoice ${inv.invoiceNumber} from ${tradieName}`,
+        bodyLines: [readyLine],
+        contentHtml: invoiceBreakdown,
+        ctaLabel: "View & pay",
+        ctaUrl: payLink(invoiceId),
+        preheader: `Your invoice for ${fmtMoney(inv.total, inv.currency)} is ready.`,
+      }),
     });
   }
 

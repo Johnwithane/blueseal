@@ -3,10 +3,12 @@ import { CALLABLE_OPTS } from "../lib/callable";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { z } from "zod";
-import { db } from "../lib/admin";
+import PDFDocument from "pdfkit";
+import { db, storage } from "../lib/admin";
 import { requireRole } from "../lib/auth";
 import { postSystemMessage } from "../lib/chatSystemMessage";
 import { notify } from "../lib/notify";
+import { breakdownHtml } from "../lib/emailBreakdown";
 import { LineItemSchema, DiscountSchema, UpfrontFeeSchema } from "../lib/quoteSchemas";
 import { computeTotals, resolveUpfrontFee } from "../lib/quoteTotals";
 
@@ -216,17 +218,81 @@ export const submitQuote = onCall(CALLABLE_OPTS, async (req) => {
 
   if (job.chatId) await postSystemMessage(job.chatId, message);
 
+  // Render + store a PDF copy of the quote so the email can link a download
+  // (mirrors invoices). Best-effort: the quote is already committed, so a PDF
+  // failure must never fail the send — swallow + log like the notify channels.
+  let quotePdfUrl: string | null = null;
+  try {
+    const clientSnap = await db.doc(`users/${job.clientId}`).get();
+    const clientName =
+      (clientSnap.data() as { displayName?: string })?.displayName ?? "Client";
+    const pdf = await renderQuotePdf({
+      quoteNumber,
+      tradieName,
+      clientName,
+      lineItems,
+      subtotal: totals.subtotal,
+      discountAmount: totals.discountAmount,
+      taxTotal: totals.taxTotal,
+      total: totals.total,
+      validUntil,
+      terms,
+      currency: "CAD",
+    });
+    const file = storage.bucket().file(`quotes/${jobId}.pdf`);
+    await file.save(pdf, { contentType: "application/pdf", resumable: false });
+    const [url] = await file.getSignedUrl({
+      action: "read",
+      expires: Date.now() + 1000 * 60 * 60 * 24 * 30,
+    });
+    quotePdfUrl = url;
+    await quoteRef.update({ pdfUrl: url });
+  } catch (err) {
+    logger.error("submitQuote: quote PDF render/store failed", { jobId, err });
+  }
+
+  // Itemized breakdown embedded in the notification email so the client can
+  // read the whole quote in their inbox. The CTA still drives back into the
+  // app, where acceptance (with e-signature) happens.
+  const upfrontFeeLabel = upfrontFee
+    ? `$${(upfrontFee.amountCents / 100).toFixed(2)}${
+        upfrontFee.type === "percent" ? ` (${(upfrontFee.bps! / 100).toFixed(0)}%)` : ""
+      }`
+    : null;
+  const quoteBreakdown = breakdownHtml({
+    kind: "quote",
+    number: quoteNumber,
+    currency: "CAD",
+    lineItems,
+    subtotal: totals.subtotal,
+    discountAmount: totals.discountAmount,
+    taxTotal: totals.taxTotal,
+    total: totals.total,
+    validUntilLabel: formatDate(validUntil),
+    estimatedHours,
+    estimatedDuration: estimatedDuration || null,
+    proposedStartLabel: proposedStartTs ? formatDate(proposedStartTs) : null,
+    upfrontFeeLabel,
+    terms,
+    pdfUrl: quotePdfUrl,
+  });
+
   await notify({
     userId: job.clientId,
+    // Reuses the "invoice_sent" type (no dedicated quote type in the shared
+    // NotificationType union); ctaLabel overrides its "View the invoice"
+    // default so the button reads correctly for a quote.
     type: "invoice_sent",
     title: `${tradieName} sent you a quote`,
-    body: `$${(totals.total / 100).toFixed(2)} — review and accept.`,
+    body: `$${(totals.total / 100).toFixed(2)} — review and approve.`,
     link: `/jobs/${jobId}`,
     actorUid: uid,
     jobId,
     chatId: job.chatId ?? null,
     recipientRole: "client",
     priority: "high",
+    emailContentHtml: quoteBreakdown,
+    ctaLabel: "Review & approve",
   });
 
   logger.info("submitQuote", {
@@ -246,4 +312,65 @@ function formatDate(ts: Timestamp): string {
     month: "short",
     day: "numeric",
   }).format(ts.toDate());
+}
+
+function fmtMoney(cents: number, currency: string): string {
+  return new Intl.NumberFormat("en-CA", { style: "currency", currency }).format(
+    cents / 100,
+  );
+}
+
+/**
+ * Basic pdfkit render of the quote — same shape as the invoice PDF
+ * (functions/src/invoicing/sendInvoice.ts) so the two documents stay
+ * consistent. Linked (signed URL) from the quote email, not attached.
+ */
+async function renderQuotePdf(q: {
+  quoteNumber: string;
+  tradieName: string;
+  clientName: string;
+  lineItems: Array<{ description: string; quantity: number; unitPrice: number }>;
+  subtotal: number;
+  discountAmount: number;
+  taxTotal: number;
+  total: number;
+  validUntil: Timestamp;
+  terms: string;
+  currency: string;
+}): Promise<Buffer> {
+  return new Promise<Buffer>((resolve, reject) => {
+    const doc = new PDFDocument({ margin: 48 });
+    const buffers: Buffer[] = [];
+    doc.on("data", (b: Buffer) => buffers.push(b));
+    doc.on("end", () => resolve(Buffer.concat(buffers)));
+    doc.on("error", reject);
+
+    doc.fontSize(20).text("Blue Seal");
+    doc.moveDown(0.5);
+    doc.fontSize(14).text(`Quote ${q.quoteNumber}`);
+    doc.fontSize(10).fillColor("#666").text(`From: ${q.tradieName}`);
+    doc.text(`To: ${q.clientName}`);
+    doc.text(`Valid until: ${formatDate(q.validUntil)}`);
+    doc.moveDown();
+    doc.fillColor("#000");
+    q.lineItems.forEach((li) => {
+      const line = `${li.description}  —  ${li.quantity} × ${fmtMoney(li.unitPrice, q.currency)}  =  ${fmtMoney(li.quantity * li.unitPrice, q.currency)}`;
+      doc.fontSize(11).text(line);
+    });
+    doc.moveDown();
+    doc.fontSize(11).text(`Subtotal: ${fmtMoney(q.subtotal, q.currency)}`);
+    if (q.discountAmount > 0) {
+      doc.text(`Discount: -${fmtMoney(q.discountAmount, q.currency)}`);
+    }
+    doc.text(`Tax: ${fmtMoney(q.taxTotal, q.currency)}`);
+    doc
+      .fontSize(13)
+      .text(`Total: ${fmtMoney(q.total, q.currency)}`, { underline: true });
+    if (q.terms && q.terms.trim()) {
+      doc.moveDown();
+      doc.fontSize(10).fillColor("#444").text("Terms:", { underline: true });
+      doc.fillColor("#000").text(q.terms.trim());
+    }
+    doc.end();
+  });
 }
