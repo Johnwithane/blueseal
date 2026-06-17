@@ -64,7 +64,18 @@ Blue Seal surfaces a "Get covered" insurance referral throughout the tradesperso
 
 ## Supplies marketplace — affiliate program sign-ups (added 2026-06-16)
 
-The job view's **Work order** tab now has a tradesperson-only **Supplies** panel (`src/components/SuppliesPanel.vue`) — search a vetted Canadian supplier for what a job needs, then log the purchase as a job expense in one tap. The code is live; every supplier link currently points at the retailer's **public site as a placeholder** (`src/data/supplyPartners.ts`). It's revenue-ready, not yet revenue-live.
+The job view's **Work order** tab has a tradesperson-only **Supplies** panel (`src/components/SuppliesPanel.vue`) — search a vetted Canadian supplier for what a job needs, then log the purchase as a job expense in one tap. Full per-supplier setup walkthrough: [docs/AFFILIATE_SETUP.md](docs/AFFILIATE_SETUP.md); local-dealer strategy: [docs/LOCAL_SUPPLIER_STRATEGY.md](docs/LOCAL_SUPPLIER_STRATEGY.md).
+
+**Status: built but NOT live — kept dark behind a flag.** The whole panel is gated on `import.meta.env.VITE_SUPPLIES_ENABLED === "true"` (`src/features/jobDetail/WorkOrderTab.vue`), default **off**, so it doesn't render in the app yet. Supplier links currently point at retailers' **public sites as placeholders** (`src/data/supplyPartners.ts`) — it's revenue-ready, not revenue-live.
+
+### [ ] Launch the Supplies section (when it's ready)
+
+- **Why:** the feature is finished but intentionally hidden until we decide it's ready for users.
+- **What:**
+  1. Set `VITE_SUPPLIES_ENABLED=true` in `.env.production` (and `.env.local` to preview locally), then redeploy hosting (`npm run deploy:prod`). No code change — same pattern as `VITE_GOOGLE_BUSINESS_ENABLED`.
+  2. Restore the **Supplies help content** in `src/data/help.ts` (the "Finding supplies" paragraph in the work-order article + the two Supplies FAQs were removed while the feature is hidden, so the Help Center stays accurate). They're in git history on the Phase 0/3 commits if you want the exact copy back.
+  3. Ideally set at least the **Amazon tag** first (below) so it launches revenue-live, not just live.
+- **Verify:** on a tradesperson account, open a job → Work order tab → the **Supplies** panel renders above Expenses.
 
 ### [ ] Apply to the affiliate programs and set each tracking link
 

@@ -38,6 +38,12 @@ const showExpenses = computed(
   () => props.isTradie && !INVOICE_LOCKED_STATUSES.has(props.job.status),
 );
 
+// The Supplies marketplace is built but not launched yet — kept dark behind a
+// flag (default off) so it doesn't ship to users until it's ready. Flip
+// VITE_SUPPLIES_ENABLED=true to turn it on (see HUMANTASKS.md). When enabling,
+// also restore the Supplies help content in src/data/help.ts.
+const suppliesEnabled = import.meta.env.VITE_SUPPLIES_ENABLED === "true";
+
 // Approved hourly change orders the tradie can clock time against.
 const approvedHourlyExtras = computed(() =>
   props.extras
@@ -87,7 +93,11 @@ function onLogExpense(prefill: ExpensePrefill) {
     <!-- Supplies marketplace — tradesperson-only (mirrors ExpensesCard's
          visibility), surfaced right by the expense workflow it feeds. Search a
          vetted supplier for what the job needs, then log it as an expense. -->
-    <SuppliesPanel v-if="showExpenses" :job="job" @log-expense="onLogExpense" />
+    <SuppliesPanel
+      v-if="showExpenses && suppliesEnabled"
+      :job="job"
+      @log-expense="onLogExpense"
+    />
 
     <!-- Receipts → reimbursable line items. Tradesperson-only (receipts
          disclose the tradie's cost basis), and hidden once the invoice is
