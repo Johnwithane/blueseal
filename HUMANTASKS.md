@@ -44,12 +44,12 @@ Supporting contract language is in **Terms of Service § 4.3** (and §§ 4.1, 4.
 
 ## Insurance partner referral (added 2026-06-15)
 
-Blue Seal surfaces a "Get covered" insurance referral throughout the tradesperson experience (onboarding card, dashboard banner, the soft bid/quote reminder dialog) and sends automated renewal reminders before a verified policy lapses. The code is live; the partner CTA currently points at **Zensurance's public site as a placeholder** (`src/data/insurancePartner.ts`).
+Blue Seal surfaces a "Get covered" / "Get insured" insurance referral throughout the tradesperson experience (onboarding card, dashboard banner, the soft bid/quote reminder dialog, and the uninsured-work waiver) and sends automated renewal reminders before a verified policy lapses. **Partner: Foxquilt** — a Foxquilt policy names Blue Seal as an additional insured, which also satisfies the additional-insured check on upload. The code is live; the CTA currently points at **Foxquilt's public site as a placeholder** (`src/data/insurancePartner.ts`).
 
-### [ ] Sign up for the affiliate program and set the referral link
+### [ ] Sign up for the Foxquilt partner program and set the tracked referral link
 
-- **Why:** Until the approved affiliate/referral URL is set, the "Get covered" CTAs point at the insurer's generic public site — clicks aren't attributed to Blue Seal, so no referral revenue is tracked.
-- **What:** Complete the affiliate/partner signup (Zensurance via Fintel Connect for the instant flat-referral option; Foxquilt or others via a direct partner deal for recurring economics). When the tracked link is issued, set it in:
+- **Why:** Until the approved partner/referral URL is set, the "Get insured" CTAs point at Foxquilt's generic public site — clicks aren't attributed to Blue Seal, so no referral revenue is tracked.
+- **What:** Complete the Foxquilt partner signup and get the tracked referral link. When it's issued, set it in:
   1. `.env` as `VITE_INSURANCE_PARTNER_URL=...` (local builds).
   2. GitHub → **Settings → Secrets and variables → Actions** → add `VITE_INSURANCE_PARTNER_URL` (deploy.yml / ci.yml already read the `VITE_*` build env). Then push to main / run the Deploy workflow so hosting rebuilds with it.
   If you switch partners, also update `name` in `src/data/insurancePartner.ts`.

@@ -10,6 +10,7 @@ import {
   TRADIE_WAIVER_CHECKBOX,
   TRADIE_WAIVER_FOOTNOTE,
 } from "@/data/insuranceWaiver";
+import { INSURANCE_PARTNER } from "@/data/insurancePartner";
 
 // The assigned tradesperson signs the per-job "I'm working without insurance"
 // waiver before they can start work. Pure capture — the parent owns the network
@@ -72,6 +73,18 @@ function onConfirm() {
         </li>
       </ul>
     </div>
+
+    <!-- Positive way out: get covered (and skip this waiver next time). -->
+    <a
+      :href="INSURANCE_PARTNER.url"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="mt-3 flex items-center gap-2 rounded-md border border-[color:var(--bs-blue)] px-3 py-2 text-sm font-semibold text-[color:var(--bs-blue-dark)]"
+    >
+      <i class="pi pi-shield" aria-hidden="true"></i>
+      <span>Get insured in minutes with {{ INSURANCE_PARTNER.name }}</span>
+      <i class="pi pi-external-link ml-auto text-[0.72rem] opacity-70" aria-hidden="true"></i>
+    </a>
 
     <label class="mt-3 flex items-start gap-2 text-sm text-[color:var(--bs-text)]">
       <Checkbox v-model="agreed" binary :disabled="props.busy" />
