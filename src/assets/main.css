@@ -220,6 +220,18 @@ a:hover, a:focus-visible { text-decoration: underline; }
   padding: 0.32rem;
 }
 
+/* PrimeVue <Avatar :image>: the base theme styles the inner <img> as
+   `width: 100%; height: 100%` with NO object-fit, so any non-square profile
+   photo is stretched to fill the square box — i.e. squished — and the circle
+   clip just crops that distorted image. `cover` center-crops to fill while
+   preserving aspect ratio, which is the expected behaviour for an avatar.
+   Applies everywhere we render a user photo through <Avatar> (notifications,
+   chat, header, admin user search, tradie/applicant cards, etc.). The AI logo
+   avatar uses the separate `.bs-ai-avatar` class above and keeps `contain`. */
+.p-avatar img {
+  object-fit: cover;
+}
+
 .bs-pill {
   display: inline-flex;
   align-items: center;
