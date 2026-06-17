@@ -92,14 +92,11 @@ onBeforeUnmount(() => store.reset());
 <style scoped>
 .bs-ai-fab {
   position: fixed;
-  /* Clear the mobile bottom nav. Bar height = ~60px (4px padding-top +
-     48px min-height + 8px padding-bottom) plus iOS safe-area inset. We
-     anchor 6rem (96px) above the viewport bottom on phones — that puts
-     the FAB visibly above the bar on a no-safe-area browser (96 - 60 =
-     36px clearance) and even further above on an iPhone (96 + 34 - 86 =
-     44px). AppShell hides the bottom nav above `md`, so the desktop
-     rule below resets to the original placement. */
-  bottom: calc(6rem + env(safe-area-inset-bottom));
+  /* Sit just above the mobile bottom nav (56px bar + safe-area inset),
+     anchored at the SAME height as the Report-a-bug FAB on the left so the two
+     line up. AppShell hides the bottom nav above `md`, so the desktop rule
+     below resets to the original placement. */
+  bottom: calc(56px + env(safe-area-inset-bottom) + 0.5rem);
   right: 1rem;
   z-index: 40;
   height: 3.25rem;
