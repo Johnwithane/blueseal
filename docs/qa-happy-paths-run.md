@@ -23,6 +23,16 @@ _none yet_
 
 ## Low
 
+### L2 — Address fields use the deprecated `google.maps.places.Autocomplete` API — **open**
+- **Where:** any address field (Account → location, /jobs/post, /request, onboarding) — 2 console
+  warnings per page that loads Maps.
+- **Evidence:** `google.maps.places.Autocomplete` is "not available to new customers" as of
+  2025-03-01; Google recommends `PlaceAutocompleteElement`. Still works (bug-fixed, ≥12 months
+  notice before any removal), so this is **tech debt / future-proofing**, not a break.
+- **Fix (deferred):** migrate `useGoogleMaps` (`src/composables/useGoogleMaps.ts`) + the address
+  fields to `PlaceAutocompleteElement`. Non-trivial (touches every address input) — flagged for a
+  deliberate change, not a mid-QA hotfix.
+
 ### L1 — CSP blocks Google Analytics (`www.google.com`) on every page — **verified**
 - Re-run after the hosting deploy: console errors went **4/11 → 0/0** on both accounts.
 - **Where:** every page; console on load.
@@ -39,6 +49,10 @@ _none yet_
 
 ## Untested / deferred
 - Email-link flows (invite-claim, prospect-claim, password reset) — need an inbox; deferred.
+- **AI Pro paywall** — both test accounts bypass it (`tradieqa` is admin → exempt; `clientqa` is
+  client → no AI). Verifying the not-Pro → `BLUESEAL_PRO_REQUIRED` → paywall popup needs a plain
+  non-admin tradesperson (or temporarily removing admin from `tradieqa`). The AI assistant itself
+  works (real Vertex response, well-formatted).
 
 ---
 
@@ -47,6 +61,12 @@ _none yet_
   `tradieqa` = tradesperson + admin + qa; tradie provisions via `/qa`; `/dashboard/tradie` renders
   after provisioning. (Confirmed the un-provisioned tradie correctly redirects to `/onboarding` —
   not a bug.)
+- **Interactive live sweep (Playwright MCP, as `tradieqa`):** sign-in ✓, tradie dashboard ✓
+  (0 errors), AI assistant ✓ (real response), admin dashboard ✓, admin user search + the inline
+  roles editor ✓, and the **user detail panel loads instantly** (verifies the reactivity fix on the
+  live site — no more "Loading details…" hang). New finding: L2 (deprecated Maps Autocomplete).
+  App is polished; few defects surfaced. (Minor: sign-in briefly lands on `/` before
+  `/dashboard/tradie` — cosmetic, not pursued.)
 - Phase 1 flagship leg 1 (client posts → tradie sees on board): **GREEN, 0 errors.** Notes (not
   bugs): every trade carries a required intake questionnaire (driver fills it generically) and
   budget is required; Firestore `Listen/channel` `ERR_ABORTED` on navigation is benign listener
