@@ -104,7 +104,12 @@ service cloud.firestore {
         // never write it from the client — that would let a tradesperson fake
         // Pro to dodge the platform service fee + unlock the AI gate.
         // `.get(field, null)` so docs predating it (every account) stay editable.
-        && request.resource.data.get('subscription', null) == resource.data.get('subscription', null);
+        && request.resource.data.get('subscription', null) == resource.data.get('subscription', null)
+        // Account suspension mirror is server-managed (adminSetUserDisabled, admin
+        // SDK). The owner can never write it — that's the support-side lock, not a
+        // self-serve toggle. `.get(field, null)` so docs predating it stay editable.
+        && request.resource.data.get('disabledAt', null) == resource.data.get('disabledAt', null)
+        && request.resource.data.get('disabledReason', null) == resource.data.get('disabledReason', null);
       allow update: if isAdmin();
       allow delete: if isAdmin();
 
@@ -118,6 +123,24 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly(['createdAt'])
           && request.resource.data.createdAt is timestamp;
         allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      // ---------- users/{userId}/supportNotes (admin-only support log) ----------
+      // Internal notes pinned to an account so the next support contact has
+      // context. Admin-only end to end — the user can never read or write them.
+      // Append-only (no update); authorUid is pinned to the writer so notes are
+      // honestly attributed. Body capped in the rule, not just the UI.
+      match /supportNotes/{noteId} {
+        allow read, delete: if isAdmin();
+        allow create: if isAdmin()
+          && request.resource.data.keys().hasOnly(['authorUid', 'authorName', 'body', 'createdAt'])
+          && request.resource.data.authorUid == uid()
+          && request.resource.data.authorName is string
+          && request.resource.data.authorName.size() <= 120
+          && request.resource.data.body is string
+          && request.resource.data.body.size() >= 1
+          && request.resource.data.body.size() <= 2000
+          && request.resource.data.createdAt == request.time;
       }
 
       // ---------- users/{userId}/devices (web-push registrations) ----------

@@ -422,9 +422,14 @@ users/{uid}
   displayName, email, photoURL, phone
   createdAt, lastActiveAt
   emailVerified: bool
+  deletedAt: timestamp | null    // PIPEDA soft-delete marker (30-day grace → scheduledHardDelete)
+  disabledAt, disabledReason     // admin suspension mirror; Auth `disabled` is the real lock. SERVER-MANAGED
   // clients only:
   clientRatingAvg: number        // visible to tradies
   clientRatingCount: number
+
+users/{uid}/supportNotes/{noteId}  // admin-only internal support log (append-only)
+  authorUid, authorName, body, createdAt  // authorUid pinned to the writing admin; body ≤ 2000 chars
 
 tradespeople/{uid}                // doc id = uid
   bio

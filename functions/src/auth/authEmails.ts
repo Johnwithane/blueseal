@@ -23,8 +23,7 @@ import { CALLABLE_OPTS } from "../lib/callable";
 import { adminAuth } from "../lib/admin";
 import { requireAuth } from "../lib/auth";
 import { enforceRateLimit } from "../lib/rateLimit";
-import { enqueueMail } from "../lib/mail";
-import { brandedEmailHtml } from "../lib/emailTemplate";
+import { deliver } from "../lib/brandedMail";
 import { appBaseUrl, emailHashOf } from "../prospects/helpers";
 
 const firebaseAuthCode = (err: unknown): string | undefined =>
@@ -52,32 +51,6 @@ function linkGenHttpsError(fn: string, err: unknown): HttpsError {
   }
   logger.error(`${fn}: link generation failed`, { code, msg });
   return new HttpsError("internal", "Couldn't send the email. Please try again.");
-}
-
-/**
- * Build the branded HTML + a plain-text fallback and enqueue. Multipart
- * (text + html) helps deliverability; brandedEmailHtml escapes the body lines.
- */
-async function deliver(opts: {
-  to: string;
-  subject: string;
-  title: string;
-  bodyLines: string[];
-  ctaLabel: string;
-  ctaUrl: string;
-}): Promise<void> {
-  const text = `${opts.bodyLines.join("\n\n")}\n\n${opts.ctaLabel}: ${opts.ctaUrl}\n`;
-  await enqueueMail({
-    to: opts.to,
-    subject: opts.subject,
-    text,
-    html: brandedEmailHtml({
-      title: opts.title,
-      bodyLines: opts.bodyLines,
-      ctaLabel: opts.ctaLabel,
-      ctaUrl: opts.ctaUrl,
-    }),
-  });
 }
 
 /**

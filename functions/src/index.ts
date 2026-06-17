@@ -56,6 +56,21 @@ export { backfillJobPrivateNotes } from "./admin/backfillJobPrivateNotes";
 export { backfillTradieContact } from "./admin/backfillTradieContact";
 export { adminGrantFoundingPro } from "./admin/grantFoundingPro";
 
+// Admin support-desk account actions (verify email, password reset / temp pw,
+// suspend/restore, resend verification, edit contact, soft-delete/restore,
+// live Auth-state read).
+export {
+  adminVerifyUserEmail,
+  adminSendPasswordReset,
+  adminResendVerificationEmail,
+  adminSetTempPassword,
+  adminSetUserDisabled,
+  adminUpdateUserContact,
+  adminGetUserAuthState,
+  adminSoftDeleteUser,
+  adminRestoreUser,
+} from "./admin/userSupport";
+
 // Chat
 export { onMessageCreated } from "./chat/onMessageCreated";
 

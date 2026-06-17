@@ -17,9 +17,11 @@ import {
   assertSucceeds,
   type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
-import { doc, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
+import { deleteDoc, doc, getDoc, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 
 import {
+  ADMIN_CLAIMS,
+  ADMIN_UID,
   CLIENT_CLAIMS,
   CLIENT_UID,
   OTHER_CLIENT_UID,
@@ -226,6 +228,30 @@ describe("users — server-managed field locks still enforced", () => {
     );
   });
 
+  it("owner cannot self-grant suspension (disabledAt) — that's the support lock", async () => {
+    await seed(CLIENT_UID, canonicalUser);
+    const fs = env.authenticatedContext(CLIENT_UID, CLIENT_CLAIMS).firestore();
+    await assertFails(
+      updateDoc(doc(fs, "users", CLIENT_UID), { disabledAt: serverTimestamp() }),
+    );
+  });
+
+  it("owner cannot clear their own disabledAt to escape a suspension", async () => {
+    await seed(CLIENT_UID, { ...canonicalUser, disabledAt: serverTimestamp(), disabledReason: "fraud" });
+    const fs = env.authenticatedContext(CLIENT_UID, CLIENT_CLAIMS).firestore();
+    await assertFails(
+      updateDoc(doc(fs, "users", CLIENT_UID), { disabledAt: null, disabledReason: null }),
+    );
+  });
+
+  it("owner can still edit displayName on a suspended doc (legacy-trap parity)", async () => {
+    await seed(CLIENT_UID, { ...canonicalUser, disabledAt: serverTimestamp(), disabledReason: "fraud" });
+    const fs = env.authenticatedContext(CLIENT_UID, CLIENT_CLAIMS).firestore();
+    await assertSucceeds(
+      updateDoc(doc(fs, "users", CLIENT_UID), { displayName: "Renamed Under Suspension" }),
+    );
+  });
+
   it("owner cannot mutate roles", async () => {
     await seed(CLIENT_UID, canonicalUser);
     const fs = env.authenticatedContext(CLIENT_UID, CLIENT_CLAIMS).firestore();
@@ -314,6 +340,79 @@ describe("users — cross-account isolation", () => {
       .firestore();
     await assertFails(
       updateDoc(doc(fs, "users", CLIENT_UID), { displayName: "Hacked" }),
+    );
+  });
+});
+
+describe("users/{uid}/supportNotes — admin-only internal log", () => {
+  const note = (over: Record<string, unknown> = {}) => ({
+    authorUid: ADMIN_UID,
+    authorName: "Support Admin",
+    body: "Called the customer; verified ID over the phone.",
+    createdAt: serverTimestamp(),
+    ...over,
+  });
+
+  async function seedNote(uid: string, id: string): Promise<void> {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "users", uid, "supportNotes", id), note());
+    });
+  }
+
+  it("admin can create a well-formed note attributed to themselves", async () => {
+    await seed(CLIENT_UID, canonicalUser);
+    const fs = env.authenticatedContext(ADMIN_UID, ADMIN_CLAIMS).firestore();
+    await assertSucceeds(
+      setDoc(doc(fs, "users", CLIENT_UID, "supportNotes", "n1"), note()),
+    );
+  });
+
+  it("admin can read and delete notes", async () => {
+    await seedNote(CLIENT_UID, "n1");
+    const fs = env.authenticatedContext(ADMIN_UID, ADMIN_CLAIMS).firestore();
+    await assertSucceeds(getDoc(doc(fs, "users", CLIENT_UID, "supportNotes", "n1")));
+    await assertSucceeds(deleteDoc(doc(fs, "users", CLIENT_UID, "supportNotes", "n1")));
+  });
+
+  it("the account owner cannot read their own support notes", async () => {
+    await seedNote(CLIENT_UID, "n1");
+    const fs = env.authenticatedContext(CLIENT_UID, CLIENT_CLAIMS).firestore();
+    await assertFails(getDoc(doc(fs, "users", CLIENT_UID, "supportNotes", "n1")));
+  });
+
+  it("a non-admin cannot create a note", async () => {
+    const fs = env.authenticatedContext(CLIENT_UID, CLIENT_CLAIMS).firestore();
+    await assertFails(
+      setDoc(doc(fs, "users", CLIENT_UID, "supportNotes", "n1"), note()),
+    );
+  });
+
+  it("admin cannot forge authorUid as someone else", async () => {
+    const fs = env.authenticatedContext(ADMIN_UID, ADMIN_CLAIMS).firestore();
+    await assertFails(
+      setDoc(doc(fs, "users", CLIENT_UID, "supportNotes", "n1"), note({ authorUid: CLIENT_UID })),
+    );
+  });
+
+  it("admin cannot write an oversized body", async () => {
+    const fs = env.authenticatedContext(ADMIN_UID, ADMIN_CLAIMS).firestore();
+    await assertFails(
+      setDoc(doc(fs, "users", CLIENT_UID, "supportNotes", "n1"), note({ body: "x".repeat(2001) })),
+    );
+  });
+
+  it("admin cannot plant extra fields beyond the allowlist", async () => {
+    const fs = env.authenticatedContext(ADMIN_UID, ADMIN_CLAIMS).firestore();
+    await assertFails(
+      setDoc(doc(fs, "users", CLIENT_UID, "supportNotes", "n1"), note({ pinned: true })),
+    );
+  });
+
+  it("notes are append-only (no update)", async () => {
+    await seedNote(CLIENT_UID, "n1");
+    const fs = env.authenticatedContext(ADMIN_UID, ADMIN_CLAIMS).firestore();
+    await assertFails(
+      updateDoc(doc(fs, "users", CLIENT_UID, "supportNotes", "n1"), { body: "edited" }),
     );
   });
 });
