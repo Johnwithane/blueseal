@@ -49,6 +49,7 @@ import { useToast } from "@/composables/useToast";
 import { useFormatters } from "@/composables/useFormatters";
 import { useGoogleMaps } from "@/composables/useGoogleMaps";
 import { humanizeError } from "@/utils/errors";
+import { forgotPasswordSchema } from "@/validation/schemas";
 import { COMMON_LANGUAGES } from "@/data/languages";
 import PortfolioEditor from "@/components/PortfolioEditor.vue";
 import TradieDocsManager from "@/components/TradieDocsManager.vue";
@@ -83,6 +84,13 @@ const tradie = ref<WithId<TradespersonDoc> | null>(null);
 const saving = ref(false);
 const uploading = ref(false);
 const sendingReset = ref(false);
+// Change-email flow: reveal an input, send a branded confirm-and-change link to
+// the NEW address (the account email only switches once the user clicks it).
+const changingEmail = ref(false);
+const newEmail = ref("");
+const newEmailError = ref<string | null>(null);
+const submittingEmailChange = ref(false);
+const emailChangeSentTo = ref<string | null>(null);
 const addingTradie = ref(false);
 const addingClient = ref(false);
 const grantingAdminAllRoles = ref(false);
@@ -700,6 +708,42 @@ async function sendPasswordReset() {
   }
 }
 
+function startEmailChange() {
+  changingEmail.value = true;
+  emailChangeSentTo.value = null;
+  newEmail.value = "";
+  newEmailError.value = null;
+}
+
+function cancelEmailChange() {
+  changingEmail.value = false;
+  newEmail.value = "";
+  newEmailError.value = null;
+}
+
+async function submitEmailChange() {
+  newEmailError.value = null;
+  const parsed = forgotPasswordSchema.shape.email.safeParse(newEmail.value);
+  if (!parsed.success) {
+    newEmailError.value = parsed.error.issues[0]?.message ?? "Enter a valid email";
+    return;
+  }
+  if (parsed.data === email.value.trim().toLowerCase()) {
+    newEmailError.value = "That's already your email address.";
+    return;
+  }
+  submittingEmailChange.value = true;
+  try {
+    await auth.changeEmail(parsed.data);
+    emailChangeSentTo.value = parsed.data;
+    changingEmail.value = false;
+  } catch (e) {
+    newEmailError.value = humanizeError(e);
+  } finally {
+    submittingEmailChange.value = false;
+  }
+}
+
 const ROLE_LABEL: Record<string, string> = {
   client: "Client",
   tradesperson: "Tradesperson",
@@ -974,9 +1018,60 @@ async function grantAllTrades() {
         <div>
           <label class="text-sm font-medium">Email</label>
           <InputText :model-value="email" disabled class="mt-1 w-full" />
-          <small class="text-[color:var(--bs-muted)]">
-            Email changes aren't supported in MVP. Contact support.
-          </small>
+
+          <!-- Sent: confirm link is on its way to the NEW address -->
+          <Message v-if="emailChangeSentTo" severity="success" :closable="false" class="mt-2">
+            Confirmation link sent to <strong>{{ emailChangeSentTo }}</strong>. Open it to finish the
+            change — your email stays the same until you do.
+          </Message>
+
+          <!-- Trigger -->
+          <Button
+            v-else-if="!changingEmail"
+            label="Change email"
+            icon="pi pi-pencil"
+            text
+            size="small"
+            class="mt-1 !px-0"
+            @click="startEmailChange"
+          />
+
+          <!-- Inline change form -->
+          <div v-else class="mt-2 space-y-2">
+            <InputText
+              v-model="newEmail"
+              type="email"
+              inputmode="email"
+              autocomplete="email"
+              placeholder="new@email.com"
+              class="w-full"
+              :invalid="!!newEmailError"
+              @keyup.enter="submitEmailChange"
+            />
+            <small v-if="newEmailError" class="block text-[color:var(--bs-danger)]">
+              {{ newEmailError }}
+            </small>
+            <small v-else class="block text-[color:var(--bs-muted)]">
+              We'll send a confirmation link to the new address. Your email only changes once you
+              click it.
+            </small>
+            <div class="flex gap-2">
+              <Button
+                label="Send confirmation"
+                icon="pi pi-envelope"
+                size="small"
+                :loading="submittingEmailChange"
+                @click="submitEmailChange"
+              />
+              <Button
+                label="Cancel"
+                text
+                size="small"
+                :disabled="submittingEmailChange"
+                @click="cancelEmailChange"
+              />
+            </div>
+          </div>
         </div>
         <div>
           <label class="text-sm font-medium">

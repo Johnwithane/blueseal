@@ -30,6 +30,9 @@ export async function enforceRateLimit(
   uid: string,
   action: string,
   dailyCap: number,
+  // Non-AI callers (auth emails, etc.) pass their own message so a hit doesn't
+  // surface the AI-specific copy. Defaults to the AI-cap wording.
+  message?: string,
 ): Promise<void> {
   const today = new Date().toISOString().slice(0, 10);
   const ref = db.doc(`rateLimits/${action}_${uid}_${today}`);
@@ -39,7 +42,8 @@ export async function enforceRateLimit(
     if (count >= dailyCap) {
       throw new HttpsError(
         "resource-exhausted",
-        `Daily AI usage limit reached (${dailyCap} requests). Please try again tomorrow.`,
+        message ??
+          `Daily AI usage limit reached (${dailyCap} requests). Please try again tomorrow.`,
       );
     }
     tx.set(

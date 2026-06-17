@@ -4,8 +4,6 @@ import {
   createUserWithEmailAndPassword,
   isSignInWithEmailLink,
   onAuthStateChanged,
-  sendEmailVerification,
-  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithEmailLink,
   signInWithPopup,
@@ -21,6 +19,11 @@ import {
   getUser,
   setActiveRole as writeActiveRole,
 } from "@/firebase/services/users";
+import {
+  sendVerificationEmail as callSendVerificationEmail,
+  requestPasswordReset as callRequestPasswordReset,
+  requestEmailChange as callRequestEmailChange,
+} from "@/firebase/services/authEmails";
 import type { Role, UserDoc, WithId } from "@/firebase/interfaces";
 import { LEGAL_VERSION } from "@/legal/version";
 import { useRoleSwitchAnimationStore } from "@/stores/roleSwitchAnimation";
@@ -236,7 +239,7 @@ export const useAuthStore = defineStore("auth", {
               role: "client",
               termsAcceptedVersion: LEGAL_VERSION,
             });
-            await sendEmailVerification(fbUser).catch(() => {});
+            await callSendVerificationEmail().catch(() => {});
             doc = await getUser(fbUser.uid);
           } catch (e) {
             // Non-fatal: leave the session profile-less and let the next
@@ -367,7 +370,10 @@ export const useAuthStore = defineStore("auth", {
           console.warn("[auth] claim reconcile at signup failed", e);
         }
         await cred.user.getIdToken(true);
-        await sendEmailVerification(cred.user).catch(() => {});
+        // Branded verification email via our Resend pipeline (callable), not the
+        // Firebase client SDK — see services/authEmails.ts. Fire-and-forget: a
+        // mail hiccup must not fail an otherwise-complete signup.
+        await callSendVerificationEmail().catch(() => {});
         this.roles = roles;
         this.activeRole = opts.role;
       } catch (e) {
@@ -511,15 +517,20 @@ export const useAuthStore = defineStore("auth", {
     },
 
     async sendPasswordReset(email: string) {
-      // Swallow user-not-found so we don't leak account existence — matches
-      // the wrong-password / user-not-found handling in utils/errors.ts.
-      try {
-        await sendPasswordResetEmail(auth, email);
-      } catch (e) {
-        const code = (e as { code?: string }).code;
-        if (code === "auth/user-not-found") return;
-        throw e;
-      }
+      // Branded reset email via our Resend pipeline (callable), not the Firebase
+      // client SDK. The callable already returns ok for an unknown address, so
+      // account existence never leaks and there's no error to swallow here.
+      await callRequestPasswordReset(email);
+    },
+
+    /**
+     * Request a change of account email. Sends a branded confirm-and-change
+     * link to `newEmail`; the account email only switches once the user clicks
+     * it. Throws (surfaced to the UI) if the address is already in use.
+     */
+    async changeEmail(newEmail: string) {
+      if (!this.fbUser) throw new Error("Sign-in required");
+      await callRequestEmailChange(newEmail);
     },
 
     async refreshClaims() {

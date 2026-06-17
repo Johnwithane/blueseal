@@ -1119,7 +1119,21 @@ const faqs: FaqItem[] = [
   {
     question: "I forgot my password — what do I do?",
     answer:
-      "Use **Forgot password** on the sign-in screen and we'll email you a reset link.",
+      "Use **Forgot password** on the sign-in screen and we'll email you a reset link from **noreply@blueseal.app**. If it doesn't arrive in a minute, check your spam or junk folder.",
+    categoryId: "account-app",
+    audience: "all",
+  },
+  {
+    question: "I didn't get my verification (or reset) email — what now?",
+    answer:
+      "Our emails come from **noreply@blueseal.app**, so first check your spam or junk folder and mark it as **Not spam** to make sure future ones land in your inbox. Verification emails are re-sent if you trigger the action again, and you can always request a fresh password-reset link from **Forgot password**. Still nothing after a few minutes? Double-check the address you used and contact support.",
+    categoryId: "account-app",
+    audience: "all",
+  },
+  {
+    question: "How do I change my account email?",
+    answer:
+      "Open **Account** from the menu and tap **Change email** under your email address. Enter the new address and we'll send a confirmation link to it — your email only changes once you open that link, so the old address keeps working until then. If the new address is already tied to a Blue Seal account, you'll be told so you can use a different one.",
     categoryId: "account-app",
     audience: "all",
   },

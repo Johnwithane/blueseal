@@ -1,0 +1,221 @@
+// Branded auth emails — verification, password reset, and email change — sent
+// through OUR Resend pipeline instead of Firebase Auth's built-in mailer.
+//
+// Why: Firebase's default emails go out from noreply@<project>.firebaseapp.com,
+// a domain with no SPF/DKIM/DMARC alignment to blueseal.app, so inbox providers
+// junk them and they're unbranded. Every other transactional email already
+// lands in the inbox via enqueueMail() → "Trigger Email" extension → Resend
+// (from Blue Seal <noreply@blueseal.app>, a verified domain). These callables
+// generate the Firebase action link with the Admin SDK (generation does NOT
+// send — only the client SDK auto-sends) and deliver it through that same
+// branded pipeline. The client therefore STOPS calling sendEmailVerification /
+// sendPasswordResetEmail, so there's no double email.
+//
+// The action links use Firebase's HOSTED action handler (no handleCodeInApp):
+// clicking verifies / resets on Firebase's page, then continues to `url`. No
+// in-app verify/reset route needed, and password-reset UX is unchanged.
+
+import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { logger } from "firebase-functions/v2";
+import { z } from "zod";
+
+import { CALLABLE_OPTS } from "../lib/callable";
+import { adminAuth } from "../lib/admin";
+import { requireAuth } from "../lib/auth";
+import { enforceRateLimit } from "../lib/rateLimit";
+import { enqueueMail } from "../lib/mail";
+import { brandedEmailHtml } from "../lib/emailTemplate";
+import { appBaseUrl, emailHashOf } from "../prospects/helpers";
+
+const firebaseAuthCode = (err: unknown): string | undefined =>
+  typeof err === "object" && err !== null && "code" in err
+    ? (err as { code?: string }).code
+    : undefined;
+
+/**
+ * Build the branded HTML + a plain-text fallback and enqueue. Multipart
+ * (text + html) helps deliverability; brandedEmailHtml escapes the body lines.
+ */
+async function deliver(opts: {
+  to: string;
+  subject: string;
+  title: string;
+  bodyLines: string[];
+  ctaLabel: string;
+  ctaUrl: string;
+}): Promise<void> {
+  const text = `${opts.bodyLines.join("\n\n")}\n\n${opts.ctaLabel}: ${opts.ctaUrl}\n`;
+  await enqueueMail({
+    to: opts.to,
+    subject: opts.subject,
+    text,
+    html: brandedEmailHtml({
+      title: opts.title,
+      bodyLines: opts.bodyLines,
+      ctaLabel: opts.ctaLabel,
+      ctaUrl: opts.ctaUrl,
+    }),
+  });
+}
+
+/**
+ * Send a branded email-verification link to the signed-in user. Requires auth
+ * (the just-created user); no role gate (a brand-new user has no claims yet).
+ * Short-circuits when the email is already verified — which also means the
+ * orphaned-account self-heal no longer fires a pointless verify email at an
+ * already-verified (e.g. Google) account.
+ */
+export const sendVerificationEmail = onCall(CALLABLE_OPTS, async (req) => {
+  const uid = requireAuth(req);
+  const token = req.auth?.token as { email?: string; email_verified?: boolean } | undefined;
+  const email = token?.email;
+  if (!email) {
+    // Federated-only accounts can lack a token email; nothing to verify here.
+    throw new HttpsError("failed-precondition", "No email on this account.");
+  }
+  if (token?.email_verified === true) return { ok: true as const };
+
+  await enforceRateLimit(
+    uid,
+    "verify_email",
+    5,
+    "Too many verification emails. Please try again tomorrow.",
+  );
+
+  const link = await adminAuth.generateEmailVerificationLink(email, {
+    url: `${appBaseUrl()}/login`,
+  });
+
+  await deliver({
+    to: email,
+    subject: "Confirm your Blue Seal email",
+    title: "Confirm your email",
+    bodyLines: [
+      "Welcome to Blue Seal — verified Canadian tradespeople.",
+      "Tap the button below to confirm your email address and finish setting up your account.",
+      "If you didn't create a Blue Seal account, you can safely ignore this email.",
+    ],
+    ctaLabel: "Confirm email",
+    ctaUrl: link,
+  });
+
+  logger.info("sendVerificationEmail: queued", { uid });
+  return { ok: true as const };
+});
+
+const ResetInput = z.object({
+  email: z.string().trim().toLowerCase().email().max(200),
+});
+
+/**
+ * Send a branded password-reset link. UNauthenticated by design (the forgot-
+ * password page is for logged-out users) — App Check (CALLABLE_OPTS) plus a
+ * per-email daily cap are the abuse guards. Always returns { ok: true }: a
+ * non-existent address never reveals itself (matches ForgotPasswordView, which
+ * always shows the success state).
+ */
+export const requestPasswordReset = onCall(CALLABLE_OPTS, async (req) => {
+  const parsed = ResetInput.safeParse(req.data);
+  if (!parsed.success) throw new HttpsError("invalid-argument", "Enter a valid email.");
+  const { email } = parsed.data;
+
+  // Rate-limit on a HASH of the email so raw addresses never land in
+  // rateLimits/ and a victim can't be mailbombed. Increment BEFORE generating
+  // so the cap binds regardless of whether the account exists.
+  await enforceRateLimit(
+    emailHashOf(email),
+    "pwreset",
+    5,
+    "Too many reset requests. Please try again tomorrow.",
+  );
+
+  try {
+    const link = await adminAuth.generatePasswordResetLink(email, {
+      url: `${appBaseUrl()}/login`,
+    });
+    await deliver({
+      to: email,
+      subject: "Reset your Blue Seal password",
+      title: "Reset your password",
+      bodyLines: [
+        "We got a request to reset the password for your Blue Seal account.",
+        "Tap the button below to choose a new password.",
+        "If you didn't request this, you can safely ignore this email — your password won't change.",
+      ],
+      ctaLabel: "Reset password",
+      ctaUrl: link,
+    });
+  } catch (err) {
+    // user-not-found / invalid-email (or any error) must NOT leak — succeed
+    // silently so account existence can't be probed.
+    logger.info("requestPasswordReset: not sent", { code: firebaseAuthCode(err) });
+  }
+
+  return { ok: true as const };
+});
+
+const ChangeInput = z.object({
+  newEmail: z.string().trim().toLowerCase().email().max(200),
+});
+
+/**
+ * Send a branded verify-and-change-email link to the user's NEW address. The
+ * account email only changes once they click. Requires auth (it's the user's
+ * own account). Surfaces "already in use" — standard for a self-service email
+ * change (the caller is authenticated; this isn't stranger enumeration).
+ *
+ * NB: Firebase also sends a security/revert notice to the OLD address via its
+ * built-in mailer. That's an intentional safety email and out of scope to
+ * rebrand here.
+ */
+export const requestEmailChange = onCall(CALLABLE_OPTS, async (req) => {
+  const uid = requireAuth(req);
+  const currentEmail = (req.auth?.token as { email?: string } | undefined)?.email;
+  if (!currentEmail) {
+    throw new HttpsError("failed-precondition", "No email on this account.");
+  }
+
+  const parsed = ChangeInput.safeParse(req.data);
+  if (!parsed.success) throw new HttpsError("invalid-argument", "Enter a valid email.");
+  const { newEmail } = parsed.data;
+  if (newEmail === currentEmail.toLowerCase()) {
+    throw new HttpsError("invalid-argument", "That's already your email address.");
+  }
+
+  await enforceRateLimit(
+    uid,
+    "email_change",
+    5,
+    "Too many email-change requests. Please try again tomorrow.",
+  );
+
+  let link: string;
+  try {
+    link = await adminAuth.generateVerifyAndChangeEmailLink(currentEmail, newEmail, {
+      url: `${appBaseUrl()}/account`,
+    });
+  } catch (err) {
+    const code = firebaseAuthCode(err);
+    if (code === "auth/email-already-exists") {
+      throw new HttpsError("already-exists", "That email is already in use.");
+    }
+    logger.error("requestEmailChange: link generation failed", { uid, code });
+    throw new HttpsError("internal", "Couldn't start the email change. Please try again.");
+  }
+
+  await deliver({
+    to: newEmail,
+    subject: "Confirm your new Blue Seal email",
+    title: "Confirm your new email",
+    bodyLines: [
+      `Confirm ${newEmail} as the new email for your Blue Seal account.`,
+      "Tap the button below to verify this address and switch your account over to it.",
+      "If you didn't request this change, you can ignore this email and your address stays the same.",
+    ],
+    ctaLabel: "Confirm new email",
+    ctaUrl: link,
+  });
+
+  logger.info("requestEmailChange: queued", { uid });
+  return { ok: true as const };
+});
