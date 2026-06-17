@@ -61,6 +61,21 @@ export async function listReviewsFor(tradieUid: string): Promise<WithId<ReviewDo
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
+/**
+ * Admin: ALL of a tradesperson's reviews regardless of status (incl. hidden),
+ * so the admin User 360 page can show + recover moderation-hidden reviews. Admin
+ * can read every review per firestore.rules. No status filter → only a
+ * single-field index is needed; sorted client-side.
+ */
+export async function listReviewsForAdmin(tradieUid: string): Promise<WithId<ReviewDoc>[]> {
+  const snap = await getDocs(
+    query(reviewsCol(), where("tradespersonId", "==", tradieUid), limit(50)),
+  );
+  return snap.docs
+    .map((d) => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0));
+}
+
 export async function createClientReview(
   input: Omit<ClientReviewDoc, "createdAt" | "revealedAt">,
 ): Promise<string> {

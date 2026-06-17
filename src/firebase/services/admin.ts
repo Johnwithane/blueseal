@@ -109,3 +109,13 @@ export const adminRestoreUser = httpsCallable<{ targetUid: string }, { ok: boole
   functions,
   "adminRestoreUser",
 );
+
+/**
+ * Admin moderation: soft-hide or recover a public review or a job-board post.
+ * Recoverable (nothing deleted). Hiding a review also recomputes the tradie's
+ * rating server-side.
+ */
+export const adminModerateContent = httpsCallable<
+  { kind: "review" | "jobPost"; id: string; hidden: boolean },
+  { ok: boolean }
+>(functions, "adminModerateContent");

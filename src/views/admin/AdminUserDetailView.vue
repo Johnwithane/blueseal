@@ -19,12 +19,13 @@ import AdminUserMessagesPanel from "@/components/admin/AdminUserMessagesPanel.vu
 import { getUser } from "@/firebase/services/users";
 import { getTradesperson, getTradespersonContact } from "@/firebase/services/tradespeople";
 import { listJobsForClient, listJobsForTradie } from "@/firebase/services/jobs";
-import { listReviewsFor, listClientReviewsFor } from "@/firebase/services/reviews";
+import { listReviewsForAdmin, listClientReviewsFor } from "@/firebase/services/reviews";
 import { listAcceptedVouchesFor, listAcceptedVouchesFrom } from "@/firebase/services/vouches";
 import { listClientInvoices } from "@/firebase/services/invoices";
 import { listJobPostsForClient } from "@/firebase/services/jobPosts";
-import { adminGetUserAuthState, type AdminAuthState } from "@/firebase/services/admin";
+import { adminGetUserAuthState, adminModerateContent, type AdminAuthState } from "@/firebase/services/admin";
 import { useFormatters } from "@/composables/useFormatters";
+import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 import { tradeLabel } from "@/data/trades";
 import { STATUS_LABEL, STATUS_SEVERITY } from "@/utils/jobStatus";
@@ -44,6 +45,7 @@ import type {
 const route = useRoute();
 const uid = route.params.uid as string;
 const { money, date, dateTime, relativeTime } = useFormatters();
+const toast = useToast();
 
 const LIST_LIMIT = 20;
 
@@ -112,7 +114,7 @@ async function load() {
       ok(adminGetUserAuthState({ targetUid: uid }).then((r) => r.data), null),
       clientRole ? ok(listJobsForClient(uid, LIST_LIMIT), []) : Promise.resolve([]),
       tradieRole ? ok(listJobsForTradie(uid, LIST_LIMIT), []) : Promise.resolve([]),
-      tradieRole ? ok(listReviewsFor(uid), []) : Promise.resolve([]),
+      tradieRole ? ok(listReviewsForAdmin(uid), []) : Promise.resolve([]),
       ok(listClientReviewsFor(uid), []),
       ok(listAcceptedVouchesFor(uid), []),
       ok(listAcceptedVouchesFrom(uid), []),
@@ -155,6 +157,40 @@ async function onRolesUpdated(roles: Role[], activeRole: Role) {
 }
 function onTradesUpdated(trades: string[]) {
   if (tradie.value) tradie.value.trades = trades;
+}
+
+// Moderation: soft-hide / recover a review or job post. Patches local state so
+// the badge + button flip without a reload.
+const moderating = ref<string | null>(null);
+async function moderateReview(r: WithId<ReviewDoc>, hidden: boolean) {
+  moderating.value = r.id;
+  try {
+    await adminModerateContent({ kind: "review", id: r.id, hidden });
+    r.status = hidden ? "hidden" : "active";
+    toast.success(hidden ? "Review hidden." : "Review restored.");
+  } catch (e) {
+    toast.error(humanizeError(e));
+  } finally {
+    moderating.value = null;
+  }
+}
+async function moderatePost(p: WithId<JobPostDoc>, hidden: boolean) {
+  moderating.value = p.id;
+  try {
+    await adminModerateContent({ kind: "jobPost", id: p.id, hidden });
+    if (hidden) {
+      if (p.status !== "admin_hidden") p.statusBeforeHide = p.status;
+      p.status = "admin_hidden";
+    } else {
+      p.status = p.statusBeforeHide ?? "open";
+      p.statusBeforeHide = null;
+    }
+    toast.success(hidden ? "Post hidden." : "Post restored.");
+  } catch (e) {
+    toast.error(humanizeError(e));
+  } finally {
+    moderating.value = null;
+  }
 }
 
 onMounted(load);
@@ -300,9 +336,26 @@ onMounted(load);
       <div v-if="jobPosts.length" class="bs-card p-4 mt-3">
         <h3 class="text-xs font-semibold uppercase tracking-wide text-[color:var(--bs-muted)] mb-2">Job-board posts ({{ jobPosts.length }}{{ jobPosts.length === LIST_LIMIT ? "+" : "" }})</h3>
         <ul class="space-y-2 text-sm">
-          <li v-for="p in jobPosts" :key="p.id" class="flex items-center justify-between gap-2 rounded border border-[color:var(--bs-border)] p-2">
-            <span>{{ p.title || tradeLabel(p.trade) }}</span>
-            <Tag :value="p.status" :severity="p.status === 'open' ? 'success' : 'secondary'" />
+          <li
+            v-for="p in jobPosts"
+            :key="p.id"
+            class="flex items-center justify-between gap-2 rounded border border-[color:var(--bs-border)] p-2"
+            :class="{ 'opacity-60': p.status === 'admin_hidden' }"
+          >
+            <span class="min-w-0 truncate">{{ p.title || tradeLabel(p.trade) }}</span>
+            <span class="flex items-center gap-2 flex-none">
+              <Tag :value="p.status === 'admin_hidden' ? 'hidden' : p.status" :severity="p.status === 'open' ? 'success' : p.status === 'admin_hidden' ? 'danger' : 'secondary'" />
+              <Button
+                v-if="p.status === 'admin_hidden'"
+                label="Recover" icon="pi pi-undo" size="small" text
+                :loading="moderating === p.id" @click="moderatePost(p, false)"
+              />
+              <Button
+                v-else
+                label="Hide" icon="pi pi-eye-slash" size="small" text severity="danger"
+                :loading="moderating === p.id" @click="moderatePost(p, true)"
+              />
+            </span>
           </li>
         </ul>
       </div>
@@ -312,10 +365,31 @@ onMounted(load);
         <section v-if="reviewsReceived.length">
           <h3 class="text-xs font-semibold uppercase tracking-wide text-[color:var(--bs-muted)] mb-2">Reviews as tradesperson ({{ reviewsReceived.length }})</h3>
           <ul class="space-y-2 text-sm">
-            <li v-for="r in reviewsReceived" :key="r.id" class="rounded border border-[color:var(--bs-border)] p-2">
-              <span class="font-medium">{{ r.rating }} ★</span>
-              <span v-if="r.text"> — {{ r.text }}</span>
-              <span class="block text-xs text-[color:var(--bs-muted)]">{{ relativeTime(r.createdAt) }}</span>
+            <li
+              v-for="r in reviewsReceived"
+              :key="r.id"
+              class="rounded border border-[color:var(--bs-border)] p-2"
+              :class="{ 'opacity-60': r.status === 'hidden' }"
+            >
+              <div class="flex items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <span class="font-medium">{{ r.rating }} ★</span>
+                  <Tag v-if="r.status === 'hidden'" value="hidden" severity="danger" class="ml-1" />
+                  <Tag v-else-if="r.status === 'flagged'" value="flagged" severity="warn" class="ml-1" />
+                  <span v-if="r.text"> — {{ r.text }}</span>
+                  <span class="block text-xs text-[color:var(--bs-muted)]">{{ relativeTime(r.createdAt) }}</span>
+                </div>
+                <Button
+                  v-if="r.status === 'hidden'"
+                  label="Recover" icon="pi pi-undo" size="small" text class="flex-none"
+                  :loading="moderating === r.id" @click="moderateReview(r, false)"
+                />
+                <Button
+                  v-else
+                  label="Hide" icon="pi pi-eye-slash" size="small" text severity="danger" class="flex-none"
+                  :loading="moderating === r.id" @click="moderateReview(r, true)"
+                />
+              </div>
             </li>
           </ul>
         </section>

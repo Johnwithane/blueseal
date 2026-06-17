@@ -1265,7 +1265,11 @@ export interface SiteVisitDoc {
 // selectedApplicantId all live in the private/meta subdoc to enforce
 // bid-blind and address privacy at the rules layer.
 // ---------------------------------------------------------------------------
-export type JobPostStatus = "open" | "closed" | "cancelled" | "expired";
+// "admin_hidden" is a moderation soft-delete set by the adminModerateContent
+// callable: a NON-terminal status (so onJobPostClosed doesn't auto-reject pending
+// applicants) that the feed + public read rule exclude (both gate on "open").
+// Recoverable — statusBeforeHide carries the status to restore.
+export type JobPostStatus = "open" | "closed" | "cancelled" | "expired" | "admin_hidden";
 
 export interface AddressPublic {
   city: string;
@@ -1302,6 +1306,9 @@ export interface JobPostDoc {
   clientName?: string | null;
   clientPhotoURL?: string | null;
   status: JobPostStatus;
+  // The status to restore when an admin recovers a moderation-hidden post.
+  // Set/cleared by adminModerateContent; absent on normal posts.
+  statusBeforeHide?: JobPostStatus | null;
   trade: string;
   title: string;
   description: string;
