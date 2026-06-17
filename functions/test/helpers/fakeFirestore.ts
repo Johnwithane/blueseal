@@ -86,10 +86,17 @@ export class FakeTransaction {
 
 export class FakeFirestore {
   private readonly store = new Map<string, Data>();
+  private seq = 0;
 
   /** Seed a document (test setup). */
   seed(path: string, data: Data): void {
     this.store.set(path, { ...data });
+  }
+  /** All stored docs whose path starts with `prefix/` (e.g. a subcollection). */
+  peekUnder(prefix: string): Data[] {
+    const out: Data[] = [];
+    for (const [k, v] of this.store) if (k.startsWith(`${prefix}/`)) out.push({ ...v });
+    return out;
   }
   /** Read the current raw data for assertions (undefined if absent). */
   peek(path: string): Data | undefined {
@@ -113,6 +120,20 @@ export class FakeFirestore {
 
   doc(path: string): FakeDocRef {
     return new FakeDocRef(this, path);
+  }
+
+  // Minimal collection ref — enough for callables that do
+  // collection(path).add(data) (audit/mail/aiUsage/replies). Auto-ids are
+  // sequential so tests can assert deterministically.
+  collection(path: string): { add: (data: Data) => Promise<{ id: string }> } {
+    return {
+      add: async (data: Data) => {
+        this.seq += 1;
+        const id = `auto_${this.seq}`;
+        this.store.set(`${path}/${id}`, { ...data });
+        return { id };
+      },
+    };
   }
 
   async runTransaction<T>(fn: (tx: FakeTransaction) => Promise<T>): Promise<T> {

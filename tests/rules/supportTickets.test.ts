@@ -187,4 +187,54 @@ describe("supportTickets — update / delete", () => {
     const fs = env.authenticatedContext(ADMIN_UID, ADMIN_CLAIMS).firestore();
     await assertSucceeds(deleteDoc(doc(fs, "supportTickets", TICKET_ID)));
   });
+
+  it("admin can write internal triage notes", async () => {
+    await seedTicket();
+    const fs = env.authenticatedContext(ADMIN_UID, ADMIN_CLAIMS).firestore();
+    await assertSucceeds(
+      updateDoc(doc(fs, "supportTickets", TICKET_ID), {
+        internalNotes: "Called the customer; awaiting docs.",
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+});
+
+describe("supportTickets/{id}/replies — admin read, callable-only write", () => {
+  async function seedReply() {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "supportTickets", TICKET_ID, "replies", "r1"), {
+        senderUid: ADMIN_UID,
+        senderName: "Support",
+        body: "Thanks for reaching out.",
+        mode: "reply",
+        sentAt: new Date(),
+      });
+    });
+  }
+
+  it("admin can read replies", async () => {
+    await seedReply();
+    const fs = env.authenticatedContext(ADMIN_UID, ADMIN_CLAIMS).firestore();
+    await assertSucceeds(getDocs(collection(fs, "supportTickets", TICKET_ID, "replies")));
+  });
+
+  it("a non-admin cannot read replies", async () => {
+    await seedReply();
+    const fs = env.authenticatedContext(CLIENT_UID, CLIENT_CLAIMS).firestore();
+    await assertFails(getDoc(doc(fs, "supportTickets", TICKET_ID, "replies", "r1")));
+  });
+
+  it("even an admin cannot create a reply from the client (callable-only)", async () => {
+    const fs = env.authenticatedContext(ADMIN_UID, ADMIN_CLAIMS).firestore();
+    await assertFails(
+      setDoc(doc(fs, "supportTickets", TICKET_ID, "replies", "r2"), {
+        senderUid: ADMIN_UID,
+        senderName: "Support",
+        body: "Hi",
+        mode: "reply",
+        sentAt: serverTimestamp(),
+      }),
+    );
+  });
 });

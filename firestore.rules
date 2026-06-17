@@ -1249,8 +1249,18 @@ service cloud.firestore {
         && request.resource.data.message.size() >= 5 && request.resource.data.message.size() <= 2000;
       allow update: if isAdmin()
         && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['status', 'updatedAt', 'handledBy']);
+             .hasOnly(['status', 'updatedAt', 'handledBy', 'internalNotes', 'lastReplyAt', 'lastReplyBy']);
       allow delete: if isAdmin();
+
+      // ---------- supportTickets/{id}/replies (sent admin replies) ----------
+      // Admin-readable thread of replies sent to the customer. Written only by
+      // the sendSupportTicketReply callable (admin SDK, which bypasses rules) so
+      // a reply doc always corresponds to an email actually sent — no client
+      // create path. Immutable.
+      match /replies/{replyId} {
+        allow read: if isAdmin();
+        allow write: if false;
+      }
     }
 
     // ---------- bugReports (QA toolkit manual bug log) ----------

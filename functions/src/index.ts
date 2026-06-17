@@ -139,6 +139,10 @@ export { aiUpdateJobLog } from "./ai/updateJobLog";
 export { parseReceipt } from "./ai/parseReceipt";
 export { aiDraftQuote } from "./ai/draftQuote";
 export { aiDraftInvoiceNote } from "./ai/draftInvoiceNote";
+export { aiDraftSupportReply } from "./ai/draftSupportReply";
+
+// Support desk — admin-sent ticket replies (branded email + in-app record).
+export { sendSupportTicketReply } from "./support/sendSupportTicketReply";
 
 // Payments — Stripe Connect Express. Tradespeople onboard a connected account
 // (createConnect*); clients pay invoices by card via a destination charge

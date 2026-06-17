@@ -17,6 +17,10 @@ export interface MailInput {
   text?: string;
   html?: string;
   attachments?: Array<{ filename: string; content: string }>;
+  // Optional Reply-To. The "Trigger Email" extension honours a top-level
+  // `replyTo`, so a customer who hits reply reaches a monitored inbox (e.g.
+  // hello@blueseal.app) rather than the no-reply From. Validated like `to`.
+  replyTo?: string;
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -35,9 +39,12 @@ export async function enqueueMail(input: MailInput): Promise<void> {
   const subject = (input.subject ?? "").slice(0, 200);
   const text = (input.text ?? "").slice(0, 50_000);
   const html = (input.html ?? "").slice(0, 100_000);
+  // Drop an invalid reply-to rather than rejecting the whole send.
+  const replyTo = input.replyTo && validEmail(input.replyTo) ? input.replyTo : undefined;
 
   await db.collection("mail").add({
     to,
+    ...(replyTo ? { replyTo } : {}),
     message: {
       subject,
       text,

@@ -2224,6 +2224,26 @@ export interface SupportTicketDoc {
   handledBy: string | null; // admin uid who last changed the status
   createdAt: Timestamp;
   updatedAt: Timestamp;
+  // Private admin triage notes (also written by scripts/support-triage.mjs).
+  internalNotes?: string | null;
+  // Denormalized last-reply marker (the authoritative thread lives in the
+  // replies subcollection). Set by sendSupportTicketReply.
+  lastReplyAt?: Timestamp | null;
+  lastReplyBy?: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// supportTickets/{ticketId}/replies/{replyId}
+// One admin reply sent to the customer (via sendSupportTicketReply). The email
+// goes out through the Resend pipeline; this is the in-app record of what was
+// sent. Admin-read-only; written only by the callable (admin SDK).
+// ---------------------------------------------------------------------------
+export interface SupportReplyDoc {
+  senderUid: string;
+  senderName: string;
+  body: string;
+  mode: "reply" | "noreply"; // "reply" set a monitored Reply-To; "noreply" didn't
+  sentAt: Timestamp;
 }
 
 // ---------------------------------------------------------------------------
