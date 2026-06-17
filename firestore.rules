@@ -45,46 +45,15 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
 
-      // Create: caller writes their own doc with role/initial-aggregate fields locked.
-      // Field allowlist via hasOnly prevents attacker-planted keys.
-      // `roles` array carries the user's identities; `activeRole` is the
-      // current view-mode and must be one of the roles in that array. New
-      // signups can only self-assign client OR tradesperson — admin is added
-      // server-side via setAdminRole. The legacy single-`role` shape is also
-      // accepted to keep any in-flight pre-cutover client code working until
-      // it gets refreshed.
-      allow create: if isOwner(userId)
-        && (
-          request.resource.data.keys().hasOnly([
-            'roles','activeRole','displayName','email','photoURL','phone','bio',
-            'createdAt','lastActiveAt','emailVerified',
-            'clientRatingAvg','clientRatingCount',
-            'termsAcceptedAt','termsAcceptedVersion',
-            'deletedAt','notificationPrefs'
-          ])
-          || request.resource.data.keys().hasOnly([
-            'role','displayName','email','photoURL','phone','bio',
-            'createdAt','lastActiveAt','emailVerified',
-            'clientRatingAvg','clientRatingCount',
-            'termsAcceptedAt','termsAcceptedVersion',
-            'deletedAt','notificationPrefs'
-          ])
-        )
-        && (
-          // New shape
-          (request.resource.data.roles is list
-            && request.resource.data.roles.size() == 1
-            && request.resource.data.roles[0] in ['client', 'tradesperson']
-            && request.resource.data.activeRole == request.resource.data.roles[0])
-          ||
-          // Legacy shape (single role string)
-          (!('roles' in request.resource.data)
-            && request.resource.data.role in ['client', 'tradesperson'])
-        )
-        && request.resource.data.clientRatingAvg == 0
-        && request.resource.data.clientRatingCount == 0
-        && request.resource.data.emailVerified == false
-        && request.resource.data.termsAcceptedVersion is string;
+      // Create: DENIED for clients. User docs are provisioned SERVER-SIDE by the
+      // `provisionAccount` callable (Admin SDK, which bypasses these rules). A
+      // client must never write this doc: it was the first Firestore op of a
+      // brand-new session and raced the Auth→Firestore token handshake — when
+      // the token wasn't attached yet the rules saw no auth, isOwner() failed,
+      // and Firestore rejected with permission-denied ("You don't have
+      // permission to do that." on signup). Locking create to `false` makes that
+      // racy client write impossible to reintroduce; the Admin SDK is unaffected.
+      allow create: if false;
 
       // Update: positive field-level equality checks (deletion-safe vs hasAny diff).
       // `roles` is server-managed (add via addRoleToSelf callable) — the user

@@ -288,23 +288,20 @@ describe("users — server-managed field locks still enforced", () => {
   });
 });
 
-describe("users — create-only / duplicate provisioning guard", () => {
-  // The signup race we fixed: applyAuthState's orphan self-heal could write a
-  // second `users/{uid}` doc concurrently with signUp's own createUser. The
-  // client-side guard (provisioningUids) stops it, but this pins the rules-side
-  // backstop the bug ultimately tripped — a second owner write lands as an
-  // `update` and the createdAt-equality lock rejects it, so a duplicate write
-  // can never silently overwrite a freshly-created doc.
-  it("owner can create their own doc once", async () => {
+describe("users — create is server-side only (provisionAccount)", () => {
+  // The durable fix for the signup race: user docs are now provisioned by the
+  // `provisionAccount` callable via the Admin SDK (which bypasses these rules),
+  // never by the client. The client-side write was the first Firestore op of a
+  // new session and raced the Auth→Firestore token handshake, surfacing as
+  // "You don't have permission to do that." on signup. The create rule is
+  // locked to `false` so that racy client write can't be reintroduced.
+  it("owner cannot create their own user doc from the client", async () => {
     const fs = env.authenticatedContext(CLIENT_UID, CLIENT_CLAIMS).firestore();
-    await assertSucceeds(setDoc(doc(fs, "users", CLIENT_UID), canonicalUser));
+    await assertFails(setDoc(doc(fs, "users", CLIENT_UID), canonicalUser));
   });
 
-  it("a second owner write (fresh createdAt) is rejected as an update", async () => {
-    const fs = env.authenticatedContext(CLIENT_UID, CLIENT_CLAIMS).firestore();
-    await assertSucceeds(setDoc(doc(fs, "users", CLIENT_UID), canonicalUser));
-    // Re-writing the full doc stamps a new createdAt serverTimestamp, which
-    // violates the update rule's createdAt-equality lock → permission-denied.
+  it("a caller cannot create someone else's user doc either", async () => {
+    const fs = env.authenticatedContext(OTHER_CLIENT_UID, CLIENT_CLAIMS).firestore();
     await assertFails(setDoc(doc(fs, "users", CLIENT_UID), canonicalUser));
   });
 });
