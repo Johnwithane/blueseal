@@ -22,7 +22,7 @@ import { humanizeError } from "@/utils/errors";
 import type { BugReportDoc, BugSeverity, BugStatus, WithId } from "@/firebase/interfaces";
 import LoadingState from "@/components/LoadingState.vue";
 
-const { relativeTime } = useFormatters();
+const { relativeTime, dateTime } = useFormatters();
 const toast = useToast();
 
 const reports = ref<WithId<BugReportDoc>[]>([]);
@@ -30,6 +30,7 @@ const loading = ref(true);
 const errored = ref(false);
 const filter = ref<BugStatus | "all">("open");
 const savingId = ref<string | null>(null);
+const copyingId = ref<string | null>(null);
 
 // Local triage edits per report (status + notes), seeded from the doc.
 const edits = reactive<Record<string, { status: BugStatus; notes: string }>>({});
@@ -92,6 +93,80 @@ async function refresh() {
 }
 
 onMounted(refresh);
+
+/**
+ * Build a Markdown block for a report — text, device/env, and screenshot links —
+ * and copy it to the clipboard so it can be pasted straight into a chat (e.g. a
+ * Claude session) to fix. Mirrors the format scripts/bug-triage.mjs emits.
+ * Note: the clipboard can't carry image bytes alongside text, so screenshots go
+ * in as their (signed) download URLs; missing ones are resolved on demand first.
+ */
+async function copyReport(r: WithId<BugReportDoc>) {
+  copyingId.value = r.id;
+  try {
+    const shotUrlList: string[] = [];
+    for (const path of r.screenshotPaths ?? []) {
+      if (!shotUrls[path]) {
+        try {
+          shotUrls[path] = await resolveBugScreenshotUrl(path);
+        } catch {
+          /* leave unresolved — fall back to the storage path below */
+        }
+      }
+      shotUrlList.push(shotUrls[path] ?? `(storage) ${path}`);
+    }
+
+    const lines = [
+      `## ${r.title || "(untitled)"}  \`${r.id}\``,
+      "",
+      `- **Severity:** ${r.severity}`,
+      `- **Status:** ${statusLabel(r.status)}${r.notes ? `  — notes: ${r.notes}` : ""}`,
+      `- **Area:** ${r.area || "—"}`,
+      `- **Reporter:** ${r.reporterName} (${r.activeRole})`,
+      `- **Route:** \`${r.route}\``,
+      `- **URL:** ${r.url || "—"}`,
+      `- **App version:** ${r.appVersion || "—"}`,
+      `- **Filed:** ${dateTime(r.createdAt)}`,
+      "",
+      "### Steps to reproduce",
+      (r.stepsToReproduce || "—").trim(),
+      "",
+      "### Expected",
+      (r.expected || "—").trim(),
+      "",
+      "### Actual",
+      (r.actual || "—").trim(),
+      "",
+      "### Device & environment",
+      "```",
+      (r.environment || "—").trim(),
+      "```",
+    ];
+    if (shotUrlList.length) {
+      lines.push("", "### Screenshots", ...shotUrlList.map((u) => `- ${u}`));
+    }
+    const md = lines.join("\n");
+
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(md);
+    } else {
+      // Fallback for non-secure contexts where the async Clipboard API is absent.
+      const ta = document.createElement("textarea");
+      ta.value = md;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
+    toast.success("Copied", "Report copied — paste it into a chat to fix.");
+  } catch (e) {
+    toast.error("Couldn't copy", humanizeError(e));
+  } finally {
+    copyingId.value = null;
+  }
+}
 
 async function save(r: WithId<BugReportDoc>) {
   const edit = edits[r.id];
@@ -170,6 +245,16 @@ async function save(r: WithId<BugReportDoc>) {
               {{ relativeTime(r.createdAt) }}
             </div>
           </div>
+          <Button
+            label="Copy"
+            icon="pi pi-copy"
+            size="small"
+            outlined
+            :loading="copyingId === r.id"
+            class="shrink-0"
+            title="Copy this report (text + device info + screenshot links) to paste into a chat"
+            @click="copyReport(r)"
+          />
         </div>
 
         <dl class="mt-3 space-y-2 text-sm">
