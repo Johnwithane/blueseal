@@ -8,6 +8,8 @@ import Textarea from "primevue/textarea";
 import SelectButton from "primevue/selectbutton";
 import Message from "primevue/message";
 import Tag from "primevue/tag";
+import ManualTimeEntryDialog from "@/components/ManualTimeEntryDialog.vue";
+import AddExpenseDialog from "@/components/AddExpenseDialog.vue";
 import { submitJobForApproval } from "@/firebase/services/jobs";
 import { recomputeTotals } from "@/firebase/services/invoices";
 import { getQuoteByJobId } from "@/firebase/services/quotes";
@@ -60,6 +62,17 @@ let timeUnsub: (() => void) | null = null;
 let expensesUnsub: (() => void) | null = null;
 let ticker: number | null = null;
 
+// Approved HOURLY change orders the tradie can log time against (mirrors
+// WorkOrderTab / TimeTrackerCard). Passed to the manual-time dialog so a
+// forgotten session can be added without leaving the wrap-up.
+const approvedHourlyExtras = computed(() =>
+  props.extras
+    .filter((e) => e.status === "approved" && e.billingType === "hourly")
+    .map((e) => ({ id: e.id, description: e.description, hourlyRateCents: e.hourlyRateCents ?? 0 })),
+);
+const showManualTime = ref(false);
+const showAddExpense = ref(false);
+
 // ----- local form state -----
 interface ExtraRow {
   description: string;
@@ -81,15 +94,27 @@ const EXTRA_PRESETS = [
   "Sourcing fee",
 ] as const;
 
-// Quote line items, hydrated once when the sheet opens. Only the FIXED rows
-// (materials, flat labour) are pre-filled — the tradesperson can edit amounts /
-// taxes per row or remove what no longer applies. HOURLY quote rows are
-// deliberately EXCLUDED: that labour is billed from clocked time via the
-// time-tracker rollup, so pre-filling the quote's estimated hours would bill
-// the estimate instead of the hours actually worked. See hydrateFromQuote.
-const quoteRows = ref<ExtraRow[]>([]);
+// Fixed (materials / flat labour) line items from the accepted quote, kept as a
+// REFERENCE the tradie pulls from rather than a pre-filled invoice section —
+// each row lands on the invoice only when they tap "Add" (default off). HOURLY
+// quote rows are deliberately EXCLUDED: that labour is billed from clocked time
+// via the time-tracker rollup, so surfacing the quote's estimated hours would
+// invite billing the estimate instead of the hours actually worked. The panel
+// stays visible on every wizard step. See hydrateFromQuote.
+interface QuoteRefRow {
+  description: string;
+  amountDollars: number;
+  taxRate: number;
+  added: boolean;
+}
+const quoteRefRows = ref<QuoteRefRow[]>([]);
 const loadingQuote = ref(false);
-const quoteLoaded = ref(false);
+const quoteRefOpen = ref(true);
+
+const addedQuoteCount = computed(() => quoteRefRows.value.filter((r) => r.added).length);
+const allQuoteAdded = computed(
+  () => quoteRefRows.value.length > 0 && quoteRefRows.value.every((r) => r.added),
+);
 
 type DiscountMode = "off" | "percent" | "fixed";
 const discountMode = ref<DiscountMode>("off");
@@ -130,13 +155,6 @@ const FINISH_STEPS = computed<{ key: string; title: string; hint: string }[]>(()
         : "Receipts and materials billed through with your markup.",
     },
   ];
-  if (loadingQuote.value || quoteRows.value.length > 0) {
-    steps.push({
-      key: "quote",
-      title: "From your quote",
-      hint: "The fixed items the client agreed to — adjust if the work differed.",
-    });
-  }
   steps.push(
     {
       key: "extras",
@@ -217,35 +235,35 @@ function detach() {
 }
 async function hydrateFromQuote() {
   loadingQuote.value = true;
-  quoteLoaded.value = false;
   try {
     const q = await getQuoteByJobId(props.jobId);
     if (!q?.lineItems?.length) {
-      quoteRows.value = [];
+      quoteRefRows.value = [];
       return;
     }
     // Skip hourly rows — they're billed from clocked time (the Time section
-    // above / the server's time rollup), NOT the quote's estimate. Pulling them
-    // in here was billing quoted hours and ignoring the tracked ones. Fixed rows
-    // (materials, flat labour) are the real agreed charges and stay.
-    quoteRows.value = q.lineItems
+    // above / the server's time rollup), NOT the quote's estimate. Surfacing
+    // them here would invite billing quoted hours and ignoring the tracked ones.
+    // Fixed rows (materials, flat labour) are the real agreed charges — offered
+    // as reference, added to the invoice only when the tradie taps them.
+    quoteRefRows.value = q.lineItems
       .filter((li) => li.kind !== "hourly")
       .map((li) => {
         const qty = li.quantity ?? 1;
         const unit = li.unitPrice ?? 0;
         return {
           description: li.description ?? "",
-          unitPriceDollars: (qty * unit) / 100,
+          amountDollars: (qty * unit) / 100,
           taxRate: li.taxRate ?? 0,
+          added: false,
         };
       });
   } catch {
     // Quote read can fail (legacy job without a quote, permission edge).
-    // Leave quoteRows empty — sheet still works from time + expenses + extras.
-    quoteRows.value = [];
+    // Leave the reference empty — sheet still works from time + expenses + extras.
+    quoteRefRows.value = [];
   } finally {
     loadingQuote.value = false;
-    quoteLoaded.value = true;
   }
 }
 
@@ -255,8 +273,8 @@ watch(
     if (v) {
       // Reset form each open so closing + re-opening starts clean.
       extraRows.value = [];
-      quoteRows.value = [];
-      quoteLoaded.value = false;
+      quoteRefRows.value = [];
+      quoteRefOpen.value = true;
       discountMode.value = "off";
       discountValue.value = 0;
       discountLabel.value = "";
@@ -368,11 +386,11 @@ const previewLines = computed<LineItem[]>(() => {
       taxRate: 0,
     });
   }
-  // Quote rows render first so the invoice line ordering matches what the
-  // client originally saw on the quote — easier to reconcile at payment time.
-  for (const r of quoteRows.value) {
-    if (!r.description.trim()) continue;
-    const unitPrice = centsFromDollars(r.unitPriceDollars);
+  // Quote rows the tradie chose to add — kept ahead of free-form extras so the
+  // invoice line ordering matches what the client originally saw on the quote.
+  for (const r of quoteRefRows.value) {
+    if (!r.added || !r.description.trim()) continue;
+    const unitPrice = centsFromDollars(r.amountDollars);
     if (unitPrice <= 0) continue;
     lines.push({
       description: r.description.trim(),
@@ -490,8 +508,19 @@ function removeExtraRow(i: number) {
   extraRows.value = extraRows.value.filter((_, idx) => idx !== i);
 }
 
-function removeQuoteRow(i: number) {
-  quoteRows.value = quoteRows.value.filter((_, idx) => idx !== i);
+// Reference → invoice: tap a quote item to add it (or remove it). It only
+// counts toward the invoice while `added` is true.
+function toggleQuoteRow(i: number) {
+  quoteRefRows.value = quoteRefRows.value.map((r, idx) =>
+    idx === i ? { ...r, added: !r.added } : r,
+  );
+}
+
+// One-tap add-all / clear-all for the common case (a fixed-price job where the
+// whole invoice is the agreed quote).
+function toggleAllQuoteRows() {
+  const next = !allQuoteAdded.value;
+  quoteRefRows.value = quoteRefRows.value.map((r) => ({ ...r, added: next }));
 }
 
 // AI-drafts the wrap-up note from the job's tracked work (time notes,
@@ -517,10 +546,17 @@ async function onSubmit() {
   if (!canSubmit.value) return;
   submitting.value = true;
   try {
-    // Quote rows + freeform extras both submit as extraLineItems — the
+    // Added quote items + freeform extras both submit as extraLineItems — the
     // server doesn't distinguish their origin. Quote first to preserve the
     // ordering the client saw originally.
-    const extraLineItems: LineItem[] = [...quoteRows.value, ...extraRows.value]
+    const addedQuoteRows = quoteRefRows.value
+      .filter((r) => r.added)
+      .map((r) => ({
+        description: r.description,
+        unitPriceDollars: r.amountDollars,
+        taxRate: r.taxRate,
+      }));
+    const extraLineItems: LineItem[] = [...addedQuoteRows, ...extraRows.value]
       .filter((r) => r.description.trim() && centsFromDollars(r.unitPriceDollars) > 0)
       .map((r) => ({
         description: r.description.trim(),
@@ -609,7 +645,16 @@ function close() {
             <i class="pi pi-clock text-[color:var(--bs-blue)]"></i>
             <h4 class="font-semibold text-sm">Time</h4>
           </div>
-          <Tag :value="totalTimeLabel" severity="secondary" />
+          <div class="flex items-center gap-2">
+            <Tag :value="totalTimeLabel" severity="secondary" />
+            <Button
+              label="Add time"
+              icon="pi pi-plus"
+              size="small"
+              outlined
+              @click="showManualTime = true"
+            />
+          </div>
         </header>
         <Message
           v-if="hasRunningEntry"
@@ -621,7 +666,8 @@ function close() {
         </Message>
         <div v-if="loadingTime" class="text-xs text-[color:var(--bs-muted)]">Loading…</div>
         <div v-else-if="timeRollup.size === 0" class="text-xs text-[color:var(--bs-muted)]">
-          No billable time on this job.
+          No billable time on this job yet — tap <span class="font-medium">Add time</span> to log a
+          session you didn't clock live.
         </div>
         <ul v-else class="text-sm space-y-1">
           <li
@@ -644,9 +690,18 @@ function close() {
 
       <!-- Expenses summary -->
       <section v-show="stepShown('expenses')" class="rounded-lg border border-[color:var(--bs-border)] p-3">
-        <header class="flex items-center gap-2 mb-2">
-          <i class="pi pi-receipt text-[color:var(--bs-blue)]"></i>
-          <h4 class="font-semibold text-sm">Expenses</h4>
+        <header class="flex items-center justify-between gap-2 mb-2">
+          <div class="flex items-center gap-2">
+            <i class="pi pi-receipt text-[color:var(--bs-blue)]"></i>
+            <h4 class="font-semibold text-sm">Expenses</h4>
+          </div>
+          <Button
+            label="Add expense"
+            icon="pi pi-plus"
+            size="small"
+            outlined
+            @click="showAddExpense = true"
+          />
         </header>
         <div v-if="loadingExpenses" class="text-xs text-[color:var(--bs-muted)]">Loading…</div>
         <div
@@ -681,62 +736,6 @@ function close() {
             edit there before finishing if anything's off.
           </template>
         </p>
-      </section>
-
-      <!-- From the original quote. Pre-filled when the sheet opens so the
-           invoice starts from "what the client agreed to", with time +
-           expenses + extras layered on top. Each row is editable and
-           removable so the tradesperson can adjust for what actually
-           happened on-site without re-typing the whole quote. -->
-      <section
-        v-if="loadingQuote || quoteRows.length > 0"
-        v-show="stepShown('quote')"
-        class="rounded-lg border border-[color:var(--bs-border)] p-3"
-      >
-        <header class="flex items-center gap-2 mb-2">
-          <i class="pi pi-file text-[color:var(--bs-blue)]"></i>
-          <h4 class="font-semibold text-sm">From your quote</h4>
-        </header>
-        <div v-if="loadingQuote" class="text-xs text-[color:var(--bs-muted)]">
-          Loading quote…
-        </div>
-        <template v-else>
-          <p class="text-[11px] text-[color:var(--bs-muted)] mb-2 leading-snug">
-            Pre-filled from the quote the client accepted. Edit amounts or
-            remove rows if the actual work differed.
-          </p>
-          <ul class="space-y-2">
-            <li
-              v-for="(r, i) in quoteRows"
-              :key="`q-${i}`"
-              class="grid grid-cols-[1fr_8rem_auto] gap-2 items-start"
-            >
-              <InputText
-                v-model="r.description"
-                placeholder="Description"
-                maxlength="200"
-                class="w-full text-sm"
-              />
-              <NumberField
-                v-model="r.unitPriceDollars"
-                mode="currency"
-                currency="CAD"
-                :min="0"
-                :max-fraction-digits="2"
-                :input-class="'text-sm w-full text-right'"
-                fluid
-              />
-              <Button
-                text
-                icon="pi pi-times"
-                size="small"
-                severity="danger"
-                aria-label="Remove line"
-                @click="removeQuoteRow(i)"
-              />
-            </li>
-          </ul>
-        </template>
       </section>
 
       <!-- Extra line items — the home for everything outside time + receipts:
@@ -890,6 +889,80 @@ function close() {
         />
       </section>
 
+      <!-- From your quote — an ever-present reference, NOT a wizard step. It
+           stays visible on every step so the tradie can pull the items the
+           client agreed to onto the invoice (or ignore them) at any point.
+           Nothing here bills until it's tapped "Add". -->
+      <section
+        v-if="loadingQuote || quoteRefRows.length > 0"
+        class="rounded-lg border border-dashed border-[color:var(--bs-blue)] p-3"
+        style="background: color-mix(in srgb, var(--bs-blue-light) 18%, transparent)"
+      >
+        <header class="flex items-center justify-between gap-2">
+          <button
+            type="button"
+            class="flex min-w-0 items-center gap-2 text-left"
+            :aria-expanded="quoteRefOpen"
+            @click="quoteRefOpen = !quoteRefOpen"
+          >
+            <i class="pi pi-file text-[color:var(--bs-blue)]"></i>
+            <span class="font-semibold text-sm">From your quote</span>
+            <span
+              v-if="addedQuoteCount > 0"
+              class="rounded-full bg-[color:var(--bs-blue)] px-1.5 py-0.5 text-[10px] font-semibold text-white"
+            >
+              {{ addedQuoteCount }} added
+            </span>
+            <i
+              class="pi text-xs text-[color:var(--bs-muted)]"
+              :class="quoteRefOpen ? 'pi-chevron-up' : 'pi-chevron-down'"
+            ></i>
+          </button>
+          <Button
+            v-if="!loadingQuote && quoteRefRows.length > 1"
+            :label="allQuoteAdded ? 'Clear all' : 'Add all'"
+            size="small"
+            text
+            @click="toggleAllQuoteRows"
+          />
+        </header>
+
+        <div v-if="loadingQuote" class="mt-2 text-xs text-[color:var(--bs-muted)]">
+          Loading quote…
+        </div>
+        <template v-else-if="quoteRefOpen">
+          <p class="mt-1 mb-2 text-[11px] leading-snug text-[color:var(--bs-muted)]">
+            What the client agreed to. Add what belongs on this invoice — tap again to remove.
+          </p>
+          <ul class="space-y-1.5">
+            <li
+              v-for="(r, i) in quoteRefRows"
+              :key="`qr-${i}`"
+              class="flex items-center justify-between gap-2 rounded-md border border-[color:var(--bs-border)] bg-white px-2.5 py-2"
+            >
+              <div class="min-w-0">
+                <p class="truncate text-sm" :class="r.added ? 'font-medium' : ''">
+                  {{ r.description || "Quote item" }}
+                </p>
+                <p class="text-[11px] text-[color:var(--bs-muted)]">
+                  {{ money(centsFromDollars(r.amountDollars)) }}
+                </p>
+              </div>
+              <button
+                type="button"
+                class="finish-sheet-quote-add shrink-0"
+                :class="r.added ? 'finish-sheet-quote-add--on' : ''"
+                :aria-pressed="r.added"
+                @click="toggleQuoteRow(i)"
+              >
+                <i :class="r.added ? 'pi pi-check' : 'pi pi-plus'" class="text-[11px]"></i>
+                {{ r.added ? "Added" : "Add" }}
+              </button>
+            </li>
+          </ul>
+        </template>
+      </section>
+
       <!-- Summary — review only (the wizard's last stop is the full form). -->
       <section
         v-show="!inWizard"
@@ -990,6 +1063,25 @@ function close() {
       </div>
     </template>
   </Dialog>
+
+  <!-- Log a session that wasn't clocked live, straight from the Time step. The
+       live time subscription picks it up, so the rollup + totals update here. -->
+  <ManualTimeEntryDialog
+    v-model:visible="showManualTime"
+    :job-id="props.jobId"
+    :billing-type="props.billingType"
+    :approved-hourly-extras="approvedHourlyExtras"
+  />
+
+  <!-- Add a receipt / material from the Expenses step. The live expense
+       subscription picks it up (billed rows on hourly jobs; record-only on
+       fixed). Same dialog as the Work order tab. -->
+  <AddExpenseDialog
+    v-model:visible="showAddExpense"
+    :job-id="props.jobId"
+    :client-id="props.clientId"
+    :cost-tracking-only="costTrackingOnly"
+  />
 </template>
 
 <style>
@@ -1042,5 +1134,35 @@ function close() {
 .finish-sheet-preset-chip:hover {
   border-color: var(--bs-blue);
   background: var(--bs-surface-alt);
+}
+
+/* Add / Added toggle on each quote-reference row. Off = outlined invite to add;
+   on = solid so what's already on the invoice reads at a glance. */
+.finish-sheet-quote-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--bs-blue);
+  background: white;
+  color: var(--bs-blue);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+.finish-sheet-quote-add:hover {
+  background: var(--bs-surface-alt);
+}
+.finish-sheet-quote-add--on {
+  background: var(--bs-blue);
+  border-color: var(--bs-blue);
+  color: white;
+}
+.finish-sheet-quote-add--on:hover {
+  background: var(--bs-blue-dark);
+  border-color: var(--bs-blue-dark);
+  color: white;
 }
 </style>
