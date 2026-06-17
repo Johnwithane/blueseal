@@ -33,6 +33,28 @@ const firebaseAuthCode = (err: unknown): string | undefined =>
     : undefined;
 
 /**
+ * Map an action-link generation failure to a friendly HttpsError. Google's
+ * Identity Toolkit throttles link generation per email when it's hit
+ * repeatedly (e.g. someone resending many times) — it surfaces as
+ * auth/too-many-requests, or auth/internal-error wrapping
+ * "TOO_MANY_ATTEMPTS_TRY_LATER". Without this, that bubbles up as a raw 500 /
+ * INTERNAL. Anything else becomes a generic internal error (never the raw
+ * provider message).
+ */
+function linkGenHttpsError(fn: string, err: unknown): HttpsError {
+  const code = firebaseAuthCode(err);
+  const msg = err instanceof Error ? err.message : String(err);
+  if (code === "auth/too-many-requests" || /TOO_MANY_ATTEMPTS/i.test(msg)) {
+    return new HttpsError(
+      "resource-exhausted",
+      "Too many email requests just now. Please wait a couple of minutes, then try again.",
+    );
+  }
+  logger.error(`${fn}: link generation failed`, { code, msg });
+  return new HttpsError("internal", "Couldn't send the email. Please try again.");
+}
+
+/**
  * Build the branded HTML + a plain-text fallback and enqueue. Multipart
  * (text + html) helps deliverability; brandedEmailHtml escapes the body lines.
  */
@@ -85,9 +107,14 @@ export const sendVerificationEmail = onCall(CALLABLE_OPTS, async (req) => {
   // After verifying, a signed-in user (the common same-device case) lands on
   // their dashboard. (A cross-device click where they're not signed in bounces
   // to Home via the auth guard — still no 404.)
-  const link = await adminAuth.generateEmailVerificationLink(email, {
-    url: `${appBaseUrl()}/dashboard`,
-  });
+  let link: string;
+  try {
+    link = await adminAuth.generateEmailVerificationLink(email, {
+      url: `${appBaseUrl()}/dashboard`,
+    });
+  } catch (err) {
+    throw linkGenHttpsError("sendVerificationEmail", err);
+  }
 
   await deliver({
     to: email,
@@ -198,12 +225,10 @@ export const requestEmailChange = onCall(CALLABLE_OPTS, async (req) => {
       url: `${appBaseUrl()}/account`,
     });
   } catch (err) {
-    const code = firebaseAuthCode(err);
-    if (code === "auth/email-already-exists") {
+    if (firebaseAuthCode(err) === "auth/email-already-exists") {
       throw new HttpsError("already-exists", "That email is already in use.");
     }
-    logger.error("requestEmailChange: link generation failed", { uid, code });
-    throw new HttpsError("internal", "Couldn't start the email change. Please try again.");
+    throw linkGenHttpsError("requestEmailChange", err);
   }
 
   await deliver({
