@@ -14,6 +14,8 @@ import LoadingState from "@/components/LoadingState.vue";
 import AdminRoleEditor from "@/components/admin/AdminRoleEditor.vue";
 import AdminUserSupport from "@/components/admin/AdminUserSupport.vue";
 import AdminUserManage from "@/components/admin/AdminUserManage.vue";
+import AdminUserAuditPanel from "@/components/admin/AdminUserAuditPanel.vue";
+import AdminUserMessagesPanel from "@/components/admin/AdminUserMessagesPanel.vue";
 import { getUser } from "@/firebase/services/users";
 import { getTradesperson, getTradespersonContact } from "@/firebase/services/tradespeople";
 import { listJobsForClient, listJobsForTradie } from "@/firebase/services/jobs";
@@ -343,6 +345,16 @@ onMounted(load);
             <li v-for="v in vouchesFrom" :key="v.id">{{ v.toDisplayName }}</li>
           </ul>
         </section>
+      </div>
+
+      <!-- Message history (job chats) -->
+      <div class="bs-card p-4 mt-3">
+        <AdminUserMessagesPanel :uid="user.id" />
+      </div>
+
+      <!-- Audit log -->
+      <div class="bs-card p-4 mt-3">
+        <AdminUserAuditPanel :uid="user.id" />
       </div>
     </template>
   </section>

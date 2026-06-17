@@ -3,12 +3,14 @@ import {
   collection,
   doc,
   getDoc,
+  getDocs,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
   setDoc,
   updateDoc,
+  where,
   limit as fbLimit,
   limitToLast,
 } from "firebase/firestore";
@@ -16,7 +18,27 @@ import { auth as fbAuth, db } from "@/firebase/config";
 import type { ChatDoc, MessageDoc, WithId } from "@/firebase/interfaces";
 import { typedConverter } from "@/firebase/converters";
 
+const chatsCol = () => collection(db, "chats").withConverter(typedConverter<ChatDoc>());
 const chatRef = (id: string) => doc(db, "chats", id).withConverter(typedConverter<ChatDoc>());
+
+/**
+ * Admin: every chat thread a user is party to (as tradesperson OR client),
+ * newest-active first. Two queries (Firestore can't OR across fields) merged +
+ * deduped by id. Needs the (tradespersonId, lastMessageAt DESC) + (clientId,
+ * lastMessageAt DESC) indexes. Admin can read any chat per firestore.rules.
+ * Threads with no messages yet (lastMessageAt null) are omitted by the orderBy.
+ */
+export async function listChatsForUser(uid: string, max = 50): Promise<WithId<ChatDoc>[]> {
+  const [asTradie, asClient] = await Promise.all([
+    getDocs(query(chatsCol(), where("tradespersonId", "==", uid), orderBy("lastMessageAt", "desc"), fbLimit(max))),
+    getDocs(query(chatsCol(), where("clientId", "==", uid), orderBy("lastMessageAt", "desc"), fbLimit(max))),
+  ]);
+  const byId = new Map<string, WithId<ChatDoc>>();
+  for (const d of [...asTradie.docs, ...asClient.docs]) byId.set(d.id, { id: d.id, ...d.data() });
+  return [...byId.values()]
+    .sort((a, b) => (b.lastMessageAt?.toMillis?.() ?? 0) - (a.lastMessageAt?.toMillis?.() ?? 0))
+    .slice(0, max);
+}
 const msgsCol = (chatId: string) =>
   collection(db, "chats", chatId, "messages").withConverter(typedConverter<MessageDoc>());
 
