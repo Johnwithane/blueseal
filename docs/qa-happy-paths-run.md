@@ -10,7 +10,16 @@ Status legend: **open** → **fixed** (code changed, not yet re-verified in brow
 
 ## Top to fix first
 
-1. _(none critical yet — run in progress)_
+1. **PAY-2** — the client's offline "Confirm payment sent" (`clientMarkPaid` → HTTP 200) is
+   **invisible to both parties**: the client UI doesn't change and the tradesperson gets no
+   "client reported payment" signal. The intended handshake silently no-ops on screen.
+2. **PAY-1** — the offline-payment dialog tells the client to "choose **Pay by card**," but no
+   Pay-by-card option exists when the tradesperson hasn't connected payouts → dead-end instruction.
+3. **UX-4** — a job with a pending applicant (client action needed) is hidden behind the
+   non-default "Posted jobs" tab with no count badge; default tab says "No active jobs."
+4. **UX-3** — the post-a-job wizard throws away the Step-1 natural-language description.
+5. **UX-6** — quote/invoice line totals are tax-inclusive but shown alongside a pre-tax Subtotal +
+   Tax (reads as double-counted).
 
 ## Critical
 _none yet_
@@ -19,9 +28,96 @@ _none yet_
 _none yet_
 
 ## Medium
-_none yet_
+
+### PAY-2 — Client "Confirm payment sent" registers on the backend but is invisible to both sides — **open**
+- **Where:** job Invoice tab, offline payment path (tradesperson with no Stripe payout connected).
+- **Repro:** client → Approve & pay → "I've paid the tradesperson" → check the box → **Confirm
+  payment sent**.
+- **Evidence:** the callable **`clientMarkPaid` returns HTTP 200** (verified in the network log;
+  no console error). Yet:
+  - **Client side:** the invoice stays **"Awaiting payment"** with the same actionable
+    **"I've paid the tradesperson"** button — no "you marked this paid / awaiting confirmation"
+    acknowledgment, and the button is immediately re-clickable (re-fires the callable). Persists
+    across reload.
+  - **Tradesperson side:** the invoice shows a **generic "Payment received? … Mark as paid"** with
+    chip **"sent"** — **no "client reported they paid $X — confirm receipt"** signal at all.
+  - Net: the intended handshake from the dialog copy ("let them know here — they'll confirm
+    receipt") produces **no visible effect for either party.**
+- **Impact:** not a hard blocker — the tradesperson can still hit "Mark as paid" to complete the
+  job — but the client gets zero feedback their action worked (looks broken, invites re-clicks) and
+  the tradesperson has no idea the client signalled payment. Medium.
+- **Suggested fix:** surface the client's mark — client side: switch the CTA to a disabled
+  "Payment marked sent · awaiting confirmation" state; tradesperson side: show a "Client reported
+  they paid $X on <date> — confirm you received it" prompt. Confirm what `clientMarkPaid` actually
+  writes and that both views read it. (Worth a code check of the callable + the invoice-status
+  rendering.)
+
+### PAY-1 — Offline-payment dialog points to a "Pay by card" option that isn't there — **open**
+- **Where:** the "Paid by e-transfer or cash?" dialog (offline path), when the tradesperson hasn't
+  connected Stripe payouts.
+- **Evidence:** the dialog body reads "Prefer to pay by card instead? Close this and choose **Pay
+  by card**." But on the invoice there is **only** an "I've paid the tradesperson" button — **no
+  "Pay by card"** anywhere (confirmed: no card text on the page). Card pay is gated on the
+  tradesperson completing payout onboarding (Quinn skipped it), so the unconditional copy sends the
+  client looking for a control that doesn't exist.
+- **Suggested fix:** make the "Pay by card" reference conditional on the tradesperson actually
+  offering card pay; otherwise drop that sentence (and ideally explain card pay isn't available
+  because the pro hasn't set up payouts).
+
+### UX-4 — Client dashboard default tab hides a posted job that needs action — **open**
+
+### UX-4 — Client dashboard default tab hides a posted job that needs action — **open**
+- **Where:** `/dashboard/client` → "My jobs" (default) vs "Posted jobs" tabs.
+- **Evidence:** Right after the client posts a job AND a tradesperson applies, the default
+  **"My jobs"** tab shows the empty state *"No active jobs. Post a job to get bids…"*. The posted
+  job — now with **1 pending applicant the client must review/accept** — sits only under the
+  separate **"Posted jobs"** tab, which has **no count/badge**. The only hint that action is
+  needed is the notification bell (1 unread). A real client could easily miss that a vetted pro is
+  waiting on them.
+- **Suggested fix:** surface posted jobs with applicants on the default tab (or add an
+  applicant-count badge to the "Posted jobs" tab, and/or an "X applicants — review" call-out on the
+  card). At minimum, don't show "No active jobs" when the client has an open post with applicants.
+
+### UX-3 — Post-a-job wizard discards the Step-1 natural-language description — **open**
+- **Where:** `/jobs/post` guided wizard, Step 1 → Step 2.
+- **Evidence:** Step 1 ("What do you need done?") accepts a free-text description and uses it to
+  **detect the trade** (works great — "Sounds like you need: Painter…"). But on Continue, Step 2
+  ("Tell us about the job") opens with **an empty title and empty "Describe the job" (0/2000)** —
+  the sentence the client just wrote is gone, so they retype it. The same text could also seed the
+  intake "Anything else?" / surface-prep answers.
+- **Suggested fix:** carry the Step-1 text into Step 2's description (and optionally propose a
+  title from it). Low-risk, high-polish — it's the first thing a client does.
 
 ## Low
+
+### UX-6 — Quote line totals are tax-inclusive but shown with a separate pre-tax Subtotal + Tax — **open**
+- **Where:** quote table on the tradesperson application view AND the client's "View full quote"
+  (job-post detail) — same component both sides.
+- **Evidence:** a $850 flat-rate line + $220 materials line (13% tax) renders line "Line" values
+  of **$960.50** and **$248.60** (i.e. tax-*inclusive*). Those sum to the **Total $1,209.10**, yet
+  the summary directly below shows **Subtotal $1,070.00 / Tax $139.10 / Total $1,209.10**. So the
+  line items already include tax, then tax is itemized again — a reader can't reconcile the lines
+  to the Subtotal and it looks like double tax.
+- **Suggested fix:** either show **pre-tax** amounts in the line column (lines then sum to
+  Subtotal, + Tax = Total), or relabel the column "Line (incl. tax)" and drop/clarify the separate
+  Subtotal+Tax. A display-only change; the math is correct.
+
+### UX-5 — Posted-jobs list: no applicant count on cards; cancelled posts never filter out — **open**
+- **Where:** `/dashboard/client` → "Posted jobs".
+- **Evidence:** each card shows status ("open"/"cancelled") but **not how many applicants** it has,
+  so the client can't tell at a glance which post has a quote waiting. Separately, **cancelled**
+  posts accumulate in the same list with no filter/collapse (a real repost-heavy client would see a
+  long noisy list). (Lots of cancelled "QA Plumber" entries here are our own harness test data.)
+- **Suggested fix:** add an applicant count to each card; default-hide or group cancelled posts
+  behind a filter.
+
+### NOTE — Draft-with-AI (non-Pro) logs an HTTP 400 from `aiDraftQuote` — **expected, not a bug**
+- **Where:** quote composer → "Draft with AI" as a non-Pro tradesperson.
+- **Evidence:** the callable throws `BLUESEAL_PRO_REQUIRED`, surfaced as `POST .../aiDraftQuote 400`
+  in console; the client catches it and shows the **Pro paywall** correctly ("Unlock the full
+  toolkit"). This is how Firebase callables return a thrown `HttpsError` — the SDK logs the HTTP
+  failure regardless. No user-facing breakage. Flagged only so it isn't mistaken for an error in
+  prod monitoring.
 
 ### L2 — Address fields use the deprecated `google.maps.places.Autocomplete` API — **open**
 - **Where:** any address field (Account → location, /jobs/post, /request, onboarding) — 2 console
@@ -48,6 +144,12 @@ _none yet_
   loosening CSP — rejected as more invasive given GA is already intentionally enabled.)
 
 ## Untested / deferred
+- **Stripe card-pay + service-fee matrix** — could not exercise the `4242…` card flow: client→
+  tradesperson **card pay is gated on the tradesperson completing Stripe Connect payout
+  onboarding** (a hosted stripe.com KYC flow), which Quinn skipped, so only the **offline**
+  "I've paid the tradesperson" path was available. To test card pay + the non-Pro service fee +
+  the Pro fee waiver + declined-card, first connect a test payout account (`/payouts`). Flagged as
+  a dedicated follow-up. (The offline mark-paid path WAS exercised end-to-end — see run log.)
 - Email-link flows (invite-claim, prospect-claim, password reset) — need an inbox; deferred.
 - **AI Pro paywall** — both test accounts bypass it (`tradieqa` is admin → exempt; `clientqa` is
   client → no AI). Verifying the not-Pro → `BLUESEAL_PRO_REQUIRED` → paywall popup needs a plain
@@ -85,3 +187,41 @@ _none yet_
   teardown (filtered as noise). Built `helpers/jobs.ts` (postJob + generic fillIntake),
   `helpers/uploads.ts`, `helpers/walk.ts` (console/network capture + noise filter), and a reusable
   `_explore.spec.ts` to learn selectors from the rendered DOM.
+- **Live two-sided flow, interactive (clientqa ↔ Quinn the approved Painter): GREEN through accept
+  + sign.** Walked the **guided post-a-job wizard** end-to-end as the client (NL trade detection →
+  title/description → Painter intake → photo upload → budget $600–1,500 → Kelowna address →
+  review card → post). Cross-side: Quinn saw it on `/jobs/browse`; opened it; **Draft-with-AI
+  correctly hit the Pro paywall** (non-Pro); built a real itemized quote ($850 flat + $220
+  materials, 13% tax = **$1,209.10**), got the **uninsured "Are you covered?" reminder**, sent it.
+  Cross-side: client saw **"Applicants 1"** with Quinn's Red Seal/ID/Cert badges + full quote →
+  **Accept quote → "Sign to accept"** (uninsured-risk warning + **required acknowledgment checkbox**
+  + **signature canvas**, drew via synthetic pointer events) → job went **In progress** at
+  `/jobs/CdKaH074QIjCrtUUnxoL` with the Details✓→Quote✓→Work→Payment→Done tracker and the full
+  street address now revealed to the chosen pro. **0 console errors** the whole way (the one console
+  entry is the expected paywall 400). Findings: **UX-3, UX-4, UX-5, UX-6** (above) + the AI-400
+  note. Lots of strong UX confirmed (privacy masking, contextual budget hint, review-before-post,
+  insurance acknowledgment, verification badges, total-on-button, materials "Cost to client").
+  **Next:** tradesperson work phase (clock in/out, submit) → client approve → invoice → Stripe pay
+  → mutual reviews.
+- **FULL flagship lifecycle COMPLETE end-to-end (interactive, both accounts): GREEN.** Continued
+  from accept+sign through to live mutual reviews, alternating client ↔ tradesperson at every hop:
+  - **Tradesperson work:** uninsured **"Sign waiver & start"** (liability release + required
+    checkbox + signature + Foxquilt "get insured" link) → **auto clock-in** (live timer) → Work
+    order tab (Charges-so-far $1,070 fixed, Time "no charge" on fixed-price, Change orders,
+    Expenses) → **"Add expense" → free receipt OCR ran with NO paywall** for non-Pro Quinn ("Receipt
+    read") → saved a $180 expense (correctly not billed on fixed-price) → clock out (2m logged) →
+    **"Create invoice" = 4-step Finish-job wizard** (Time → Expenses → Extras → Discount/Note), built
+    the invoice from the quote ("Add all"), added a completion note → **"Send for approval —
+    $1,209.10"** → job **Awaiting approval**.
+  - **Client:** saw "Please review the work" → **Review invoice** (INV-2026-0001, Total due
+    $1,209.10) → **Approve & pay** → offline path only (**PAY-1, PAY-2** found here) → marked
+    payment sent.
+  - **Tradesperson:** **Mark as paid → "Yes, mark paid"** → job **Complete**, invoice **paid** →
+    left the client a blind review (categories Punctuality/Communication/Clarity/Payment, comment).
+  - **Client:** job **Complete** → left Quinn a blind review (categories Quality/Punctuality/
+    Communication/Value) → **"Reviews are live"** (blind-until-both released on mutual submit).
+  - **0 console errors** across the whole lifecycle (one benign teardown error on a sign-out). New
+    findings: **PAY-1, PAY-2** (payment handshake). Strong UX confirmed: dual insurance
+    waivers/acknowledgments, auto clock-in, fixed-price time/expense clarity, **free receipt OCR**,
+    finish-job wizard, invoice PDF, fee-free offline-pay note, mutual **blind reviews** with
+    role-appropriate categories.
