@@ -14,11 +14,17 @@ Status legend: **open** → **fixed** (code changed, not yet re-verified in brow
    **FIXED + deployed (`947a071`).**
 2. ~~**PAY-1** — offline-payment dialog points to a "Pay by card" option that isn't there.~~
    **FIXED (`64cd8d5`).**
-3. **UX-4** — a job with a pending applicant (client action needed) is hidden behind the
-   non-default "Posted jobs" tab with no count badge; default tab says "No active jobs."
-4. **UX-3** — the post-a-job wizard throws away the Step-1 natural-language description.
-5. **UX-6** — quote/invoice line totals are tax-inclusive but shown alongside a pre-tax Subtotal +
-   Tax (reads as double-counted).
+3. ~~**UX-4** — a job with a pending applicant is hidden behind the non-default "Posted jobs" tab
+   with no count badge.~~ **FIXED (`66c9a27`).**
+4. ~~**UX-3** — the post-a-job wizard throws away the Step-1 natural-language description.~~
+   **FIXED (`76d0259`).**
+5. ~~**UX-6** — quote/invoice line totals are tax-inclusive but shown alongside a pre-tax
+   Subtotal + Tax.~~ **FIXED (`5792ca7`).**
+6. ~~**UX-5** — posted-jobs cards lack applicant counts; cancelled posts never filter.~~
+   **FIXED (`66c9a27`).**
+
+_All findings from the flagship walk are now fixed. Re-verify the client-facing ones on the next
+hosting deploy._
 
 ## Critical
 _none yet_
@@ -77,9 +83,11 @@ _none yet_
   offering card pay; otherwise drop that sentence (and ideally explain card pay isn't available
   because the pro hasn't set up payouts).
 
-### UX-4 — Client dashboard default tab hides a posted job that needs action — **open**
-
-### UX-4 — Client dashboard default tab hides a posted job that needs action — **open**
+### UX-4 — Client dashboard default tab hides a posted job that needs action — **fixed (`66c9a27`, pending hosting deploy)**
+- **Fix:** the "Posted jobs" tab now carries a live applicant-count badge (from each open post's
+  `jobPostMeta.applicationCount`), the "My jobs" empty state points at open posts ("You have N open
+  job posts with M applicants waiting →"), and each open post card shows its applicant count. No
+  backend change.
 - **Where:** `/dashboard/client` → "My jobs" (default) vs "Posted jobs" tabs.
 - **Evidence:** Right after the client posts a job AND a tradesperson applies, the default
   **"My jobs"** tab shows the empty state *"No active jobs. Post a job to get bids…"*. The posted
@@ -91,7 +99,10 @@ _none yet_
   applicant-count badge to the "Posted jobs" tab, and/or an "X applicants — review" call-out on the
   card). At minimum, don't show "No active jobs" when the client has an open post with applicants.
 
-### UX-3 — Post-a-job wizard discards the Step-1 natural-language description — **open**
+### UX-3 — Post-a-job wizard discards the Step-1 natural-language description — **fixed (`76d0259`, pending hosting deploy)**
+- **Fix:** extracted `seedFromDescribe()` and also run it when leaving step 1, so the describe text
+  seeds the title/description whether the trade was set via a suggestion chip OR the dropdown (the
+  dropdown path previously dropped it). Idempotent — only fills blanks.
 - **Where:** `/jobs/post` guided wizard, Step 1 → Step 2.
 - **Evidence:** Step 1 ("What do you need done?") accepts a free-text description and uses it to
   **detect the trade** (works great — "Sounds like you need: Painter…"). But on Continue, Step 2
@@ -103,7 +114,11 @@ _none yet_
 
 ## Low
 
-### UX-6 — Quote line totals are tax-inclusive but shown with a separate pre-tax Subtotal + Tax — **open**
+### UX-6 — Quote line totals are tax-inclusive but shown with a separate pre-tax Subtotal + Tax — **fixed (`5792ca7`, pending hosting deploy)**
+- **Fix:** relabeled the column "Line" → "Line (incl. tax)" in QuoteBreakdown + InvoiceBreakdown
+  and "Line total" → "Line total (incl. tax)" in the PDF, so the tax-inclusive lines are
+  self-explanatory against the pre-tax Subtotal. The math was already correct and intentional
+  (`pdfRender.ts`); only the header was ambiguous.
 - **Where:** quote table on the tradesperson application view AND the client's "View full quote"
   (job-post detail) — same component both sides.
 - **Evidence:** a $850 flat-rate line + $220 materials line (13% tax) renders line "Line" values
@@ -115,7 +130,10 @@ _none yet_
   Subtotal, + Tax = Total), or relabel the column "Line (incl. tax)" and drop/clarify the separate
   Subtotal+Tax. A display-only change; the math is correct.
 
-### UX-5 — Posted-jobs list: no applicant count on cards; cancelled posts never filter out — **open**
+### UX-5 — Posted-jobs list: no applicant count on cards; cancelled posts never filter out — **fixed (`66c9a27`, pending hosting deploy)**
+- **Fix:** each open post card now shows its live applicant count (`jobPostMeta.applicationCount`),
+  highlighted when someone's applied; closed/cancelled/expired posts are collapsed behind a "Show
+  closed (N)" toggle instead of cluttering the list.
 - **Where:** `/dashboard/client` → "Posted jobs".
 - **Evidence:** each card shows status ("open"/"cancelled") but **not how many applicants** it has,
   so the client can't tell at a glance which post has a quote waiting. Separately, **cancelled**
