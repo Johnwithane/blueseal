@@ -49,6 +49,28 @@ export function attachCapture(page: Page, label: string): Capture {
   return cap;
 }
 
+// Dump the current page's visible buttons / headings / fields so a driver can be
+// built from ground truth at any point in a flow. Prints a single JSON line.
+export async function dumpPage(page: Page, label = ""): Promise<void> {
+  const d = await page.evaluate(() => {
+    const vis = (el: Element) =>
+      !!(el as HTMLElement).offsetParent || (el as HTMLElement).getClientRects().length > 0;
+    const t = (el: Element) => (el as HTMLElement).innerText?.trim().replace(/\s+/g, " ").slice(0, 60) || "";
+    return {
+      url: location.pathname,
+      buttons: [...document.querySelectorAll("button")]
+        .filter(vis)
+        .map((b) => t(b) || b.getAttribute("aria-label") || "")
+        .filter(Boolean),
+      headings: [...document.querySelectorAll("h1,h2,h3,label,[role=tab]")].filter(vis).map(t).filter(Boolean),
+      fields: [...document.querySelectorAll("input,textarea,.p-select,.p-multiselect")]
+        .filter(vis)
+        .map((i) => ({ tag: i.tagName.toLowerCase(), ph: (i as HTMLInputElement).placeholder || "", id: (i as HTMLElement).id || "" })),
+    };
+  });
+  console.log(`[dump ${label}] ${JSON.stringify(d)}`);
+}
+
 // Flatten captures into a list of findings strings (empty = clean).
 export function findings(...caps: Capture[]): string[] {
   const out: string[] = [];

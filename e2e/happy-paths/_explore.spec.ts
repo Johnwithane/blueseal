@@ -39,8 +39,12 @@ test("explore a route", async ({ browser }) => {
         id: e.id || "",
       };
     });
-    const headings = [...document.querySelectorAll("h1,h2,h3,label")].map(t).filter(Boolean);
-    return { url: location.pathname, buttons, fields, headings };
+    const headings = [...document.querySelectorAll("h1,h2,h3,label")].filter(visible).map(t).filter(Boolean);
+    const links = [...document.querySelectorAll("a[href]")]
+      .filter(visible)
+      .map((a) => (a as HTMLAnchorElement).getAttribute("href") || "")
+      .filter((h) => /\/jobs\/|\/request|\/invoices/.test(h));
+    return { url: location.pathname, buttons, fields, headings, links: [...new Set(links)].slice(0, 20) };
   });
   console.log("EXPLORE_DUMP_START");
   console.log(JSON.stringify(dump, null, 2));
