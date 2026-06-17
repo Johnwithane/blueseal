@@ -24,6 +24,7 @@ test-results/
 playwright-report/
 blob-report/
 playwright/.cache/
+e2e/.artifacts/
 *.log
 functions/lib/
 functions/node_modules/
