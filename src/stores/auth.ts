@@ -72,11 +72,17 @@ function rolesFromClaims(claims: Record<string, unknown>): Role[] {
   const raw = claims.roles;
   if (Array.isArray(raw)) {
     return raw.filter(
-      (r): r is Role => r === "client" || r === "tradesperson" || r === "admin",
+      (r): r is Role =>
+        r === "client" || r === "tradesperson" || r === "admin" || r === "qa",
     );
   }
   const legacy = claims.role;
-  if (legacy === "client" || legacy === "tradesperson" || legacy === "admin") {
+  if (
+    legacy === "client" ||
+    legacy === "tradesperson" ||
+    legacy === "admin" ||
+    legacy === "qa"
+  ) {
     return [legacy];
   }
   return [];
@@ -106,6 +112,10 @@ export const useAuthStore = defineStore("auth", {
     hasClientRole: (s) => s.roles.includes("client"),
     hasTradieRole: (s) => s.roles.includes("tradesperson"),
     hasAdminRole: (s) => s.roles.includes("admin"),
+    // "Holds the qa capability" — unlocks the /qa toolkit and the global
+    // Report-a-bug button. There is no qa activeRole, so there's no `isQa`
+    // view-mode getter to match isClient/isTradie/isAdmin.
+    hasQaRole: (s) => s.roles.includes("qa"),
     // True when the user holds more than one role — drives whether the
     // header avatar menu shows a switcher.
     canSwitchRole: (s) => s.roles.length > 1,
@@ -200,7 +210,11 @@ export const useAuthStore = defineStore("auth", {
         // ensureSelfRoles reconciler, bounded to one attempt.
         const docRoles: Role[] = Array.isArray(doc?.roles)
           ? (doc.roles as unknown[]).filter(
-              (r): r is Role => r === "client" || r === "tradesperson" || r === "admin",
+              (r): r is Role =>
+                r === "client" ||
+                r === "tradesperson" ||
+                r === "admin" ||
+                r === "qa",
             )
           : [];
         const claimMissing = docRoles.some((r) => !claimRoles.includes(r));
@@ -508,7 +522,7 @@ export const useAuthStore = defineStore("auth", {
      * when needed and updates the custom claims. Sets activeRole to the
      * newly-added role so the UI flips into the new view immediately.
      */
-    async addRole(role: Exclude<Role, "admin">) {
+    async addRole(role: Exclude<Role, "admin" | "qa">) {
       if (!this.fbUser) throw new Error("Sign-in required");
       if (this.roles.includes(role)) {
         this.activeRole = role;

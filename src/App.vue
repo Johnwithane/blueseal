@@ -8,6 +8,7 @@ import AppHeader from "@/components/AppHeader.vue";
 import AppFooter from "@/components/AppFooter.vue";
 import TradieStatusBanner from "@/components/TradieStatusBanner.vue";
 import AssistantBubble from "@/components/assistant/AssistantBubble.vue";
+import ReportBugButton from "@/components/qa/ReportBugButton.vue";
 import PaywallDialog from "@/components/PaywallDialog.vue";
 import InsuranceReminderDialog from "@/components/InsuranceReminderDialog.vue";
 import RoleSwitchOverlay from "@/components/RoleSwitchOverlay.vue";
@@ -190,6 +191,9 @@ function openFromToast(notifId: string) {
          it on their respective pages. The bubble has its own route + role
          visibility rules. -->
     <AssistantBubble />
+    <!-- Global "Report a bug" button — its own visibility rule (qa/admin only).
+         Lets testers file a reproducible bug from anywhere in the app. -->
+    <ReportBugButton />
     <!-- Global Blue Seal Pro upgrade popup. Any gated AI/Pro action funnels its
          paywall error into the paywall store, which this dialog renders. -->
     <PaywallDialog />

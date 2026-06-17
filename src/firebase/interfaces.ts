@@ -1,6 +1,10 @@
 import type { GeoPoint, Timestamp } from "firebase/firestore";
 
-export type Role = "client" | "tradesperson" | "admin";
+// "qa" is an additive *capability* claim, not a view-mode: it rides in `roles`
+// (and the mirrored custom claim) so `hasRole('qa')` gates the self-serve QA
+// toolkit, but it is NEVER an `activeRole` (there is no qa dashboard) and is
+// only ever granted by an admin via adminSetUserRoles — never self-assigned.
+export type Role = "client" | "tradesperson" | "admin" | "qa";
 
 export type WithId<T> = T & { id: string };
 
@@ -389,6 +393,12 @@ export interface TradespersonDoc {
   // subscribes; readers treat undefined as false. Discloses only "subscribes
   // to Pro", which the Featured tag states anyway.
   isPro?: boolean;
+  // Marker set when this profile was fabricated by the self-serve QA toolkit
+  // (qaProvisionSelfTradesperson). Purely a sweep tag so QA-created accounts can
+  // be found and removed before public launch; readers treat undefined as false.
+  // Not currently filtered from search (pre-launch, no real users) — see the QA
+  // toolkit plan for the post-launch exclusion step.
+  isQa?: boolean;
   // Cached Google Business reviews when the tradesperson has connected their
   // Google Business Profile (opt-in). Server-managed; null/absent when not
   // connected. Shown in a separate, attributed section — never folded into the
@@ -2180,6 +2190,37 @@ export interface SupportTicketDoc {
   message: string;
   status: SupportTicketStatus;
   handledBy: string | null; // admin uid who last changed the status
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+// ---------------------------------------------------------------------------
+// bugReports/{id} — QA toolkit bug log. A qa (or admin) tester files a
+// structured report from the in-app "Report a bug" button; admins triage it
+// from /admin/bug-reports. Direct client create under tight rules (no Cloud
+// Function), mirroring supportTickets. The reporter can read their own; admins
+// read + triage all. Screenshots live under Storage bugReports/{uid}/...
+// ---------------------------------------------------------------------------
+export type BugSeverity = "low" | "medium" | "high" | "critical";
+export type BugStatus = "open" | "triaged" | "in_progress" | "fixed" | "wontfix";
+
+export interface BugReportDoc {
+  reporterUid: string;
+  reporterName: string;
+  url: string; // window.location.href at file time
+  route: string; // router fullPath / name
+  activeRole: Role; // the reporter's activeRole when they filed it
+  severity: BugSeverity;
+  title: string;
+  stepsToReproduce: string;
+  expected: string;
+  actual: string;
+  screenshotPaths: string[]; // Storage paths under bugReports/{reporterUid}/
+  area: string; // free tag, e.g. "jobs" / "search" / "payouts"
+  appVersion: string; // build id, best-effort
+  status: BugStatus; // starts "open"
+  triagedBy: string | null; // admin uid on triage
+  notes: string; // admin triage notes ("" on create)
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

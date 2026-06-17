@@ -1,6 +1,14 @@
 {
   "indexes": [
     {
+      "collectionGroup": "bugReports",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "reporterUid", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "tradespeople",
       "queryScope": "COLLECTION",
       "fields": [

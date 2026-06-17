@@ -40,7 +40,9 @@ export const setRoleOnSignup = onDocumentCreated("users/{uid}", async (event) =>
   // granted an implied role (tradesperson ⇒ client) before we execute —
   // overwriting from the stale snapshot would clobber it. Also preserves an
   // out-of-band admin grant and merges non-role claims (tenant, region, etc.).
-  const KNOWN_CLAIM_ROLES = ["client", "tradesperson", "admin"];
+  // qa is included so an out-of-band qa grant already on the claims survives the
+  // union here (signup never *sources* qa — VALID_ROLES above stays qa-free).
+  const KNOWN_CLAIM_ROLES = ["client", "tradesperson", "admin", "qa"];
   const current = await adminAuth.getUser(uid);
   const existing = (current.customClaims ?? {}) as {
     roles?: unknown;

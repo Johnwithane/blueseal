@@ -6,6 +6,22 @@ Tasks are grouped by the phase that introduced them so you can see why each one 
 
 ---
 
+## QA toolkit — disable before public launch (added 2026-06-16)
+
+A self-serve QA toolkit shipped so the QA team can stand up their own test state without admin power: a new **`qa`** role (admin-granted only, via Admin → Users), a `/qa` view to provision an approved tradesperson on any trade + toggle their own Pro + reset their own data, a global **Report a bug** button (`bugReports` + `/admin/bug-reports` triage), and QA read/resolve access to the existing `errorLogs`. The two *fabrication* callables (`qaProvisionSelfTradesperson`, `qaSetSelfPro`) are env-gated by **`QA_TOOLKIT_ENABLED`**, currently **`true`** in `functions/.env.blueseal-762af` (safe pre-launch — no live users). Provisioned QA tradesperson profiles are tagged `tradespeople/{uid}.isQa = true`.
+
+### [ ] Before real users arrive: turn the toolkit off + sweep QA data
+
+- **Why:** The provisioning callables can fabricate an approved/visible tradesperson and grant Pro with no Stripe — fine for a no-users test deployment, but it must not be reachable once real clients can find these accounts in search.
+- **What:**
+  1. Set `QA_TOOLKIT_ENABLED=false` (or remove the line) in `functions/.env.blueseal-762af`, then `firebase deploy --only functions:qaProvisionSelfTradesperson,functions:qaSetSelfPro`. The callables then throw `failed-precondition` ("QA toolkit is disabled in this environment").
+  2. Revoke the `qa` role from tester accounts (Admin → Users → untick **qa**).
+  3. Sweep QA-created data — delete `tradespeople` docs where `isQa == true` (and their jobs/posts), or have each tester run **Reset my data** first.
+  4. Optional hardening: exclude `isQa` pros from public search by adding a `discoverable`-style `if (data.isQa) continue;` at the two query sites in `src/firebase/services/tradespeople.ts`.
+- **Verify:** As a qa tester after the flip, `/qa` → *Provision me* returns the "disabled in this environment" error; search returns no `isQa` profiles.
+
+---
+
 ## Uninsured-work waiver — legal review (added 2026-06-16)
 
 Blue Seal now records explicit, signed acknowledgments around insurance so work can proceed safely:

@@ -44,3 +44,8 @@ export const OTHER_CLIENT_UID = "other-client-uid";
 export const ADMIN_CLAIMS = { roles: ["admin"], role: "admin" };
 export const TRADIE_CLAIMS = { roles: ["tradesperson"], role: "tradesperson" };
 export const CLIENT_CLAIMS = { roles: ["client"], role: "client" };
+
+// A QA tester: the qa capability is layered on a normal client+tradesperson
+// account (qa is never the legacy primary `role`, so it stays "client").
+export const QA_UID = "qa-uid";
+export const QA_CLAIMS = { roles: ["client", "tradesperson", "qa"], role: "client" };

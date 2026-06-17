@@ -87,6 +87,13 @@ export const ensureSelfRoles = onCall(CALLABLE_OPTS, async (req) => {
   if (existingClaimRoles.includes("admin") && !claimRoles.includes("admin")) {
     claimRoles.push("admin");
   }
+  // Same defense for the qa capability: it's not in PUBLIC_ROLES (so it's never
+  // sourced from the doc here), but if an admin granted it on the claims we must
+  // preserve it — this callable fires on most page loads and would otherwise
+  // strip qa from the token within one load.
+  if (existingClaimRoles.includes("qa") && !claimRoles.includes("qa")) {
+    claimRoles.push("qa");
+  }
   const claimsChanged =
     claimRoles.length !== existingClaimRoles.length ||
     claimRoles.some((r) => !existingClaimRoles.includes(r));

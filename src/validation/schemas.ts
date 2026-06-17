@@ -602,3 +602,19 @@ export const supportTicketSchema = z.object({
   message: z.string().trim().min(5, "Add a short message").max(2000),
 });
 export type SupportTicketInput = z.infer<typeof supportTicketSchema>;
+
+// ---------------------------------------------------------------------------
+// Bug report (bugReports/{id}) — the in-app QA "Report a bug" form. Only the
+// human-entered fields live here; the bugReports service stamps reporter /
+// route / status / timestamps. Caps mirror the Firestore rules (defence in depth).
+// ---------------------------------------------------------------------------
+export const bugReportSchema = z.object({
+  title: z.string().trim().min(3, "Add a short title").max(140),
+  severity: z.enum(["low", "medium", "high", "critical"]),
+  stepsToReproduce: z.string().trim().max(4000).default(""),
+  expected: z.string().trim().max(2000).default(""),
+  actual: z.string().trim().max(2000).default(""),
+  area: z.string().trim().max(60).default(""),
+  screenshotPaths: z.array(z.string().max(400)).max(5).default([]),
+});
+export type BugReportInput = z.infer<typeof bugReportSchema>;

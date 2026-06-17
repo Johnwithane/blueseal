@@ -18,6 +18,9 @@ service cloud.firestore {
     function isAdmin() { return hasRole('admin'); }
     function isTradie() { return hasRole('tradesperson'); }
     function isClient() { return hasRole('client'); }
+    // QA toolkit capability: lets a tester file bug reports. Additive claim,
+    // granted only by an admin — never implies admin power.
+    function isQa() { return hasRole('qa'); }
     function isOwner(ownerId) { return isSignedIn() && uid() == ownerId; }
 
     function jobDoc(jobId) { return get(/databases/$(database)/documents/jobs/$(jobId)); }
@@ -1246,6 +1249,50 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ---------- bugReports (QA toolkit manual bug log) ----------
+    // A qa (or admin) tester files a structured report from the in-app "Report a
+    // bug" button; admins triage from /admin/bug-reports. Direct client create
+    // under tight rules (status starts 'open', no triage fields set, timestamps
+    // == request.time, reporter == the caller). The reporter reads their own;
+    // admins read + triage all. Mirrors supportTickets; the qa/admin create gate
+    // keeps this collection staff-only.
+    match /bugReports/{reportId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.reporterUid == uid());
+      allow create: if (isQa() || isAdmin())
+        && request.resource.data.keys().hasOnly([
+             'reporterUid', 'reporterName', 'url', 'route', 'activeRole', 'severity',
+             'title', 'stepsToReproduce', 'expected', 'actual', 'screenshotPaths',
+             'area', 'appVersion', 'status', 'triagedBy', 'notes', 'createdAt', 'updatedAt'])
+        && request.resource.data.reporterUid == uid()
+        && request.resource.data.status == 'open'
+        && request.resource.data.triagedBy == null
+        && request.resource.data.notes == ''
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.severity in ['low', 'medium', 'high', 'critical']
+        && request.resource.data.activeRole in ['client', 'tradesperson', 'admin', 'qa']
+        && request.resource.data.title is string
+           && request.resource.data.title.size() >= 3 && request.resource.data.title.size() <= 140
+        && request.resource.data.stepsToReproduce is string
+           && request.resource.data.stepsToReproduce.size() <= 4000
+        && request.resource.data.expected is string && request.resource.data.expected.size() <= 2000
+        && request.resource.data.actual is string && request.resource.data.actual.size() <= 2000
+        && request.resource.data.url is string && request.resource.data.url.size() <= 500
+        && request.resource.data.route is string && request.resource.data.route.size() <= 200
+        && request.resource.data.area is string && request.resource.data.area.size() <= 60
+        && request.resource.data.appVersion is string && request.resource.data.appVersion.size() <= 60
+        && request.resource.data.reporterName is string
+           && request.resource.data.reporterName.size() <= 120
+        && request.resource.data.screenshotPaths is list
+           && request.resource.data.screenshotPaths.size() <= 5;
+      // Reporter can't edit after create; admin-only triage of status/notes/triagedBy.
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['status', 'notes', 'triagedBy', 'updatedAt'])
+        && request.resource.data.status in ['open', 'triaged', 'in_progress', 'fixed', 'wontfix'];
+      allow delete: if isAdmin();
+    }
+
     // ---------- payouts (Stripe Connect payout ledger; server-only writes) ----------
     // Doc id == Stripe `po_…` payout id; created/updated by the webhook
     // dispatcher in response to `payout.created|paid|failed` events. The
@@ -1302,11 +1349,12 @@ service cloud.firestore {
     }
 
     // ---------- client error telemetry (write via the reportClientError
-    // callable using the Admin SDK; admin read; admin may only toggle the
-    // `resolved` flag — no client create/delete) ----------
+    // callable using the Admin SDK; admin + qa read + resolve so the QA team
+    // shares the diagnostics queue; the `resolved` flag is the only mutation —
+    // no client create/delete) ----------
     match /errorLogs/{errorId} {
-      allow read: if isAdmin();
-      allow update: if isAdmin()
+      allow read: if isAdmin() || isQa();
+      allow update: if (isAdmin() || isQa())
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['resolved']);
       allow create, delete: if false;
     }

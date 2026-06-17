@@ -2,12 +2,14 @@
 import { computed } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { useNavItems } from "@/composables/useNavItems";
+import { useAuthStore } from "@/stores/auth";
 import NotificationsButton from "@/components/shell/NotificationsButton.vue";
 import ProfileMenu from "@/components/shell/ProfileMenu.vue";
 import RoleSwitcher from "@/components/shell/RoleSwitcher.vue";
 import BlueSealLockup from "@/components/brand/BlueSealLockup.vue";
 
 const { sideItems, isActive } = useNavItems();
+const auth = useAuthStore();
 
 // Help is a role-agnostic utility link pinned to the footer (just above the
 // profile) rather than a primary nav item — the conventional spot for it.
@@ -16,6 +18,10 @@ const route = useRoute();
 const helpActive = computed(
   () => route.path === "/help" || route.path.startsWith("/help/"),
 );
+// QA toolkit footer link — only for staff holding the qa capability. Sits with
+// the other footer utilities; qa is a capability, not a view-mode, so it isn't a
+// primary nav item.
+const qaActive = computed(() => route.path === "/qa");
 </script>
 
 <template>
@@ -48,6 +54,16 @@ const helpActive = computed(
     <!-- Footer utility link, pinned below the scrollable nav. Help sits just
          above the role switcher / profile so it's always reachable without
          hunting through the primary nav. -->
+    <RouterLink
+      v-if="auth.hasQaRole"
+      to="/qa"
+      class="side-row side-panel__help"
+      :class="{ 'side-row--active': qaActive }"
+    >
+      <i class="pi pi-bug side-row__icon" aria-hidden="true"></i>
+      <span class="side-row__label">QA toolkit</span>
+    </RouterLink>
+
     <RouterLink
       to="/help"
       class="side-row side-panel__help"

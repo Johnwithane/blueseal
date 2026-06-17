@@ -29,7 +29,10 @@ const emit = defineEmits<{
 const auth = useAuthStore();
 const toast = useToast();
 
-const ALL_ROLES: Role[] = ["client", "tradesperson", "admin"];
+// "qa" grants the self-serve QA toolkit (provision own test profile, toggle own
+// Pro, file bugs) — a capability layered on top of a normal client/tradesperson
+// account, NOT a view-mode and NOT admin power.
+const ALL_ROLES: Role[] = ["client", "tradesperson", "admin", "qa"];
 const isSelf = computed(() => auth.fbUser?.uid === props.user.id);
 
 // --- Roles editor ---------------------------------------------------------
@@ -38,6 +41,7 @@ const working = reactive<Record<Role, boolean>>({
   client: savedRoles.value.includes("client"),
   tradesperson: savedRoles.value.includes("tradesperson"),
   admin: savedRoles.value.includes("admin"),
+  qa: savedRoles.value.includes("qa"),
 });
 const savingRoles = ref(false);
 const rolesError = ref<string | null>(null);
@@ -55,7 +59,10 @@ const needsConfirm = computed(() => {
   const after = new Set(nextRoles.value);
   const adminChanged = before.has("admin") !== after.has("admin");
   const tradieRemoved = before.has("tradesperson") && !after.has("tradesperson");
-  return adminChanged || tradieRemoved;
+  // Granting/removing the QA capability is consequential too (it unlocks the
+  // self-serve provisioning toolkit) — confirm it explicitly.
+  const qaChanged = before.has("qa") !== after.has("qa");
+  return adminChanged || tradieRemoved || qaChanged;
 });
 
 const confirmSummary = computed(() => {

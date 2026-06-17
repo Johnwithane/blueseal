@@ -5,16 +5,20 @@ import type { Role } from "@/firebase/interfaces";
 
 const store = useRoleSwitchAnimationStore();
 
+// qa never animates a view-switch (it has no view-mode); the keys exist only to
+// satisfy the exhaustive Record<Role> type.
 const ROLE_LABEL: Record<Role, string> = {
   client: "Client",
   tradesperson: "Tradesperson",
   admin: "Admin",
+  qa: "QA",
 };
 
 const ROLE_ICON: Record<Role, string> = {
   client: "pi pi-user",
   tradesperson: "pi pi-wrench",
   admin: "pi pi-shield",
+  qa: "pi pi-bug",
 };
 
 const visible = computed(() => store.targetRole !== null);

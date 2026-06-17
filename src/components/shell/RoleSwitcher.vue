@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { useToast } from "@/composables/useToast";
@@ -13,16 +14,24 @@ const auth = useAuthStore();
 const router = useRouter();
 const toast = useToast();
 
+// qa is a capability, never a view-mode — present only to satisfy the
+// exhaustive Record<Role> type; it is filtered out of `viewRoles` below so it
+// never renders a pill.
 const ROLE_LABEL: Record<Role, string> = {
   client: "Client",
   tradesperson: "Tradesperson",
   admin: "Admin",
+  qa: "QA",
 };
 const ROLE_ICON: Record<Role, string> = {
   client: "pi-user",
   tradesperson: "pi-wrench",
   admin: "pi-shield",
+  qa: "pi-bug",
 };
+
+// Only roles that map to an actual view (everything except qa).
+const viewRoles = computed(() => auth.roles.filter((r) => r !== "qa"));
 
 async function onSelect(role: Role) {
   if (auth.activeRole === role) return;
@@ -37,11 +46,11 @@ async function onSelect(role: Role) {
 </script>
 
 <template>
-  <div v-if="auth.canSwitchRole" class="role-switcher">
+  <div v-if="viewRoles.length > 1" class="role-switcher">
     <div class="role-switcher__label">Viewing as</div>
     <div class="role-switcher__group" role="group" aria-label="Switch view">
       <button
-        v-for="r in auth.roles"
+        v-for="r in viewRoles"
         :key="r"
         type="button"
         class="role-switcher__pill"

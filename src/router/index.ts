@@ -425,6 +425,21 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, role: "admin", layout: "app", title: "Error log" },
   },
   {
+    path: "/admin/bug-reports",
+    name: "AdminBugReports",
+    component: () => import("@/views/admin/AdminBugReportsView.vue"),
+    meta: { requiresAuth: true, role: "admin", layout: "app", title: "Bug reports" },
+  },
+  {
+    // Self-serve QA toolkit. Gated on holding the qa capability (granted only by
+    // an admin). qa is NOT a view-mode, so the guard below deliberately does not
+    // auto-switch activeRole into it.
+    path: "/qa",
+    name: "QaToolkit",
+    component: () => import("@/views/qa/QaToolkitView.vue"),
+    meta: { requiresAuth: true, role: "qa", layout: "app", title: "QA toolkit" },
+  },
+  {
     path: "/admin/disputes/:id",
     name: "AdminDisputeDetail",
     component: () => import("@/views/admin/DisputeDetailView.vue"),
@@ -467,7 +482,9 @@ router.beforeEach(async (to) => {
     if (!auth.roles.includes(requiredRole as Role)) {
       return { name: "Home" };
     }
-    if (auth.activeRole !== requiredRole) {
+    // qa is a capability claim, not a view-mode — gate on holding it (above) but
+    // never flip the active view into qa (there is no qa dashboard to render).
+    if (requiredRole !== "qa" && auth.activeRole !== requiredRole) {
       await auth.switchActiveRole(requiredRole as Role).catch(() => {});
     }
   }

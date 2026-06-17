@@ -10,7 +10,7 @@ import { newTradieDocDefaults } from "../lib/tradieProfile";
 const Input = z.object({
   targetUid: z.string().min(1).max(128),
   roles: z
-    .array(z.enum(["client", "tradesperson", "admin"]))
+    .array(z.enum(["client", "tradesperson", "admin", "qa"]))
     .min(1)
     .refine((r) => new Set(r).size === r.length, "Roles must be unique"),
 });
@@ -91,11 +91,17 @@ export const adminSetUserRoles = onCall(CALLABLE_OPTS, async (req) => {
     }
   }
 
-  // Keep the current view-mode if it's still valid; otherwise fall back.
+  // Keep the current view-mode if it's still valid; otherwise fall back. qa is a
+  // capability, never a view-mode, so it can never become the activeRole — fall
+  // back to the first *view* role (a qa grant is always layered on client/
+  // tradesperson, so one exists in practice).
+  const viewRoles = nextRoles.filter((r) => r !== "qa");
   const currentActive =
     typeof userData.activeRole === "string" ? userData.activeRole : null;
   const activeRole =
-    currentActive && nextRoles.includes(currentActive) ? currentActive : nextRoles[0];
+    currentActive && currentActive !== "qa" && nextRoles.includes(currentActive)
+      ? currentActive
+      : viewRoles[0] ?? nextRoles[0];
   const legacyRole = primaryRole(nextRoles);
 
   // Snapshot for rollback if the claim write fails after the doc write.

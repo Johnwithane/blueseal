@@ -70,6 +70,13 @@ service firebase.storage {
       allow write: if false;
     }
 
+    // QA bug-report screenshots — the reporter writes under their own uid; the
+    // reporter + admins read (path-based, not world-readable). WebP/JPEG only.
+    match /bugReports/{reporterUid}/{file=**} {
+      allow read: if isOwner(reporterUid) || isAdmin();
+      allow write: if isOwner(reporterUid) && smallSizeOk() && isCompressedImage();
+    }
+
     // Tradesperson portfolio — owner write, world read (gated by isVisible elsewhere). WebP only.
     match /tradespeople/{tradieId}/portfolio/{file=**} {
       allow read: if true;

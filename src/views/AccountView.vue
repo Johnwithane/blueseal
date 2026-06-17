@@ -61,6 +61,9 @@ import LocationPicker, { type LocationValue } from "@/components/LocationPicker.
 import TabBar from "@/components/TabBar.vue";
 
 const auth = useAuthStore();
+// Roles the user can switch their *view* into. Excludes "qa", which is a
+// capability claim (it unlocks the /qa toolkit) and has no view-mode.
+const viewRoles = computed(() => auth.roles.filter((r) => r !== "qa"));
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
@@ -1366,7 +1369,7 @@ async function grantAllTrades() {
 
         <ul class="mt-3 space-y-2">
           <li
-            v-for="r in auth.roles"
+            v-for="r in viewRoles"
             :key="r"
             class="flex items-center justify-between rounded-lg border border-[color:var(--bs-border)] px-3 py-2"
           >

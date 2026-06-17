@@ -1,0 +1,325 @@
+# Blue Seal — QA Happy Paths
+
+> The step-by-step "golden paths" for the QA team. Each path is the **intended,
+> success** route through a feature. Work top-to-bottom; file a bug the moment
+> reality diverges from the **Expected** line.
+>
+> Reference for intended behaviour: the in-app **Help Center** (`/help`). Each
+> path cites the relevant article/FAQ slug — open `/help` and search the slug if
+> you're unsure how something *should* work.
+
+---
+
+## 0. Setup & reference (read first)
+
+### Environment
+- Test against the **deployed test-mode site** (the URL Johnny gives you).
+- **Stripe is in TEST MODE** — no real money ever moves. Use the test cards below.
+- Test **mobile-first**: do every path at **375px width** first (Chrome DevTools
+  device toolbar → iPhone SE / "Responsive" 375), then re-check on desktop.
+
+### Get your accounts (the QA toolkit)
+1. Sign up at `/sign-up` — create **one account** (you'll hold multiple roles on it).
+2. Ask an admin to grant your account the **QA role** (Admin → Users → your user →
+   tick **qa** → Save). One-time.
+3. Open **`/qa`** (also in the left side panel as **QA toolkit**, and `/qa` works
+   on mobile). From here you self-serve, no admin needed:
+   - **Become an approved tradesperson** — pick trade(s) → *Provision me*. You're
+     instantly approved + visible (no vetting wait) on those trades.
+   - **Blue Seal Pro** — *Enable Pro* / *Disable Pro* to test free vs Pro.
+   - **Reset my data** — wipes your jobs/posts/applications + sets your tradie
+     profile back to draft, so you can re-run a flow clean.
+   - **Switch views** — use the role switcher (side panel / Account) to move
+     between **Client** and **Tradesperson** views. (QA is a capability, not a
+     view — there's no "QA view".)
+
+### Stripe test cards (CAD · any future expiry · any CVC · any postal code)
+| Card number | Result |
+| --- | --- |
+| `4242 4242 4242 4242` | Payment succeeds |
+| `4000 0000 0000 0002` | Card declined |
+| `4000 0000 0000 9995` | Declined — insufficient funds |
+| `4000 0027 6000 3184` | 3-D Secure challenge (complete it) |
+
+### Logging bugs
+- Use the floating **Report a bug** button (bottom-right, visible to QA on every
+  screen). It auto-captures the page + your active role.
+- **Screenshots: paste them** — copy a screenshot (e.g. Win **⊞+Shift+S**, Mac
+  **⌘+Shift+4**) then **Ctrl/⌘+V** inside the bug dialog. Pasted images are
+  converted to WebP automatically. (A *Choose file* fallback exists.)
+- Fill **Title, Severity, Steps, Expected, Actual**. Submit → it lands in admin
+  triage (`/admin/bug-reports`). You can see your own in `/qa` → *My bug reports*.
+- **Crashes/JS errors are captured automatically** in the **Error log** (visible
+  to QA at `/qa` → *Error log*, and admins at `/admin/errors`). If you hit a
+  white screen or a console error, still file a bug **and** note it's in the
+  error log.
+
+### Severity guide
+- **Critical** — blocks a core flow / data loss / payment wrong / security.
+- **High** — feature broken, no workaround.
+- **Medium** — broken with a workaround, or wrong on one screen.
+- **Low** — cosmetic / copy / minor mobile glitch.
+
+---
+
+## 1. Onboarding & verification  → help: `get-verified`, `create-an-account`, `insurance-and-getting-covered`
+
+Tradesperson verification has three independent documents — **ID**, **certification(s)**,
+**insurance** — that gate different things. Walk all four states.
+
+### 1.1 Client sign-up (the simple one)
+1. `/sign-up`, choose **Client**, enter name/email/password, accept terms.
+2. **Expected:** lands on the client dashboard; no wizard; can immediately search
+   and post jobs. A verification email is sent.
+
+### 1.2 Tradesperson onboarding — NO ID / NO cert / NO insurance
+1. `/sign-up`, choose **Tradesperson** → lands in the 7-step onboarding wizard.
+2. Fill **Basics** (name + bio), **Trades** (primary trade), **Pricing**, **Area**
+   (location), optionally **Hours**. Skip the **Documents** step entirely.
+3. Go to **Submit**.
+4. **Expected:** **cannot submit for vetting** — the submit step lists the
+   blockers (needs **ID** + at least **one certification**). Trying to open
+   `/jobs/browse` shows a "not eligible / finish onboarding" message — you are
+   **not visible** to clients.
+
+### 1.3 Tradesperson onboarding — ID ONLY
+1. From 1.2, in **Documents** upload a government **ID** only (any test image).
+2. Try **Submit**.
+3. **Expected:** still **cannot submit** — certification is still required. The
+   blocker now names only the missing cert (ID is satisfied).
+
+### 1.4 Tradesperson onboarding — CERT + ID, NO insurance
+1. Add **one certification per trade** (upload an image, or declare "no formal
+   certification" where allowed) **and** the **ID**. Leave **insurance** empty.
+2. **Submit for vetting.**
+3. **Expected:** submits successfully → status **Pending review**; the form goes
+   read-only with a "Withdraw to edit" option.
+4. As **admin** (or have the admin tester) approve the ID + cert in the vetting
+   queue. *(QA shortcut: provisioning via `/qa` approves you instantly — use that
+   when you only need an approved tradie, not to test the vetting gate itself.)*
+5. **Expected after approval:** you become **visible/eligible** — you appear in
+   client search and can browse the job board. **No "Insured" badge** (insurance
+   is optional). Insurance-related disclosures appear later (see 4.2 / path uses
+   the uninsured waiver).
+
+### 1.5 Tradesperson onboarding — ALL docs incl. insurance
+1. As 1.4, plus upload **insurance**. Test **both** branches:
+   - **Blue Seal additional-insured** declared, and
+   - **own-policy** path → you sign the **liability release**.
+2. Optionally add **WSIB/WorkSafe** for your province.
+3. **Expected:** after admin confirms insurance, the **Insured** badge shows on
+   your public profile.
+
+---
+
+## 2. Job creation  → help: `post-a-job`, `request-a-quote`, `find-a-tradesperson`, `bring-your-own-client`
+
+### 2.1 Client posts a job to the board (open marketplace)
+1. As **Client**, `/jobs/post`. Wizard: **trade → describe → trade-specific
+   details → photos (≥1) → when & where (address) → review**.
+2. Confirm the **draft persists** (reload mid-wizard → fields restored) and the
+   **rebate panel** shows on review for energy-type work.
+3. Submit.
+4. **Expected:** post created; visible to matching tradespeople in `/jobs/browse`;
+   you can see it under your posted jobs.
+
+### 2.2 Client requests a quote from a specific tradesperson (direct)
+1. As **Client**, `/search` → open a tradesperson profile → **Request a quote**.
+2. Same wizard shape (trade only shown if they offer 2+).
+3. Submit.
+4. **Expected:** a job is created in **Requested** status; the tradesperson is
+   notified (in-app + email); a job chat opens.
+
+### 2.3 Tradesperson creates a job for their own client (invite / solo)
+1. As **Tradesperson**, `/jobs/new`. Enter client name + email, trade, address.
+2. Submit.
+3. **Expected:** returns a copyable **invite link** + emails a magic sign-in link
+   to the client. Job appears in your kanban (client not yet attached). This flow
+   is **free** (no Pro needed).
+
+---
+
+## 3. Applications & quotes (tradesperson)  → help: `win-work`
+
+Provision yourself on the post's trade first (`/qa`) so the post is in your feed.
+
+### 3.1 Apply with a full itemized quote (default)
+1. As **Tradesperson**, `/jobs/browse` → open a post → **Apply**.
+2. Build an itemized quote: line items, optional **upfront fee**, **proposed
+   start date**, estimated duration, terms, cover note.
+3. Submit.
+4. **Expected:** application sent with the quote; post drops out of your feed (you
+   already applied). The client sees your quote in their compare view.
+
+### 3.2 Apply — "I need a site visit first"
+1. On a post, choose **Site visit first**. Set a visit fee (**$0 is allowed**),
+   optional date, note. Submit.
+2. **Expected:** the client sees "Site visit: $X / Free visit" instead of a price.
+   After they accept, the job enters **Requested** and you send a firm quote later.
+
+### 3.3 Apply — "Chat first" / ask for more information
+1. On a post, choose **Chat first**, write your questions. Submit (no quote yet).
+2. **Expected:** the client sees "Wants to chat" and can open a Q&A thread.
+3. After the client answers, **revise your application** to attach a full quote.
+4. **Expected:** the client's compare view shows your quote with a "Revised" mark.
+
+### 3.4 Direct-request quote + propose a site visit
+1. On a **Requested** direct job (from 2.2), open it and **send a quote**
+   (itemized). Optionally try **Draft with AI** — see 8.2 for the Pro gate.
+2. Alternatively **propose a site visit** on the direct job.
+3. **Expected:** job moves to **Quoted**; the client is notified.
+
+---
+
+## 4. Client reviews & accepts  → help: `post-a-job`, `the-job-thread`
+
+### 4.1 Compare applications & accept a quote
+1. As **Client**, open your posted job → review applications. Expand quote
+   breakdowns; open an applicant **chat**; **decline** one (optional reason).
+2. **Accept** an applicant's quote → **sign** on the signature pad.
+3. **Expected:** post closes; a job is created in **In progress** (or **Awaiting
+   upfront payment** if the quote had an upfront fee); a job chat opens; **other
+   applicants are notified** they weren't selected. You never see the total
+   applicant count (bid-blind).
+
+### 4.2 Accept an uninsured tradesperson (waiver)
+1. Use a tradesperson with **no insurance** (1.4 state). As the client, accept
+   their quote.
+2. **Expected:** before signing you must tick the **uninsured acknowledgement**;
+   the signature also records the waiver.
+
+### 4.3 Direct quote — accept / decline / revise
+1. On a **Quoted** direct job, as the client **Accept** (sign), **Decline** (with
+   reason), or have the tradie **revise & resend**.
+2. **Expected:** accept → **In progress**; decline → stays **Quoted**, tradie can
+   revise.
+
+---
+
+## 5. Job pipeline (the kanban)  → help: `work-order-time-and-change-orders`
+
+1. On an **In progress** job, as the **Tradesperson**: **clock in / clock out**,
+   add **travel** and **expenses**, and **scan a receipt** (receipt OCR).
+2. **Expected:** receipt OCR reads vendor/total **for free** — **no paywall** (it's
+   the one free AI feature).
+3. **Change order:** propose extra work (flat or hourly). As the **client**,
+   approve or decline it.
+4. **Expected:** approved extras fold into the final invoice.
+5. **Wrap up:** tradie submits the job → status **Awaiting client approval**.
+   Client **Approves** (→ Awaiting payment) or **Requests changes** (tradie
+   re-submits).
+
+---
+
+## 6. Payments (Stripe test mode)  → help: `quotes-and-invoices`, `paying-for-a-job`, `getting-paid-out`
+
+### 6.1 Pay an upfront fee
+1. Accept a quote that has an **upfront fee** (3.1). As the client, pay it with
+   `4242 4242 4242 4242`.
+2. **Expected:** fee marked paid; job moves from **Awaiting upfront payment** to
+   **In progress**.
+
+### 6.2 Invoice → card payment → service fee
+1. As the **Tradesperson**, send the invoice. As the **Client**, pay by **card**.
+2. **Expected:** a **Blue Seal service fee** is shown at checkout (**5%, min $2,
+   capped $99**) before you confirm; `4242…` succeeds; job → **Complete**.
+3. Try `4000 0000 0000 0002` → **Expected:** decline surfaced, job stays unpaid.
+
+### 6.3 Pro fee waiver
+1. Make the tradesperson **Pro** (`/qa` → Enable Pro). As the client, pay their
+   invoice by card.
+2. **Expected:** the service fee is **waived to $0**.
+
+### 6.4 Offline payment (no fee)
+1. Mark an invoice paid by **e-transfer / cash** instead of card.
+2. **Expected:** **no service fee**; job completes.
+
+---
+
+## 7. Reviews  → help: `mutual-reviews`
+
+1. On a **Complete** job: as the **Client**, leave a public review (overall +
+   quality/punctuality/communication/value). As the **Tradesperson**, leave a
+   **private** review of the client.
+2. **Expected:** reviews are **blind until both** are submitted; the public review
+   shows on the tradie's profile and updates their rating. **Solo/invite jobs
+   never produce public reviews.**
+
+---
+
+## 8. Blue Seal Pro & the paywall  → help: `blue-seal-pro`, `clients-and-recurring-billing`
+
+### 8.1 Start a real trial (Stripe path)
+1. As a tradesperson **without** Pro, start the trial via the upgrade flow →
+   Stripe Checkout (card required, `4242…`).
+2. **Expected:** status becomes **Trialing** (30 days); the billing portal lets
+   you cancel/switch. *(For most QA, just toggle Pro instantly in `/qa` instead.)*
+
+### 8.2 Paywall on AI tools
+1. As a **non-Pro** tradesperson, try an **AI** tool (AI assistant, **Draft with
+   AI** on a quote/invoice, suggested replies).
+2. **Expected:** the **Blue Seal Pro paywall** popup appears. Enable Pro (`/qa`)
+   → the same action now works. **Receipt OCR stays free** (re-confirm 5.2).
+
+### 8.3 Clients tab + recurring billing (Pro)
+1. As a **Pro** tradesperson, open **Clients**, create a **recurring plan**.
+2. **Expected:** it **drafts** an invoice each period and **never auto-sends or
+   auto-charges**; you can pause/resume. (Whole Clients tab is Pro-gated.)
+
+---
+
+## 9. Cross-cutting
+
+1. **Role switching** — flip Client ⇄ Tradesperson (side panel / Account); the
+   view changes. → `switching-roles`
+2. **Account & profile** — edit profile, notification prefs. → `notifications`
+3. **Email notifications** — key events (new request, quote, message, invoice)
+   send a branded email.
+4. **PWA install** — install to home screen (iPhone/Android/desktop). → `install-the-app`
+5. **Help Center** — browse `/help`, search, open an article and a FAQ. →
+   `report-a-problem`
+
+---
+
+## 10. The QA toolkit itself  → (no help article; internal)
+
+1. **Provision** yourself as a tradesperson on a given trade (`/qa`) → confirm you
+   appear in client **search** and can **browse jobs**.
+2. **Toggle Pro** on → AI unlocks + client fee waived; off → paywall returns.
+3. **Reset my data** → your jobs/posts/applications are gone, profile back to
+   draft; re-provision and re-run.
+4. **File a bug** via the floating button (paste a screenshot) → confirm it
+   appears in **My bug reports** (`/qa`) and in **admin triage** (`/admin/bug-reports`).
+5. **Error log** — trigger nothing special; just confirm `/qa` → *Error log* lists
+   recent captured errors and you can mark one **Resolved**.
+
+---
+
+## Coverage checklist (tick as you complete a full pass)
+
+- [ ] 1.1 Client sign-up
+- [ ] 1.2 Tradie onboarding — no docs (submit blocked)
+- [ ] 1.3 Tradie onboarding — ID only (still blocked)
+- [ ] 1.4 Tradie onboarding — cert+ID, no insurance (approved + visible)
+- [ ] 1.5 Tradie onboarding — all docs incl. insurance (Insured badge)
+- [ ] 2.1 Client posts a job to the board
+- [ ] 2.2 Client direct-requests a quote
+- [ ] 2.3 Tradie creates an invite/solo job
+- [ ] 3.1 Apply with full itemized quote
+- [ ] 3.2 Apply — site visit first
+- [ ] 3.3 Apply — chat first → revise with quote
+- [ ] 3.4 Direct-request quote (+ AI draft / site visit)
+- [ ] 4.1 Client compares + accepts a quote (sign)
+- [ ] 4.2 Accept uninsured tradie (waiver)
+- [ ] 4.3 Direct quote accept/decline/revise
+- [ ] 5 Pipeline: clock, expenses, receipt OCR (free), change order, wrap-up/approval
+- [ ] 6.1 Upfront fee payment
+- [ ] 6.2 Invoice card payment + service fee (+ decline)
+- [ ] 6.3 Pro fee waiver
+- [ ] 6.4 Offline payment (no fee)
+- [ ] 7 Mutual reviews
+- [ ] 8.1 Pro trial (Stripe)
+- [ ] 8.2 AI paywall + receipt OCR free
+- [ ] 8.3 Recurring billing drafts (never auto-sends)
+- [ ] 9 Role switch / notifications / PWA install / Help Center
+- [ ] 10 QA toolkit: provision / Pro toggle / reset / bug / error log

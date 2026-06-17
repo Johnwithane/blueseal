@@ -10,6 +10,13 @@ export { addRoleToSelf } from "./auth/addRoleToSelf";
 export { ensureSelfRoles } from "./auth/ensureSelfRoles";
 export { grantAllRolesForAdminTesting } from "./auth/grantAllRolesForAdminTesting";
 export { grantAllTradesForAdminTesting } from "./auth/grantAllTradesForAdminTesting";
+
+// QA toolkit — self-serve test provisioning, gated to the qa role (granted only
+// by an admin). The two fabrication callables are additionally env-gated by
+// QA_TOOLKIT_ENABLED (see qa/guard.ts + HUMANTASKS.md).
+export { qaProvisionSelfTradesperson } from "./qa/provisionSelfTradesperson";
+export { qaSetSelfPro } from "./qa/setSelfPro";
+export { qaResetSelfData } from "./qa/resetSelfData";
 export { requestAccountDeletion } from "./auth/requestAccountDeletion";
 export { exportMyData } from "./auth/exportMyData";
 export { scheduledHardDelete } from "./auth/scheduledHardDelete";
