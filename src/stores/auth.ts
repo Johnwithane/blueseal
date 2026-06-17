@@ -88,6 +88,52 @@ function rolesFromClaims(claims: Record<string, unknown>): Role[] {
   return [];
 }
 
+/**
+ * Provisions the user doc as the FIRST Firestore write of a freshly
+ * authenticated session, retrying on `permission-denied`.
+ *
+ * That first write races the Auth→Firestore token handshake: the SDK can
+ * dispatch the write before it has attached the new user's ID token (the same
+ * race applyAuthState documents on its read). When it loses, the rules see
+ * request.auth as null/stale, isOwner() fails, and Firestore rejects with
+ * permission-denied — which the UI surfaced as "You don't have permission to
+ * do that." on signup even though the Auth account had just been created (and
+ * the verification email already sent). It's worse on iOS Safari / in-app
+ * browsers (slow or storage-restricted) and when a stale prior session lingers
+ * — exactly the contexts users hit it in.
+ *
+ * Minting a token first gives the Firestore SDK a credential to attach; the
+ * retry (with a forced refresh + short backoff) then rides out the transient
+ * window. A plain create-retry is safe: a rejected setDoc is rolled back
+ * server-side so no doc is left behind, and applyAuthState's self-heal — the
+ * only other writer of users/{uid} — is suppressed via provisioningUids for
+ * the whole provisioning window, so there's no concurrent write to collide
+ * with. Throws unchanged on any non-permission-denied error or once retries
+ * are exhausted (a genuinely broken environment still surfaces).
+ */
+async function provisionUserDoc(
+  user: User,
+  args: Parameters<typeof createUser>[0],
+): Promise<void> {
+  await user.getIdToken();
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await createUser(args);
+      return;
+    } catch (e) {
+      const code = (e as { code?: string }).code;
+      if (code === "permission-denied" && attempt < 4) {
+        await user.getIdToken(true);
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, 200 * (attempt + 1));
+        });
+        continue;
+      }
+      throw e;
+    }
+  }
+}
+
 export const useAuthStore = defineStore("auth", {
   state: (): State => ({
     fbUser: null,
@@ -299,7 +345,7 @@ export const useAuthStore = defineStore("auth", {
         provisioningUid = cred.user.uid;
         provisioningUids.add(provisioningUid);
         await updateProfile(cred.user, { displayName: opts.displayName });
-        await createUser({
+        await provisionUserDoc(cred.user, {
           uid: cred.user.uid,
           email: opts.email,
           displayName: opts.displayName,
@@ -366,7 +412,7 @@ export const useAuthStore = defineStore("auth", {
         const existing = await getUser(cred.user.uid);
         if (!existing) {
           isNew = true;
-          await createUser({
+          await provisionUserDoc(cred.user, {
             uid: cred.user.uid,
             email: cred.user.email ?? "",
             displayName: cred.user.displayName ?? "Anonymous",
@@ -426,7 +472,7 @@ export const useAuthStore = defineStore("auth", {
         let isNew = false;
         if (!existing) {
           isNew = true;
-          await createUser({
+          await provisionUserDoc(cred.user, {
             uid: cred.user.uid,
             email: cred.user.email ?? email,
             displayName: cred.user.displayName ?? "",
