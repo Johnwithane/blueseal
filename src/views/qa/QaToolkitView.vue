@@ -49,7 +49,8 @@ const pathSections = computed<PathSection[]>(() =>
       return { label, body };
     }),
 );
-// Single-open accordion: only one path expanded at a time, all collapsed at first.
+// The whole runbook collapses; inside it, only one path is open at a time.
+const showPaths = ref(false);
 const openPath = ref<number | null>(null);
 function togglePath(i: number) {
   openPath.value = openPath.value === i ? null : i;
@@ -183,15 +184,26 @@ onMounted(() => {
 
 <template>
   <section class="bs-container max-w-3xl py-6">
-    <h1 class="text-xl font-bold text-[color:var(--bs-blue-dark)]">QA toolkit</h1>
-    <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
+    <p class="text-sm text-[color:var(--bs-muted)]">
       Self-serve test setup. Everything here acts only on your own account.
     </p>
 
-    <!-- Happy paths (accordion) -->
-    <div class="qa-card mt-5">
-      <div class="qa-head"><i class="pi pi-list-check" aria-hidden="true"></i>Happy paths (QA runbook)</div>
-      <div class="qa-body">
+    <!-- Happy paths — distinct "hero" card; the whole runbook collapses. -->
+    <div class="qa-card qa-card--hero mt-4">
+      <button
+        type="button"
+        class="qa-head qa-head--hero"
+        :aria-expanded="showPaths"
+        @click="showPaths = !showPaths"
+      >
+        <i class="pi pi-book" aria-hidden="true"></i>
+        <span>Happy paths (QA runbook)</span>
+        <i
+          :class="['pi', showPaths ? 'pi-chevron-up' : 'pi-chevron-down', 'qa-head__chev']"
+          aria-hidden="true"
+        ></i>
+      </button>
+      <div v-if="showPaths" class="qa-body">
         <p class="qa-hint">Pick a flow to expand it — one at a time. Then use “Jump to a flow” below to start it.</p>
         <ul>
           <li v-for="(s, i) in pathSections" :key="i" class="qa-path-item">
@@ -212,39 +224,17 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- Stripe sandbox -->
-    <div class="qa-card mt-4">
-      <div class="qa-head"><i class="pi pi-credit-card" aria-hidden="true"></i>Stripe sandbox (test mode)</div>
-      <div class="qa-body">
-        <p class="qa-hint">
-          Test mode — no real charges. Use any future expiry, any CVC, any postal code.
-          Tap a card to copy it.
-        </p>
-        <ul class="space-y-2">
-          <li
-            v-for="c in STRIPE_CARDS"
-            :key="c.number"
-            class="flex items-center justify-between gap-3 rounded-lg border border-[color:var(--bs-border)] p-2"
-          >
-            <div class="min-w-0">
-              <code class="font-semibold">{{ c.number }}</code>
-              <span class="ml-2 text-xs text-[color:var(--bs-muted)]">{{ c.result }}</span>
-            </div>
-            <Button icon="pi pi-copy" size="small" text aria-label="Copy card number" @click="copyCard(c.number)" />
-          </li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- Provision as tradesperson -->
-    <div class="qa-card mt-4">
-      <div class="qa-head"><i class="pi pi-verified" aria-hidden="true"></i>Become an approved tradesperson</div>
-      <div class="qa-body">
-        <p class="qa-hint">
-          Pick the trades to test. This approves + verifies you instantly so you appear in search
-          and can browse the job board (no vetting wait).
-        </p>
-        <div class="flex flex-wrap items-center gap-3">
+    <!-- Setup / reference / diagnostics, as tiles (2-col on desktop). Paired by
+         rough height so the grid stays tidy. -->
+    <div class="grid gap-4 mt-4 sm:grid-cols-2 items-start">
+      <!-- Become a tradesperson -->
+      <div class="qa-card">
+        <div class="qa-head"><i class="pi pi-verified" aria-hidden="true"></i>Become an approved tradesperson</div>
+        <div class="qa-body">
+          <p class="qa-hint">
+            Pick the trades to test. This approves + verifies you instantly so you appear in search
+            and can browse the job board (no vetting wait).
+          </p>
           <MultiSelect
             v-model="selectedTrades"
             :options="TRADES"
@@ -253,105 +243,131 @@ onMounted(() => {
             filter
             display="chip"
             placeholder="Select trades"
-            class="w-full sm:w-96"
+            class="w-full"
           />
-          <Button
-            label="Provision me"
-            icon="pi pi-verified"
-            :loading="provisioning"
-            :disabled="selectedTrades.length === 0"
-            @click="provision"
-          />
+          <div class="mt-2">
+            <Button
+              label="Provision me"
+              icon="pi pi-verified"
+              size="small"
+              :loading="provisioning"
+              :disabled="selectedTrades.length === 0"
+              @click="provision"
+            />
+          </div>
+          <Message v-if="provisionDone" severity="success" :closable="false" class="mt-3">
+            Approved on: {{ provisionDone.join(", ") }}. Switch to Tradesperson view to browse jobs.
+          </Message>
         </div>
-        <Message v-if="provisionDone" severity="success" :closable="false" class="mt-3">
-          Approved on: {{ provisionDone.join(", ") }}. Switch to Tradesperson view to browse jobs.
-        </Message>
       </div>
-    </div>
 
-    <!-- Toggle Pro -->
-    <div class="qa-card mt-4">
-      <div class="qa-head"><i class="pi pi-star" aria-hidden="true"></i>Blue Seal Pro</div>
-      <div class="qa-body">
-        <p class="qa-hint">
-          Flip your own Pro entitlement to test free vs Pro (AI tools, client fee waiver). No Stripe.
-          <span v-if="isPro !== null" class="font-medium text-[color:var(--bs-text)]">Currently: {{ isPro ? "Pro" : "Free" }}.</span>
-        </p>
-        <div class="flex flex-wrap gap-2">
-          <Button label="Enable Pro" icon="pi pi-star" :loading="settingPro" @click="setPro(true)" />
-          <Button
-            label="Disable Pro"
-            icon="pi pi-star-fill"
-            severity="secondary"
-            outlined
-            :loading="settingPro"
-            @click="setPro(false)"
-          />
-        </div>
-      </div>
-    </div>
-
-    <!-- Reset my data -->
-    <div class="qa-card mt-4">
-      <div class="qa-head"><i class="pi pi-trash" aria-hidden="true"></i>Reset my data</div>
-      <div class="qa-body">
-        <p class="qa-hint">
-          Delete your own jobs, job posts and applications, and set your tradesperson profile back to
-          draft — so you can re-run a flow clean.
-        </p>
-        <div v-if="!confirmingReset">
-          <Button label="Reset my data" icon="pi pi-trash" severity="danger" outlined @click="confirmingReset = true" />
-        </div>
-        <div v-else class="flex flex-wrap items-center gap-2">
-          <span class="text-sm font-medium">This can't be undone. Continue?</span>
-          <Button label="Yes, reset" severity="danger" :loading="resetting" @click="resetData" />
-          <Button label="Cancel" text :disabled="resetting" @click="confirmingReset = false" />
-        </div>
-      </div>
-    </div>
-
-    <!-- Quick links -->
-    <div class="qa-card mt-4">
-      <div class="qa-head"><i class="pi pi-directions" aria-hidden="true"></i>Jump to a flow</div>
-      <div class="qa-body">
-        <div class="flex flex-wrap gap-2">
-          <RouterLink to="/dashboard/client"><Button label="Client dashboard" icon="pi pi-home" outlined size="small" /></RouterLink>
-          <RouterLink to="/dashboard/tradie"><Button label="Tradesperson dashboard" icon="pi pi-wrench" outlined size="small" /></RouterLink>
-          <RouterLink to="/jobs/browse"><Button label="Browse jobs" icon="pi pi-search" outlined size="small" /></RouterLink>
-          <RouterLink to="/jobs/post"><Button label="Post a job" icon="pi pi-plus" outlined size="small" /></RouterLink>
-          <RouterLink to="/search"><Button label="Search tradespeople" icon="pi pi-users" outlined size="small" /></RouterLink>
-          <RouterLink v-if="auth.hasAdminRole" to="/admin/bug-reports"><Button label="Bug triage (admin)" icon="pi pi-bug" outlined size="small" /></RouterLink>
-        </div>
-      </div>
-    </div>
-
-    <!-- Error log -->
-    <div class="qa-card mt-4">
-      <div class="qa-head">
-        <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>Error log ({{ openErrors.length }} open)
-        <Button label="Refresh" icon="pi pi-refresh" text size="small" class="ml-auto qa-head-btn" :loading="loadingErrors" @click="loadErrors" />
-      </div>
-      <div class="qa-body">
-        <p class="qa-hint">Runtime errors captured automatically across all sessions. Resolve once handled.</p>
-        <ul v-if="openErrors.length" class="space-y-2">
-          <li
-            v-for="e in openErrors.slice(0, 25)"
-            :key="e.id"
-            class="rounded-lg border border-[color:var(--bs-border)] p-3 text-sm"
-          >
-            <div class="flex items-start justify-between gap-2">
+      <!-- Stripe sandbox -->
+      <div class="qa-card">
+        <div class="qa-head"><i class="pi pi-credit-card" aria-hidden="true"></i>Stripe sandbox (test mode)</div>
+        <div class="qa-body">
+          <p class="qa-hint">
+            Test mode — no real charges. Any future expiry, any CVC, any postal. Tap to copy.
+          </p>
+          <ul class="space-y-2">
+            <li
+              v-for="c in STRIPE_CARDS"
+              :key="c.number"
+              class="flex items-center justify-between gap-2 rounded-lg border border-[color:var(--bs-border)] p-2"
+            >
               <div class="min-w-0">
-                <div class="truncate font-medium">{{ e.message }}</div>
-                <div class="mt-0.5 text-xs text-[color:var(--bs-muted)]">
-                  <Tag :value="e.source" severity="secondary" class="mr-1" />
-                  {{ e.route || "—" }} · {{ relativeTime(e.createdAt) }}
-                </div>
+                <code class="font-semibold">{{ c.number }}</code>
+                <span class="block text-xs text-[color:var(--bs-muted)]">{{ c.result }}</span>
               </div>
-              <Button label="Resolve" size="small" text @click="resolveError(e.id)" />
-            </div>
-          </li>
-        </ul>
-        <p v-else class="text-sm text-[color:var(--bs-muted)]">No open errors.</p>
+              <Button icon="pi pi-copy" size="small" text aria-label="Copy card number" @click="copyCard(c.number)" />
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Blue Seal Pro -->
+      <div class="qa-card">
+        <div class="qa-head"><i class="pi pi-star" aria-hidden="true"></i>Blue Seal Pro</div>
+        <div class="qa-body">
+          <p class="qa-hint">
+            Flip your own Pro entitlement to test free vs Pro. No Stripe.
+            <span v-if="isPro !== null" class="font-medium text-[color:var(--bs-text)]">Currently: {{ isPro ? "Pro" : "Free" }}.</span>
+          </p>
+          <div class="flex flex-wrap gap-2">
+            <Button label="Enable Pro" icon="pi pi-star" size="small" :loading="settingPro" @click="setPro(true)" />
+            <Button
+              label="Disable Pro"
+              icon="pi pi-star-fill"
+              severity="secondary"
+              outlined
+              size="small"
+              :loading="settingPro"
+              @click="setPro(false)"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Reset my data -->
+      <div class="qa-card">
+        <div class="qa-head"><i class="pi pi-trash" aria-hidden="true"></i>Reset my data</div>
+        <div class="qa-body">
+          <p class="qa-hint">
+            Delete your own jobs, posts and applications, and set your profile back to draft.
+          </p>
+          <div v-if="!confirmingReset">
+            <Button label="Reset my data" icon="pi pi-trash" severity="danger" outlined size="small" @click="confirmingReset = true" />
+          </div>
+          <div v-else class="flex flex-wrap items-center gap-2">
+            <span class="text-sm font-medium">This can't be undone. Continue?</span>
+            <Button label="Yes, reset" severity="danger" size="small" :loading="resetting" @click="resetData" />
+            <Button label="Cancel" text size="small" :disabled="resetting" @click="confirmingReset = false" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Jump to a flow -->
+      <div class="qa-card">
+        <div class="qa-head"><i class="pi pi-directions" aria-hidden="true"></i>Jump to a flow</div>
+        <div class="qa-body">
+          <div class="flex flex-wrap gap-2">
+            <RouterLink to="/dashboard/client"><Button label="Client dashboard" icon="pi pi-home" outlined size="small" /></RouterLink>
+            <RouterLink to="/dashboard/tradie"><Button label="Tradesperson" icon="pi pi-wrench" outlined size="small" /></RouterLink>
+            <RouterLink to="/jobs/browse"><Button label="Browse jobs" icon="pi pi-search" outlined size="small" /></RouterLink>
+            <RouterLink to="/jobs/post"><Button label="Post a job" icon="pi pi-plus" outlined size="small" /></RouterLink>
+            <RouterLink to="/search"><Button label="Search" icon="pi pi-users" outlined size="small" /></RouterLink>
+            <RouterLink v-if="auth.hasAdminRole" to="/admin/bug-reports"><Button label="Bug triage" icon="pi pi-bug" outlined size="small" /></RouterLink>
+          </div>
+        </div>
+      </div>
+
+      <!-- Error log -->
+      <div class="qa-card">
+        <div class="qa-head">
+          <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>Error log ({{ openErrors.length }})
+          <Button label="Refresh" icon="pi pi-refresh" text size="small" class="ml-auto qa-head-btn" :loading="loadingErrors" @click="loadErrors" />
+        </div>
+        <div class="qa-body">
+          <p class="qa-hint">Runtime errors captured automatically across all sessions.</p>
+          <ul v-if="openErrors.length" class="space-y-2">
+            <li
+              v-for="e in openErrors.slice(0, 25)"
+              :key="e.id"
+              class="rounded-lg border border-[color:var(--bs-border)] p-3 text-sm"
+            >
+              <div class="flex items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <div class="truncate font-medium">{{ e.message }}</div>
+                  <div class="mt-0.5 text-xs text-[color:var(--bs-muted)]">
+                    <Tag :value="e.source" severity="secondary" class="mr-1" />
+                    {{ e.route || "—" }} · {{ relativeTime(e.createdAt) }}
+                  </div>
+                </div>
+                <Button label="Resolve" size="small" text @click="resolveError(e.id)" />
+              </div>
+            </li>
+          </ul>
+          <p v-else class="text-sm text-[color:var(--bs-muted)]">No open errors.</p>
+        </div>
       </div>
     </div>
 
@@ -390,20 +406,45 @@ onMounted(() => {
   overflow: hidden;
   background: #fff;
 }
+/* Regular card header: soft light-blue band with dark-blue text (low contrast). */
 .qa-head {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background: var(--bs-blue-dark);
-  color: #fff;
-  padding: 0.7rem 0.95rem;
+  background: var(--bs-blue-light);
+  color: var(--bs-blue-dark);
+  padding: 0.65rem 0.9rem;
   font-weight: 600;
   font-size: 0.95rem;
+  width: 100%;
+  text-align: left;
 }
-.qa-head :deep(.qa-head-btn .p-button-label),
-.qa-head :deep(.qa-head-btn) {
+.qa-head i {
+  color: var(--bs-blue);
+}
+.qa-head-btn :deep(.p-button-label),
+.qa-head-btn :deep(.p-button-icon) {
+  color: var(--bs-blue-dark);
+}
+
+/* Happy-paths hero: a distinct, slightly stronger header so it stands apart
+   from the soft cards. Acts as the collapse toggle for the whole runbook. */
+.qa-card--hero {
+  border-color: var(--bs-blue);
+}
+.qa-head--hero {
+  background: var(--bs-blue);
+  color: #fff;
+  cursor: pointer;
+  border: 0;
+}
+.qa-head--hero i {
   color: #fff;
 }
+.qa-head__chev {
+  margin-left: auto;
+}
+
 .qa-body {
   padding: 1rem 0.95rem;
 }
@@ -414,7 +455,7 @@ onMounted(() => {
   line-height: 1.5;
 }
 
-/* Happy-paths accordion */
+/* Happy-paths inner accordion: soft light-blue rows, the open one filled. */
 .qa-path-item {
   margin-bottom: 0.4rem;
 }
@@ -427,18 +468,17 @@ onMounted(() => {
   padding: 0.55rem 0.75rem;
   border: 0;
   cursor: pointer;
-  background: var(--bs-blue);
-  color: #fff;
+  background: var(--bs-blue-light);
+  color: var(--bs-blue-dark);
   font-weight: 600;
   font-size: 0.875rem;
   text-align: left;
   border-radius: 0.5rem;
 }
 .qa-path-head.open {
+  background: var(--bs-blue);
+  color: #fff;
   border-radius: 0.5rem 0.5rem 0 0;
-}
-.qa-path-head:hover {
-  filter: brightness(1.06);
 }
 .qa-path-body {
   border: 1px solid var(--bs-border);
