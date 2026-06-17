@@ -97,16 +97,23 @@ const error = ref<string | null>(null);
 const describe = ref("");
 const prefilledFromDescribe = ref(false);
 
+// Seed the title/description/urgency from the plain-English "what do you need
+// done" text. Idempotent — only fills blanks, never clobbers what the user
+// typed. Called both when a trade suggestion is tapped AND when leaving the
+// first step with the trade picked from the dropdown, so the describe text is
+// never silently dropped.
+function seedFromDescribe() {
+  const text = describe.value.trim();
+  if (!text) return;
+  if (!description.value.trim()) description.value = text;
+  if (!title.value.trim()) title.value = deriveTitle(text);
+  if (urgency.value === "flexible") urgency.value = deriveUrgency(text);
+  prefilledFromDescribe.value = true;
+}
+
 function applyDescribe(s: TradeSuggestion) {
   trade.value = s.key;
-  const text = describe.value.trim();
-  if (text) {
-    // Only seed empty fields — never clobber something the user already wrote.
-    if (!description.value.trim()) description.value = text;
-    if (!title.value.trim()) title.value = deriveTitle(text);
-    if (urgency.value === "flexible") urgency.value = deriveUrgency(text);
-    prefilledFromDescribe.value = true;
-  }
+  seedFromDescribe();
 }
 
 const tradeOptions = TRADES.map((t) => ({ label: t.label, value: t.key }));
@@ -453,6 +460,11 @@ async function wizardNext() {
     await focusFirst(FIELD_ORDER);
     return;
   }
+  // Carry the plain-English describe text into the title/description before
+  // leaving the first step — whether the trade was set by tapping a suggestion
+  // or picked from the dropdown (UX-3: the text was previously dropped on the
+  // dropdown path).
+  if (cur?.key === "trade") seedFromDescribe();
   clearErrors();
   wizardStep.value = Math.min(i + 1, POST_STEPS.value.length - 1);
 }
