@@ -14,6 +14,7 @@ import {
   getReceiptDownloadUrl,
   subscribeJobExpenses,
   updateExpense,
+  type ExpensePrefill,
 } from "@/firebase/services/expenses";
 import type { ExpenseCategory, ExpenseDoc, WithId } from "@/firebase/interfaces";
 import AddExpenseDialog from "@/components/AddExpenseDialog.vue";
@@ -44,6 +45,16 @@ const loading = ref(true);
 const loadError = ref<string | null>(null);
 // "Add expense" popup — receipt upload + AI auto-fill, or manual entry.
 const showAddDialog = ref(false);
+// Set when a sibling (the Supplies panel) opens the dialog pre-filled after a
+// supplier click-through; cleared for a plain "Add expense" tap.
+const pendingPrefill = ref<ExpensePrefill | null>(null);
+
+/** Open the add-expense dialog, optionally pre-filled. Exposed to the parent. */
+function openAdd(prefill?: ExpensePrefill | null) {
+  pendingPrefill.value = prefill ?? null;
+  showAddDialog.value = true;
+}
+defineExpose({ openAdd });
 
 const CATEGORY_OPTIONS = EXPENSE_CATEGORY_OPTIONS;
 
@@ -164,7 +175,7 @@ function statusTagSeverity(s: ExpenseDoc["status"]): "info" | "warn" | "success"
       label="Add expense"
       icon="pi pi-plus"
       class="w-full"
-      @click="showAddDialog = true"
+      @click="openAdd()"
     />
     <p class="text-[11px] text-[color:var(--bs-muted)] mt-1.5 leading-snug">
       Upload a receipt and it's auto-read for total, vendor and date — or add a
@@ -296,6 +307,7 @@ function statusTagSeverity(s: ExpenseDoc["status"]): "info" | "warn" | "success"
       :job-id="jobId"
       :client-id="clientId"
       :cost-tracking-only="costTrackingOnly"
+      :prefill="pendingPrefill"
     />
   </div>
 </template>

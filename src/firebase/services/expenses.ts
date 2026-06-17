@@ -204,6 +204,18 @@ export interface ExpensePatch {
   spentAt?: Date | null;
 }
 
+/**
+ * Fields a caller can pre-populate the Add-expense dialog with — e.g. after a
+ * tradesperson clicks through to a supplier from the Supplies panel, so logging
+ * the purchase is just "type the amount". Subset of ExpensePatch the manual
+ * (receiptless) entry path understands.
+ */
+export interface ExpensePrefill {
+  description?: string;
+  vendor?: string | null;
+  category?: ExpenseCategory | null;
+}
+
 export async function updateExpense(
   jobId: string,
   expenseId: string,

@@ -397,6 +397,7 @@ You can return to the **Payouts** screen any time to finish setup or open your p
       "receipt",
       "expenses",
       "materials",
+      "supplies",
     ],
     body: `Every active job has a **Work order** tab — the home for the actual work: time, travel, receipts, and any change orders.
 
@@ -410,7 +411,9 @@ You can return to the **Payouts** screen any time to finish setup or open your p
 
 **Change orders.** When a job picks up extra work that wasn't in the original quote, the tradesperson proposes a **change order** — a flat fee, or an hourly rate they then clock against. The client **approves it first**; nothing extra is billed without that sign-off. Approved change orders flow onto the final invoice alongside the agreed price, so the breakdown stays clear and above board.
 
-**Receipts & expenses.** The tradesperson can upload receipts (materials, fuel, disposal) on the Work order tab — we auto-read the total, vendor and date, and the receipt itself stays private to the tradesperson. Materials supplied from the tradesperson's own stock can be **added manually too — no receipt needed** — and bill the same way. On an **hourly** job each expense becomes a billable line with an optional markup. On a **fixed-price** job expenses are **for the tradesperson's records only and aren't billed** — the agreed price already covers materials. To charge for a material that was genuinely outside the original scope, the tradesperson proposes a **change order** the client approves, rather than adding it as an expense.`,
+**Receipts & expenses.** The tradesperson can upload receipts (materials, fuel, disposal) on the Work order tab — we auto-read the total, vendor and date, and the receipt itself stays private to the tradesperson. Materials supplied from the tradesperson's own stock can be **added manually too — no receipt needed** — and bill the same way. On an **hourly** job each expense becomes a billable line with an optional markup. On a **fixed-price** job expenses are **for the tradesperson's records only and aren't billed** — the agreed price already covers materials. To charge for a material that was genuinely outside the original scope, the tradesperson proposes a **change order** the client approves, rather than adding it as an expense.
+
+**Finding supplies.** Right above the receipts is a **Supplies** panel — search a vetted Canadian supplier (Home Depot, RONA, Amazon.ca and more) for the parts, tools, rental gear or workwear a job needs. Tap **Log expense** on anything you buy and it drops into your receipts pre-filled, so it bills through without re-typing. It's there to save you time on the supply run — it's tradesperson-only (your client never sees it), shopping through the links helps fund Blue Seal, and we only list suppliers we'd use ourselves.`,
   },
   {
     slug: "bring-your-own-client",
@@ -620,6 +623,20 @@ const faqs: FaqItem[] = [
     question: "Will Blue Seal remind me when my insurance is about to expire?",
     answer:
       "Yes. We track the expiry date on your verified insurance and remind you by email and in-app before it lapses, so your **Insured** badge doesn't quietly disappear. When you renew, upload the new certificate with **Replace** on your insurance card.",
+    categoryId: "for-tradespeople",
+    audience: "tradesperson",
+  },
+  {
+    question: "Where do I find supplies for a job?",
+    answer:
+      "Open the job's **Work order** tab — the **Supplies** panel (just above your receipts) lets you search a vetted Canadian supplier for the parts, tools, rental gear or workwear the job needs. Tap **Log expense** on anything you buy and it's added to your receipts pre-filled, so it bills through without re-typing. It's a tradesperson tool — your client never sees it.",
+    categoryId: "for-tradespeople",
+    audience: "tradesperson",
+  },
+  {
+    question: "Does Blue Seal earn from the supplier links?",
+    answer:
+      "Sometimes, yes — a few suppliers pay us a small commission when you shop through their link, at no extra cost to you, which helps keep the core app free. We only list suppliers we'd actually use, the panel is there to save you a step on the supply run, and it's never shown to your clients.",
     categoryId: "for-tradespeople",
     audience: "tradesperson",
   },

@@ -25,6 +25,7 @@ import {
   updateExpense,
   uploadReceiptAndCreateExpense,
 } from "@/firebase/services/expenses";
+import type { ExpensePrefill } from "@/firebase/services/expenses";
 import type { ExpenseCategory, ExpenseDoc, WithId } from "@/firebase/interfaces";
 import { compressOrPassPdf } from "@/utils/image";
 import { useFormatters } from "@/composables/useFormatters";
@@ -37,6 +38,9 @@ const props = defineProps<{
   clientId: string | null;
   // Fixed-price jobs: receipts are cost-tracking only — hide markup/billing.
   costTrackingOnly?: boolean;
+  // Optional pre-fill for the manual path — e.g. a supplier the tradie just
+  // shopped from. Applied when the dialog opens; they just enter the amount.
+  prefill?: ExpensePrefill | null;
 }>();
 
 const emit = defineEmits<{
@@ -59,6 +63,9 @@ const billedTouched = ref(false);
 const category = ref<ExpenseCategory | null>("materials");
 const ocrVendor = ref<string | null>(null);
 const ocrSpentAt = ref<Date | null>(null);
+// Vendor carried in from a prefill (e.g. the supplier shopped from). Saved on
+// the manual path so the expense row shows where it came from.
+const prefillVendor = ref<string | null>(null);
 
 // ----- receipt / OCR state -----
 const fileInput = ref<HTMLInputElement | null>(null);
@@ -75,14 +82,15 @@ watch(
   () => props.visible,
   (v) => {
     if (v) {
-      description.value = "";
+      description.value = props.prefill?.description ?? "";
       costDollars.value = null;
       markupPercent.value = DEFAULT_MARKUP_PERCENT;
       billedDollars.value = null;
       billedTouched.value = false;
-      category.value = "materials";
+      category.value = props.prefill?.category ?? "materials";
       ocrVendor.value = null;
       ocrSpentAt.value = null;
+      prefillVendor.value = props.prefill?.vendor ?? null;
       receiptExpenseId.value = null;
       uploading.value = false;
       parsing.value = false;
@@ -186,7 +194,12 @@ async function onSave() {
     if (receiptExpenseId.value) {
       await updateExpense(props.jobId, receiptExpenseId.value, patch);
     } else {
-      await createManualExpense(props.jobId, props.clientId, patch);
+      // Carry the vendor only on the manual path — the receipt path keeps the
+      // OCR'd vendor untouched.
+      await createManualExpense(props.jobId, props.clientId, {
+        ...patch,
+        vendor: prefillVendor.value,
+      });
     }
     toast.success("Expense added", patch.description || "Saved to this job");
     emit("added");
@@ -235,6 +248,15 @@ async function onCancel() {
           The client only sees the marked-up line item.
         </template>
       </p>
+
+      <Message
+        v-if="prefillVendor && !receiptExpenseId"
+        severity="info"
+        :closable="false"
+        class="text-xs"
+      >
+        Logging a purchase from <strong>{{ prefillVendor }}</strong> — just enter what you paid.
+      </Message>
 
       <!-- Receipt upload + AI auto-fill -->
       <input

@@ -62,6 +62,39 @@ Blue Seal surfaces a "Get covered" insurance referral throughout the tradesperso
 
 ---
 
+## Supplies marketplace — affiliate program sign-ups (added 2026-06-16)
+
+The job view's **Work order** tab now has a tradesperson-only **Supplies** panel (`src/components/SuppliesPanel.vue`) — search a vetted Canadian supplier for what a job needs, then log the purchase as a job expense in one tap. The code is live; every supplier link currently points at the retailer's **public site as a placeholder** (`src/data/supplyPartners.ts`). It's revenue-ready, not yet revenue-live.
+
+### [ ] Apply to the affiliate programs and set each tracking link
+
+- **Why:** Until each approved affiliate/tracking URL is set, the "Shop" links point at the retailer's generic site — clicks aren't attributed to Blue Seal, so no commission is tracked. (Click intent is already logged via Firebase Analytics: `supply_partner_click` / `supply_expense_prefill`.)
+- **What:** Apply to each program, then set the issued tracking link via the matching env var (no code change). The fallback public URLs keep the panel working in the meantime.
+
+  | Partner (`id`) | Program / network | Env var |
+  | --- | --- | --- |
+  | Amazon.ca (`amazon_ca`) | Amazon Associates Canada (tag can append to search URLs) | `VITE_SUPPLY_AMAZON_CA_URL` |
+  | The Home Depot Canada (`homedepot_ca`) | Impact / Rakuten | `VITE_SUPPLY_HOMEDEPOT_CA_URL` |
+  | Home Depot Tool Rental (`homedepot_rental`) | (same program as above) | `VITE_SUPPLY_HOMEDEPOT_RENTAL_URL` |
+  | RONA (`rona`) | RONA affiliate program | `VITE_SUPPLY_RONA_URL` |
+  | Canadian Tire (`canadian_tire`) | Rakuten | `VITE_SUPPLY_CANADIAN_TIRE_URL` |
+  | Sunbelt Rentals Canada (`sunbelt_rentals`) | direct partner deal | `VITE_SUPPLY_SUNBELT_URL` |
+  | Mark's (`marks`) | Rakuten (Canadian Tire group) | `VITE_SUPPLY_MARKS_URL` |
+  | Work Authority (`work_authority`) | direct / network | `VITE_SUPPLY_WORK_AUTHORITY_URL` |
+  | QuickBooks Canada (`quickbooks_ca`) | Intuit affiliate (Impact) | `VITE_SUPPLY_QUICKBOOKS_URL` |
+  | FreshBooks (`freshbooks`) | FreshBooks affiliate | `VITE_SUPPLY_FRESHBOOKS_URL` |
+
+  Set each in **both**: (1) `.env` for local builds, and (2) GitHub → **Settings → Secrets and variables → Actions** (deploy.yml / ci.yml already pass `VITE_*` into the build), then push / run the Deploy workflow so hosting rebuilds.
+- **Disclosure:** the panel already shows an "we may earn a commission" line, and there's a transparent Help Center FAQ ("Does Blue Seal earn from the supplier links?") — keep these accurate to satisfy program terms (Amazon Associates in particular **requires** a visible disclosure).
+- **Verify:** on a tradesperson account, open a job → Work order tab → Supplies → "Shop" opens **your** tracking link (not the generic site) in a new tab.
+
+### [ ] (Optional, fast-follow) Search-level attribution + per-trade catalog
+
+- **Why:** v1 attributes the tile "Shop" click via the partner `url`; the search box deep-links the retailer's public search, which most networks won't attribute. Amazon Associates is the easy win — its tag appends to any search URL.
+- **What:** when the Amazon tag is issued, fold it into `buildSearchUrl()` so searches are attributed too. A future per-trade quick-pick catalog (Phase 2) is purely additive — no human task.
+
+---
+
 ## Web push notifications (added 2026-06-10)
 
 Push notifications (FCM) ship **safe-by-default**: until the key below is set, the

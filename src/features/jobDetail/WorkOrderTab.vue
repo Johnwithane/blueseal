@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import WorkOrderSummaryCard from "@/components/WorkOrderSummaryCard.vue";
 import TimeTrackerCard from "@/components/TimeTrackerCard.vue";
 import ChangeOrdersCard from "@/components/ChangeOrdersCard.vue";
 import ExpensesCard from "@/components/ExpensesCard.vue";
+import SuppliesPanel from "@/components/SuppliesPanel.vue";
 import type { JobDoc, JobStatus, WithId, JobExtraDoc } from "@/firebase/interfaces";
+import type { ExpensePrefill } from "@/firebase/services/expenses";
 import { jobBillingType } from "@/utils/jobBilling";
 
 const props = defineProps<{
@@ -42,6 +44,12 @@ const approvedHourlyExtras = computed(() =>
     .filter((e) => e.status === "approved" && e.billingType === "hourly")
     .map((e) => ({ id: e.id, description: e.description, hourlyRateCents: e.hourlyRateCents ?? 0 })),
 );
+
+// Supplies panel → "Log expense" opens the Expenses card's add dialog pre-filled.
+const expensesCard = ref<InstanceType<typeof ExpensesCard> | null>(null);
+function onLogExpense(prefill: ExpensePrefill) {
+  expensesCard.value?.openAdd(prefill);
+}
 </script>
 
 <template>
@@ -76,12 +84,18 @@ const approvedHourlyExtras = computed(() =>
       :solo="job.clientId === null"
     />
 
+    <!-- Supplies marketplace — tradesperson-only (mirrors ExpensesCard's
+         visibility), surfaced right by the expense workflow it feeds. Search a
+         vetted supplier for what the job needs, then log it as an expense. -->
+    <SuppliesPanel v-if="showExpenses" :job="job" @log-expense="onLogExpense" />
+
     <!-- Receipts → reimbursable line items. Tradesperson-only (receipts
          disclose the tradie's cost basis), and hidden once the invoice is
          locked. Moved here from the Invoice tab: it's part of the live work,
          not the invoice. -->
     <ExpensesCard
       v-if="showExpenses"
+      ref="expensesCard"
       :job-id="job.id"
       :client-id="job.clientId"
       :tradesperson-id="job.tradespersonId"
