@@ -83,6 +83,21 @@ export interface UserDoc {
 }
 
 // ---------------------------------------------------------------------------
+// users/{uid}/supportNotes/{noteId}
+// Admin-only internal support log: free-form notes a support agent pins to an
+// account so the next contact has context. Append-only; admin read/create/delete
+// only (locked in firestore.rules). `authorUid` is rule-pinned to the writing
+// admin so attribution can't be forged. Separate from the central auditLog —
+// this is the human support narrative, not the action audit trail.
+// ---------------------------------------------------------------------------
+export interface SupportNoteDoc {
+  authorUid: string;
+  authorName: string;
+  body: string;
+  createdAt: Timestamp;
+}
+
+// ---------------------------------------------------------------------------
 // Blue Seal Pro subscription (MONETIZATION.md — $29 CAD/mo or $290 CAD/yr,
 // 30-day card-required trial). Lives on users/{uid} because it carries
 // private Stripe identifiers + trial/renewal dates; `users` is owner+admin

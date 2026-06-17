@@ -50,3 +50,62 @@ export const submitForVetting = httpsCallable<Record<string, never>, { ok: boole
   functions,
   "submitForVetting",
 );
+
+// --- Admin support-desk account actions (see functions/src/admin/userSupport.ts) ---
+
+/** Authoritative live Auth state for a user (the Firestore emailVerified mirror can lag). */
+export interface AdminAuthState {
+  ok: boolean;
+  email: string | null;
+  emailVerified: boolean;
+  disabled: boolean;
+  lastSignInTime: string | null;
+  creationTime: string | null;
+  providerIds: string[];
+}
+
+export const adminVerifyUserEmail = httpsCallable<{ targetUid: string }, { ok: boolean }>(
+  functions,
+  "adminVerifyUserEmail",
+);
+
+export const adminSendPasswordReset = httpsCallable<{ targetUid: string }, { ok: boolean }>(
+  functions,
+  "adminSendPasswordReset",
+);
+
+export const adminResendVerificationEmail = httpsCallable<{ targetUid: string }, { ok: boolean }>(
+  functions,
+  "adminResendVerificationEmail",
+);
+
+/** Returns the one-time temp password — show it once, never persist it. */
+export const adminSetTempPassword = httpsCallable<
+  { targetUid: string },
+  { ok: boolean; tempPassword: string }
+>(functions, "adminSetTempPassword");
+
+export const adminSetUserDisabled = httpsCallable<
+  { targetUid: string; disabled: boolean; reason?: string },
+  { ok: boolean; disabled: boolean }
+>(functions, "adminSetUserDisabled");
+
+export const adminUpdateUserContact = httpsCallable<
+  { targetUid: string; displayName?: string; phone?: string | null; email?: string },
+  { ok: boolean; emailChanged: boolean }
+>(functions, "adminUpdateUserContact");
+
+export const adminGetUserAuthState = httpsCallable<{ targetUid: string }, AdminAuthState>(
+  functions,
+  "adminGetUserAuthState",
+);
+
+export const adminSoftDeleteUser = httpsCallable<
+  { targetUid: string; reason?: string },
+  { ok: boolean; alreadyPending: boolean }
+>(functions, "adminSoftDeleteUser");
+
+export const adminRestoreUser = httpsCallable<{ targetUid: string }, { ok: boolean }>(
+  functions,
+  "adminRestoreUser",
+);

@@ -1,18 +1,22 @@
 import {
+  addDoc,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
   limit as fbLimit,
   orderBy,
   query,
+  type QueryDocumentSnapshot,
   serverTimestamp,
+  startAfter,
   updateDoc,
   where,
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { db, functions } from "@/firebase/config";
-import type { Role, UserDoc, WithId } from "@/firebase/interfaces";
+import { auth, db, functions } from "@/firebase/config";
+import type { Role, SupportNoteDoc, UserDoc, WithId } from "@/firebase/interfaces";
 import { typedConverter } from "@/firebase/converters";
 
 /**
@@ -180,6 +184,65 @@ export async function searchUsers(input: string): Promise<WithId<UserDoc>[]> {
   }
 
   return results.slice(0, 10);
+}
+
+export interface UsersPage {
+  users: WithId<UserDoc>[];
+  /** Cursor for the next page — pass straight back in as `cursor`. */
+  lastDoc: QueryDocumentSnapshot<UserDoc> | null;
+  reachedEnd: boolean;
+}
+
+/**
+ * Admin browse: one page of users, newest first. The cursor is the last
+ * DocumentSnapshot of the previous page (NOT a Timestamp) — `createdAt` is a
+ * serverTimestamp and two docs written in the same millisecond would otherwise
+ * be skipped/duplicated at the page boundary; a snapshot cursor disambiguates
+ * on the full order key. Browse is best-effort `createdAt`-desc: a legacy doc
+ * with no `createdAt` won't appear here, so search stays the authoritative
+ * lookup. Admin can read every user doc per firestore.rules.
+ */
+export async function listUsersPage(opts: {
+  pageSize: number;
+  cursor?: QueryDocumentSnapshot<UserDoc> | null;
+}): Promise<UsersPage> {
+  const usersCol = collection(db, "users").withConverter(typedConverter<UserDoc>());
+  const snap = await getDocs(
+    opts.cursor
+      ? query(usersCol, orderBy("createdAt", "desc"), startAfter(opts.cursor), fbLimit(opts.pageSize))
+      : query(usersCol, orderBy("createdAt", "desc"), fbLimit(opts.pageSize)),
+  );
+  return {
+    users: snap.docs.map((d) => ({ id: d.id, ...d.data() })),
+    lastDoc: snap.docs.length ? snap.docs[snap.docs.length - 1] : (opts.cursor ?? null),
+    reachedEnd: snap.docs.length < opts.pageSize,
+  };
+}
+
+// ---- Admin support notes (users/{uid}/supportNotes) -----------------------
+// Admin-only internal log. Direct Firestore writes (no callable): the rules
+// gate it to admins and pin authorUid to the signed-in writer. See SupportNoteDoc.
+
+export async function addSupportNote(targetUid: string, body: string): Promise<void> {
+  const me = auth.currentUser;
+  if (!me) throw new Error("You must be signed in.");
+  await addDoc(collection(db, "users", targetUid, "supportNotes"), {
+    authorUid: me.uid,
+    authorName: me.displayName || me.email || "Admin",
+    body,
+    createdAt: serverTimestamp(),
+  });
+}
+
+export async function listSupportNotes(targetUid: string): Promise<WithId<SupportNoteDoc>[]> {
+  const snap = await getDocs(
+    query(collection(db, "users", targetUid, "supportNotes"), orderBy("createdAt", "desc")),
+  );
+  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as SupportNoteDoc) }));
+}
+
+export async function deleteSupportNote(targetUid: string, noteId: string): Promise<void> {
+  await deleteDoc(doc(db, "users", targetUid, "supportNotes", noteId));
 }
 
 /** Save per-channel notification opt-outs. Owner-writable per Firestore rules. */

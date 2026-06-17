@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
+import type { QueryDocumentSnapshot } from "firebase/firestore";
 import Avatar from "primevue/avatar";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
@@ -12,15 +13,17 @@ import type {
   UserDoc,
   WithId,
 } from "@/firebase/interfaces";
-import { searchUsers } from "@/firebase/services/users";
+import { searchUsers, listUsersPage } from "@/firebase/services/users";
 import { getTradesperson, getTradespersonContact } from "@/firebase/services/tradespeople";
 import { listJobsForClient, listJobsForTradie } from "@/firebase/services/jobs";
+import { adminGetUserAuthState, type AdminAuthState } from "@/firebase/services/admin";
 import { useFormatters } from "@/composables/useFormatters";
 import { humanizeError } from "@/utils/errors";
 import { tradeLabel } from "@/data/trades";
 import { STATUS_LABEL, STATUS_SEVERITY } from "@/utils/jobStatus";
 import LoadingState from "@/components/LoadingState.vue";
 import AdminUserManage from "@/components/admin/AdminUserManage.vue";
+import AdminUserSupport from "@/components/admin/AdminUserSupport.vue";
 import AdminRoleEditor from "@/components/admin/AdminRoleEditor.vue";
 import type { Role } from "@/firebase/interfaces";
 
@@ -31,6 +34,15 @@ const results = ref<WithId<UserDoc>[]>([]);
 const loading = ref(false);
 const searched = ref(false);
 const error = ref<string | null>(null);
+
+// Two modes share the `results` list: "browse" paginates all users newest-first
+// (loaded on mount); "search" narrows via searchUsers. Switching modes fully
+// replaces the list + resets expansion.
+const mode = ref<"browse" | "search">("browse");
+const PAGE_SIZE = 25;
+const cursor = ref<QueryDocumentSnapshot<UserDoc> | null>(null);
+const reachedEnd = ref(false);
+const loadingMore = ref(false);
 
 // Per-uid expansion state. We lazy-load the heavier reads (tradesperson doc +
 // jobs as client + jobs as tradie) on first expand so the result list stays
@@ -44,6 +56,8 @@ interface ExpandedState {
   tradieAddress: string | null;
   clientJobs: WithId<JobDoc>[];
   tradieJobs: WithId<JobDoc>[];
+  // Authoritative Auth state (the Firestore emailVerified mirror can lag).
+  authState: AdminAuthState | null;
   // Job lists are collapsed by default so they don't bury the admin actions.
   showClientJobs: boolean;
   showTradieJobs: boolean;
@@ -52,8 +66,35 @@ const expanded = ref<Record<string, ExpandedState>>({});
 
 const RECENT_JOBS_LIMIT = 20;
 
+// Browse: load the first page on mount; "Load more" appends with the snapshot
+// cursor. Called with reset=true on mount and when returning from search.
+async function loadBrowse(reset: boolean) {
+  if (reset) {
+    loading.value = true;
+    results.value = [];
+    cursor.value = null;
+    reachedEnd.value = false;
+    expanded.value = {};
+  } else {
+    loadingMore.value = true;
+  }
+  error.value = null;
+  try {
+    const page = await listUsersPage({ pageSize: PAGE_SIZE, cursor: cursor.value });
+    results.value = reset ? page.users : [...results.value, ...page.users];
+    cursor.value = page.lastDoc;
+    reachedEnd.value = page.reachedEnd;
+  } catch (e) {
+    error.value = humanizeError(e);
+  } finally {
+    loading.value = false;
+    loadingMore.value = false;
+  }
+}
+
 async function runSearch() {
   if (!query.value.trim()) return;
+  mode.value = "search";
   loading.value = true;
   error.value = null;
   searched.value = true;
@@ -67,6 +108,16 @@ async function runSearch() {
     loading.value = false;
   }
 }
+
+// Return to the full browse list.
+function clearSearch() {
+  query.value = "";
+  searched.value = false;
+  mode.value = "browse";
+  void loadBrowse(true);
+}
+
+onMounted(() => loadBrowse(true));
 
 function roleSeverity(role: string): "info" | "success" | "warn" | "danger" {
   if (role === "admin") return "warn";
@@ -97,6 +148,7 @@ async function toggleExpand(user: WithId<UserDoc>) {
     tradieAddress: null,
     clientJobs: [],
     tradieJobs: [],
+    authState: null,
     showClientJobs: false,
     showTradieJobs: false,
   };
@@ -108,16 +160,22 @@ async function toggleExpand(user: WithId<UserDoc>) {
   const isTradie = (user.roles ?? []).includes("tradesperson");
   const isClient = (user.roles ?? []).includes("client");
   try {
-    const [tradie, contact, clientJobs, tradieJobs] = await Promise.all([
+    const [tradie, contact, clientJobs, tradieJobs, authState] = await Promise.all([
       isTradie ? getTradesperson(user.id) : Promise.resolve(null),
       isTradie ? getTradespersonContact(user.id) : Promise.resolve(null),
       isClient ? listJobsForClient(user.id, RECENT_JOBS_LIMIT) : Promise.resolve([]),
       isTradie ? listJobsForTradie(user.id, RECENT_JOBS_LIMIT) : Promise.resolve([]),
+      // Authoritative Auth state for the support panel. Best-effort — a failure
+      // here shouldn't blank the whole expansion, so swallow to null.
+      adminGetUserAuthState({ targetUid: user.id })
+        .then((r) => r.data)
+        .catch(() => null),
     ]);
     state.tradie = tradie;
     state.tradieAddress = contact?.primaryAddressText ?? null;
     state.clientJobs = clientJobs;
     state.tradieJobs = tradieJobs;
+    state.authState = authState;
     state.loaded = true;
   } catch (e) {
     state.error = humanizeError(e);
@@ -164,6 +222,24 @@ function onTradesUpdated(user: WithId<UserDoc>, trades: string[]) {
   const tradie = expanded.value[user.id]?.tradie;
   if (tradie) tradie.trades = trades;
 }
+
+// AdminUserSupport emits a partial UserDoc after each action — merge it into the
+// in-memory row so the badges/contact line update without a reload.
+function onSupportPatch(user: WithId<UserDoc>, patch: Partial<UserDoc>) {
+  Object.assign(user, patch);
+}
+
+// Re-pull authoritative Auth state into the expanded panel after an action that
+// changes it (verify email, suspend, email change).
+async function onRefreshAuth(user: WithId<UserDoc>) {
+  const state = expanded.value[user.id];
+  if (!state) return;
+  try {
+    state.authState = (await adminGetUserAuthState({ targetUid: user.id })).data;
+  } catch {
+    /* leave the last-known state in place */
+  }
+}
 </script>
 
 <template>
@@ -174,8 +250,8 @@ function onTradesUpdated(user: WithId<UserDoc>, trades: string[]) {
 
     <header class="mt-2 mb-6">
       <p class="text-sm text-[color:var(--bs-muted)]">
-        Look up an account by name, email, phone, or UID. Used by support
-        when a customer writes in.
+        All accounts, newest first — search to narrow by name, email, phone, or
+        UID. Used by support when a customer writes in.
       </p>
     </header>
 
@@ -192,9 +268,17 @@ function onTradesUpdated(user: WithId<UserDoc>, trades: string[]) {
         <Button
           label="Search"
           icon="pi pi-search"
-          :loading="loading"
+          :loading="loading && mode === 'search'"
           :disabled="!query.trim()"
           @click="runSearch"
+        />
+        <Button
+          v-if="mode === 'search'"
+          label="Clear"
+          icon="pi pi-times"
+          severity="secondary"
+          outlined
+          @click="clearSearch"
         />
       </div>
       <p class="mt-2 text-xs text-[color:var(--bs-muted)]">
@@ -209,10 +293,10 @@ function onTradesUpdated(user: WithId<UserDoc>, trades: string[]) {
       {{ error }}
     </Message>
 
-    <LoadingState v-if="loading" class="mt-3" label="Searching…" />
+    <LoadingState v-if="loading" class="mt-3" :label="mode === 'search' ? 'Searching…' : 'Loading users…'" />
 
     <div
-      v-else-if="searched && results.length === 0"
+      v-else-if="mode === 'search' && results.length === 0"
       class="bs-empty mt-3"
     >
       <i class="pi pi-user-edit mb-2 block text-3xl text-[color:var(--bs-border)]"></i>
@@ -373,6 +457,16 @@ function onTradesUpdated(user: WithId<UserDoc>, trades: string[]) {
                 <span class="font-medium">Bio:</span> {{ u.bio }}
               </p>
             </section>
+
+            <!-- Support tools (all users): email/password/access/contact/notes
+                 + danger zone. Placed high — it's the most-used part for support. -->
+            <AdminUserSupport
+              class="border-t border-[color:var(--bs-border)] pt-4"
+              :user="u"
+              :auth-state="expanded[u.id].authState"
+              @patch="(patch) => onSupportPatch(u, patch)"
+              @refresh-auth="() => onRefreshAuth(u)"
+            />
 
             <!-- Admin actions (trades + Pro) — only for tradespeople, placed high
                  so it isn't buried under the job lists. Roles are edited at the
@@ -554,5 +648,20 @@ function onTradesUpdated(user: WithId<UserDoc>, trades: string[]) {
         </div>
       </li>
     </ul>
+
+    <!-- Browse pagination — cursor-based "Load more". -->
+    <div v-if="mode === 'browse' && results.length" class="mt-4 text-center">
+      <Button
+        v-if="!reachedEnd"
+        label="Load more"
+        icon="pi pi-chevron-down"
+        outlined
+        :loading="loadingMore"
+        @click="loadBrowse(false)"
+      />
+      <p class="mt-2 text-xs text-[color:var(--bs-muted)]">
+        Showing {{ results.length }} account{{ results.length === 1 ? "" : "s" }}{{ reachedEnd ? " (all)" : "" }}.
+      </p>
+    </div>
   </section>
 </template>
