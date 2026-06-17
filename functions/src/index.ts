@@ -3,6 +3,7 @@ import { setGlobalOptions } from "firebase-functions/v2";
 setGlobalOptions({ region: "us-central1", maxInstances: 10 });
 
 // Auth & roles
+export { provisionAccount } from "./auth/provisionAccount";
 export { setRoleOnSignup } from "./auth/setRoleOnSignup";
 export { setAdminRole } from "./auth/setAdminRole";
 export { adminSetUserRoles } from "./auth/adminSetUserRoles";

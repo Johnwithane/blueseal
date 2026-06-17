@@ -7,7 +7,6 @@ import {
   orderBy,
   query,
   serverTimestamp,
-  setDoc,
   updateDoc,
   where,
 } from "firebase/firestore";
@@ -65,40 +64,31 @@ export async function getUser(uid: string): Promise<WithId<UserDoc> | null> {
   return { id: snap.id, ...data };
 }
 
-export async function createUser(opts: {
-  uid: string;
+/**
+ * Provisions the signed-in user's `users/{uid}` profile doc + role claims
+ * SERVER-SIDE via the `provisionAccount` callable.
+ *
+ * Replaces the old client-side `setDoc(users/{uid})`, which was the first
+ * Firestore write of a new session and raced the Auth→Firestore token
+ * handshake — when the token wasn't attached yet the rules saw no auth,
+ * `isOwner()` failed, and Firestore rejected with permission-denied (the
+ * "You don't have permission to do that." users hit on signup). The callable
+ * writes via the Admin SDK, which bypasses rules entirely, so there's no token
+ * to race. Idempotent; returns the resulting roles so the caller can seed
+ * local state without waiting for the claim trigger.
+ */
+export async function provisionAccount(input: {
   role: Role;
-  email: string;
   displayName: string;
-  photoURL?: string | null;
-  phone?: string | null;
   termsAcceptedVersion: string;
-}): Promise<void> {
-  const ref = usersCol(opts.uid);
-  // Plain setDoc (no merge): on a brand-new uid this is a Firestore `create`.
-  // It does NOT throw if the doc already exists — it would overwrite — but a
-  // second write is instead an `update` op, and the users update rule locks
-  // `createdAt` equal to the stored value, so a duplicate/racing write (e.g.
-  // applyAuthState's self-heal, now guarded by provisioningUids) is rejected
-  // with permission-denied rather than silently clobbering the doc. Cloud
-  // Function setRoleOnSignup then mirrors `roles` to the custom claim.
-  await setDoc(ref, {
-    roles: [opts.role],
-    activeRole: opts.role,
-    displayName: opts.displayName,
-    email: opts.email,
-    photoURL: opts.photoURL ?? null,
-    phone: opts.phone ?? null,
-    createdAt: serverTimestamp() as never,
-    lastActiveAt: serverTimestamp() as never,
-    emailVerified: false,
-    clientRatingAvg: 0,
-    clientRatingCount: 0,
-    termsAcceptedAt: serverTimestamp() as never,
-    termsAcceptedVersion: opts.termsAcceptedVersion,
-    deletedAt: null,
-    notificationPrefs: { emailEnabled: true, whatsappEnabled: true },
-  });
+  photoURL?: string | null;
+}): Promise<{ roles: Role[]; activeRole: Role }> {
+  const callable = httpsCallable<typeof input, { roles: Role[]; activeRole: Role }>(
+    functions,
+    "provisionAccount",
+  );
+  const result = await callable(input);
+  return result.data;
 }
 
 // How many user docs we pull for the partial-name/partial-email fallback.

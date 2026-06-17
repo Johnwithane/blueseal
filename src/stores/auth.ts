@@ -14,9 +14,9 @@ import {
 import { auth } from "@/firebase/config";
 import {
   addRoleToSelf as callAddRoleToSelf,
-  createUser,
   ensureSelfRoles as callEnsureSelfRoles,
   getUser,
+  provisionAccount as callProvisionAccount,
   setActiveRole as writeActiveRole,
 } from "@/firebase/services/users";
 import {
@@ -89,52 +89,6 @@ function rolesFromClaims(claims: Record<string, unknown>): Role[] {
     return [legacy];
   }
   return [];
-}
-
-/**
- * Provisions the user doc as the FIRST Firestore write of a freshly
- * authenticated session, retrying on `permission-denied`.
- *
- * That first write races the Auth→Firestore token handshake: the SDK can
- * dispatch the write before it has attached the new user's ID token (the same
- * race applyAuthState documents on its read). When it loses, the rules see
- * request.auth as null/stale, isOwner() fails, and Firestore rejects with
- * permission-denied — which the UI surfaced as "You don't have permission to
- * do that." on signup even though the Auth account had just been created (and
- * the verification email already sent). It's worse on iOS Safari / in-app
- * browsers (slow or storage-restricted) and when a stale prior session lingers
- * — exactly the contexts users hit it in.
- *
- * Minting a token first gives the Firestore SDK a credential to attach; the
- * retry (with a forced refresh + short backoff) then rides out the transient
- * window. A plain create-retry is safe: a rejected setDoc is rolled back
- * server-side so no doc is left behind, and applyAuthState's self-heal — the
- * only other writer of users/{uid} — is suppressed via provisioningUids for
- * the whole provisioning window, so there's no concurrent write to collide
- * with. Throws unchanged on any non-permission-denied error or once retries
- * are exhausted (a genuinely broken environment still surfaces).
- */
-async function provisionUserDoc(
-  user: User,
-  args: Parameters<typeof createUser>[0],
-): Promise<void> {
-  await user.getIdToken();
-  for (let attempt = 0; ; attempt++) {
-    try {
-      await createUser(args);
-      return;
-    } catch (e) {
-      const code = (e as { code?: string }).code;
-      if (code === "permission-denied" && attempt < 4) {
-        await user.getIdToken(true);
-        await new Promise<void>((resolve) => {
-          setTimeout(resolve, 200 * (attempt + 1));
-        });
-        continue;
-      }
-      throw e;
-    }
-  }
 }
 
 export const useAuthStore = defineStore("auth", {
@@ -237,13 +191,14 @@ export const useAuthStore = defineStore("auth", {
             uid: fbUser.uid,
           });
           try {
-            await createUser({
-              uid: fbUser.uid,
-              email: fbUser.email ?? "",
-              displayName: fbUser.displayName ?? fbUser.email?.split("@")[0] ?? "there",
-              photoURL: fbUser.photoURL,
+            // Server-side provision (Admin SDK, bypasses rules) — same path as
+            // a fresh signup, so the orphan-recovery write can't hit the
+            // token-handshake race the client write used to.
+            await callProvisionAccount({
               role: "client",
+              displayName: fbUser.displayName ?? fbUser.email?.split("@")[0] ?? "there",
               termsAcceptedVersion: LEGAL_VERSION,
+              photoURL: fbUser.photoURL,
             });
             await callSendVerificationEmail().catch(() => {});
             doc = await getUser(fbUser.uid);
@@ -344,44 +299,38 @@ export const useAuthStore = defineStore("auth", {
     }) {
       this.pending = true;
       this.error = null;
-      // Guard applyAuthState's self-heal against racing our own createUser
-      // below (see provisioningUids). Register the uid with no `await` between
-      // the auth call and the add, so the concurrently-queued applyAuthState
-      // sees it set.
+      // Guard applyAuthState's self-heal against racing our own provisionAccount
+      // below (see provisioningUids): without it the self-heal could provision a
+      // `client` doc first and the intended tradesperson role would be lost.
+      // Register the uid with no `await` between the auth call and the add, so
+      // the concurrently-queued applyAuthState sees it set.
       let provisioningUid: string | null = null;
       try {
         const cred = await createUserWithEmailAndPassword(auth, opts.email, opts.password);
         provisioningUid = cred.user.uid;
         provisioningUids.add(provisioningUid);
         await updateProfile(cred.user, { displayName: opts.displayName });
-        await provisionUserDoc(cred.user, {
-          uid: cred.user.uid,
-          email: opts.email,
-          displayName: opts.displayName,
+        // Create the user doc + mirror role claims SERVER-SIDE (Admin SDK,
+        // bypasses rules). This replaces the old client-side users/{uid} write
+        // that raced the Auth→Firestore token handshake and surfaced as
+        // "You don't have permission to do that." The callable also applies the
+        // implied-role invariant (tradesperson ⇒ client), so no separate
+        // ensureSelfRoles call is needed here.
+        const { roles, activeRole } = await callProvisionAccount({
           role: opts.role,
+          displayName: opts.displayName,
           termsAcceptedVersion: LEGAL_VERSION,
         });
-        // setRoleOnSignup mirrors roles → claims via an async Firestore
-        // trigger, which RACES the token refresh below — when the refresh
-        // wins, the session caches a role-less token for ~1h and every
-        // role-gated callable rejects ("Role client required") until reload.
-        // ensureSelfRoles reconciles doc → claims synchronously, so the
-        // refresh is guaranteed to pick the role up. On failure, fall back
-        // to the optimistic local role; applyAuthState's divergence recovery
-        // heals the token next page-load.
-        let roles: Role[] = [opts.role];
-        try {
-          roles = (await callEnsureSelfRoles()).roles;
-        } catch (e) {
-          console.warn("[auth] claim reconcile at signup failed", e);
-        }
+        // Refresh so the token carries the claims the callable just set. If the
+        // claim write lagged (handled server-side by the setRoleOnSignup
+        // trigger), applyAuthState's divergence recovery heals it next load.
         await cred.user.getIdToken(true);
         // Branded verification email via our Resend pipeline (callable), not the
         // Firebase client SDK — see services/authEmails.ts. Fire-and-forget: a
         // mail hiccup must not fail an otherwise-complete signup.
         await callSendVerificationEmail().catch(() => {});
         this.roles = roles;
-        this.activeRole = opts.role;
+        this.activeRole = activeRole;
       } catch (e) {
         this.error = (e as Error).message;
         throw e;
@@ -424,25 +373,16 @@ export const useAuthStore = defineStore("auth", {
         const existing = await getUser(cred.user.uid);
         if (!existing) {
           isNew = true;
-          await provisionUserDoc(cred.user, {
-            uid: cred.user.uid,
-            email: cred.user.email ?? "",
-            displayName: cred.user.displayName ?? "Anonymous",
-            photoURL: cred.user.photoURL,
+          // Server-side provision (Admin SDK, bypasses rules) — see signUp.
+          const { roles, activeRole } = await callProvisionAccount({
             role: intendedRole,
+            displayName: cred.user.displayName ?? "Anonymous",
             termsAcceptedVersion: LEGAL_VERSION,
+            photoURL: cred.user.photoURL,
           });
-          // Same trigger race as signUp: reconcile doc → claims synchronously
-          // before refreshing so the new token carries the role.
-          let roles: Role[] = [intendedRole];
-          try {
-            roles = (await callEnsureSelfRoles()).roles;
-          } catch (e) {
-            console.warn("[auth] claim reconcile at signup failed", e);
-          }
           await cred.user.getIdToken(true);
           this.roles = roles;
-          this.activeRole = intendedRole;
+          this.activeRole = activeRole;
         }
       } catch (e) {
         this.error = (e as Error).message;
@@ -484,25 +424,15 @@ export const useAuthStore = defineStore("auth", {
         let isNew = false;
         if (!existing) {
           isNew = true;
-          await provisionUserDoc(cred.user, {
-            uid: cred.user.uid,
-            email: cred.user.email ?? email,
-            displayName: cred.user.displayName ?? "",
-            photoURL: cred.user.photoURL,
+          // Server-side provision (Admin SDK, bypasses rules) — see signUp.
+          const { roles, activeRole } = await callProvisionAccount({
             role,
+            displayName: cred.user.displayName ?? "",
             termsAcceptedVersion: LEGAL_VERSION,
+            photoURL: cred.user.photoURL,
           });
-          // Same trigger race as signUp: reconcile doc → claims synchronously
-          // so the refresh below carries the roles claim, not just
-          // email_verified.
-          let roles: Role[] = [role];
-          try {
-            roles = (await callEnsureSelfRoles()).roles;
-          } catch (e) {
-            console.warn("[auth] claim reconcile at signup failed", e);
-          }
           this.roles = roles;
-          this.activeRole = role;
+          this.activeRole = activeRole;
         }
         // Refresh the token so the verified-email claim is visible to the
         // claimProspect callable (which gates on email_verified) and the
