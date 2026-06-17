@@ -6,6 +6,10 @@ import {
   markNotificationRead,
   subscribeMyNotifications,
 } from "@/firebase/services/notifications";
+import {
+  resetJobBoardCount as clearJobBoardCounter,
+  subscribeJobBoardCount,
+} from "@/firebase/services/jobBoard";
 import { findJobIdByChatId } from "@/firebase/services/jobs";
 import {
   resolveNotificationLink,
@@ -22,6 +26,10 @@ interface State {
   // tear-down can cancel it cleanly. `started` guards against double-init in
   // dev (vite HMR re-runs App.vue's onMounted).
   unsub: (() => void) | null;
+  // Separate listener for the "new jobs in your area" badge counter
+  // (jobBoardCounters/{uid}). Lives in this store because it's another
+  // auth-scoped header badge — restarted alongside the inbox on uid change.
+  jobBoardUnsub: (() => void) | null;
   started: boolean;
   // Chat the user is *actively reading* right now (chat sub-tab visible in
   // the JobChatOverlay). Set by the overlay, cleared on close / AI sub-tab /
@@ -29,6 +37,9 @@ interface State {
   // toasts for the chat the user is already looking at — the inbox doc is
   // still written so the bell badge survives if they navigate away.
   activeChatId: string | null;
+  // Count of new job posts in the tradesperson's area since they last opened
+  // the board — rendered as a badge on the "Browse open jobs" nav button.
+  jobBoardCount: number;
 }
 
 export const useNotificationsStore = defineStore("notifications", {
@@ -36,8 +47,10 @@ export const useNotificationsStore = defineStore("notifications", {
     items: [],
     loading: false,
     unsub: null,
+    jobBoardUnsub: null,
     started: false,
     activeChatId: null,
+    jobBoardCount: 0,
   }),
 
   getters: {
@@ -66,15 +79,26 @@ export const useNotificationsStore = defineStore("notifications", {
         this.unsub();
         this.unsub = null;
       }
+      if (this.jobBoardUnsub) {
+        this.jobBoardUnsub();
+        this.jobBoardUnsub = null;
+      }
       const auth = useAuthStore();
       if (!auth.isAuthenticated) {
         this.items = [];
+        this.jobBoardCount = 0;
         return;
       }
       this.loading = true;
       this.unsub = subscribeMyNotifications((items) => {
         this.items = items;
         this.loading = false;
+      });
+      // Tradesperson-only in practice — the doc only exists for tradies the
+      // fan-out has flagged — but subscribing for everyone is harmless (a
+      // client's doc is simply absent → count 0) and survives role switches.
+      this.jobBoardUnsub = subscribeJobBoardCount((count) => {
+        this.jobBoardCount = count;
       });
     },
 
@@ -134,6 +158,19 @@ export const useNotificationsStore = defineStore("notifications", {
       const unreadIds = this.items.filter((n) => !n.read).map((n) => n.id);
       if (unreadIds.length === 0) return;
       await markAllRead(unreadIds);
+    },
+
+    /**
+     * Clear the "new jobs in your area" badge — the tradesperson just opened
+     * the board. Optimistically zero the local count so the badge disappears
+     * instantly; the snapshot listener reconciles. Fire-and-forget so a slow
+     * write never blocks the board from rendering.
+     */
+    resetJobBoardCount() {
+      this.jobBoardCount = 0;
+      clearJobBoardCounter().catch(() => {
+        /* listener will restore the true count if the reset write fails */
+      });
     },
   },
 });

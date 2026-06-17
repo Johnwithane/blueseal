@@ -894,6 +894,13 @@ const faqs: FaqItem[] = [
     audience: "tradesperson",
   },
   {
+    question: "How do I know when there are new jobs near me?",
+    answer:
+      "A number appears on **Browse open jobs** in the top bar whenever clients post new jobs in your trade and service area — open the board and it clears. We keep this off the notification bell on purpose: the bell stays for things that need you personally (messages, quotes, application updates), while the job feed lives right where you go to act on it.",
+    categoryId: "for-tradespeople",
+    audience: "tradesperson",
+  },
+  {
     question: "Can I refer a job to another tradesperson?",
     answer:
       "Yes. When you browse the job board with the **Any trade** filter, you'll see open jobs outside your own trade too. Tap the **share icon** on a job card (or **Refer this job** on the post itself) and pick a verified tradesperson in that trade who covers the job's area — they get a notification with your note and a **Referred to you by** banner on the post, and can apply like any other applicant. If they apply, you're notified too.",

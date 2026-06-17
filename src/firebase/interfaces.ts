@@ -58,6 +58,14 @@ export interface UserDoc {
   // timestamp. Recovery within the grace window goes via support — there's
   // no self-serve un-delete to keep the deletion path deliberate.
   deletedAt: Timestamp | null;
+  // Admin support: account suspension mirror. Auth `disabled` is the real lock
+  // (it blocks sign-in); these denormalize it onto the user doc so the admin
+  // browse list can flag a suspended account without an Auth round-trip per row.
+  // SERVER-MANAGED via the adminSetUserDisabled callable (admin SDK) and locked
+  // in firestore.rules — the owner can never write them. Optional/absent on
+  // every doc that predates this feature (treated as "active").
+  disabledAt?: Timestamp | null;
+  disabledReason?: string | null;
   // Per-channel notification opt-outs. notify() reads these before fanning
   // to email/WhatsApp; the in-app inbox is always written regardless (it's
   // the source-of-truth audit log). Missing = default-enabled so legacy
@@ -2360,6 +2368,25 @@ export interface NotificationDoc {
   // through the wrong lens. Null on legacy docs created before the field
   // existed; the click handler treats null as "don't switch."
   recipientRole: Role | null;
+}
+
+// ---------------------------------------------------------------------------
+// jobBoardCounters/{uid}
+// Drives the unread BADGE on the tradesperson's "Browse open jobs" nav button.
+// "New job in your area" is a marketplace feed, not a personal/transactional
+// event, so it lives here as an ambient counter rather than as one bell
+// notification per post (which buried the inbox). onJobPostCreated increments
+// `count` once per eligible new post (Admin SDK, bypassing rules); the client
+// may only ever reset it to 0 — which it does when the tradesperson opens the
+// board. Absent doc = count 0 (nobody's posted a matching job yet).
+export interface JobBoardCounterDoc {
+  count: number;
+  // When the most recent eligible post landed / when the tradesperson last
+  // opened the board (reset). Both nullable: a freshly-reset doc has no
+  // lastJobAt until the next post, and a never-reset doc has no lastSeenAt.
+  lastJobAt: Timestamp | null;
+  lastSeenAt: Timestamp | null;
+  updatedAt: Timestamp;
 }
 
 // ---------------------------------------------------------------------------

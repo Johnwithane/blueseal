@@ -59,6 +59,9 @@ interface PrimaryAction {
   label: string;
   icon: string;
   to: string;
+  // Unread count badge (e.g. new jobs in the tradesperson's area). Omitted /
+  // 0 = no badge.
+  badge?: number;
 }
 
 // Primary actions reflect the home-hero logic so the header and hero stay
@@ -68,7 +71,12 @@ const primaryActions = computed<PrimaryAction[]>(() => {
   if (!auth.isAuthenticated) return [];
   if (auth.activeRole === "tradesperson") {
     return [
-      { label: "Browse open jobs", icon: "pi pi-megaphone", to: "/jobs/browse" },
+      {
+        label: "Browse open jobs",
+        icon: "pi pi-megaphone",
+        to: "/jobs/browse",
+        badge: notifs.jobBoardCount,
+      },
       { label: "My applications", icon: "pi pi-send", to: "/my-applications" },
     ];
   }
@@ -98,6 +106,9 @@ const items = computed(() => {
     list.push({
       label: a.label,
       icon: a.icon,
+      // PrimeVue Menu renders item.badge as a pill — mirrors the desktop nav
+      // badge so the new-jobs count shows in the mobile dropdown too.
+      badge: a.badge ? (a.badge > 9 ? "9+" : String(a.badge)) : undefined,
       class: "sm:hidden",
       command: () => router.push(a.to),
     });
@@ -203,6 +214,13 @@ function openMenu(e: Event) {
         >
           <i :class="[a.icon, 'text-xs text-[color:var(--bs-blue)]']"></i>
           <span>{{ a.label }}</span>
+          <span
+            v-if="a.badge"
+            class="inline-flex h-[1.1rem] min-w-[1.1rem] items-center justify-center rounded-full bg-[color:var(--bs-red)] px-1 text-[10px] font-semibold leading-none text-white"
+            :aria-label="`${a.badge} new`"
+          >
+            {{ a.badge > 9 ? "9+" : a.badge }}
+          </span>
         </RouterLink>
       </nav>
 

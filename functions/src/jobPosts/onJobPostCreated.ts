@@ -1,15 +1,13 @@
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions/v2";
+import { FieldValue } from "firebase-admin/firestore";
 import { distanceBetween, geohashQueryBounds } from "geofire-common";
 import { db } from "../lib/admin";
-import { notify } from "../lib/notify";
 
 interface JobPostLike {
   clientId?: string;
   trade?: string;
-  title?: string;
   status?: string;
-  addressPublic?: { city?: string; region?: string };
 }
 
 interface MetaLike {
@@ -31,14 +29,19 @@ interface TradieLike {
 const MAX_BOUNDING_RADIUS_KM = 200;
 
 /**
- * Fan-out: when a client posts a new job to the marketplace, notify every
- * tradesperson who matches the trade AND whose own service radius covers
- * the job's location. Direct-request notifications live in
- * jobs/onJobCreated — this trigger only fires for /jobPosts/{postId}.
+ * Fan-out: when a client posts a new job to the marketplace, flag it for every
+ * tradesperson who matches the trade AND whose own service radius covers the
+ * job's location. Direct-request notifications live in jobs/onJobCreated — this
+ * trigger only fires for /jobPosts/{postId}.
  *
- * Priority is "low" (in-app only) so this never enqueues email or
- * WhatsApp regardless of the user's global channel prefs. Per-type opt-
- * out is gated by notificationPrefs.newJobPostingEnabled inside notify().
+ * This used to write one bell notification per eligible tradesperson per post,
+ * which buried the transactional inbox under "New job in your area" rows (the
+ * feedback that prompted this rewrite). Instead we increment a per-user counter
+ * (jobBoardCounters/{uid}) that the header renders as an unread BADGE on
+ * "Browse open jobs"; opening the board resets it. The new-jobs signal is a
+ * marketplace feed, not a personal/transactional event, so it belongs on the
+ * board's nav affordance — not in the bell. The newJobPostingEnabled opt-out is
+ * still honoured (checked here now that we no longer route through notify()).
  */
 export const onJobPostCreated = onDocumentCreated(
   "jobPosts/{postId}",
@@ -103,30 +106,72 @@ export const onJobPostCreated = onDocumentCreated(
       return;
     }
 
-    const city = post.addressPublic?.city;
-    const title = "New job in your area";
-    const body = `${post.title ?? "A new job"}${city ? ` in ${city}` : ""}. Tap to view and apply.`;
-    const link = `/jobs/posted/${postId}`;
+    const recipients = await filterByJobPostingPref(eligibleUids);
+    if (recipients.length === 0) {
+      logger.info("onJobPostCreated: all eligible tradies opted out", { postId });
+      return;
+    }
 
-    await Promise.all(
-      eligibleUids.map((uid) =>
-        notify({
-          userId: uid,
-          type: "new_job_posting",
-          title,
-          body,
-          link,
-          actorUid: post.clientId ?? null,
-          recipientRole: "tradesperson",
-          priority: "low",
-        }),
-      ),
-    );
+    await bumpJobBoardCounters(recipients);
 
-    logger.info("onJobPostCreated: fan-out complete", {
+    logger.info("onJobPostCreated: badge fan-out complete", {
       postId,
       trade: post.trade,
       eligibleCount: eligibleUids.length,
+      notifiedCount: recipients.length,
     });
   },
 );
+
+// Firestore batched writes cap at 500 ops; stay under it with headroom so a
+// dense urban fan-out (hundreds of matching tradies) chunks cleanly.
+const COUNTER_BATCH_LIMIT = 450;
+
+/**
+ * Drop tradespeople who've opted out of new-job alerts
+ * (notificationPrefs.newJobPostingEnabled === false). Missing pref = enabled,
+ * matching the legacy-friendly default in lib/notify's getUserContact. A read
+ * failure keeps the recipient — a transient miss shouldn't silently swallow a
+ * lead.
+ */
+async function filterByJobPostingPref(uids: string[]): Promise<string[]> {
+  const results = await Promise.all(
+    uids.map(async (uid) => {
+      try {
+        const snap = await db.doc(`users/${uid}`).get();
+        const prefs = (snap.data()?.notificationPrefs ?? {}) as {
+          newJobPostingEnabled?: boolean;
+        };
+        return prefs.newJobPostingEnabled !== false ? uid : null;
+      } catch (err) {
+        logger.warn("onJobPostCreated: pref read failed; keeping recipient", { uid, err });
+        return uid;
+      }
+    }),
+  );
+  return results.filter((u): u is string => u !== null);
+}
+
+/**
+ * Bump each recipient's jobBoardCounters/{uid}.count by one. merge:true so the
+ * first post for a user creates the doc and later posts add to it; the client
+ * resets count to 0 (the only client-side write rules permit) when the
+ * tradesperson opens the board.
+ */
+async function bumpJobBoardCounters(uids: string[]): Promise<void> {
+  for (let i = 0; i < uids.length; i += COUNTER_BATCH_LIMIT) {
+    const batch = db.batch();
+    for (const uid of uids.slice(i, i + COUNTER_BATCH_LIMIT)) {
+      batch.set(
+        db.doc(`jobBoardCounters/${uid}`),
+        {
+          count: FieldValue.increment(1),
+          lastJobAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+    }
+    await batch.commit();
+  }
+}

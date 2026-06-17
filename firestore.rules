@@ -872,6 +872,18 @@ service cloud.firestore {
       allow create, delete: if false;
     }
 
+    // ---------- jobBoardCounters (per-user "new jobs in your area" badge) ----------
+    // The onJobPostCreated trigger (Admin SDK, bypasses these rules) increments
+    // `count` once per eligible new marketplace post. The header renders it as a
+    // badge on "Browse open jobs"; opening the board resets it. The ONLY client
+    // write allowed is that reset — count must be 0 — so a compromised client can
+    // clear its own badge but never inflate it or touch anyone else's.
+    match /jobBoardCounters/{userId} {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId) && request.resource.data.count == 0;
+      allow delete: if false;
+    }
+
     // ---------- rateLimits (server-only) ----------
     match /rateLimits/{limitId} {
       allow read, write: if false;

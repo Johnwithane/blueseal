@@ -7,6 +7,7 @@ import Slider from "primevue/slider";
 import Tag from "primevue/tag";
 import Message from "primevue/message";
 import { useAuthStore } from "@/stores/auth";
+import { useNotificationsStore } from "@/stores/notifications";
 import { getTradesperson } from "@/firebase/services/tradespeople";
 import { subscribeJobPostFeed } from "@/firebase/services/jobPosts";
 import { subscribeMyApplications } from "@/firebase/services/applications";
@@ -23,6 +24,7 @@ import LoadingState from "@/components/LoadingState.vue";
 import ReferJobDialog from "@/components/jobPost/ReferJobDialog.vue";
 
 const auth = useAuthStore();
+const notifs = useNotificationsStore();
 const { relativeTime } = useFormatters();
 
 const tradie = ref<WithId<TradespersonDoc> | null>(null);
@@ -50,6 +52,9 @@ const tradeOptions = computed(() => [
 
 onMounted(async () => {
   if (!auth.fbUser) return;
+  // They're looking at the board now — clear the "new jobs in your area"
+  // badge. Fire-and-forget; don't block the feed load on the reset write.
+  notifs.resetJobBoardCount();
   tradie.value = await getTradesperson(auth.fbUser.uid);
   loadingTradie.value = false;
 
