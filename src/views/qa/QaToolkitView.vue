@@ -11,7 +11,9 @@ import Button from "primevue/button";
 import MultiSelect from "primevue/multiselect";
 import Tag from "primevue/tag";
 import Message from "primevue/message";
+import MarkdownProse from "@/components/help/MarkdownProse.vue";
 import { TRADES } from "@/data/trades";
+import qaHappyPathsMd from "../../../docs/QA_HAPPY_PATHS.md?raw";
 import { useAuthStore } from "@/stores/auth";
 import { useToast } from "@/composables/useToast";
 import { useFormatters } from "@/composables/useFormatters";
@@ -28,6 +30,11 @@ import type { BugReportDoc, ErrorLogDoc, WithId } from "@/firebase/interfaces";
 const auth = useAuthStore();
 const toast = useToast();
 const { relativeTime } = useFormatters();
+
+// Inline happy-paths runbook (single source: docs/QA_HAPPY_PATHS.md). Collapsed
+// by default since it's long, but kept right at the top so testers can follow a
+// flow without leaving the toolkit.
+const showRunbook = ref(false);
 
 // --- Provision as tradesperson -------------------------------------------
 const selectedTrades = ref<string[]>([]);
@@ -146,6 +153,27 @@ onMounted(() => {
     <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
       Self-serve test setup. Everything here acts only on your own account.
     </p>
+
+    <!-- Happy-paths runbook, inline so testers can follow a flow without leaving -->
+    <div class="bs-card mt-5 p-5">
+      <div class="flex items-center justify-between gap-3">
+        <h2 class="text-base font-semibold">Happy paths (QA runbook)</h2>
+        <Button
+          :label="showRunbook ? 'Hide' : 'Show'"
+          :icon="showRunbook ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"
+          text
+          size="small"
+          @click="showRunbook = !showRunbook"
+        />
+      </div>
+      <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
+        The step-by-step flows to test — open one, then use the quick links below
+        (Jump to a flow) to start it.
+      </p>
+      <div v-if="showRunbook" class="qa-runbook mt-3">
+        <MarkdownProse :source="qaHappyPathsMd" />
+      </div>
+    </div>
 
     <!-- Provision as tradesperson -->
     <div class="bs-card mt-5 p-5">
@@ -283,3 +311,22 @@ onMounted(() => {
     </div>
   </section>
 </template>
+
+<style scoped>
+/* MarkdownProse doesn't style tables/checkboxes; the runbook uses both. */
+.qa-runbook :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+}
+.qa-runbook :deep(th),
+.qa-runbook :deep(td) {
+  border: 1px solid var(--bs-border);
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+}
+.qa-runbook :deep(li) {
+  line-height: 1.6;
+}
+</style>
