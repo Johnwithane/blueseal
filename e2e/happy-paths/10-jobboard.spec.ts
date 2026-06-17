@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { signIn, settle } from "./helpers/auth";
+import { signIn } from "./helpers/auth";
 import { requireEnv } from "./helpers/env";
 import { provisionTradie, resetSelfData } from "./helpers/provision";
 import { postJob, browseFindsJob, applyWithQuote, closeOpenPosts } from "./helpers/jobs";
