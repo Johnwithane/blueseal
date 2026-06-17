@@ -33,6 +33,15 @@ export interface SupplyPartner {
   /** Public search deep-link with `{q}` placeholder. Omit if no search. */
   searchUrlTemplate?: string;
   /**
+   * For networks that attribute via an appended query param — Amazon
+   * Associates' `tag`, or a program's sub-id/ref. When `id` is set (from env),
+   * it's appended to BOTH the tile link and every search deep-link, so the
+   * whole shopping flow is affiliate-attributed, not just the homepage. Leave
+   * `id` empty and links work unattributed. Redirect-wrapper networks
+   * (Impact/Rakuten) instead use the env-swappable `url`.
+   */
+  affiliate?: { param: string; id: string };
+  /**
    * Optional trade relevance filter (canonical trade keys from data/trades.ts).
    * Omit = relevant to all trades. Used to order/curate tiles per job.
    */
@@ -72,6 +81,9 @@ export const SUPPLY_PARTNERS: readonly SupplyPartner[] = [
     blurb: "Tools, consumables and hard-to-find parts, fast.",
     icon: "pi pi-box",
     searchUrlTemplate: "https://www.amazon.ca/s?k={q}",
+    // Amazon Associates attributes via `?tag=...`. Set VITE_SUPPLY_AMAZON_CA_TAG
+    // to your store tag and every Amazon link (tiles + searches) is tracked.
+    affiliate: { param: "tag", id: (import.meta.env.VITE_SUPPLY_AMAZON_CA_TAG ?? "").trim() },
   },
   {
     id: "canadian_tire",
@@ -174,17 +186,32 @@ export function getPartner(id: string): SupplyPartner | undefined {
   return SUPPLY_PARTNERS.find((p) => p.id === id);
 }
 
+/** Append the partner's affiliate tracking param (if configured) to a URL. */
+function withAffiliate(partner: SupplyPartner, url: string): string {
+  const aff = partner.affiliate;
+  if (!aff || !aff.id) return url;
+  const sep = url.includes("?") ? "&" : "?";
+  return `${url}${sep}${encodeURIComponent(aff.param)}=${encodeURIComponent(aff.id)}`;
+}
+
+/** The outbound link for a partner tile (landing page), affiliate-tagged. */
+export function partnerLink(partner: SupplyPartner): string {
+  return withAffiliate(partner, partner.url);
+}
+
 /**
  * Build the outbound link for a search query. Uses the partner's search
  * template when it has one (the useful path); otherwise falls back to its
- * landing `url`. Query is URL-encoded.
+ * landing `url`. Query is URL-encoded and the affiliate tag (if any) is
+ * appended, so search-throughs are attributed too.
  */
 export function buildSearchUrl(partner: SupplyPartner, query: string): string {
   const q = query.trim();
-  if (partner.searchUrlTemplate && q) {
-    return partner.searchUrlTemplate.replace("{q}", encodeURIComponent(q));
-  }
-  return partner.url;
+  const base =
+    partner.searchUrlTemplate && q
+      ? partner.searchUrlTemplate.replace("{q}", encodeURIComponent(q))
+      : partner.url;
+  return withAffiliate(partner, base);
 }
 
 /** The default supplier to deep-link a search to — first materials partner. */

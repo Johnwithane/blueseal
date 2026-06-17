@@ -73,7 +73,7 @@ The job view's **Work order** tab now has a tradesperson-only **Supplies** panel
 
   | Partner (`id`) | Program / network | Env var |
   | --- | --- | --- |
-  | Amazon.ca (`amazon_ca`) | Amazon Associates Canada (tag can append to search URLs) | `VITE_SUPPLY_AMAZON_CA_URL` |
+  | Amazon.ca (`amazon_ca`) | Amazon Associates Canada — **also set the tag** below | `VITE_SUPPLY_AMAZON_CA_URL` |
   | The Home Depot Canada (`homedepot_ca`) | Impact / Rakuten | `VITE_SUPPLY_HOMEDEPOT_CA_URL` |
   | Home Depot Tool Rental (`homedepot_rental`) | (same program as above) | `VITE_SUPPLY_HOMEDEPOT_RENTAL_URL` |
   | RONA (`rona`) | RONA affiliate program | `VITE_SUPPLY_RONA_URL` |
@@ -85,6 +85,8 @@ The job view's **Work order** tab now has a tradesperson-only **Supplies** panel
   | FreshBooks (`freshbooks`) | FreshBooks affiliate | `VITE_SUPPLY_FRESHBOOKS_URL` |
 
   Set each in **both**: (1) `.env` for local builds, and (2) GitHub → **Settings → Secrets and variables → Actions** (deploy.yml / ci.yml already pass `VITE_*` into the build), then push / run the Deploy workflow so hosting rebuilds.
+
+  **Amazon is the easy win — do this one first.** Amazon Associates attributes via a `?tag=` query param, so once you have your store tag (e.g. `blueseal-20`), set **`VITE_SUPPLY_AMAZON_CA_TAG`** and *every* Amazon link in the panel — the tiles **and the search box / shopping deep-links** — is affiliate-tracked automatically. No tracking redirect needed; leave `VITE_SUPPLY_AMAZON_CA_URL` at the default. (Other retailers use redirect wrappers, so only their tile link is attributed until the network supports query-level tracking.)
 - **Disclosure:** the panel already shows an "we may earn a commission" line, and there's a transparent Help Center FAQ ("Does Blue Seal earn from the supplier links?") — keep these accurate to satisfy program terms (Amazon Associates in particular **requires** a visible disclosure).
 - **Verify:** on a tradesperson account, open a job → Work order tab → Supplies → "Shop" opens **your** tracking link (not the generic site) in a new tab.
 

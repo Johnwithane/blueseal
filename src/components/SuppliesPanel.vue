@@ -11,11 +11,14 @@ import Select from "primevue/select";
 import type { JobDoc, WithId } from "@/firebase/interfaces";
 import type { ExpensePrefill } from "@/firebase/services/expenses";
 import { tradeLabel } from "@/data/trades";
+import { catalogForTrade, type SupplyItem } from "@/data/suppliesCatalog";
 import {
   SUPPLY_CATEGORY_LABELS,
   SUPPLY_CATEGORY_ORDER,
   buildSearchUrl,
   defaultSearchPartner,
+  getPartner,
+  partnerLink,
   partnersForCategory,
   partnersForTrade,
   type SupplyCategory,
@@ -58,6 +61,43 @@ function runSearch() {
   openExternal(buildSearchUrl(searchPartner.value, q));
 }
 
+// ----- per-trade quick-pick catalog -----
+interface CatalogGroup {
+  name: string;
+  items: SupplyItem[];
+}
+// Items for this job's trade, grouped by section (order preserved). Empty for
+// unseeded trades → the block is hidden and the search box carries the panel.
+const catalogGroups = computed<CatalogGroup[]>(() => {
+  const groups: CatalogGroup[] = [];
+  for (const item of catalogForTrade(props.job.trade)) {
+    const last = groups[groups.length - 1];
+    if (last && last.name === item.group) last.items.push(item);
+    else groups.push({ name: item.group, items: [item] });
+  }
+  return groups;
+});
+// Catalog quick-picks shop from the supplier the tradie has selected above,
+// unless the item names its own preferred partner.
+function partnerForItem(item: SupplyItem): SupplyPartner {
+  return (item.defaultPartnerId && getPartner(item.defaultPartnerId)) || searchPartner.value;
+}
+function shopItem(item: SupplyItem) {
+  const partner = partnerForItem(item);
+  trackClick(partner, "catalog");
+  openExternal(buildSearchUrl(partner, item.query));
+}
+function logItem(item: SupplyItem) {
+  const partner = partnerForItem(item);
+  void track("supply_expense_prefill", {
+    partnerId: partner.id,
+    category: "materials",
+    trade: props.job.trade,
+    jobId: props.job.id,
+  });
+  emit("log-expense", { vendor: partner.name, description: item.label, category: "materials" });
+}
+
 // ----- category-filtered tiles -----
 const activeCategory = ref<SupplyCategory>("materials");
 // Partners relevant to this trade (all, until a partner declares a trade filter).
@@ -74,7 +114,7 @@ function canLog(category: SupplyCategory): boolean {
 
 function shopPartner(partner: SupplyPartner) {
   trackClick(partner, "tile");
-  openExternal(partner.url);
+  openExternal(partnerLink(partner));
 }
 
 function logFromPartner(partner: SupplyPartner) {
@@ -139,6 +179,36 @@ function logFromSearch() {
         :disabled="!query.trim()"
         @click="logFromSearch"
       />
+    </div>
+
+    <!-- Per-trade quick-picks — what this trade usually needs, one tap to shop
+         or log. Hidden for trades we haven't seeded; the search box covers them. -->
+    <div v-if="catalogGroups.length" class="mt-3">
+      <div class="text-[11px] font-medium uppercase tracking-wide text-[color:var(--bs-muted)]">
+        Common for {{ tradeLabel(job.trade) }} jobs
+      </div>
+      <div v-for="g in catalogGroups" :key="g.name" class="mt-2">
+        <div class="text-xs font-medium">{{ g.name }}</div>
+        <ul class="mt-1 divide-y divide-[color:var(--bs-border)]">
+          <li v-for="item in g.items" :key="item.query" class="flex items-center gap-2 py-1.5">
+            <span class="flex-1 min-w-0 truncate text-sm">{{ item.label }}</span>
+            <Button
+              label="Shop"
+              icon="pi pi-external-link"
+              size="small"
+              text
+              @click="shopItem(item)"
+            />
+            <Button
+              icon="pi pi-plus"
+              size="small"
+              text
+              aria-label="Log as expense"
+              @click="logItem(item)"
+            />
+          </li>
+        </ul>
+      </div>
     </div>
 
     <!-- Category chips -->
