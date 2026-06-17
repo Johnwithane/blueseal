@@ -65,15 +65,31 @@ const proStatusLabel = computed(() => {
 });
 const compActive = computed(() => !!compUntil.value && compUntil.value.getTime() > Date.now());
 
-async function grantPro(months: number) {
+// Grant durations. The callable takes an arbitrary `until` ISO datetime, so we
+// just compute it from now. Days vs months kept separate so "2 weeks" is exact.
+interface ProDuration {
+  label: string;
+  days?: number;
+  months?: number;
+}
+const PRO_DURATIONS: ProDuration[] = [
+  { label: "2 weeks", days: 14 },
+  { label: "1 month", months: 1 },
+  { label: "3 months", months: 3 },
+  { label: "6 months", months: 6 },
+  { label: "1 year", months: 12 },
+];
+
+async function grantPro(opt: ProDuration) {
   savingPro.value = true;
   proError.value = null;
   try {
     const until = new Date();
-    until.setMonth(until.getMonth() + months);
+    if (opt.days) until.setDate(until.getDate() + opt.days);
+    if (opt.months) until.setMonth(until.getMonth() + opt.months);
     const res = await adminGrantFoundingPro({ uid: props.user.id, until: until.toISOString() });
     compUntil.value = res.data.proCompUntil ? new Date(res.data.proCompUntil) : null;
-    toast.success(`Granted ${months} months of Blue Seal Pro.`);
+    toast.success(`Granted ${opt.label} of Blue Seal Pro.`);
   } catch (e) {
     proError.value = humanizeError(e);
   } finally {
@@ -145,17 +161,23 @@ async function revokePro() {
       <Message v-if="proError" severity="error" :closable="false" class="mt-2">
         {{ proError }}
       </Message>
-      <div class="mt-2 flex flex-wrap gap-2">
+      <p class="mt-2 text-xs text-[color:var(--bs-muted)]">Grant free Pro for:</p>
+      <div class="mt-1 flex flex-wrap gap-2">
         <Button
-          label="Grant 3 months"
+          v-for="opt in PRO_DURATIONS"
+          :key="opt.label"
+          :label="opt.label"
           icon="pi pi-star"
           size="small"
+          outlined
           :loading="savingPro"
-          @click="grantPro(3)"
+          @click="grantPro(opt)"
         />
+      </div>
+      <div v-if="compActive" class="mt-2">
         <Button
-          v-if="compActive"
           label="Revoke comp"
+          icon="pi pi-times"
           severity="secondary"
           outlined
           size="small"
