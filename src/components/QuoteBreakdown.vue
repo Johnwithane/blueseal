@@ -71,7 +71,7 @@ const KIND_ICON: Record<LineItemKind, string> = {
           <tr class="text-left text-[color:var(--bs-muted)]">
             <th class="py-1 font-medium">Item</th>
             <th class="py-1 font-medium w-32 text-right hidden sm:table-cell">Detail</th>
-            <th class="py-1 font-medium w-28 text-right">Line</th>
+            <th class="py-1 font-medium w-28 text-right">Line (incl. tax)</th>
           </tr>
         </thead>
         <tbody>

@@ -449,7 +449,7 @@ async function renderPdf(
   autoTable(doc, {
     startY: cursorY,
     margin: { left: margin, right: margin },
-    head: [["Description", "Qty", "Unit price", "Tax %", "Line total"]],
+    head: [["Description", "Qty", "Unit price", "Tax %", "Line total (incl. tax)"]],
     body: tableBody,
     headStyles: {
       fillColor: [...BRAND.blueDark],
