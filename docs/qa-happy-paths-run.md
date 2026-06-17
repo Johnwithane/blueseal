@@ -67,6 +67,18 @@ _none yet_
   live site — no more "Loading details…" hang). New finding: L2 (deprecated Maps Autocomplete).
   App is polished; few defects surfaced. (Minor: sign-in briefly lands on `/` before
   `/dashboard/tradie` — cosmetic, not pursued.)
+- **Live onboarding → vetting (interactive, end-to-end): GREEN, 0 console errors.** Signed up a
+  brand-new tradesperson (`qatradie2@blueseal.app`, "Quinn QA Painter") and walked all 7 wizard
+  steps — Basics, Trades (Painter), Pricing ($75/hr), Area (Kelowna via Google Places, map
+  centered correctly), Hours, **Documents (uploaded a photo ID + a Red Seal cert, both accepted →
+  "In review")**, Review → **Submit for review**. Dashboard correctly showed "Application under
+  review". Then as admin (`tradieqa`) → `/admin/vetting` → the application appeared → review page
+  showed profile/cert/ID with verify-helper links → **"Approve everything"** → queue clear, profile
+  live. Flawless.
+- **AI Pro paywall verified (gap closed):** as the new non-Pro, non-admin tradesperson (Quinn), the
+  AI assistant shows the **"Blue Seal AI is part of Pro"** upgrade screen (Start 30-day trial +
+  "Receipt scanning stays free") instead of the chat. With an entitled account (admin) the AI
+  returns a real answer. Paywall behaves correctly both ways.
 - Phase 1 flagship leg 1 (client posts → tradie sees on board): **GREEN, 0 errors.** Notes (not
   bugs): every trade carries a required intake questionnaire (driver fills it generically) and
   budget is required; Firestore `Listen/channel` `ERR_ABORTED` on navigation is benign listener
