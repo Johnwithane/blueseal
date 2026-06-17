@@ -294,10 +294,13 @@ const approveBlockerHint = computed(() => {
 
     <LoadingState v-if="loading" class="mt-4" />
     <template v-else-if="tradie">
-      <header class="mt-2 mb-4">
+      <header class="mt-2 mb-4 flex flex-wrap items-center justify-between gap-2">
         <div class="text-sm text-[color:var(--bs-muted)]">
           <code>{{ uid }}</code>
         </div>
+        <RouterLink :to="{ name: 'AdminUserDetail', params: { uid } }" class="text-sm text-[color:var(--bs-blue)] hover:underline">
+          View full account →
+        </RouterLink>
       </header>
 
       <div class="grid lg:grid-cols-3 gap-4">

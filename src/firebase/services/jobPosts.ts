@@ -2,6 +2,7 @@ import {
   collection,
   doc,
   getDoc,
+  getDocs,
   limit,
   onSnapshot,
   orderBy,
@@ -44,6 +45,21 @@ export async function createJobPost(
 export async function getJobPost(id: string): Promise<WithId<JobPostDoc> | null> {
   const snap = await getDoc(postRef(id));
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+
+/**
+ * One-shot list of a client's job posts, newest first. Used by the admin User
+ * 360 page (admin can read any post per firestore.rules). Reuses the same
+ * (clientId, createdAt) index as subscribeMyJobPosts.
+ */
+export async function listJobPostsForClient(
+  clientId: string,
+  max = 20,
+): Promise<WithId<JobPostDoc>[]> {
+  const snap = await getDocs(
+    query(postsCol(), where("clientId", "==", clientId), orderBy("createdAt", "desc"), limit(max)),
+  );
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
 export function subscribeMyJobPosts(

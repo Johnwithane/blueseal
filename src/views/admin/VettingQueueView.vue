@@ -62,9 +62,14 @@ onMounted(refresh);
             <code>{{ t.id.slice(0, 10) }}…</code>
           </div>
         </div>
-        <RouterLink :to="{ name: 'AdminApplication', params: { uid: t.id } }">
-          <Button label="Review" icon="pi pi-search" size="small" />
-        </RouterLink>
+        <div class="flex gap-2">
+          <RouterLink :to="{ name: 'AdminUserDetail', params: { uid: t.id } }">
+            <Button label="Account" icon="pi pi-user" size="small" text />
+          </RouterLink>
+          <RouterLink :to="{ name: 'AdminApplication', params: { uid: t.id } }">
+            <Button label="Review" icon="pi pi-search" size="small" />
+          </RouterLink>
+        </div>
       </li>
     </ul>
 
@@ -97,9 +102,14 @@ onMounted(refresh);
               · <code>{{ t.id.slice(0, 10) }}…</code>
             </div>
           </div>
-          <RouterLink :to="{ name: 'AdminApplication', params: { uid: t.id } }">
-            <Button label="Review" icon="pi pi-search" size="small" outlined />
-          </RouterLink>
+          <div class="flex gap-2">
+            <RouterLink :to="{ name: 'AdminUserDetail', params: { uid: t.id } }">
+              <Button label="Account" icon="pi pi-user" size="small" text />
+            </RouterLink>
+            <RouterLink :to="{ name: 'AdminApplication', params: { uid: t.id } }">
+              <Button label="Review" icon="pi pi-search" size="small" outlined />
+            </RouterLink>
+          </div>
         </li>
       </ul>
     </div>

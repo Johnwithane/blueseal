@@ -380,6 +380,9 @@ async function onRefreshAuth(user: WithId<UserDoc>) {
           </div>
 
           <div class="flex flex-col gap-2 flex-none">
+            <RouterLink :to="{ name: 'AdminUserDetail', params: { uid: u.id } }">
+              <Button label="Open profile" icon="pi pi-arrow-up-right" size="small" />
+            </RouterLink>
             <RouterLink
               v-if="(u.roles ?? []).includes('tradesperson')"
               :to="{ name: 'TradieProfile', params: { uid: u.id } }"
