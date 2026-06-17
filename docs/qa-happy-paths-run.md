@@ -10,11 +10,10 @@ Status legend: **open** → **fixed** (code changed, not yet re-verified in brow
 
 ## Top to fix first
 
-1. **PAY-2** — the client's offline "Confirm payment sent" (`clientMarkPaid` → HTTP 200) is
-   **invisible to both parties**: the client UI doesn't change and the tradesperson gets no
-   "client reported payment" signal. The intended handshake silently no-ops on screen.
-2. **PAY-1** — the offline-payment dialog tells the client to "choose **Pay by card**," but no
-   Pay-by-card option exists when the tradesperson hasn't connected payouts → dead-end instruction.
+1. ~~**PAY-2** — the client's offline "Confirm payment sent" is invisible to both parties.~~
+   **FIXED + deployed (`947a071`).**
+2. ~~**PAY-1** — offline-payment dialog points to a "Pay by card" option that isn't there.~~
+   **FIXED (`64cd8d5`).**
 3. **UX-4** — a job with a pending applicant (client action needed) is hidden behind the
    non-default "Posted jobs" tab with no count badge; default tab says "No active jobs."
 4. **UX-3** — the post-a-job wizard throws away the Step-1 natural-language description.
@@ -29,7 +28,17 @@ _none yet_
 
 ## Medium
 
-### PAY-2 — Client "Confirm payment sent" registers on the backend but is invisible to both sides — **open**
+### PAY-2 — Client "Confirm payment sent" registers on the backend but is invisible to both sides — **fixed + deployed (pending live re-verify)**
+- **Fix (commit `947a071`, deployed `functions:clientMarkPaid` + `functions:clientApproveJob`):**
+  the nudge now records a **non-authoritative** `clientReportedPaidAt` on the job (status
+  unchanged — `markJobPaid` is still what completes the job). Both invoice cards read it from the
+  job they already hold: client sees **"Payment marked as sent — waiting for the tradesperson to
+  confirm receipt"** (replaces the re-clickable pay button); tradesperson's card becomes **"Client
+  says they've paid — confirm receipt."** `clientApproveJob` resets the flag to `null` on each
+  entry to `awaiting_payment` so a re-invoice cycle starts clean. No rules change. Re-verify the
+  two-sided handshake on the next hosting deploy.
+- _Original report below._
+
 - **Where:** job Invoice tab, offline payment path (tradesperson with no Stripe payout connected).
 - **Repro:** client → Approve & pay → "I've paid the tradesperson" → check the box → **Confirm
   payment sent**.
