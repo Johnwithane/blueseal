@@ -107,7 +107,7 @@ function resolveTheme(theme: CardTheme): ResolvedTheme {
     headline: C.navyDark,
     body: C.ink,
     accent: C.red,
-    urlColor: C.midBlue,
+    urlColor: C.navy, // dark blue — strong on the cream card
     caption: C.muted,
     qrDark: C.navyDark,
     knock: C.white,
@@ -526,11 +526,16 @@ export function drawCardFace(
     g.addColorStop(1, "#8FC0EE");
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, full.w, full.h);
-    // Large centred vertical logo, tagline beneath.
-    drawImageContain(ctx, assets.logoVert, cx + cw * 0.17, cy, cw * 0.66, chH - 46, "center");
+    // Large centred vertical logo, tagline + website beneath.
+    drawImageContain(ctx, assets.logoVert, cx + cw * 0.17, cy, cw * 0.66, chH - 76, "center");
     ctx.fillStyle = C.navyDark;
-    ctx.font = `600 18px "Roboto", sans-serif`;
-    drawCenteredTracked(ctx, SITE_TAGLINE.toUpperCase(), cx + cw / 2, cy + chH - 2, 2.5);
+    ctx.font = `600 17px "Roboto", sans-serif`;
+    drawCenteredTracked(ctx, SITE_TAGLINE.toUpperCase(), cx + cw / 2, cy + chH - 38, 2.5);
+    ctx.fillStyle = C.navy;
+    ctx.font = `700 23px "Roboto", sans-serif`;
+    ctx.textAlign = "center";
+    ctx.fillText(SITE_HOST, cx + cw / 2, cy + chH - 6);
+    ctx.textAlign = "left";
     return;
   }
 
@@ -545,17 +550,15 @@ export function drawCardFace(
   }
   ctx.fillRect(0, 0, full.w, full.h);
 
-  // Footer: a large brand logo bottom-left. The left content sits in the region
-  // above it; the QR is centred in the FULL card height (it's on the right,
-  // clear of the bottom-left logo, so it can run large).
+  // Footer: a large brand logo bottom-left. The left content and the QR are
+  // both centred in the full card height (squared up + balanced); the content
+  // is clamped to stay clear of the bottom-left logo.
   const footerH = 80;
-  const footerLift = 14;
-  const footerGap = 20;
-  const region = chH - footerH - footerLift - footerGap;
+  const footerTop = cy + chH - footerH;
   const lx = cx;
 
-  // Large QR, right, vertically centred in the full height, caption beneath.
-  const qrSize = 380;
+  // Large QR, right, vertically centred, caption beneath.
+  const qrSize = 400;
   const qrX = cx + cw - qrSize;
   const qrY = cy + (chH - (qrSize + 34)) / 2;
   drawQr(ctx, assets, th, qrX, qrY, qrSize);
@@ -567,6 +570,13 @@ export function drawCardFace(
 
   const lw = qrX - cx - 48;
 
+  // Vertically centre a block of height `h` in the card, clamped above the logo.
+  const centreY = (h: number): number => {
+    let y = cy + Math.max(0, (chH - h) / 2);
+    if (y + h > footerTop - 8) y = footerTop - 8 - h;
+    return Math.max(y, cy);
+  };
+
   if (content.type === "tradesperson_profile" && content.profile) {
     const p = content.profile;
     const pr = 54; // photo radius
@@ -577,8 +587,8 @@ export function drawCardFace(
     const nameBlockH = nameLines.length * 40 + (p.company ? 28 : 0) + (p.trade ? 24 : 0);
     const rowH = Math.max(pr * 2, nameBlockH);
     const contactLines = (p.email ? 1 : 0) + (p.phone ? 1 : 0);
-    const stackH = rowH + 24 + contactLines * 32 + 32 + 14 + 40;
-    let y = cy + Math.max(0, (region - stackH) / 2);
+    const stackH = rowH + 24 + contactLines * 32 + 16 + 40;
+    let y = centreY(stackH);
 
     // Photo + name/company/trade row.
     drawAvatar(ctx, assets, lx + pr, y + pr, pr, th, p.name);
@@ -613,11 +623,10 @@ export function drawCardFace(
       ctx.fillText(`✆  ${p.phone}`, lx, y + 16);
       y += 32;
     }
-    ctx.fillStyle = th.urlColor;
-    ctx.font = `700 21px "Roboto", sans-serif`;
-    ctx.fillText(SITE_HOST, lx, y + 16);
-    y += 32 + 14;
+    y += 16;
 
+    // Website lives on the back (under the tagline), so the profile front stays
+    // clean — just the verified badge here.
     drawVerifiedPill(
       ctx,
       assets,
@@ -636,9 +645,9 @@ export function drawCardFace(
       .flatMap((line) => wrapText(ctx, line, lw))
       .slice(0, 3);
 
-    const ctaH = content.ctaUrl ? 12 + 30 : 0;
+    const ctaH = content.ctaUrl ? 14 + 28 : 0;
     const stackH = headlineLines.length * 62 + 24 + subLines.length * 32 + ctaH;
-    let y = cy + Math.max(0, (region - stackH) / 2);
+    let y = centreY(stackH);
 
     ctx.font = headFont;
     drawHeadline(ctx, headlineLines, lx, y + 44, 62, 54, th.headline, C.red, C.cream);
@@ -650,25 +659,29 @@ export function drawCardFace(
       ctx.fillText(ln, lx, y + 16);
       y += 32;
     }
-    // CTA row: label on the left, vanity URL (heavier, light/mid blue) on the right.
+    // CTA: value phrase, then an arrow pointing to the vanity URL (dark blue),
+    // all inline so the URL sits right next to the text.
     if (content.ctaUrl) {
-      y += 12;
-      const baseline = y + 24;
+      y += 14;
+      const baseline = y + 22;
+      let cur = lx;
       if (content.ctaLabel) {
         ctx.fillStyle = th.body;
         ctx.font = `400 21px "Roboto", sans-serif`;
-        ctx.fillText(content.ctaLabel, lx, baseline);
+        ctx.fillText(content.ctaLabel, cur, baseline);
+        cur += ctx.measureText(content.ctaLabel).width;
       }
       ctx.fillStyle = th.urlColor;
-      ctx.font = `700 27px "Roboto", sans-serif`;
-      ctx.textAlign = "right";
-      ctx.fillText(content.ctaUrl, lx + lw, baseline);
-      ctx.textAlign = "left";
+      ctx.font = `700 22px "Roboto", sans-serif`;
+      const arrow = "  →  ";
+      ctx.fillText(arrow, cur, baseline);
+      cur += ctx.measureText(arrow).width;
+      ctx.font = `700 25px "Roboto", sans-serif`;
+      ctx.fillText(content.ctaUrl, cur, baseline);
     }
   }
 
   // Brand logo, bottom-left (full-colour on cream / beige on navy).
-  const footerTop = cy + chH - footerLift - footerH;
   drawImageContain(ctx, assets.logo, lx, footerTop, Math.min(cw * 0.6, 340), footerH, "left");
 }
 
