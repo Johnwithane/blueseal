@@ -221,8 +221,8 @@ export const quoteTemplateSchema = z.object({
 const caFsaRegex = /^[A-Za-z]\d[A-Za-z]$/;
 
 const addressPublicSchema = z.object({
-  city: z.string().trim().min(2).max(100),
-  region: z.string().trim().min(2).max(100),
+  city: z.string().trim().min(2, "Enter your city").max(100),
+  region: z.string().trim().min(2, "Enter your province").max(100),
   postalFsa: z
     .string()
     .trim()
@@ -231,7 +231,7 @@ const addressPublicSchema = z.object({
 });
 
 const addressPrivateSchema = z.object({
-  line1: z.string().trim().min(2).max(200),
+  line1: z.string().trim().min(2, "Enter your street address").max(200),
   fullPostal: z
     .string()
     .trim()
