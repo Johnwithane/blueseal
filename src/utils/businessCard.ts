@@ -495,7 +495,6 @@ export interface CardAssets {
   logoVert: HTMLImageElement; // vertical full-colour (back)
   qr: HTMLCanvasElement | HTMLImageElement; // theme-appropriate modules, transparent
   brandmark?: HTMLImageElement | null; // QR centre + verified pill
-  markWhite?: HTMLImageElement | null; // white brandmark — back chip (always navy)
   photo?: HTMLImageElement | null; // profile photo (optional)
 }
 
@@ -528,35 +527,39 @@ export function drawCardFace(
     g.addColorStop(1, "#8FC0EE");
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, full.w, full.h);
-    // Large centred vertical logo (kept high), with the tagline + website chip
-    // tucked close together beneath it.
-    drawImageContain(ctx, assets.logoVert, cx + cw * 0.17, cy, cw * 0.66, chH - 78, "center");
+    // Logo, tagline and website chip stacked as one centred group with generous
+    // gaps between them.
+    const backLogoH = 250;
+    const gapLogoTag = 46;
+    const gapTagChip = 34;
+    const taglineH = 18;
+    const chipH = 42;
+    const groupH = backLogoH + gapLogoTag + taglineH + gapTagChip + chipH;
+    let gy = cy + Math.max(0, (chH - groupH) / 2);
+
+    drawImageContain(ctx, assets.logoVert, cx + cw * 0.19, gy, cw * 0.62, backLogoH, "center");
+    gy += backLogoH + gapLogoTag;
     ctx.fillStyle = C.navyDark;
     ctx.font = `600 17px "Roboto", sans-serif`;
-    drawCenteredTracked(ctx, SITE_TAGLINE.toUpperCase(), cx + cw / 2, cy + chH - 58, 2.5);
+    drawCenteredTracked(ctx, SITE_TAGLINE.toUpperCase(), cx + cw / 2, gy + 14, 2.5);
+    gy += taglineH + gapTagChip;
 
-    // Website chip: navy pill, white brandmark + cream "blueseal.app", centred.
-    ctx.font = `600 19px "Roboto", sans-serif`;
-    const markSize = 22;
-    const padL = assets.markWhite ? 14 : 22;
-    const gap = 9;
-    const padR = 22;
-    const tw = ctx.measureText(SITE_HOST).width;
-    const chipW = padL + (assets.markWhite ? markSize + gap : 0) + tw + padR;
-    const chipH = 42;
+    // Website chip: navy pill with white, letter-spaced "blueseal.app", centred.
+    const chipSpacing = 2.5;
+    ctx.font = `600 20px "Roboto", sans-serif`;
+    const chipTextW =
+      [...SITE_HOST].reduce((acc, ch) => acc + ctx.measureText(ch).width + chipSpacing, 0) -
+      chipSpacing;
+    const chipPadX = 30;
+    const chipW = chipTextW + chipPadX * 2;
     const chipX = cx + cw / 2 - chipW / 2;
-    const chipYc = cy + chH - 26;
+    const chipYc = gy + chipH / 2;
     roundRectPath(ctx, chipX, chipYc - chipH / 2, chipW, chipH, chipH / 2);
     ctx.fillStyle = C.navy;
     ctx.fill();
-    let chipTextX = chipX + padL;
-    if (assets.markWhite) {
-      drawImageContain(ctx, assets.markWhite, chipTextX, chipYc - markSize / 2, markSize, markSize, "center");
-      chipTextX += markSize + gap;
-    }
-    ctx.fillStyle = C.cream;
+    ctx.fillStyle = C.white;
     ctx.textBaseline = "middle";
-    ctx.fillText(SITE_HOST, chipTextX, chipYc + 1);
+    drawTracked(ctx, SITE_HOST, chipX + chipPadX, chipYc + 1, chipSpacing);
     ctx.textBaseline = "alphabetic";
     return;
   }
@@ -666,7 +669,7 @@ export function drawCardFace(
       .flatMap((line) => wrapText(ctx, line, lw))
       .slice(0, 3);
 
-    const ctaH = content.ctaUrl ? 14 + 28 : 0;
+    const ctaH = content.ctaUrl ? 26 : 0;
     const contentH = headlineLines.length * 62 + 24 + subLines.length * 32 + ctaH;
     let y = groupTop(contentH);
 
@@ -681,10 +684,9 @@ export function drawCardFace(
       y += 32;
     }
     // CTA: value phrase, then an arrow pointing to the vanity URL (dark blue),
-    // all inline so the URL sits right next to the text.
+    // all inline so the URL sits right next to the text — tight under the sub.
     if (content.ctaUrl) {
-      y += 14;
-      const baseline = y + 22;
+      const baseline = y + 18;
       let curx = lx;
       if (content.ctaLabel) {
         ctx.fillStyle = th.body;
@@ -699,7 +701,7 @@ export function drawCardFace(
       curx += ctx.measureText(arrow).width;
       ctx.font = `700 25px "Roboto", sans-serif`;
       ctx.fillText(content.ctaUrl, curx, baseline);
-      y += 28;
+      y += 26;
     }
     drawImageContain(ctx, assets.logo, lx, y + logoGap, Math.min(cw * 0.6, 340), logoH, "left");
   }
