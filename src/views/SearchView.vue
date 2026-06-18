@@ -419,6 +419,43 @@ async function onToggleSave(tradieId: string) {
   }
 }
 
+// --- Empty-state copy -------------------------------------------------------
+// Once a location is set the page always runs a search (the immediate
+// auto-search watcher above), so "location set + not loading + zero hits"
+// means "searched and found nobody" — not "haven't searched yet". The old
+// single message ("No results yet. Set a location and search.") told users to
+// set a location they'd already set. Split the two states, and when a real
+// search comes up empty, name the gap and nudge them to help fill it.
+const selectedTradeLabel = computed(() => (trade.value ? tradeLabel(trade.value) : null));
+const areaLabel = computed(() => location.value.label || "this area");
+const tradeNoun = computed(() =>
+  selectedTradeLabel.value ? selectedTradeLabel.value.toLowerCase() : "tradesperson",
+);
+const noResultsHeading = computed(() =>
+  selectedTradeLabel.value
+    ? `No "${selectedTradeLabel.value}" tradespeople are signed up in ${areaLabel.value} yet.`
+    : `No tradespeople are signed up in ${areaLabel.value} yet.`,
+);
+
+// Blue Seal grows by word of mouth — when a search comes up empty, let the
+// client invite a tradesperson they rate. Native share sheet on mobile,
+// clipboard fallback on desktop. A cancelled share sheet throws AbortError;
+// swallow it so it never surfaces as an error toast.
+async function inviteTradesperson() {
+  const url = window.location.origin;
+  const text = `I'm looking for a ${tradeNoun.value} on Blue Seal — verified trades near ${areaLabel.value}. Join and get verified:`;
+  try {
+    if (navigator.share) {
+      await navigator.share({ title: "Blue Seal", text, url });
+      return;
+    }
+    await navigator.clipboard.writeText(`${text} ${url}`);
+    toast.success("Invite link copied", "Send it to a tradesperson you'd recommend.");
+  } catch {
+    /* share sheet cancelled or clipboard blocked — nothing to report */
+  }
+}
+
 onMounted(async () => {
   // localStorage already hydrated `location` at setup and the immediate
   // auto-search watcher has it covered — nothing left to resolve.
@@ -565,7 +602,24 @@ onMounted(async () => {
         class="bs-empty"
       >
         <i class="pi pi-search mb-2 block text-3xl"></i>
-        <p>No results yet. Set a location and search.</p>
+        <!-- No location yet → prompt to search. Location set (so a search has
+             already run) but nothing came back → name the gap + invite. -->
+        <p v-if="location.lat == null">No results yet. Set a location and search.</p>
+        <template v-else>
+          <p class="font-medium">{{ noResultsHeading }}</p>
+          <p class="mx-auto mt-1 max-w-sm text-sm">
+            Blue Seal is still growing here. Know a great {{ tradeNoun }} you'd
+            recommend? Invite them to get verified.
+          </p>
+          <Button
+            class="mt-3"
+            label="Invite a tradesperson"
+            icon="pi pi-send"
+            outlined
+            size="small"
+            @click="inviteTradesperson"
+          />
+        </template>
       </div>
       <template v-else>
         <div v-if="visibleResults.length" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
