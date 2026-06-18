@@ -45,21 +45,27 @@ const THEME_OPTIONS: { label: string; value: CardTheme }[] = [
 // Per-type starting copy. Switching type re-applies these so the fields always
 // match the selected card's intent. Headlines: "\n" = line break, "*word*" =
 // highlighted (red box, cream text).
-const DEFAULTS: Record<CardType, { headline: string; subcopy: string; qrCaption: string }> = {
+const DEFAULTS: Record<
+  CardType,
+  { headline: string; subcopy: string; qrCaption: string; ctaLabel: string }
+> = {
   tradesperson_signup: {
     headline: "Get *verified*.\nGet hired.",
-    subcopy: "Join Canada's network of vetted trades.\nFree to apply.",
+    subcopy: "Join Canada's network of vetted trades.",
     qrCaption: "Scan to apply",
+    ctaLabel: "Free to apply",
   },
   client_search: {
     headline: "Find a pro\nyou can *trust*.",
-    subcopy: "Every pro is ID-checked and certified.\nHire with confidence.",
+    subcopy: "Every pro is ID-checked and certified.",
     qrCaption: "Scan to find a pro",
+    ctaLabel: "Hire with confidence",
   },
   tradesperson_profile: {
     headline: "",
     subcopy: "",
     qrCaption: "Scan to hire me",
+    ctaLabel: "",
   },
 };
 
@@ -151,6 +157,7 @@ const content = computed<CardContent>(() => ({
   headline: form.headline,
   subcopy: form.subcopy,
   qrCaption: form.qrCaption,
+  ctaLabel: isProfile.value ? undefined : form.ctaLabel,
   ctaUrl: isProfile.value ? undefined : cardVanityUrl(form.type),
   profile: isProfile.value
     ? {
@@ -163,6 +170,8 @@ const content = computed<CardContent>(() => ({
       }
     : undefined,
 }));
+
+const vanityUrl = computed(() => cardVanityUrl(form.type));
 
 const photoUrl = computed(() =>
   isProfile.value && form.showPhoto ? loadedPhotoUrl.value : null,
@@ -284,6 +293,16 @@ const fileBaseName = computed(() => {
             auto-resize
             class="w-full"
           />
+          <InputText
+            v-model="form.ctaLabel"
+            placeholder="CTA label (e.g. Free to apply)"
+            maxlength="40"
+            class="w-full"
+          />
+          <p class="text-xs text-[color:var(--bs-muted)]">
+            Shows on the card with <strong>{{ vanityUrl }}</strong> to its right
+            (which redirects to the {{ form.type === "client_search" ? "search" : "signup" }} page).
+          </p>
         </div>
 
         <!-- Shared options -->
