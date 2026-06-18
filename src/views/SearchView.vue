@@ -14,7 +14,7 @@ import {
 } from "@/firebase/services/tradespeople";
 import { searchProspects } from "@/firebase/services/prospects";
 import { useAuthStore } from "@/stores/auth";
-import { TRADES, tradeLabel } from "@/data/trades";
+import { TRADES, tradeLabel, tradePlural } from "@/data/trades";
 import type { TradeSuggestion } from "@/data/tradeKeywords";
 import { saveRequestPrefill } from "@/utils/requestPrefill";
 import type { AvatarMarkerData } from "@/utils/avatarMarker";
@@ -426,14 +426,15 @@ async function onToggleSave(tradieId: string) {
 // single message ("No results yet. Set a location and search.") told users to
 // set a location they'd already set. Split the two states, and when a real
 // search comes up empty, name the gap and nudge them to help fill it.
-const selectedTradeLabel = computed(() => (trade.value ? tradeLabel(trade.value) : null));
+// Curated plural noun for the selected trade ("home inspectors", "HVAC techs")
+// — see tradePlural / the searchPlural field. Null when no trade filter is set,
+// so the copy falls back to the generic "tradespeople".
+const selectedTradePlural = computed(() => (trade.value ? tradePlural(trade.value) : null));
 const areaLabel = computed(() => location.value.label || "this area");
-const tradeNoun = computed(() =>
-  selectedTradeLabel.value ? selectedTradeLabel.value.toLowerCase() : "tradesperson",
-);
+const invitePlural = computed(() => selectedTradePlural.value ?? "tradespeople");
 const noResultsHeading = computed(() =>
-  selectedTradeLabel.value
-    ? `No "${selectedTradeLabel.value}" tradespeople are signed up in ${areaLabel.value} yet.`
+  selectedTradePlural.value
+    ? `No "${selectedTradePlural.value}" are signed up in ${areaLabel.value} yet.`
     : `No tradespeople are signed up in ${areaLabel.value} yet.`,
 );
 
@@ -443,7 +444,7 @@ const noResultsHeading = computed(() =>
 // swallow it so it never surfaces as an error toast.
 async function inviteTradesperson() {
   const url = window.location.origin;
-  const text = `I'm looking for a ${tradeNoun.value} on Blue Seal — verified trades near ${areaLabel.value}. Join and get verified:`;
+  const text = `I'm looking for ${invitePlural.value} on Blue Seal — verified trades near ${areaLabel.value}. Join and get verified:`;
   try {
     if (navigator.share) {
       await navigator.share({ title: "Blue Seal", text, url });
@@ -608,8 +609,8 @@ onMounted(async () => {
         <template v-else>
           <p class="font-medium">{{ noResultsHeading }}</p>
           <p class="mx-auto mt-1 max-w-sm text-sm">
-            Blue Seal is still growing here. Know a great {{ tradeNoun }} you'd
-            recommend? Invite them to get verified.
+            Blue Seal is still growing here. Know any great {{ invitePlural }}
+            you'd recommend? Invite them to get verified.
           </p>
           <Button
             class="mt-3"
