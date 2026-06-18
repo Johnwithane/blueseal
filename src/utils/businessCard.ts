@@ -550,11 +550,11 @@ export function drawCardFace(
   }
   ctx.fillRect(0, 0, full.w, full.h);
 
-  // Footer: a large brand logo bottom-left. The left content and the QR are
-  // both centred in the full card height (squared up + balanced); the content
-  // is clamped to stay clear of the bottom-left logo.
-  const footerH = 80;
-  const footerTop = cy + chH - footerH;
+  // The left column treats the content + brand logo as ONE group and centres it
+  // vertically in the card (so the title/profile block and the logo read as a
+  // single centred unit). The QR is centred in the full height on the right.
+  const logoH = 80;
+  const logoGap = 40;
   const lx = cx;
 
   // Large QR, right, vertically centred, caption beneath.
@@ -569,13 +569,9 @@ export function drawCardFace(
   ctx.textAlign = "left";
 
   const lw = qrX - cx - 48;
-
-  // Vertically centre a block of height `h` in the card, clamped above the logo.
-  const centreY = (h: number): number => {
-    let y = cy + Math.max(0, (chH - h) / 2);
-    if (y + h > footerTop - 8) y = footerTop - 8 - h;
-    return Math.max(y, cy);
-  };
+  // Top of the centred group, given the content height (logo is appended below).
+  const groupTop = (contentH: number): number =>
+    cy + Math.max(0, (chH - (contentH + logoGap + logoH)) / 2);
 
   if (content.type === "tradesperson_profile" && content.profile) {
     const p = content.profile;
@@ -587,8 +583,8 @@ export function drawCardFace(
     const nameBlockH = nameLines.length * 40 + (p.company ? 28 : 0) + (p.trade ? 24 : 0);
     const rowH = Math.max(pr * 2, nameBlockH);
     const contactLines = (p.email ? 1 : 0) + (p.phone ? 1 : 0);
-    const stackH = rowH + 24 + contactLines * 32 + 16 + 40;
-    let y = centreY(stackH);
+    const contentH = rowH + 24 + contactLines * 32 + 16 + 40;
+    let y = groupTop(contentH);
 
     // Photo + name/company/trade row.
     drawAvatar(ctx, assets, lx + pr, y + pr, pr, th, p.name);
@@ -635,6 +631,8 @@ export function drawCardFace(
       y + 20,
       p.isPro ? "Blue Seal Pro · Verified" : "Verified on Blue Seal",
     );
+    y += 40;
+    drawImageContain(ctx, assets.logo, lx, y + logoGap, Math.min(cw * 0.6, 340), logoH, "left");
   } else {
     const headFont = `700 54px "Poltawski Nowy", Georgia, serif`;
     ctx.font = headFont;
@@ -646,8 +644,8 @@ export function drawCardFace(
       .slice(0, 3);
 
     const ctaH = content.ctaUrl ? 14 + 28 : 0;
-    const stackH = headlineLines.length * 62 + 24 + subLines.length * 32 + ctaH;
-    let y = centreY(stackH);
+    const contentH = headlineLines.length * 62 + 24 + subLines.length * 32 + ctaH;
+    let y = groupTop(contentH);
 
     ctx.font = headFont;
     drawHeadline(ctx, headlineLines, lx, y + 44, 62, 54, th.headline, C.red, C.cream);
@@ -664,25 +662,24 @@ export function drawCardFace(
     if (content.ctaUrl) {
       y += 14;
       const baseline = y + 22;
-      let cur = lx;
+      let curx = lx;
       if (content.ctaLabel) {
         ctx.fillStyle = th.body;
         ctx.font = `400 21px "Roboto", sans-serif`;
-        ctx.fillText(content.ctaLabel, cur, baseline);
-        cur += ctx.measureText(content.ctaLabel).width;
+        ctx.fillText(content.ctaLabel, curx, baseline);
+        curx += ctx.measureText(content.ctaLabel).width;
       }
       ctx.fillStyle = th.urlColor;
       ctx.font = `700 22px "Roboto", sans-serif`;
       const arrow = "  →  ";
-      ctx.fillText(arrow, cur, baseline);
-      cur += ctx.measureText(arrow).width;
+      ctx.fillText(arrow, curx, baseline);
+      curx += ctx.measureText(arrow).width;
       ctx.font = `700 25px "Roboto", sans-serif`;
-      ctx.fillText(content.ctaUrl, cur, baseline);
+      ctx.fillText(content.ctaUrl, curx, baseline);
+      y += 28;
     }
+    drawImageContain(ctx, assets.logo, lx, y + logoGap, Math.min(cw * 0.6, 340), logoH, "left");
   }
-
-  // Brand logo, bottom-left (full-colour on cream / beige on navy).
-  drawImageContain(ctx, assets.logo, lx, footerTop, Math.min(cw * 0.6, 340), footerH, "left");
 }
 
 // --- Export ----------------------------------------------------------------
