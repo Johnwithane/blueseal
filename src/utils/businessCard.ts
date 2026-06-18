@@ -153,7 +153,10 @@ export function loadImage(src: string, crossOrigin = true): Promise<HTMLImageEle
     if (crossOrigin) img.crossOrigin = "anonymous";
     img.onload = () => resolve(img);
     img.onerror = () => reject(new Error(`Failed to load image: ${src}`));
-    img.src = encodeURI(src);
+    // Only encode local asset paths (which may contain parens/spaces). Absolute
+    // URLs (e.g. Firebase Storage download URLs) are already encoded — running
+    // encodeURI on them double-encodes "%2F" → "%252F" and 404s the photo.
+    img.src = /^https?:\/\//i.test(src) ? src : encodeURI(src);
   });
 }
 

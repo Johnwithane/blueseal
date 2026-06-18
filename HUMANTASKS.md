@@ -14,17 +14,21 @@ needed for the **"mail a card to the first 500 annual members"** gift idea. Full
 plan in [`docs/BUSINESS_CARD_PRINT.md`](./docs/BUSINESS_CARD_PRINT.md). None of
 these block using the generator today.
 
-### [ ] Configure Storage CORS so profile photos render on profile cards
+### [x] Configure Storage CORS so profile photos render on profile cards — DONE 2026-06-17
 
 - **Why:** The profile card embeds the tradesperson's photo on a `<canvas>`. A
   cross-origin image taints the canvas (breaking PNG/PDF export), so we load it
   with `crossOrigin="anonymous"` — which requires the photo host to send CORS
-  headers. Without it the card falls back to an initials avatar (still works,
-  just no photo).
-- **What:** Set a CORS policy on the Firebase Storage bucket allowing GET from
-  the app origin, e.g. `gsutil cors set cors.json gs://<bucket>` with
-  `[{"origin":["https://blueseal.app"],"method":["GET"],"maxAgeSeconds":3600}]`.
-  (Google account photos on `googleusercontent.com` usually already allow it.)
+  headers. Without it the card fell back to an initials avatar.
+- **What:** Applied a GET/HEAD CORS policy to `gs://blueseal-762af.firebasestorage.app`
+  via `gsutil cors set storage.cors.json` (policy committed at repo root as
+  [`storage.cors.json`](./storage.cors.json) — origin `*`, GET/HEAD only; the
+  objects themselves are still guarded by Storage rules + download tokens). This
+  also fixes remote tradie logos/banners in invoice PDFs. Re-apply with the same
+  command if the bucket is ever recreated. (Google account photos on
+  `googleusercontent.com` are a different host and rely on Google's own CORS.)
+- **Also fixed in code:** the card image loader was running `encodeURI` on the
+  photo URL, double-encoding `%2F` in Storage download URLs (404 → initials).
 
 ### [ ] Order a proof pack before any run
 
