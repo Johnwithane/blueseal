@@ -109,7 +109,7 @@ function resolveTheme(theme: CardTheme): ResolvedTheme {
     accent: C.red,
     urlColor: C.navy, // dark blue — strong on the cream card
     caption: C.muted,
-    qrDark: C.navyDark,
+    qrDark: C.navy,
     knock: C.white,
     logo: "dark",
     brandmark: "dark",
@@ -125,22 +125,23 @@ function resolveTheme(theme: CardTheme): ResolvedTheme {
 // --- Assets ----------------------------------------------------------------
 export const CARD_ASSETS = {
   logoHorFull: "/branding/Horizontal/BlueSeal_Logo-Hor_Full(noborder).png",
-  logoHorBeige: "/branding/Horizontal/BlueSeal_Logo_Hor_Beige.png",
+  logoHorLightBlue: "/branding/Horizontal/BlueSeal_Logo_Hor_LightBlue.png",
   logoVertFull: "/branding/Vertical/BlueSeal_Logo_Vert_Full(noborder).png",
   brandmarkDark: "/branding/Brandmark/BlueSeal_Brandmark_DarkBlue.png",
   brandmarkWhite: "/branding/Brandmark/BlueSeal_Brandmark_White.png",
 } as const;
 
 export function logoUrlForTheme(theme: CardTheme): string {
-  // Cream → full-colour logo (reads on the warm off-white). Navy → beige logo
-  // (the full-colour version would disappear on the dark background).
-  return theme === "navy" ? CARD_ASSETS.logoHorBeige : CARD_ASSETS.logoHorFull;
+  // Cream → full-colour logo (reads on the warm off-white). Navy → light-blue
+  // logo (reads on the dark background; full-colour would disappear).
+  return theme === "navy" ? CARD_ASSETS.logoHorLightBlue : CARD_ASSETS.logoHorFull;
 }
 export function brandmarkUrlForTheme(theme: CardTheme): string {
   return theme === "navy" ? CARD_ASSETS.brandmarkWhite : CARD_ASSETS.brandmarkDark;
 }
 export function qrDarkForTheme(theme: CardTheme): string {
-  return theme === "navy" ? C.white : C.navyDark;
+  // Brand blue on cream (matches the centre brandmark); white on navy (inverted).
+  return theme === "navy" ? C.white : C.navy;
 }
 
 export function loadImage(src: string, crossOrigin = true): Promise<HTMLImageElement> {
@@ -494,6 +495,7 @@ export interface CardAssets {
   logoVert: HTMLImageElement; // vertical full-colour (back)
   qr: HTMLCanvasElement | HTMLImageElement; // theme-appropriate modules, transparent
   brandmark?: HTMLImageElement | null; // QR centre + verified pill
+  markWhite?: HTMLImageElement | null; // white brandmark — back chip (always navy)
   photo?: HTMLImageElement | null; // profile photo (optional)
 }
 
@@ -526,14 +528,36 @@ export function drawCardFace(
     g.addColorStop(1, "#8FC0EE");
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, full.w, full.h);
-    // Large centred vertical logo, tagline + website beneath.
-    drawImageContain(ctx, assets.logoVert, cx + cw * 0.17, cy, cw * 0.66, chH - 76, "center");
+    // Large centred vertical logo (kept high), with the tagline + website chip
+    // tucked close together beneath it.
+    drawImageContain(ctx, assets.logoVert, cx + cw * 0.17, cy, cw * 0.66, chH - 78, "center");
     ctx.fillStyle = C.navyDark;
     ctx.font = `600 17px "Roboto", sans-serif`;
-    drawCenteredTracked(ctx, SITE_TAGLINE.toUpperCase(), cx + cw / 2, cy + chH - 38, 2.5);
-    ctx.fillStyle = C.muted; // grey, all-caps, tracked
-    ctx.font = `700 20px "Roboto", sans-serif`;
-    drawCenteredTracked(ctx, SITE_HOST.toUpperCase(), cx + cw / 2, cy + chH - 6, 2);
+    drawCenteredTracked(ctx, SITE_TAGLINE.toUpperCase(), cx + cw / 2, cy + chH - 58, 2.5);
+
+    // Website chip: navy pill, white brandmark + cream "blueseal.app", centred.
+    ctx.font = `600 19px "Roboto", sans-serif`;
+    const markSize = 22;
+    const padL = assets.markWhite ? 14 : 22;
+    const gap = 9;
+    const padR = 22;
+    const tw = ctx.measureText(SITE_HOST).width;
+    const chipW = padL + (assets.markWhite ? markSize + gap : 0) + tw + padR;
+    const chipH = 42;
+    const chipX = cx + cw / 2 - chipW / 2;
+    const chipYc = cy + chH - 26;
+    roundRectPath(ctx, chipX, chipYc - chipH / 2, chipW, chipH, chipH / 2);
+    ctx.fillStyle = C.navy;
+    ctx.fill();
+    let chipTextX = chipX + padL;
+    if (assets.markWhite) {
+      drawImageContain(ctx, assets.markWhite, chipTextX, chipYc - markSize / 2, markSize, markSize, "center");
+      chipTextX += markSize + gap;
+    }
+    ctx.fillStyle = C.cream;
+    ctx.textBaseline = "middle";
+    ctx.fillText(SITE_HOST, chipTextX, chipYc + 1);
+    ctx.textBaseline = "alphabetic";
     return;
   }
 
