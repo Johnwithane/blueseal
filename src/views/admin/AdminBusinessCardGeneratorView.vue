@@ -15,7 +15,13 @@ import SelectButton from "primevue/selectbutton";
 import ToggleSwitch from "primevue/toggleswitch";
 import Message from "primevue/message";
 import BusinessCardPreview from "@/components/BusinessCardPreview.vue";
-import { cardTargetUrl, type CardContent, type CardTheme, type CardType } from "@/utils/businessCard";
+import {
+  cardTargetUrl,
+  cardVanityUrl,
+  type CardContent,
+  type CardTheme,
+  type CardType,
+} from "@/utils/businessCard";
 import { businessCardConfigSchema } from "@/validation/businessCard";
 import { getTradesperson, getTradespersonContact } from "@/firebase/services/tradespeople";
 import { getUser } from "@/firebase/services/users";
@@ -42,18 +48,18 @@ const THEME_OPTIONS: { label: string; value: CardTheme }[] = [
 const DEFAULTS: Record<CardType, { headline: string; subcopy: string; qrCaption: string }> = {
   tradesperson_signup: {
     headline: "Get *verified*.\nGet hired.",
-    subcopy: "Join Canada's network of vetted trades. Free to apply.",
+    subcopy: "Join Canada's network of vetted trades.\nFree to apply.",
     qrCaption: "Scan to apply",
   },
   client_search: {
     headline: "Find a pro\nyou can *trust*.",
-    subcopy: "Every pro is ID-checked and certified — hire with confidence.",
+    subcopy: "Every pro is ID-checked and certified.\nHire with confidence.",
     qrCaption: "Scan to find a pro",
   },
   tradesperson_profile: {
     headline: "",
     subcopy: "",
-    qrCaption: "Scan to view my profile",
+    qrCaption: "Scan to hire me",
   },
 };
 
@@ -145,6 +151,7 @@ const content = computed<CardContent>(() => ({
   headline: form.headline,
   subcopy: form.subcopy,
   qrCaption: form.qrCaption,
+  ctaUrl: isProfile.value ? undefined : cardVanityUrl(form.type),
   profile: isProfile.value
     ? {
         name: form.profileName || "Blue Seal tradesperson",

@@ -36,6 +36,20 @@ const routes: RouteRecordRaw[] = [
     component: () => import("@/views/HomeView.vue"),
     meta: { layout: "public" },
   },
+  // Short vanity URLs printed on business cards (see src/utils/businessCard.ts).
+  // /apply → tradesperson signup, /hire → client search. utm tags attribute the
+  // typed-URL traffic (the QR codes carry their own per-card utm campaign).
+  {
+    path: "/apply",
+    redirect: {
+      path: "/sign-up",
+      query: { as: "tradesperson", utm_source: "business_card", utm_medium: "print" },
+    },
+  },
+  {
+    path: "/hire",
+    redirect: { path: "/search", query: { utm_source: "business_card", utm_medium: "print" } },
+  },
   {
     path: "/search",
     name: "Search",

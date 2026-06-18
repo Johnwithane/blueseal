@@ -53,6 +53,8 @@ const C = {
   white: "#FFFFFF",
 } as const;
 
+const SITE_HOST = SITE_URL.replace(/^https?:\/\//, ""); // e.g. "blueseal.app"
+
 interface ResolvedTheme {
   bgKind: "solid" | "gradient";
   bgFrom: string;
@@ -466,7 +468,20 @@ export interface CardContent {
   headline: string;
   subcopy: string;
   qrCaption: string;
+  /** Short vanity URL shown in heavier type under the sub-copy (signup/client). */
+  ctaUrl?: string;
   profile?: CardProfile;
+}
+
+/**
+ * Memorable URL printed on the card. Backed by router redirects:
+ *   /apply → /sign-up?as=tradesperson   ·   /hire → /search
+ * (The QR still encodes the full UTM-tagged deep link for scan attribution.)
+ */
+export function cardVanityUrl(type: CardType): string {
+  if (type === "tradesperson_signup") return `${SITE_HOST}/apply`;
+  if (type === "client_search") return `${SITE_HOST}/hire`;
+  return SITE_HOST;
 }
 
 export interface CardAssets {
@@ -525,15 +540,17 @@ export function drawCardFace(
   }
   ctx.fillRect(0, 0, full.w, full.h);
 
-  // The logo sits bottom-left as a footer; the headline/profile block and the
-  // QR are both vertically centred in the region ABOVE it.
-  const footerH = 46;
-  const footerGap = 16;
-  const region = chH - footerH - footerGap;
+  // Footer band (bottom): brand logo bottom-left, blueseal.app bottom-right.
+  // The headline/profile block and the QR are both vertically centred in the
+  // region ABOVE it.
+  const footerH = 60;
+  const footerLift = 14; // raise the logo off the bottom edge
+  const footerGap = 18;
+  const region = chH - footerH - footerLift - footerGap;
   const lx = cx;
 
   // Large QR, right, vertically centred in the region, caption beneath.
-  const qrSize = 296;
+  const qrSize = 320;
   const qrX = cx + cw - qrSize;
   const qrY = cy + (region - qrSize) / 2 - 4;
   drawQr(ctx, assets, th, qrX, qrY, qrSize);
@@ -608,9 +625,13 @@ export function drawCardFace(
     ctx.font = headFont;
     const headlineLines = wrapHeadline(ctx, content.headline, lw).slice(0, 3);
     ctx.font = `400 21px "Roboto", sans-serif`;
-    const subLines = wrapText(ctx, content.subcopy, lw).slice(0, 3);
+    const subLines = content.subcopy
+      .split("\n")
+      .flatMap((line) => wrapText(ctx, line, lw))
+      .slice(0, 4);
 
-    const stackH = headlineLines.length * 62 + 26 + subLines.length * 32;
+    const stackH =
+      headlineLines.length * 62 + 26 + subLines.length * 32 + (content.ctaUrl ? 38 : 0);
     let y = cy + Math.max(0, (region - stackH) / 2);
 
     ctx.font = headFont;
@@ -623,10 +644,25 @@ export function drawCardFace(
       ctx.fillText(ln, lx, y + 16);
       y += 32;
     }
+    if (content.ctaUrl) {
+      y += 6;
+      ctx.fillStyle = th.accent;
+      ctx.font = `700 23px "Roboto", sans-serif`;
+      ctx.fillText(content.ctaUrl, lx, y + 18);
+    }
   }
 
-  // Brand logo, bottom-left (full-colour on cream / beige on navy).
-  drawImageContain(ctx, assets.logo, lx, cy + chH - footerH, Math.min(cw * 0.5, 260), footerH, "left");
+  // Footer: brand logo bottom-left (full-colour on cream / beige on navy).
+  const footerTop = cy + chH - footerLift - footerH;
+  drawImageContain(ctx, assets.logo, lx, footerTop, Math.min(cw * 0.5, 300), footerH, "left");
+  // Profile cards have no in-block CTA URL, so anchor the site bottom-right.
+  if (content.type === "tradesperson_profile") {
+    ctx.textAlign = "right";
+    ctx.fillStyle = th.caption;
+    ctx.font = `600 19px "Roboto", sans-serif`;
+    ctx.fillText(SITE_HOST, cx + cw, footerTop + footerH / 2 + 7);
+    ctx.textAlign = "left";
+  }
 }
 
 // --- Export ----------------------------------------------------------------
