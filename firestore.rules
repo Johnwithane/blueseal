@@ -194,10 +194,21 @@ service cloud.firestore {
         && request.resource.data.get('verifiedCredentials', null)
              == resource.data.get('verifiedCredentials', null)
         && request.resource.data.idVerified == resource.data.idVerified
-        && request.resource.data.insuranceVerified == resource.data.insuranceVerified
-        && request.resource.data.insuranceExpiresAt == resource.data.insuranceExpiresAt
-        && request.resource.data.wsibVerified == resource.data.wsibVerified
-        && request.resource.data.wsibExpiresAt == resource.data.wsibExpiresAt
+        // Insurance + WSIB badges are set by Cloud Function triggers on admin
+        // review — owner can't self-grant them. `.get(field, null)` because all
+        // four are optional on docs that pre-date the verification schema (a
+        // fresh draft from older code never initialised them); a direct
+        // `resource.data.insuranceVerified` throws "Property ... is undefined"
+        // on those docs and locks the owner out of editing their own profile
+        // (e.g. the Short bio draft autosave → "permission denied").
+        && request.resource.data.get('insuranceVerified', null)
+             == resource.data.get('insuranceVerified', null)
+        && request.resource.data.get('insuranceExpiresAt', null)
+             == resource.data.get('insuranceExpiresAt', null)
+        && request.resource.data.get('wsibVerified', null)
+             == resource.data.get('wsibVerified', null)
+        && request.resource.data.get('wsibExpiresAt', null)
+             == resource.data.get('wsibExpiresAt', null)
         && request.resource.data.isVisible == resource.data.isVisible
         && request.resource.data.ratingAvg == resource.data.ratingAvg
         && request.resource.data.ratingCount == resource.data.ratingCount

@@ -213,6 +213,42 @@ describe("tradespeople — server-managed field locks", () => {
     );
   });
 
+  it("owner can edit bio on a legacy doc missing the insurance/WSIB fields (verification-badge trap regression)", async () => {
+    // Repro of the prod bug (bugReports/7SuzO8QTyabNWf95EPUo): a draft created
+    // by older code never initialised insuranceVerified / insuranceExpiresAt /
+    // wsibVerified / wsibExpiresAt. A direct `resource.data.insuranceVerified`
+    // in the update rule threw "Property ... is undefined" on those docs,
+    // surfacing to the owner as permission-denied on the Short bio autosave.
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const legacy = { ...baselineTradie } as Partial<typeof baselineTradie>;
+      delete legacy.insuranceVerified;
+      delete legacy.insuranceExpiresAt;
+      delete legacy.wsibVerified;
+      delete legacy.wsibExpiresAt;
+      await setDoc(doc(ctx.firestore(), "tradespeople", TRADIE_UID), legacy);
+    });
+    const fs = env.authenticatedContext(TRADIE_UID, TRADIE_CLAIMS).firestore();
+    await assertSucceeds(
+      updateDoc(doc(fs, "tradespeople", TRADIE_UID), { bio: "draft autosave" }),
+    );
+  });
+
+  it("owner cannot self-grant insuranceVerified (would fake an insurance badge)", async () => {
+    await seedTradie();
+    const fs = env.authenticatedContext(TRADIE_UID, TRADIE_CLAIMS).firestore();
+    await assertFails(
+      updateDoc(doc(fs, "tradespeople", TRADIE_UID), { insuranceVerified: true }),
+    );
+  });
+
+  it("owner cannot self-grant wsibVerified (would fake a WSIB badge)", async () => {
+    await seedTradie();
+    const fs = env.authenticatedContext(TRADIE_UID, TRADIE_CLAIMS).firestore();
+    await assertFails(
+      updateDoc(doc(fs, "tradespeople", TRADIE_UID), { wsibVerified: true }),
+    );
+  });
+
   it("owner cannot self-grant isPro (would win Featured placement for free)", async () => {
     await seedTradie();
     const fs = env.authenticatedContext(TRADIE_UID, TRADIE_CLAIMS).firestore();
