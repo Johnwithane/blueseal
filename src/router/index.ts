@@ -395,6 +395,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, role: "admin", layout: "app", title: "Site content" },
   },
   {
+    path: "/admin/business-cards",
+    name: "AdminBusinessCards",
+    component: () => import("@/views/admin/AdminBusinessCardGeneratorView.vue"),
+    meta: { requiresAuth: true, role: "admin", layout: "app", title: "Business cards" },
+  },
+  {
     path: "/admin/rebate-programs",
     name: "AdminRebatePrograms",
     component: () => import("@/views/admin/AdminRebateProgramsView.vue"),

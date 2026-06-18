@@ -6,6 +6,52 @@ Tasks are grouped by the phase that introduced them so you can see why each one 
 
 ---
 
+## Business card generator — print & mail-out (added 2026-06-17)
+
+The admin tool at `/admin/business-cards` generates print-ready two-sided card
+PDFs (3.5 × 2 in + bleed, QR-coded). The generator is done; these tasks are only
+needed for the **"mail a card to the first 500 annual members"** gift idea. Full
+plan in [`docs/BUSINESS_CARD_PRINT.md`](./docs/BUSINESS_CARD_PRINT.md). None of
+these block using the generator today.
+
+### [ ] Configure Storage CORS so profile photos render on profile cards
+
+- **Why:** The profile card embeds the tradesperson's photo on a `<canvas>`. A
+  cross-origin image taints the canvas (breaking PNG/PDF export), so we load it
+  with `crossOrigin="anonymous"` — which requires the photo host to send CORS
+  headers. Without it the card falls back to an initials avatar (still works,
+  just no photo).
+- **What:** Set a CORS policy on the Firebase Storage bucket allowing GET from
+  the app origin, e.g. `gsutil cors set cors.json gs://<bucket>` with
+  `[{"origin":["https://blueseal.app"],"method":["GET"],"maxAgeSeconds":3600}]`.
+  (Google account photos on `googleusercontent.com` usually already allow it.)
+
+### [ ] Order a proof pack before any run
+
+- **Why:** The QR is live — a typo or wrong link wastes the whole print order.
+- **What:** Generate the card, scan the QR from the preview, then order **one
+  proof pack** from a Canadian gang-run printer (Jukebox or Vistaprint.ca cheap;
+  MOO for premium gift feel — 16pt + soft-touch recommended). See doc §2.
+
+### [ ] Capture a mailing address for annual members (the blocker for auto-mail)
+
+- **Why:** We only collect a *service area*, not a postal address to receive mail.
+  Mailing the gift **requires** a verified shipping address.
+- **What:** Add an opt-in "where should we send your welcome card?" step to the
+  annual-membership flow (or a one-time prompt). Verify it (PostGrid AddressComplete).
+
+### [ ] (If automating) PostGrid/Lob account + server-side renderer
+
+- **Why:** End-to-end auto-mail (Path B in the doc) needs a print-&-mail API and a
+  way to render the card outside the browser.
+- **What:** PostGrid (Canadian, primary) or Lob account + API key as a Functions
+  secret; a Cloud Run/`node-canvas` renderer reusing `drawCardFace`; a
+  `cardFulfillments/{uid}` collection to dedupe + enforce the 500 cap.
+- **Note:** Start with the **semi-automated** path (Path A: batch-export PDFs + a
+  CSV to the provider's dashboard) for the first 500 — no new backend.
+
+---
+
 ## Support desk — monitored reply inbox (added 2026-06-17)
 
 Admins can now reply to Help Center tickets from `/admin/support` (AI-drafted +

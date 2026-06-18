@@ -237,6 +237,14 @@ export function useNavItems(): {
           mobile: false,
           matches: prefix("/admin/site-content"),
         },
+        {
+          key: "business-cards",
+          label: "Business cards",
+          icon: "pi-id-card",
+          to: "/admin/business-cards",
+          mobile: false,
+          matches: prefix("/admin/business-cards"),
+        },
         // Account moved into ProfileMenu (bottom of side panel / mobile
         // Profile tab) so it doesn't duplicate the avatar dropdown.
       ];

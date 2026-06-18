@@ -190,6 +190,9 @@ onMounted(async () => {
       <RouterLink to="/admin/site-content">
         <Button label="Site content" icon="pi pi-pencil" outlined size="small" />
       </RouterLink>
+      <RouterLink to="/admin/business-cards">
+        <Button label="Business cards" icon="pi pi-id-card" outlined size="small" />
+      </RouterLink>
       <RouterLink to="/admin/rebate-programs">
         <Button label="Rebates" icon="pi pi-gift" outlined size="small" />
       </RouterLink>
