@@ -14,6 +14,7 @@ import Textarea from "primevue/textarea";
 import SelectButton from "primevue/selectbutton";
 import ToggleSwitch from "primevue/toggleswitch";
 import Message from "primevue/message";
+import AutoComplete from "primevue/autocomplete";
 import BusinessCardPreview from "@/components/BusinessCardPreview.vue";
 import {
   cardTargetUrl,
@@ -23,8 +24,13 @@ import {
   type CardType,
 } from "@/utils/businessCard";
 import { businessCardConfigSchema } from "@/validation/businessCard";
-import { getTradesperson, getTradespersonContact } from "@/firebase/services/tradespeople";
+import {
+  getTradesperson,
+  getTradespersonContact,
+  searchVisibleTradiesByName,
+} from "@/firebase/services/tradespeople";
 import { getUser } from "@/firebase/services/users";
+import type { TradespersonDoc, WithId } from "@/firebase/interfaces";
 import { tradeLabel } from "@/data/trades";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
@@ -91,20 +97,55 @@ watch(
   (t) => Object.assign(form, DEFAULTS[t]),
 );
 
-// --- Profile loading -------------------------------------------------------
+// --- Profile lookup --------------------------------------------------------
 const profileLoading = ref(false);
 const loadedPhotoUrl = ref<string | null>(null);
 const loadedIsPro = ref(false);
 
-/** Accepts a raw uid or a pasted profile URL (…/tradies/:uid). */
+// Name search (autocomplete) — the primary way to pick a tradesperson. Only
+// verified/visible members are searchable (profile cards are a member feature).
+const tradieQuery = ref<WithId<TradespersonDoc> | string>("");
+const tradieMatches = ref<WithId<TradespersonDoc>[]>([]);
+
+async function onTradieSearch(e: { query: string }): Promise<void> {
+  try {
+    tradieMatches.value = await searchVisibleTradiesByName(e.query, 8);
+  } catch {
+    tradieMatches.value = [];
+  }
+}
+
+async function onTradieSelect(e: { value: WithId<TradespersonDoc> }): Promise<void> {
+  await applyTradie(e.value);
+  toast.success("Loaded", form.profileName);
+}
+
+/** Fill the form from a tradesperson doc, then pull phone + email on file. */
+async function applyTradie(t: WithId<TradespersonDoc>): Promise<void> {
+  form.profileUid = t.id;
+  form.profileName = t.displayName?.trim() || "Blue Seal tradesperson";
+  form.profileCompany = t.companyName ?? "";
+  form.profileTrade = t.trades.map(tradeLabel).filter(Boolean).slice(0, 2).join(" · ");
+  loadedPhotoUrl.value = t.photoURL ?? null;
+  loadedIsPro.value = !!t.isPro;
+  // Best-effort: phone from the private contact subdoc, email from the user doc.
+  const [user, contact] = await Promise.all([
+    getUser(t.id).catch(() => null),
+    getTradespersonContact(t.id).catch(() => null),
+  ]);
+  form.profileEmail = user?.email ?? "";
+  form.profilePhone = contact?.businessPhone ?? user?.phone ?? "";
+}
+
+// Fallback: load by UID or a pasted profile URL (for non-searchable members).
+const manualUid = ref("");
 function extractUid(input: string): string {
   const s = input.trim();
   const m = s.match(/tradies\/([^/?#]+)/);
   return (m ? m[1] : s).trim();
 }
-
-async function loadProfile() {
-  const uid = extractUid(form.profileUid);
+async function loadProfile(): Promise<void> {
+  const uid = extractUid(manualUid.value);
   if (!uid) {
     toast.warn("Enter an ID", "Paste a tradesperson UID or their profile URL.");
     return;
@@ -113,23 +154,10 @@ async function loadProfile() {
   try {
     const t = await getTradesperson(uid);
     if (!t) {
-      toast.error("Not found", "No tradesperson matches that ID.");
+      toast.error("Not found", "No verified tradesperson matches that ID — try the search above.");
       return;
     }
-    form.profileUid = uid;
-    form.profileName = t.displayName?.trim() || "Blue Seal tradesperson";
-    form.profileCompany = t.companyName ?? "";
-    form.profileTrade = t.trades.map(tradeLabel).filter(Boolean).slice(0, 2).join(" · ");
-    loadedPhotoUrl.value = t.photoURL ?? null;
-    loadedIsPro.value = !!t.isPro;
-    // Best-effort contact prefill (admin-readable). Failures are non-fatal —
-    // the admin can type email/phone manually.
-    const [user, contact] = await Promise.all([
-      getUser(uid).catch(() => null),
-      getTradespersonContact(uid).catch(() => null),
-    ]);
-    form.profileEmail = user?.email ?? "";
-    form.profilePhone = contact?.businessPhone ?? user?.phone ?? "";
+    await applyTradie(t);
     toast.success("Loaded", form.profileName);
   } catch (e) {
     toast.error("Couldn't load", humanizeError(e));
@@ -230,18 +258,47 @@ const fileBaseName = computed(() => {
         <div v-if="isProfile" class="bs-card p-4 space-y-3">
           <label class="block text-sm font-semibold">Tradesperson</label>
           <p class="text-xs text-[color:var(--bs-muted)]">
-            Paste a tradesperson's UID or their profile URL, then load to pull
-            their name, business, trade, photo, email and phone.
+            Search by name to auto-fill their details, photo, email and phone.
+            Only verified members are searchable.
           </p>
-          <div class="flex gap-2">
-            <InputText
-              v-model="form.profileUid"
-              placeholder="UID or blueseal.app/tradies/…"
-              class="flex-1"
-              @keyup.enter="loadProfile"
-            />
-            <Button label="Load" icon="pi pi-search" :loading="profileLoading" @click="loadProfile" />
-          </div>
+          <AutoComplete
+            v-model="tradieQuery"
+            :suggestions="tradieMatches"
+            option-label="displayName"
+            placeholder="Search tradespeople by name…"
+            :delay="250"
+            complete-on-focus
+            class="w-full"
+            input-class="w-full"
+            @complete="onTradieSearch"
+            @item-select="onTradieSelect"
+          >
+            <template #option="{ option }">
+              <div class="flex flex-col">
+                <span class="font-medium">{{ option.displayName || "Unnamed" }}</span>
+                <span class="text-xs text-[color:var(--bs-muted)]">
+                  {{
+                    option.companyName ||
+                    option.trades.map(tradeLabel).filter(Boolean).slice(0, 2).join(" · ") ||
+                    "Tradesperson"
+                  }}
+                </span>
+              </div>
+            </template>
+          </AutoComplete>
+          <details class="text-xs text-[color:var(--bs-muted)]">
+            <summary class="cursor-pointer select-none">Or load by UID / profile URL</summary>
+            <div class="mt-2 flex gap-2">
+              <InputText
+                v-model="manualUid"
+                placeholder="UID or blueseal.app/tradies/…"
+                class="flex-1"
+                @keyup.enter="loadProfile"
+              />
+              <Button label="Load" icon="pi pi-search" :loading="profileLoading" @click="loadProfile" />
+            </div>
+          </details>
+
           <div v-if="form.profileUid" class="grid gap-2 sm:grid-cols-2">
             <InputText v-model="form.profileName" placeholder="Name" maxlength="60" />
             <InputText v-model="form.profileCompany" placeholder="Business (optional)" maxlength="60" />
