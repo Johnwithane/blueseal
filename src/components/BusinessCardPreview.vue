@@ -84,15 +84,14 @@ async function getPhoto(): Promise<HTMLImageElement | null> {
 async function resolveAssets(): Promise<CardAssets> {
   await ensureCardFonts();
   const theme = props.content.theme;
-  const [logo, logoVert, qr, brandmark, markWhite, photo] = await Promise.all([
+  const [logo, logoVert, qr, brandmark, photo] = await Promise.all([
     getImage(logoUrlForTheme(theme)),
     getImage(CARD_ASSETS.logoVertFull),
     getQr(props.targetUrl, qrDarkForTheme(theme)),
     props.includeBrandmark ? getImage(brandmarkUrlForTheme(theme)) : Promise.resolve(null),
-    getImage(CARD_ASSETS.brandmarkWhite), // back chip (always navy)
     getPhoto(),
   ]);
-  return { logo, logoVert, qr, brandmark, markWhite, photo };
+  return { logo, logoVert, qr, brandmark, photo };
 }
 
 async function renderTo(
