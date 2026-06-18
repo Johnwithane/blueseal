@@ -39,6 +39,9 @@ const error = ref<string | null>(null);
 const photoBlocked = ref(false);
 const busy = ref(false);
 
+// Base canvas is 300 DPI; exports render at 3× → 900 DPI for crisp print/zoom.
+const EXPORT_SCALE = 3;
+
 const imageCache = new Map<string, HTMLImageElement>();
 let qrCache: { key: string; canvas: HTMLCanvasElement } | null = null;
 let photoCache: { url: string; img: HTMLImageElement } | null = null;
@@ -55,7 +58,8 @@ async function getImage(url: string): Promise<HTMLImageElement> {
 async function getQr(url: string, dark: string): Promise<HTMLCanvasElement> {
   const key = `${url}|${dark}`;
   if (qrCache?.key === key) return qrCache.canvas;
-  const canvas = await generateQrCanvas(url, { dark });
+  // Generate large so it stays crisp at the 3× export scale.
+  const canvas = await generateQrCanvas(url, { dark, size: 1400 });
   qrCache = { key, canvas };
   return canvas;
 }
@@ -99,12 +103,16 @@ async function renderTo(
   face: CardFace,
   bleed: boolean,
   assets: CardAssets,
+  scale = 1,
 ): Promise<void> {
   const size = cardPixelSize(bleed);
-  canvas.width = size.w;
-  canvas.height = size.h;
+  // Setting width/height resets the transform; scale draws everything (text,
+  // shapes, QR, logo) at higher device resolution for crisp export.
+  canvas.width = Math.round(size.w * scale);
+  canvas.height = Math.round(size.h * scale);
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas 2D context unavailable");
+  if (scale !== 1) ctx.scale(scale, scale);
   drawCardFace(ctx, props.content, assets, face, bleed);
 }
 
@@ -121,9 +129,13 @@ async function renderPreview(): Promise<void> {
   }
 }
 
-async function offscreen(face: CardFace, assets: CardAssets): Promise<HTMLCanvasElement> {
+async function offscreen(
+  face: CardFace,
+  assets: CardAssets,
+  scale: number,
+): Promise<HTMLCanvasElement> {
   const c = document.createElement("canvas");
-  await renderTo(c, face, true, assets);
+  await renderTo(c, face, true, assets, scale);
   return c;
 }
 
@@ -131,8 +143,8 @@ async function downloadPdf(): Promise<void> {
   busy.value = true;
   try {
     const assets = await resolveAssets();
-    const front = await offscreen("front", assets);
-    const back = await offscreen("back", assets);
+    const front = await offscreen("front", assets, EXPORT_SCALE);
+    const back = await offscreen("back", assets, EXPORT_SCALE);
     await downloadCardPdf([front, back], `${props.fileBaseName}.pdf`);
   } catch (e) {
     error.value = e instanceof Error ? e.message : "Could not export the PDF.";
@@ -146,7 +158,7 @@ async function downloadPng(face: CardFace): Promise<void> {
   try {
     const assets = await resolveAssets();
     const c = document.createElement("canvas");
-    await renderTo(c, face, false, assets);
+    await renderTo(c, face, false, assets, EXPORT_SCALE);
     downloadCanvasPng(c, `${props.fileBaseName}-${face}.png`);
   } catch (e) {
     error.value = e instanceof Error ? e.message : "Could not export the PNG.";

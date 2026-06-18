@@ -741,7 +741,7 @@ export async function downloadCardPdf(
       CARD_BLEED_MM.w,
       CARD_BLEED_MM.h,
       undefined,
-      "FAST",
+      "SLOW", // max (lossless) deflate — keeps the hi-res image crisp, smaller file
     );
   });
   pdf.save(filename);

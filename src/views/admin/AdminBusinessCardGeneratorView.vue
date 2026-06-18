@@ -53,7 +53,7 @@ const DEFAULTS: Record<
     headline: "Get *verified*.\nGet hired.",
     subcopy: "Join Canada's network of vetted trades.",
     qrCaption: "Scan to apply",
-    ctaLabel: "Free to apply",
+    ctaLabel: "Apply now",
   },
   client_search: {
     headline: "Find a pro\nyou can *trust*.",
