@@ -529,15 +529,15 @@ export function drawCardFace(
     ctx.fillRect(0, 0, full.w, full.h);
     // Logo, tagline and website chip stacked as one centred group with generous
     // gaps between them.
-    const backLogoH = 250;
-    const gapLogoTag = 46;
-    const gapTagChip = 34;
+    const backLogoH = 356;
+    const gapLogoTag = 36;
+    const gapTagChip = 26;
     const taglineH = 18;
     const chipH = 42;
     const groupH = backLogoH + gapLogoTag + taglineH + gapTagChip + chipH;
     let gy = cy + Math.max(0, (chH - groupH) / 2);
 
-    drawImageContain(ctx, assets.logoVert, cx + cw * 0.19, gy, cw * 0.62, backLogoH, "center");
+    drawImageContain(ctx, assets.logoVert, cx + cw * 0.09, gy, cw * 0.82, backLogoH, "center");
     gy += backLogoH + gapLogoTag;
     ctx.fillStyle = C.navyDark;
     ctx.font = `600 17px "Roboto", sans-serif`;
