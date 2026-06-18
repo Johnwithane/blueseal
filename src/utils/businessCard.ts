@@ -531,11 +531,9 @@ export function drawCardFace(
     ctx.fillStyle = C.navyDark;
     ctx.font = `600 17px "Roboto", sans-serif`;
     drawCenteredTracked(ctx, SITE_TAGLINE.toUpperCase(), cx + cw / 2, cy + chH - 38, 2.5);
-    ctx.fillStyle = C.navy;
-    ctx.font = `700 23px "Roboto", sans-serif`;
-    ctx.textAlign = "center";
-    ctx.fillText(SITE_HOST, cx + cw / 2, cy + chH - 6);
-    ctx.textAlign = "left";
+    ctx.fillStyle = C.muted; // grey, all-caps, tracked
+    ctx.font = `700 20px "Roboto", sans-serif`;
+    drawCenteredTracked(ctx, SITE_HOST.toUpperCase(), cx + cw / 2, cy + chH - 6, 2);
     return;
   }
 
@@ -557,10 +555,11 @@ export function drawCardFace(
   const logoGap = 40;
   const lx = cx;
 
-  // Large QR, right, vertically centred, caption beneath.
+  // Large QR, right. The QR itself is vertically centred (caption is tacked on
+  // beneath it, not part of the centring).
   const qrSize = 400;
   const qrX = cx + cw - qrSize;
-  const qrY = cy + (chH - (qrSize + 34)) / 2;
+  const qrY = cy + (chH - qrSize) / 2;
   drawQr(ctx, assets, th, qrX, qrY, qrSize);
   ctx.textAlign = "center";
   ctx.fillStyle = th.caption;
