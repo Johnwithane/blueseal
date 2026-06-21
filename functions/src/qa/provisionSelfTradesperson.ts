@@ -85,6 +85,7 @@ export const qaProvisionSelfTradesperson = onCall(CALLABLE_OPTS, async (req) => 
   const tradieSnap = await tradieRef.get();
   const existing = (tradieSnap.exists ? tradieSnap.data() ?? {} : {}) as {
     locationApprox?: GeoPoint | null;
+    serviceRadiusKm?: number;
   };
 
   const patch: Record<string, unknown> = tradieSnap.exists
@@ -112,6 +113,14 @@ export const qaProvisionSelfTradesperson = onCall(CALLABLE_OPTS, async (req) => 
   if (!hasLocation) {
     patch.locationApprox = new GeoPoint(DEFAULT_LAT, DEFAULT_LNG);
     patch.geohashPublic = deriveGeohashes(DEFAULT_LAT, DEFAULT_LNG).geohashPublic;
+  }
+  // Guarantee a usable search radius. A new doc gets 25 km from the defaults,
+  // but an older partial draft could carry 0/undefined — which leaves the
+  // provisioned tradie matching NOTHING on /jobs/browse ("No matching posts")
+  // even with a location set. Only fill it when missing; never shrink a radius
+  // the tester chose.
+  if (!existing.serviceRadiusKm || existing.serviceRadiusKm <= 0) {
+    patch.serviceRadiusKm = 25;
   }
 
   await tradieRef.set(patch, { merge: true });
