@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import Button from "primevue/button";
 import Textarea from "primevue/textarea";
@@ -75,6 +75,19 @@ const meta = ref<JobPostMetaDoc | null>(null);
 const applications = ref<WithId<ApplicationDoc>[]>([]);
 const applicantTradies = ref<Map<string, WithId<TradespersonDoc>>>(new Map());
 const myApplication = ref<WithId<ApplicationDoc> | null>(null);
+// After a successful apply the "Your application" card appears once the
+// subscription round-trips. A 3s toast alone was easy to miss ("did it send?"),
+// so scroll the persistent confirmation into view the first time it shows.
+const appliedCardEl = ref<HTMLElement | null>(null);
+const scrollToAppliedNext = ref(false);
+watch(myApplication, (app) => {
+  if (app && scrollToAppliedNext.value) {
+    scrollToAppliedNext.value = false;
+    void nextTick(() =>
+      appliedCardEl.value?.scrollIntoView({ behavior: "smooth", block: "center" }),
+    );
+  }
+});
 const photoUrls = ref<Map<string, string>>(new Map());
 
 const loading = ref(true);
@@ -391,6 +404,8 @@ async function submitApply() {
     );
     applyMessage.value = "";
     applyAttempted.value = false;
+    // Jump to the persistent "Your application" confirmation once it renders.
+    scrollToAppliedNext.value = true;
   } catch (e) {
     applyError.value = humanizeError(e);
   } finally {
@@ -718,7 +733,7 @@ const visibleApplications = computed(() => {
           />
         </div>
 
-        <div v-if="myApplication" class="bs-card p-5 mt-6">
+        <div v-if="myApplication" ref="appliedCardEl" class="bs-card p-5 mt-6">
           <div class="flex items-center justify-between gap-2 flex-wrap">
             <div>
               <h2 class="text-lg font-semibold">Your application</h2>
