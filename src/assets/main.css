@@ -146,6 +146,16 @@ body {
   }
 }
 
+/* Google Places autocomplete suggestions (.pac-container) are appended to
+   <body>, so inside a PrimeVue modal — e.g. the Search "Change location"
+   dialog — they render *behind* the dialog overlay and can't be tapped. The
+   user types a city, the suggestion list is invisible, no suggestion is
+   selected, place_changed never fires, and the pin never moves. Lift the list
+   above PrimeVue's dialog/overlay z-index stack (~1100) so it's always usable. */
+.pac-container {
+  z-index: 100000 !important;
+}
+
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--bs-font-heading);
   font-weight: 400;
