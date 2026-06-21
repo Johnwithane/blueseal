@@ -85,6 +85,10 @@ const canApproveInsurance = computed(() => {
 const showRequestInfo = ref(false);
 const showReject = ref(false);
 const notesInput = ref("");
+// Guards "Approve everything" against the impatient multi-click that fired ~20
+// welcome emails: the button spins and is disabled until the callable resolves
+// (then we navigate away). The callable is idempotent too — belt and braces.
+const approvingAll = ref(false);
 
 // Per-cert and ID rejection live in modals (no native prompt()).
 const showRejectCert = ref(false);
@@ -236,6 +240,8 @@ async function confirmRejectWsib() {
 }
 
 async function approveAll() {
+  if (approvingAll.value) return;
+  approvingAll.value = true;
   // Per design.md: callable handles email + sets isVisible/verifiedTrades via downstream triggers.
   // Callable also refuses if ID/cert aren't approved yet — surface that to the
   // admin instead of leaving an unhandled rejection in the console.
@@ -243,8 +249,11 @@ async function approveAll() {
     await approveApplication({ tradieUid: uid });
     toast.success("Application approved", "Welcome email queued.");
     router.replace({ name: "AdminVetting" });
+    // Leave approvingAll set on success — we're navigating away and the view
+    // unmounts; re-enabling would briefly flash the button back to active.
   } catch (e) {
     toast.error("Couldn't approve", (e as Error).message);
+    approvingAll.value = false;
   }
 }
 
@@ -589,7 +598,8 @@ const approveBlockerHint = computed(() => {
             label="Approve everything"
             icon="pi pi-check"
             severity="success"
-            :disabled="!canApproveApplication"
+            :loading="approvingAll"
+            :disabled="!canApproveApplication || approvingAll"
             class="col-span-2 w-full sm:col-span-1 sm:w-auto"
             @click="approveAll"
           />

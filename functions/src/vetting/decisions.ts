@@ -48,6 +48,11 @@ export const approveApplication = onCall(CALLABLE_OPTS, async (req) => {
     db.collection("certifications").where("tradespersonId", "==", tradieUid).get(),
   ]);
   if (!tradieSnap.exists) throw new HttpsError("not-found", "Tradesperson not found.");
+  // Whether this call is a real transition into "approved". Re-approving an
+  // already-approved tradie (impatient double-tap, or a later re-review) must
+  // NOT re-send the welcome email — that was the "20 approval emails" bug.
+  const wasAlreadyApproved =
+    (tradieSnap.data() as { vettingStatus?: string }).vettingStatus === "approved";
   if (!idSnap.exists) {
     throw new HttpsError("failed-precondition", "No ID document on file.");
   }
@@ -121,15 +126,18 @@ export const approveApplication = onCall(CALLABLE_OPTS, async (req) => {
     verifiedTrades: FieldValue.arrayUnion(...Array.from(verifiedTrades)),
   });
   await maybeMarkVisible(tradieUid);
-  await notify({
-    userId: tradieUid,
-    type: "vetting_approved",
-    title: "You're approved — welcome to Blue Seal",
-    body: "Your profile is live and discoverable. Start receiving job requests today.",
-    link: "/dashboard/tradie",
-    recipientRole: "tradesperson",
-    priority: "high",
-  });
+  // Only on the transition into approved — re-approving doesn't re-notify.
+  if (!wasAlreadyApproved) {
+    await notify({
+      userId: tradieUid,
+      type: "vetting_approved",
+      title: "You're approved — welcome to Blue Seal",
+      body: "Your profile is live and discoverable. Start receiving job requests today.",
+      link: "/dashboard/tradie",
+      recipientRole: "tradesperson",
+      priority: "high",
+    });
+  }
   await logAdminAction({
     actorUid: actor,
     action: "approveApplication",
