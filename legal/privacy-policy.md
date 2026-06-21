@@ -60,7 +60,7 @@ When you use the Service we automatically collect:
 
 - **Device and connection data:** IP address, browser type and version, operating system, device identifiers, language and timezone settings
 - **Usage data:** pages and features viewed, actions taken, timestamps, error reports
-- **Approximate location:** derived from your IP address, and (with your permission) precise location from your browser when searching for tradespeople near you
+- **Approximate location:** derived from your IP address — including via a third-party IP-geolocation lookup service that receives your IP address to return an approximate city/region so search can default to your area — and (with your permission) precise location from your browser when searching for tradespeople near you
 - **Cookies and similar technologies:** see § 9 below
 
 ### 2.3 Information from third parties
