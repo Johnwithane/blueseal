@@ -106,13 +106,27 @@ const issuingBodyForSubmit = computed(() =>
   issuingBody.value === "Other" ? customIssuingBody.value.trim() : issuingBody.value,
 );
 
-const canPickFile = computed(
-  () => !!certNameForSubmit.value && !!issuingBodyForSubmit.value && !!certNumber.value.trim(),
-);
+// Which required fields are still empty, phrased for a human. Picking "Other"
+// for the certification or issuing body reveals a free-text field that must be
+// filled before we have something to attach the file to. Previously the upload
+// button was simply `:disabled` when these were blank, so a tradesperson who
+// chose "Other" saw a dead button with no hint why — the #1 onboarding snag.
+// Driving both an inline hint and the on-click toast off this list fixes that.
+const missingFields = computed(() => {
+  const missing: string[] = [];
+  if (!certNameForSubmit.value) {
+    missing.push(selectedPreset.value === OTHER_CERT ? "the credential name" : "a certification");
+  }
+  if (!issuingBodyForSubmit.value) {
+    missing.push(issuingBody.value === "Other" ? "the issuing body name" : "the issuing body");
+  }
+  if (!certNumber.value.trim()) missing.push("the certificate / licence number");
+  return missing;
+});
 
 function triggerFilePicker() {
-  if (!canPickFile.value) {
-    toast.warn("Fill in the certification, issuing body, and number first.");
+  if (missingFields.value.length) {
+    toast.warn("A few details first", `Add ${missingFields.value.join(", ")} before uploading.`);
     return;
   }
   fileInput.value?.click();
@@ -219,8 +233,8 @@ function cancelEdit() {
 
 async function saveEdit() {
   if (!props.existing) return;
-  if (!certNameForSubmit.value || !issuingBodyForSubmit.value || !certNumber.value.trim()) {
-    toast.warn("Fill in the certification, issuing body, and number first.");
+  if (missingFields.value.length) {
+    toast.warn("A few details first", `Add ${missingFields.value.join(", ")} to save.`);
     return;
   }
   saving.value = true;
@@ -477,13 +491,16 @@ const defaultOpen = computed(
             </p>
           </div>
 
+          <Message v-if="missingFields.length" severity="info" :closable="false" class="text-sm">
+            Add {{ missingFields.join(", ") }} to {{ editing ? "save your changes" : "upload" }}.
+          </Message>
+
           <div class="flex items-center justify-between pt-1 gap-2 flex-wrap">
             <template v-if="!editing">
               <Button
                 icon="pi pi-upload"
                 label="Upload PDF / image"
                 outlined
-                :disabled="!canPickFile"
                 :loading="uploading"
                 @click="triggerFilePicker"
               />
@@ -500,7 +517,6 @@ const defaultOpen = computed(
               <Button
                 icon="pi pi-check"
                 label="Save changes"
-                :disabled="!canPickFile"
                 :loading="saving"
                 @click="saveEdit"
               />

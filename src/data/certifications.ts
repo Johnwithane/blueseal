@@ -91,6 +91,11 @@ export const CERT_PRESETS_BY_TRADE: Record<string, CertPreset[]> = {
     { label: "WHMIS 2015 training", name: "WHMIS 2015 training" },
     { label: "Bonded & insured (general liability)", name: "Bonded & insured — general liability" },
   ],
+  general_contractor: [
+    { label: "Licensed Residential Builder (BC Housing)", name: "Residential Builder Licence", defaultIssuer: "BC Housing — Licensing & Consumer Services" },
+    { label: "Provincial home builder / new-home warranty licence", name: "Home builder licence" },
+    { label: "Business licence", name: "Business licence (municipal)" },
+  ],
 
   // ── Automotive & vehicle (Red Seal) ───────────────────────────────────────
   auto_service: [
@@ -210,6 +215,7 @@ export const ISSUING_BODIES: string[] = [
   "TSSA (Ontario)",
   "SkilledTradesBC",
   "Technical Safety BC",
+  "BC Housing — Licensing & Consumer Services",
   "Alberta Apprenticeship & Industry Training",
   "SaskApprenticeship",
   "Apprenticeship Manitoba",
