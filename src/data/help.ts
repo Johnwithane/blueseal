@@ -661,7 +661,7 @@ const faqs: FaqItem[] = [
   {
     question: "How is Blue Seal different from other directories?",
     answer:
-      "Most sites just hand you a phone number. Blue Seal **verifies** every pro four ways (ID, certification, insurance, WSIB) and runs the **whole job** in one place — chat with photos, a status board, quotes, invoices, an AI assistant, and mutual reviews.",
+      "Most sites just hand you a phone number. Blue Seal **verifies** every pro by hand — government ID and trade certification before they can take work, with insurance and workers'-comp badges on top — and runs the **whole job** in one place: chat with photos, a status board, quotes, invoices, an AI assistant, and mutual reviews.",
     categoryId: "getting-started",
     audience: "all",
   },

@@ -126,9 +126,10 @@ function searchBody(): string {
     section(
       h1("Find a verified tradesperson in Canada") +
         p(
-          "Every tradesperson on Blue Seal is manually reviewed — government ID, trade " +
-            "certification, insurance and WSIB — before they can take work. Search by trade " +
-            "and area, compare ratings, and start a job thread in minutes.",
+          "Every tradesperson on Blue Seal is manually reviewed — government ID and trade " +
+            "certification verified by hand before they can take work, with insurance and " +
+            "workers'-comp badges on top. Search by trade and area, compare ratings, and start " +
+            "a job thread in minutes.",
         ),
     ),
     section(`<h2>Browse by trade</h2>${ul(tradeLinks)}${link("/trades", "See all trades")}`),
@@ -252,8 +253,9 @@ function tradesIndexBody(): string {
     section(
       h1("Find a verified tradesperson by trade") +
         p(
-          "Every trade on Blue Seal is staffed by manually verified pros — ID, certification, " +
-            "insurance and WSIB checked. Pick a trade to find one near you.",
+          "Every trade on Blue Seal is staffed by manually verified pros — government ID and " +
+            "trade certification checked by hand, with insurance and workers'-comp badges on top. " +
+            "Pick a trade to find one near you.",
         ),
     ) + section(`<h2>All trades</h2>${ul(links)}`)
   );

@@ -168,10 +168,10 @@ const standoutFeatures = [
   },
   {
     kicker: "Real verification",
-    title: "Every pro, verified four ways",
+    title: "Checked by a person, not a checkbox",
     blurb:
-      "Government ID, trade certification, insurance and WSIB. Our team checks each one by hand before a pro can take any work.",
-    points: ["Government ID", "Trade certification", "Insurance + WSIB on file"],
+      "Government ID and trade certification, verified by hand before a pro can take any work. Many pros add insurance and workers'-comp badges on top.",
+    points: ["Government ID — required", "Trade ticket — required", "Insurance + workers'-comp — added"],
     seal: "scene-verified",
   },
   {
@@ -182,6 +182,19 @@ const standoutFeatures = [
     points: ["Itemised quotes", "Auto-invoicing", "In-app pay & payouts"],
     seal: "scene-invoice",
   },
+];
+
+// "Blue Seal vs. the rest" — concrete, side-by-side contrast vs a generic
+// directory / lead site. Qualitative only (no fee figures or SLAs, same rule
+// as the standout features) and never names a competitor — the caption under
+// the table makes clear it describes the category, not one company.
+const comparisonRows = [
+  { feature: "Getting verified", blueSeal: "ID + trade ticket checked by a real person", others: "Anyone can list — or pay to appear" },
+  { feature: "After you match", blueSeal: "The whole job — quote, chat, schedule, invoice, pay", others: "A phone number, then you're on your own" },
+  { feature: "Leads", blueSeal: "Never charged for a job you didn't win", others: "Pros pay per lead — win or lose" },
+  { feature: "Your details", blueSeal: "Go to one verified pro you choose", others: "Sold to several contractors at once" },
+  { feature: "Reviews", blueSeal: "Both sides rated — clients and pros", others: "One-way only" },
+  { feature: "Tools", blueSeal: "AI quoting, invoicing & payments built in", others: "None — bring your own" },
 ];
 
 // A short FAQ teaser pulled from the curated Help Center baseline.
@@ -223,8 +236,9 @@ onMounted(async () => {
             </h1>
 
             <p class="mt-6 max-w-xl text-lg leading-relaxed text-[color:var(--bs-blue-dark)]/80 sm:text-xl">
-              We check every tradesperson's government ID, trade ticket, insurance and WSIB before
-              they can take a job. So you always know who's knocking on your door.
+              A real person checks every tradesperson's government ID and trade ticket before they can
+              take a job — with insurance and workers'-comp badges on top. So you always know who's
+              knocking on your door.
             </p>
 
             <!-- Tradesperson view: straight to work. -->
@@ -310,7 +324,7 @@ onMounted(async () => {
           <span class="flex items-center gap-2"><i class="pi pi-verified text-[color:var(--bs-red)]"></i> Government ID</span>
           <span class="flex items-center gap-2"><i class="pi pi-id-card text-[color:var(--bs-red)]"></i> Trade certified</span>
           <span class="flex items-center gap-2"><i class="pi pi-shield text-[color:var(--bs-red)]"></i> Insured</span>
-          <span class="flex items-center gap-2"><i class="pi pi-briefcase text-[color:var(--bs-red)]"></i> WSIB on file</span>
+          <span class="flex items-center gap-2"><i class="pi pi-briefcase text-[color:var(--bs-red)]"></i> Workers' comp</span>
           <span class="flex items-center gap-2"><i class="pi pi-star text-[color:var(--bs-red)]"></i> Mutual reviews</span>
           <span class="flex items-center gap-2"><i class="pi pi-bolt text-[color:var(--bs-red)]"></i> AI quote helper</span>
         </span>
@@ -445,6 +459,69 @@ onMounted(async () => {
             </div>
           </div>
         </div>
+      </div>
+    </section>
+
+    <!-- ══ CHAPTER 5b · COMPARISON — white; the difference, side by side ══ -->
+    <section class="bg-white py-20 sm:py-24">
+      <div class="bs-container">
+        <div class="bs-reveal max-w-2xl">
+          <span class="bs-kicker">Blue Seal vs. the rest</span>
+          <h2 class="bs-display mt-3 text-4xl leading-[1.02] tracking-[-0.015em] text-[color:var(--bs-blue-dark)] sm:text-5xl">
+            See the difference, side by side.
+          </h2>
+          <p class="mt-3 text-lg text-[color:var(--bs-muted)]">
+            Directories and lead sites stop at the introduction. Here's what you get with us that you
+            won't get there.
+          </p>
+        </div>
+
+        <div class="bs-reveal mt-10 overflow-hidden rounded-2xl border border-[color:var(--bs-border)]">
+          <table class="w-full border-collapse text-left">
+            <caption class="sr-only">How Blue Seal compares to a typical online directory or lead site</caption>
+            <thead>
+              <tr class="bg-[color:var(--bs-light-blue)]/40">
+                <th class="w-1/3 px-3 py-3 sm:px-5"><span class="sr-only">What</span></th>
+                <th class="w-1/3 px-3 py-3 text-sm font-bold text-[color:var(--bs-blue-dark)] sm:px-5 sm:text-base">
+                  <span class="inline-flex items-center gap-1.5">
+                    <i class="pi pi-verified text-[color:var(--bs-red)]" aria-hidden="true"></i> Blue Seal
+                  </span>
+                </th>
+                <th class="w-1/3 px-3 py-3 text-sm font-semibold text-[color:var(--bs-muted)] sm:px-5 sm:text-base">
+                  A typical directory
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="(row, i) in comparisonRows"
+                :key="row.feature"
+                class="border-t border-[color:var(--bs-border)]"
+                :class="i % 2 ? 'bg-[color:var(--bs-bg)]' : 'bg-white'"
+              >
+                <th scope="row" class="px-3 py-4 align-top text-xs font-semibold text-[color:var(--bs-blue-dark)] sm:px-5 sm:text-sm">
+                  {{ row.feature }}
+                </th>
+                <td class="px-3 py-4 align-top sm:px-5">
+                  <span class="flex gap-2 text-xs text-[color:var(--bs-text)] sm:text-sm">
+                    <i class="pi pi-check-circle mt-0.5 shrink-0 text-[color:var(--bs-blue)]" aria-hidden="true"></i>
+                    <span>{{ row.blueSeal }}</span>
+                  </span>
+                </td>
+                <td class="px-3 py-4 align-top sm:px-5">
+                  <span class="flex gap-2 text-xs text-[color:var(--bs-muted)] sm:text-sm">
+                    <i class="pi pi-times-circle mt-0.5 shrink-0 text-[color:var(--bs-muted)]/50" aria-hidden="true"></i>
+                    <span>{{ row.others }}</span>
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="bs-reveal mt-5 text-center text-sm text-[color:var(--bs-muted)]">
+          Reflects how most online directories and lead-generation sites typically work — not any one company.
+        </p>
       </div>
     </section>
 
