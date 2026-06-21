@@ -486,8 +486,20 @@ const router = createRouter({
   routes,
   // Restore the previous scroll position on back/forward (so returning to the
   // search results from a profile lands where you left off); fresh navigations
-  // scroll to the top.
-  scrollBehavior: (_to, _from, savedPosition) => savedPosition ?? { top: 0 },
+  // scroll to the top. In-page anchors (e.g. the help "Contact support" button
+  // → /help#contact) scroll to the target element, cleared of the fixed header
+  // — without this the hash was ignored and the page just jumped to the top,
+  // which read as a pointless reload of the help center.
+  scrollBehavior: (to, _from, savedPosition) => {
+    if (to.hash) {
+      return new Promise((resolve) =>
+        // Wait a tick so the destination view (often a freshly-mounted
+        // component) has rendered the anchor before we scroll to it.
+        setTimeout(() => resolve({ el: to.hash, top: 80, behavior: "smooth" }), 120),
+      );
+    }
+    return savedPosition ?? { top: 0 };
+  },
 });
 
 router.beforeEach(async (to) => {
