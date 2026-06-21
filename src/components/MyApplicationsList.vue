@@ -4,7 +4,9 @@ import { RouterLink } from "vue-router";
 import Tag from "primevue/tag";
 import { useAuthStore } from "@/stores/auth";
 import { subscribeMyApplications } from "@/firebase/services/applications";
+import { getJobPost } from "@/firebase/services/jobPosts";
 import type { ApplicationDoc, WithId } from "@/firebase/interfaces";
+import { tradeLabel } from "@/data/trades";
 import { useFormatters } from "@/composables";
 
 // Renders the signed-in tradesperson's job-board applications grouped by
@@ -16,9 +18,57 @@ const { relativeTime } = useFormatters();
 const apps = ref<WithId<ApplicationDoc>[]>([]);
 let unsub: (() => void) | null = null;
 
+interface JobBrief {
+  title: string;
+  trade: string;
+  city: string;
+}
+
+// Fallback post details for legacy applications created before submitApplication
+// denormalized the post identity onto the application doc. Only fetchable while
+// the post is still open (rules), which covers the pending cards that matter
+// most; closed-post legacy cards simply omit the title.
+const fetchedPosts = ref<Record<string, JobBrief | null>>({});
+
+function briefFor(a: WithId<ApplicationDoc>): JobBrief | null {
+  if (a.postTitle) {
+    return { title: a.postTitle, trade: a.postTrade ?? "", city: a.postCity ?? "" };
+  }
+  return fetchedPosts.value[a.postId] ?? null;
+}
+
+async function hydrateMissing(list: WithId<ApplicationDoc>[]) {
+  const missing = [
+    ...new Set(list.filter((a) => !a.postTitle).map((a) => a.postId)),
+  ].filter((id) => !(id in fetchedPosts.value));
+  if (!missing.length) return;
+  // Seed null first so a rapid second snapshot doesn't double-fetch.
+  const seed = { ...fetchedPosts.value };
+  for (const id of missing) seed[id] = null;
+  fetchedPosts.value = seed;
+  await Promise.all(
+    missing.map(async (id) => {
+      try {
+        const p = await getJobPost(id);
+        if (p) {
+          fetchedPosts.value = {
+            ...fetchedPosts.value,
+            [id]: { title: p.title, trade: p.trade, city: p.addressPublic?.city ?? "" },
+          };
+        }
+      } catch {
+        /* post closed / unreadable — leave null, card degrades gracefully */
+      }
+    }),
+  );
+}
+
 onMounted(() => {
   if (auth.fbUser) {
-    unsub = subscribeMyApplications(auth.fbUser.uid, (a) => (apps.value = a));
+    unsub = subscribeMyApplications(auth.fbUser.uid, (a) => {
+      apps.value = a;
+      void hydrateMissing(a);
+    });
   }
 });
 
@@ -110,6 +160,15 @@ function unreadFor(a: WithId<ApplicationDoc>): number {
           :to="{ name: 'JobPostDetail', params: { postId: a.postId } }"
           class="bs-card p-4 no-underline text-inherit hover:shadow-md transition-shadow"
         >
+          <template v-if="briefFor(a)">
+            <div class="font-semibold text-[color:var(--bs-text)] line-clamp-1">
+              {{ briefFor(a)!.title }}
+            </div>
+            <div class="text-xs text-[color:var(--bs-muted)] mb-1">
+              {{ tradeLabel(briefFor(a)!.trade)
+              }}<template v-if="briefFor(a)!.city"> · {{ briefFor(a)!.city }}</template>
+            </div>
+          </template>
           <div class="flex items-start justify-between gap-2">
             <div class="text-sm text-[color:var(--bs-muted)]">
               Applied {{ relativeTime(a.createdAt) }}

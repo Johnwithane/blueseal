@@ -148,6 +148,9 @@ export const submitApplication = onCall(CALLABLE_OPTS, async (req) => {
         status: string;
         clientId: string;
         expiresAt?: Timestamp;
+        title?: string;
+        trade?: string;
+        addressPublic?: { city?: string };
       };
       if (post.status !== "open") {
         throw new HttpsError("failed-precondition", "This job post is no longer open.");
@@ -174,6 +177,11 @@ export const submitApplication = onCall(CALLABLE_OPTS, async (req) => {
         tradespersonId: uid,
         postId,
         clientId: post.clientId,
+        // Denormalized so "My applications" cards stay readable after the post
+        // closes (the tradie loses read access to jobPosts/{postId} then).
+        postTitle: post.title ?? "",
+        postTrade: post.trade ?? "",
+        postCity: post.addressPublic?.city ?? "",
         status: "pending",
         message,
         proposedPrice,

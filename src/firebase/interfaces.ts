@@ -1393,6 +1393,15 @@ export interface ApplicationDoc {
   tradespersonId: string;
   postId: string; // duplicated so collectionGroup queries can filter by post
   clientId: string; // duplicated so rules can validate without an extra read
+  // Denormalized post identity so the tradie's "My applications" cards can show
+  // which job each application is for. Can't be read live from jobPosts/{postId}
+  // because the rules forbid a tradie reading a post once it closes (which every
+  // resolved/rejected application's post has). Stamped by submitApplication at
+  // create time. Optional: applications predating this fall back to a best-effort
+  // fetch (only succeeds while the post is still open).
+  postTitle?: string;
+  postTrade?: string;
+  postCity?: string;
   status: ApplicationStatus;
   message: string;
   // Quick one-line summary of the bid. In the bid-marketplace flow this is
