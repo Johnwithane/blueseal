@@ -16,6 +16,8 @@ import type { Urgency } from "@/firebase/interfaces";
 import { useAuthStore } from "@/stores/auth";
 import { useGoogleMaps } from "@/composables/useGoogleMaps";
 import { useToast } from "@/composables/useToast";
+import { useFormErrors } from "@/composables/useFormErrors";
+import FieldError from "@/components/FieldError.vue";
 import { humanizeError } from "@/utils/errors";
 
 const router = useRouter();
@@ -36,8 +38,8 @@ const myTrades = ref<string[]>([]);
 // list so they're never blocked from creating a job.
 const tradeOptions = computed(() =>
   myTrades.value.length
-    ? myTrades.value.map((key) => ({ key, label: tradeLabel(key) }))
-    : TRADES.map((t) => ({ key: t.key, label: t.label })),
+    ? myTrades.value.map((key) => ({ value: key, label: tradeLabel(key) }))
+    : TRADES.map((t) => ({ value: t.key, label: t.label })),
 );
 
 onMounted(async () => {
@@ -103,7 +105,12 @@ const preferredStart = ref<Date | null>(null);
 const addressAutocompleteEl = ref<HTMLInputElement | null>(null);
 
 const submitting = ref(false);
+// `error` is reserved for server-side failures (the catch below). Field-level
+// validation errors render under each input via useFormErrors instead of being
+// flattened into one banner showing a raw Zod message.
 const error = ref<string | null>(null);
+const { errors, clear: clearErrors, setFromZod, focusFirst } = useFormErrors();
+const FIELD_ORDER = ["trade", "title", "description", "clientName", "clientEmail", "address"];
 
 // Success state: the invite link is returned exactly once by the callable
 // (only its hash is stored server-side), so it's surfaced here for copying.
@@ -129,6 +136,7 @@ function toDateString(d: Date | null): string | null {
 async function submit() {
   if (submitting.value) return;
   error.value = null;
+  clearErrors();
   const parsed = inviteJobSchema.safeParse({
     trade: trade.value,
     title: title.value,
@@ -145,7 +153,8 @@ async function submit() {
     preferredStart: toDateString(preferredStart.value),
   });
   if (!parsed.success) {
-    error.value = parsed.error.issues[0]?.message ?? "Check the form";
+    setFromZod(parsed.error);
+    await focusFirst(FIELD_ORDER);
     return;
   }
   submitting.value = true;
@@ -186,41 +195,51 @@ function openJob() {
     </p>
 
     <form class="space-y-4" @submit.prevent="submit">
-      <div>
+      <div data-field="trade">
         <label class="text-sm font-medium">Trade</label>
         <Select
           v-model="trade"
           :options="tradeOptions"
           option-label="label"
-          option-value="key"
+          option-value="value"
           :filter="myTrades.length === 0"
           placeholder="Select a trade"
           class="mt-1 w-full"
+          :invalid="!!errors.trade"
         />
+        <FieldError :message="errors.trade" />
       </div>
 
-      <div>
+      <div data-field="title">
         <label class="text-sm font-medium">Title</label>
-        <InputText v-model="title" placeholder="Short summary of the job" maxlength="140" class="mt-1 w-full" />
+        <InputText v-model="title" placeholder="Short summary of the job" maxlength="140" class="mt-1 w-full" :invalid="!!errors.title" />
+        <FieldError :message="errors.title" />
       </div>
 
-      <div>
+      <div data-field="description">
         <label class="text-sm font-medium">Description</label>
-        <Textarea v-model="description" rows="4" maxlength="4000" class="w-full" placeholder="Scope of work, as you'd write it on a quote" />
+        <Textarea v-model="description" rows="4" maxlength="4000" class="w-full" placeholder="Scope of work, as you'd write it on a quote" :invalid="!!errors.description" />
+        <FieldError :message="errors.description" />
       </div>
 
       <fieldset>
         <legend class="text-sm font-medium mb-2">Your client</legend>
         <div class="grid sm:grid-cols-2 gap-2">
-          <InputText v-model="clientName" placeholder="Client name" maxlength="80" autocomplete="off" />
-          <InputText v-model="clientEmail" type="email" placeholder="Client email" maxlength="200" autocomplete="off" />
+          <div data-field="clientName">
+            <InputText v-model="clientName" placeholder="Client name" maxlength="80" autocomplete="off" class="w-full" :invalid="!!errors.clientName" />
+            <FieldError :message="errors.clientName" />
+          </div>
+          <div data-field="clientEmail">
+            <InputText v-model="clientEmail" type="email" placeholder="Client email" maxlength="200" autocomplete="off" class="w-full" :invalid="!!errors.clientEmail" />
+            <FieldError :message="errors.clientEmail" />
+          </div>
         </div>
         <p class="text-xs text-[color:var(--bs-muted)] mt-1">
           They'll get a link to follow the job — no account or password needed.
         </p>
       </fieldset>
 
-      <fieldset>
+      <fieldset data-field="address">
         <legend class="text-sm font-medium mb-2">Job address</legend>
         <!-- Raw input (not InputText) so the Places autocomplete in onMounted
              can attach to a real HTMLInputElement. autocomplete="off" keeps the
@@ -236,10 +255,11 @@ function openJob() {
           autocomplete="off"
         />
         <div class="grid sm:grid-cols-2 gap-2 mt-2">
-          <InputText v-model="city" placeholder="City" maxlength="100" />
-          <InputText v-model="region" placeholder="Province" maxlength="100" />
-          <InputText v-model="postalCode" placeholder="Postal code (A1A 1A1)" maxlength="7" />
+          <InputText v-model="city" placeholder="City" maxlength="100" :invalid="!!errors.address" />
+          <InputText v-model="region" placeholder="Province" maxlength="100" :invalid="!!errors.address" />
+          <InputText v-model="postalCode" placeholder="Postal code (A1A 1A1)" maxlength="7" :invalid="!!errors.address" />
         </div>
+        <FieldError :message="errors.address" />
       </fieldset>
 
       <div class="grid sm:grid-cols-2 gap-2">

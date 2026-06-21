@@ -3,7 +3,12 @@ import { TRADES } from "@/data/trades";
 import { SUPPORT_TOPICS } from "@/data/support";
 
 const tradeKeys = TRADES.map((t) => t.key) as [string, ...string[]];
-const tradeKeyEnum = z.enum(tradeKeys);
+// Friendly fallback so an empty/invalid trade surfaces as "Please choose a
+// trade" everywhere this enum is used, instead of leaking the raw Zod dump
+// ("Invalid enum value. Expected 'plumber' | 'electrician' | …").
+const tradeKeyEnum = z.enum(tradeKeys, {
+  errorMap: () => ({ message: "Please choose a trade" }),
+});
 
 // Canadian postal format (e.g. "V8V 2P1"). Tolerates lowercase + hyphen, normalize before storing.
 const caPostalRegex = /^[A-Za-z]\d[A-Za-z][\s-]?\d[A-Za-z]\d$/;
@@ -145,8 +150,8 @@ export const jobRequestSchema = z.object({
 // flow compares against; the callable re-validates server-side.
 export const inviteJobSchema = z.object({
   trade: tradeKeyEnum,
-  title: z.string().trim().min(3).max(140),
-  description: z.string().trim().min(10).max(4000),
+  title: z.string().trim().min(3, "Give the job a short title").max(140),
+  description: z.string().trim().min(10, "Add a short description of the work").max(4000),
   clientName: z.string().trim().min(1, "Your client's name").max(80),
   clientEmail: z
     .string()
@@ -156,9 +161,9 @@ export const inviteJobSchema = z.object({
     .max(200),
   urgency: z.enum(["flexible", "this_week", "urgent"]),
   address: z.object({
-    line1: z.string().trim().min(2).max(200),
-    city: z.string().trim().min(2).max(100),
-    region: z.string().trim().min(2).max(100),
+    line1: z.string().trim().min(2, "Enter the street address").max(200),
+    city: z.string().trim().min(2, "Enter the city").max(100),
+    region: z.string().trim().min(2, "Enter the province").max(100),
     postalCode: z
       .string()
       .trim()
