@@ -146,7 +146,7 @@ function fmt(n: number): string {
               <h1 class="h-xl">Hire a tradesperson<br />you can actually trust.</h1>
               <p class="lead lead-top">
                 Blue Seal hand-checks every tradesperson's certification and ID, then runs the
-                whole job — quote, chat, schedule, invoice, pay — with AI built in. Live and
+                whole job (quote, chat, schedule, invoice, pay) with AI built in. Live and
                 validated in the Okanagan.
               </p>
               <div class="chips">
@@ -175,10 +175,10 @@ function fmt(n: number): string {
       <section class="band band--paper">
         <div class="container reveal">
           <div class="kicker">The problem</div>
-          <h2 class="h-lg">Good local tradespeople are hard to find — and hard to be.</h2>
+          <h2 class="h-lg">Good local tradespeople are hard to find, and hard to be.</h2>
           <div class="grid g3 grid-top">
             <div class="card"><h3>Trust is a guess</h3><p>Anyone can claim a trade. Almost no one checks the certification or the ID.</p></div>
-            <div class="card"><h3>Ad budgets win</h3><p>The biggest marketing spend gets the job — not the best tradesperson.</p></div>
+            <div class="card"><h3>Ad budgets win</h3><p>The biggest marketing spend gets the job, not the best tradesperson.</p></div>
             <div class="card"><h3>Pros run on paper</h3><p>Skilled trades juggle texts, sticky notes and spreadsheets to run a business.</p></div>
           </div>
           <div class="card quote-card">
@@ -200,7 +200,7 @@ function fmt(n: number): string {
           <div class="grid g3 grid-top">
             <div class="card center"><img class="char pillar-char" src="/characters/seal-scene-verified.webp" alt="" /><h3>Verified by hand</h3><p>Cert + government ID, reviewed by a person before a profile goes live.</p></div>
             <div class="card center"><img class="char pillar-char" src="/characters/seal-scene-chat.webp" alt="" /><h3>Mutual reputation</h3><p>Clients rate pros. Pros rate clients. Both build a real record.</p></div>
-            <div class="card center"><img class="char pillar-char" src="/characters/seal-scene-ai.webp" alt="" /><h3>AI in every job</h3><p>Diagnose, draft replies, quote and invoice — in seconds.</p></div>
+            <div class="card center"><img class="char pillar-char" src="/characters/seal-scene-ai.webp" alt="" /><h3>AI in every job</h3><p>Diagnose, draft replies, quote and invoice, all in seconds.</p></div>
           </div>
         </div>
       </section>
@@ -215,7 +215,7 @@ function fmt(n: number): string {
               <p class="m0">
                 In the trades, a <strong>Red Seal</strong> is the national standard for your skill.
                 A <strong>Blue Seal</strong> is the real certification for running the business
-                behind it. Our app is that second seal, in software — helping a great tradesperson
+                behind it. Our app is that second seal, in software, helping a great tradesperson
                 win and manage work like a pro. <span class="hand">James earns his Blue Seal this year.</span>
               </p>
             </div>
@@ -243,7 +243,7 @@ function fmt(n: number): string {
         <div class="container reveal">
           <div class="kicker">The product</div>
           <h2 class="h-lg">The whole job, from find to paid.</h2>
-          <p class="lead">Not a concept — the full app is shipped and running. Four steps, one pipeline.</p>
+          <p class="lead">Not a concept. The full app is shipped and running. Four steps, one pipeline.</p>
           <div class="grid g4 grid-top">
             <div class="card center"><img class="char step-char" src="/characters/seal-scene-search.webp" alt="" /><div class="si">1</div><h3>Find</h3><p>Search verified pros, or post a job and compare quotes.</p></div>
             <div class="card center"><img class="char step-char" src="/characters/seal-scene-quote.webp" alt="" /><div class="si">2</div><h3>Quote</h3><p>Itemized quote, drafted with AI in seconds.</p></div>
@@ -289,19 +289,19 @@ function fmt(n: number): string {
       <!-- AI -->
       <section class="band band--navy">
         <div class="container reveal">
-          <div class="kicker">AI — built in, not bolted on</div>
+          <div class="kicker">AI: built in, not bolted on</div>
           <h2 class="h-lg">An AI partner inside every job.</h2>
-          <p class="lead">It reads the job — the intake, the chat, the photos — so the help is specific, not generic.</p>
+          <p class="lead">It reads the job (the intake, the chat, the photos) so the help is specific, not generic.</p>
           <div class="grid g3 grid-top">
             <div class="card"><h3>Context-aware assistant <span class="pill pill--pro">PRO</span></h3><p>Ask anything about the job. It can set your schedule, clock you in, and keep private notes.</p></div>
             <div class="card"><h3>Reply for me <span class="pill pill--pro">PRO</span></h3><p>One tap drafts a reply to the client's last message, in your voice.</p></div>
             <div class="card"><h3>Draft the quote <span class="pill pill--pro">PRO</span></h3><p>Turns a job thread into an itemized, editable quote.</p></div>
             <div class="card"><h3>Write the invoice note <span class="pill pill--pro">PRO</span></h3><p>Numbers fill in from tracked time + expenses; AI writes the wrap-up.</p></div>
             <div class="card"><h3>Auto job-log <span class="pill pill--pro">PRO</span></h3><p>Catches scope changes in the chat so nothing slips before billing.</p></div>
-            <div class="card"><h3>Snap a receipt <span class="pill pill--free">FREE</span></h3><p>Reads vendor, total, date, category — expenses ready for tax time.</p></div>
+            <div class="card"><h3>Snap a receipt <span class="pill pill--free">FREE</span></h3><p>Reads vendor, total, date, category, with expenses ready for tax time.</p></div>
           </div>
           <figure class="shot" style="max-width: 360px; margin: 1.4rem auto 0;"><MockAiChat /><figcaption>The in-job AI: diagnose, draft a reply, build the quote.</figcaption></figure>
-          <p class="note">Most AI is part of Blue Seal Pro. Receipt scanning is free for every tradesperson — the on-ramp to a paid subscription.</p>
+          <p class="note">Most AI is part of Blue Seal Pro. Receipt scanning is free for every tradesperson: the on-ramp to a paid subscription.</p>
         </div>
       </section>
 
@@ -335,20 +335,20 @@ function fmt(n: number): string {
       <section class="band band--paper">
         <div class="container reveal">
           <div class="kicker">Where we are</div>
-          <h2 class="h-lg">Past the hard part — built, and validating.</h2>
+          <h2 class="h-lg">Past the hard part: built, and validating.</h2>
           <p class="lead">The typical path from idea to scale. We've shipped the whole product and we're at validation. The raise funds the next three steps.</p>
           <div class="roadmap">
             <div class="rm-line">
               <div class="rm-node rm-done"><div class="rm-dot">✓</div><h4>Idea</h4><p>20 years in the trades; a real, lived problem.</p></div>
               <div class="rm-node rm-done"><div class="rm-dot">✓</div><h4>Design</h4><p>Architecture, brand, and flows.</p></div>
-              <div class="rm-node rm-done"><div class="rm-dot">✓</div><h4>Build — full MVP</h4><p>Vetting, marketplace, AI, invoicing, payments.</p></div>
+              <div class="rm-node rm-done"><div class="rm-dot">✓</div><h4>Build: full MVP</h4><p>Vetting, marketplace, AI, invoicing, payments.</p></div>
               <div class="rm-node rm-now"><div class="rm-dot">◉</div><h4>Validate</h4><p>~100 verified Okanagan pros · real paid jobs.</p><div class="rm-here">You are here</div></div>
               <div class="rm-node"><div class="rm-dot">5</div><h4>Launch &amp; grow</h4><p>Incorporate · payments live · insurance partner · Okanagan marketing.</p></div>
               <div class="rm-node"><div class="rm-dot">6</div><h4>Scale</h4><p>Kamloops → all of BC.</p></div>
               <div class="rm-node"><div class="rm-dot">7</div><h4>Expand</h4><p>Alberta · enterprise · new verticals.</p></div>
             </div>
           </div>
-          <p class="note">Steps 5–7 are what the $150K funds. The product risk is behind us — this is a go-to-market raise, not a build raise.</p>
+          <p class="note">Steps 5–7 are what the $150K funds. The product risk is behind us. This is a go-to-market raise, not a build raise.</p>
         </div>
       </section>
 
@@ -357,14 +357,14 @@ function fmt(n: number): string {
         <div class="container reveal">
           <div class="kicker">The market</div>
           <h2 class="h-lg">~15,000 tradespeople in the Okanagan alone.</h2>
-          <p class="lead">Big, fragmented, mostly offline — and we've barely touched it. Penetration today is under 1%.</p>
+          <p class="lead">Big, fragmented, mostly offline, and we've barely touched it. Penetration today is under 1%.</p>
           <div class="grid g4 grid-top">
             <div class="tile tile--light"><div class="n">~15,000</div><div class="l">tradespeople in the Okanagan (SOM, est.)</div></div>
             <div class="tile tile--light"><div class="n">~23,000</div><div class="l">Thompson-Okanagan, +Kamloops</div></div>
             <div class="tile tile--light"><div class="n">~185,600</div><div class="l">tradespeople in BC (SAM, 2024)</div></div>
             <div class="tile tile--light"><div class="n">&lt;1%</div><div class="l">of the Okanagan onboarded so far</div></div>
           </div>
-          <p class="note">~900 plumbers in the Okanagan — one of 134 trades we serve. BC pool: ~185,600 tradespeople in construction (BC Construction Association / StatCan, 2024); Thompson-Okanagan ≈ 12.6% of provincial construction employment (Job Bank). Okanagan figure estimated bottom-up — verify before sharing.</p>
+          <p class="note">~900 plumbers in the Okanagan, just one of 134 trades we serve. BC pool: ~185,600 tradespeople in construction (BC Construction Association / StatCan, 2024); Thompson-Okanagan ≈ 12.6% of provincial construction employment (Job Bank). Okanagan figure estimated bottom-up; verify before sharing.</p>
         </div>
       </section>
 
@@ -440,7 +440,7 @@ function fmt(n: number): string {
       <section class="band band--paper">
         <div class="container reveal">
           <div class="kicker">Competition</div>
-          <h2 class="h-lg">Tools, or leads, or reviews. Nobody does all three — verified.</h2>
+          <h2 class="h-lg">Tools, or leads, or reviews. Nobody does all three, verified.</h2>
           <p class="lead">Everyone owns one slice of the job. None of them verify the pro, run the work, and price it fairly.</p>
           <div class="tablewrap grid-top">
             <table>
@@ -455,7 +455,7 @@ function fmt(n: number): string {
               </tbody>
             </table>
           </div>
-          <p class="note">Locally, a cluster of scrape-and-list “Okanagan trades directory” sites has appeared — proof homeowners search for this, but none verify the pro or run the job. They compete on listings; we compete on the whole transaction.</p>
+          <p class="note">Locally, a cluster of scrape-and-list “Okanagan trades directory” sites has appeared, proof homeowners search for this, but none verify the pro or run the job. They compete on listings; we compete on the whole transaction.</p>
         </div>
       </section>
 
@@ -466,16 +466,16 @@ function fmt(n: number): string {
           <h2 class="h-lg">Win one city. Then copy-paste.</h2>
           <div class="grid split grid-top">
             <div>
-              <div class="step"><span class="si">1</span><p class="m0"><strong>Build verified supply first</strong> — the marketplace is full before we spend on demand.</p></div>
-              <div class="step"><span class="si">2</span><p class="m0"><strong>Pour in demand</strong> — paid client acquisition onto a stocked shelf.</p></div>
+              <div class="step"><span class="si">1</span><p class="m0"><strong>Build verified supply first</strong>, so the marketplace is full before we spend on demand.</p></div>
+              <div class="step"><span class="si">2</span><p class="m0"><strong>Pour in demand</strong>: paid client acquisition onto a stocked shelf.</p></div>
               <div class="step"><span class="si">3</span><p class="m0"><strong>Saturate the Okanagan</strong>, prove the playbook, then repeat.</p></div>
               <div class="region-pills">
                 <span class="pill pill--next">Okanagan</span><span class="pill pill--next">Kamloops</span><span class="pill pill--next">BC</span><span class="pill pill--next">Alberta</span><span class="pill pill--next">Canada</span>
               </div>
             </div>
             <div class="grid loops">
-              <div class="card"><h4>Free loop 1 — bring your own client</h4><p class="m0">A pro invites their existing customer by link. A real client, acquired at $0.</p></div>
-              <div class="card"><h4>Free loop 2 — Pro waives the fee</h4><p class="m0">A Pro pro is cheaper to hire. That's a built-in referral engine.</p></div>
+              <div class="card"><h4>Free loop 1: bring your own client</h4><p class="m0">A pro invites their existing customer by link. A real client, acquired at $0.</p></div>
+              <div class="card"><h4>Free loop 2: Pro waives the fee</h4><p class="m0">A Pro pro is cheaper to hire. That's a built-in referral engine.</p></div>
             </div>
           </div>
         </div>
@@ -486,24 +486,24 @@ function fmt(n: number): string {
         <div class="container reveal">
           <div class="kicker">Where it grows</div>
           <h2 class="h-lg">Three more revenue lines on a base we already own.</h2>
-          <p class="lead">Each turns the verified audience we've earned into new revenue, with a real benchmark behind it. We're building the first — insurance — right now.</p>
+          <p class="lead">Each turns the verified audience we've earned into new revenue, with a real benchmark behind it. We're building the first (insurance) right now.</p>
           <div class="grid g3 eqh grid-top">
             <div class="card">
               <div class="bignum">~$135 / pro / yr</div>
               <h3 class="mt-s">Insurance <span class="pill pill--test">IN BUILD NOW</span></h3>
-              <p>Solo trades pay ~$900/yr for liability cover. We already verify it — and we're setting up placement right now, earning ~15% commission (or a ~$45 flat affiliate fee). 10% of 15,000 Okanagan pros ≈ a six-figure line locally; BC is ~12× larger.</p>
+              <p>Solo trades pay ~$900/yr for liability cover. We already verify it, and we're setting up placement right now, earning ~15% commission (or a ~$45 flat affiliate fee). 10% of 15,000 Okanagan pros ≈ a six-figure line locally; BC is ~12× larger.</p>
               <p class="src">Live this year. Run in Canada today by Zensurance, Foxquilt, APOLLO.</p>
             </div>
             <div class="card">
               <div class="bignum">$40 / seat / mo</div>
               <h3 class="mt-s">Enterprise &amp; dispatch <span class="pill pill--next">NEXT</span></h3>
-              <p>Team accounts billed per seat — a 5-person shop is ~$2,400/yr. We bill in CAD and undercut the incumbents' US-dollar pricing.</p>
+              <p>Team accounts billed per seat: a 5-person shop is ~$2,400/yr. We bill in CAD and undercut the incumbents' US-dollar pricing.</p>
               <p class="src">ServiceTitan: ~$245–398/tech/mo · $961M revenue · 70% margin (public).</p>
             </div>
             <div class="card">
               <div class="bignum">52,600 needed</div>
               <h3 class="mt-s">Apprenticeship pathway <span class="pill pill--pro">MISSION</span></h3>
-              <p>BC needs ~52,600 more tradespeople this decade. We pair journeymen with apprentices toward their Red &amp; Blue Seal — our future supply, and a moat.</p>
+              <p>BC needs ~52,600 more tradespeople this decade. We pair journeymen with apprentices toward their Red &amp; Blue Seal: our future supply, and a moat.</p>
               <p class="src">SkilledTradesBC: ~47,000 apprentices registered.</p>
             </div>
           </div>
@@ -539,7 +539,7 @@ function fmt(n: number): string {
               </tbody>
             </table>
           </div>
-          <p class="note">For scale: ServiceTitan does ~$961M revenue at ~70% margin (public, ~$6.6B market cap); Housecall Pro ~$600M ARR; Thumbtack ~$400M — the category supports eight–nine figures, and this is a fraction of that ceiling. Assumptions (illustrative): 30% Pro conversion; insurance in build now, modelled conservatively from Y2 (~10% of pros, ~$120/insured/yr, affiliate → embedded, needs a brokerage licence); enterprise per-seat from Y3 (~$40/seat/mo, teams a minority of accounts); ~70% gross margin. Swap in live figures before any meeting.</p>
+          <p class="note">For scale: ServiceTitan does ~$961M revenue at ~70% margin (public, ~$6.6B market cap); Housecall Pro ~$600M ARR; Thumbtack ~$400M. The category supports eight–nine figures, and this is a fraction of that ceiling. Assumptions (illustrative): 30% Pro conversion; insurance in build now, modelled conservatively from Y2 (~10% of pros, ~$120/insured/yr, affiliate → embedded, needs a brokerage licence); enterprise per-seat from Y3 (~$40/seat/mo, teams a minority of accounts); ~70% gross margin. Swap in live figures before any meeting.</p>
         </div>
       </section>
 
@@ -554,7 +554,7 @@ function fmt(n: number): string {
               <div>
                 <h3 class="member-name">James Jansen</h3>
                 <p class="member-role">Co-CEO · Product, Sales &amp; Marketing</p>
-                <p class="m0">Red Seal tradesperson, 20+ years; earning his Blue Seal this year. Lived the problem building his own home. Leads product, sales and marketing — and shoots the founding headshots (he's a professional photographer).</p>
+                <p class="m0">Red Seal tradesperson, 20+ years; earning his Blue Seal this year. Lived the problem building his own home. Leads product, sales and marketing, and shoots the founding headshots (he's a professional photographer).</p>
               </div>
             </div>
             <div class="card member">
@@ -562,12 +562,12 @@ function fmt(n: number): string {
               <div>
                 <h3 class="member-name">Johnny Jansen</h3>
                 <p class="member-role">Co-CEO · Technology &amp; Brand</p>
-                <p class="m0">Builds and maintains the platform, and owns the brand. Award-winning creative director — work with Disney, LEGO and Ocean Wise. Prism Prize winner, Juno nominee.</p>
+                <p class="m0">Builds and maintains the platform, and owns the brand. Award-winning creative director, with work for Disney, LEGO and Ocean Wise. Prism Prize winner, Juno nominee.</p>
               </div>
             </div>
           </div>
           <div class="card seat-card">
-            <h3>The seat we're filling — you</h3>
+            <h3>The seat we're filling: you</h3>
             <p class="m0">An equal third partner to incorporate the company and own <strong>legal + finance</strong>: structure, the tax / FINTRAC questions, and the books. Trade + growth + finance = a complete founding team.</p>
           </div>
         </div>
@@ -586,7 +586,7 @@ function fmt(n: number): string {
                 <li>Three equal owner-operators</li>
                 <li>You incorporate + run legal &amp; finance</li>
               </ul>
-              <p class="ask-note">A founder round, not a priced raise — deliberately accessible. The product is already six figures of built software. The valuation step-up comes at the next round, once the Okanagan is proven. That's your upside.</p>
+              <p class="ask-note">A founder round, not a priced raise, and deliberately accessible. The product is already six figures of built software. The valuation step-up comes at the next round, once the Okanagan is proven. That's your upside.</p>
             </div>
             <div class="card">
               <h4 class="funds-h">Where it goes</h4>
@@ -613,7 +613,7 @@ function fmt(n: number): string {
             <a class="btn btn--primary" href="#ask">Join as the third partner →</a>
             <a class="btn btn--outline" href="https://blueseal.app/search" target="_blank" rel="noopener">See the live app yourself</a>
           </div>
-          <p class="vision-foot">See the live marketplace at <strong>blueseal.app/search</strong> — or create an account and look around.</p>
+          <p class="vision-foot">See the live marketplace at <strong>blueseal.app/search</strong>, or create an account and look around.</p>
         </div>
       </section>
 
@@ -622,7 +622,7 @@ function fmt(n: number): string {
         <div class="container">
           <img src="/branding/Vertical/BlueSeal_Logo_Vert_White.png" alt="Blue Seal" />
           <p><strong>Johnny Jansen &amp; James Jansen</strong> · Kelowna, BC<br />contact@blueseal.app · blueseal.app</p>
-          <p class="fine">Confidential. Prepared for a prospective partner; not for distribution. Live counts read from the platform; other traction figures are illustrative placeholders and projections are modelled estimates on stated assumptions — not guarantees. © Blue Seal 2026.</p>
+          <p class="fine">Confidential. Prepared for a prospective partner; not for distribution. Live counts read from the platform; other traction figures are illustrative placeholders and projections are modelled estimates on stated assumptions, not guarantees. © Blue Seal 2026.</p>
         </div>
       </footer>
     </div>
