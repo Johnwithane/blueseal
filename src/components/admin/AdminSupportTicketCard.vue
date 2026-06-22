@@ -95,7 +95,8 @@ function useSuggestion(s: string) {
 }
 
 async function send() {
-  if (!draft.value.trim()) return;
+  // Re-entry guard so a double-tap can't email the customer the reply twice.
+  if (sending.value || !draft.value.trim()) return;
   sending.value = true;
   try {
     await sendSupportTicketReply({
@@ -206,7 +207,7 @@ onMounted(loadReplies);
       <div class="flex flex-wrap items-center gap-2">
         <SelectButton v-model="mode" :options="MODE_OPTIONS" option-label="label" option-value="value" :allow-empty="false" />
         <Select v-model="sendStatus" :options="STATUS_OPTIONS" option-label="label" option-value="value" class="w-40" />
-        <Button label="Send" icon="pi pi-send" size="small" :loading="sending" :disabled="!draft.trim()" @click="send" />
+        <Button label="Send" icon="pi pi-send" size="small" :loading="sending" :disabled="!draft.trim() || sending" @click="send" />
       </div>
       <p class="text-xs text-[color:var(--bs-muted)]">
         Sent from Blue Seal.<template v-if="mode === 'reply'"> Customer replies go to the monitored support inbox.</template>
