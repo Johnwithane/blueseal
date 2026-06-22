@@ -129,6 +129,26 @@ export function serviceLd(input: {
   };
 }
 
+/** Service — for per-city landing pages (e.g. tradespeople in Kelowna, BC). */
+export function cityServiceLd(input: {
+  city: string;
+  region: string;
+  description: string;
+  path: string;
+}): JsonLd {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Service",
+    serviceType: "Verified tradespeople",
+    name: `Verified tradespeople in ${input.city}, ${input.region}`,
+    description: input.description,
+    url: absoluteUrl(input.path),
+    areaServed: { "@type": "City", name: input.city },
+    provider: { "@id": ORG_ID },
+    category: "Home services",
+  };
+}
+
 /**
  * Person — for a verified tradesperson's public profile. Optional rating +
  * trade are included only when present so we never emit empty/zero values.

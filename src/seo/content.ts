@@ -13,6 +13,7 @@
 
 import { HELP_CONTENT_SEED } from "../data/help";
 import { TRADES } from "../data/trades";
+import { CITIES, findCity } from "../data/cities";
 import { SITE_NAME, SITE_TAGLINE, DEFAULT_DESCRIPTION, COUNTRY } from "./site";
 import {
   organizationLd,
@@ -21,6 +22,7 @@ import {
   faqPageLd,
   articleLd,
   serviceLd,
+  cityServiceLd,
   type JsonLd,
 } from "./jsonld";
 import { mdToHtml, mdToText, clampDescription, escapeHtml } from "./markdown";
@@ -306,6 +308,84 @@ function tradePageBody(key: string): string {
   ].join("");
 }
 
+// --- City landing pages (local SEO) -----------------------------------------
+
+function cityDescription(name: string, region: string): string {
+  return (
+    `Looking for a tradesperson in ${name}, ${region}? Blue Seal verifies every pro's ` +
+    `government ID and trade ticket by hand. Post a job and compare quotes, or search local ` +
+    `pros, then run the whole job in one place: quote, schedule, pay and review.`
+  );
+}
+
+export function citySeo(slug: string): SeoMeta | null {
+  const c = findCity(slug);
+  if (!c) return null;
+  const path = `/cities/${c.slug}`;
+  const description = cityDescription(c.name, c.region);
+  return {
+    title: `Verified tradespeople in ${c.name}, ${c.region}`,
+    description,
+    path,
+    type: "website",
+    jsonLd: [
+      cityServiceLd({ city: c.name, region: c.region, description, path }),
+      crumb({ name: "Areas", path: "/cities" }, { name: c.name, path }),
+    ],
+  };
+}
+
+function cityBody(slug: string): string {
+  const c = findCity(slug);
+  if (!c) return "";
+  const tradeLinks = TRADES.slice(0, 12).map((t) => link(`/search?trade=${t.key}`, t.label));
+  const otherCities = CITIES.filter((x) => x.slug !== c.slug).map((x) =>
+    link(`/cities/${x.slug}`, `${x.name}, ${x.region}`),
+  );
+  return [
+    section(
+      `<nav>${link("/cities", "Areas")} › ${escapeHtml(c.name)}</nav>` +
+        h1(`Verified tradespeople in ${c.name}, ${c.region}`) +
+        p(c.intro),
+    ),
+    section(`<h2>Every ${escapeHtml(c.name)} pro, verified</h2>${ul(TRUST_POINTS.map(escapeHtml))}`),
+    section(`<h2>How Blue Seal works in ${escapeHtml(c.name)}</h2>${ul(HOW_IT_WORKS.map(escapeHtml))}`),
+    section(
+      `<h2>Popular trades in ${escapeHtml(c.name)}</h2>${ul(tradeLinks)}${link("/trades", "See all trades")}`,
+    ),
+    section(
+      p("Ready to start?") +
+        link("/jobs/post", "Post a job and get quotes") +
+        " · " +
+        link("/search", "Search verified pros"),
+    ),
+    section(`<h2>Other areas we cover</h2>${ul(otherCities)}`),
+  ].join("");
+}
+
+export function citiesIndexSeo(): SeoMeta {
+  return {
+    title: "Areas we cover in the Okanagan",
+    description:
+      "Find verified, ID-checked tradespeople across the Okanagan and Thompson-Okanagan: " +
+      "Kelowna, West Kelowna, Vernon, Penticton, Kamloops and more.",
+    path: "/cities",
+    jsonLd: [crumb({ name: "Areas", path: "/cities" })],
+  };
+}
+
+function citiesIndexBody(): string {
+  const links = CITIES.map((c) => link(`/cities/${c.slug}`, `${c.name}, ${c.region}`));
+  return section(
+    h1("Areas we cover") +
+      p(
+        "Blue Seal is built in the Okanagan. Find verified tradespeople in your town, post a job " +
+          "and compare quotes, and run the whole job in one place.",
+      ) +
+      `<h2>Towns and cities</h2>${ul(links)}`,
+  );
+}
+
 // ===========================================================================
 // The full set of prerendered routes (drives scripts/prerender.ts + sitemap)
 // ===========================================================================
@@ -328,6 +408,26 @@ export function getPrerenderRoutes(): PrerenderRoute[] {
         path: `/trades/${t.key}`,
         seo,
         body: tradePageBody(t.key),
+        priority: 0.7,
+        changefreq: "monthly",
+      });
+    }
+  }
+
+  routes.push({
+    path: "/cities",
+    seo: citiesIndexSeo(),
+    body: citiesIndexBody(),
+    priority: 0.7,
+    changefreq: "monthly",
+  });
+  for (const c of CITIES) {
+    const seo = citySeo(c.slug);
+    if (seo) {
+      routes.push({
+        path: `/cities/${c.slug}`,
+        seo,
+        body: cityBody(c.slug),
         priority: 0.7,
         changefreq: "monthly",
       });
