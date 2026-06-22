@@ -212,7 +212,7 @@ onMounted(async () => {
           <!-- LEFT: kicker → oversized headline → CTA -->
           <div>
             <p class="bs-kicker !text-[color:var(--bs-blue-dark)]">
-              <i class="pi pi-verified" aria-hidden="true"></i>Verified Canadian tradespeople
+              <i class="pi pi-verified" aria-hidden="true"></i>Verified trades across Canada
             </p>
 
             <h1
@@ -271,16 +271,28 @@ onMounted(async () => {
                 </button>
               </form>
 
-              <div class="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
+              <!-- Client alt-path: stays right under the search, part of the same "hire" flow. -->
+              <p class="mt-4">
                 <RouterLink to="/jobs/post" class="bs-btn bs-btn--text">
                   or post a job and get bids →
                 </RouterLink>
-                <RouterLink
-                  v-if="!auth.isAuthenticated"
-                  to="/sign-up?as=tradesperson"
-                  class="bs-btn bs-btn--text"
-                >
-                  I'm a tradesperson →
+              </p>
+
+              <!-- Tradesperson door: a distinct strip, set apart so it never competes with the
+                   client search. Logged-out only — signed-in clients have no reason to see it. -->
+              <div
+                v-if="!auth.isAuthenticated"
+                class="mt-8 flex flex-col gap-3 border-t border-[color:var(--bs-blue-dark)]/15 pt-6 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <p class="flex items-center gap-2 text-[color:var(--bs-blue-dark)]/80">
+                  <i class="pi pi-wrench text-[color:var(--bs-red)]" aria-hidden="true"></i>
+                  <span>
+                    <span class="font-semibold text-[color:var(--bs-blue-dark)]">Work in the trades?</span>
+                    Get verified and start taking jobs.
+                  </span>
+                </p>
+                <RouterLink to="/sign-up?as=tradesperson" class="bs-btn bs-btn--secondary shrink-0">
+                  <i class="pi pi-id-card" aria-hidden="true"></i>I'm a tradesperson
                 </RouterLink>
               </div>
             </template>
@@ -573,8 +585,8 @@ onMounted(async () => {
           Ready to <span class="bs-mark">seal</span> the deal?
         </h2>
         <p class="mx-auto mt-4 max-w-2xl text-lg text-[color:var(--bs-blue-dark)]/80">
-          Need a job done right? Ready to get verified as a pro? Either way, Blue Seal is built for
-          trusted trades across Canada.
+          Find a verified tradesperson, or post a job and let vetted pros come to you. Blue Seal is
+          built for trusted trades across Canada.
         </p>
         <div class="mt-8 flex flex-wrap justify-center gap-3">
           <RouterLink to="/search" class="bs-btn bs-btn--primary bs-btn--lg">
@@ -584,6 +596,15 @@ onMounted(async () => {
             <i class="pi pi-megaphone" aria-hidden="true"></i>Post a job, get bids
           </RouterLink>
         </div>
+        <p v-if="!auth.isAuthenticated" class="mt-6 text-[color:var(--bs-blue-dark)]/75">
+          Work in the trades?
+          <RouterLink
+            to="/sign-up?as=tradesperson"
+            class="font-semibold text-[color:var(--bs-red)] underline-offset-2 hover:underline"
+          >
+            Get verified as a tradesperson →
+          </RouterLink>
+        </p>
       </div>
     </section>
   </div>
