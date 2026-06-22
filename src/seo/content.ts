@@ -65,9 +65,9 @@ export const TRUST_POINTS = [
 ];
 
 export const HOW_IT_WORKS = [
-  "Search verified pros by trade and area, or post a job and let pros come to you.",
-  "Chat, get an itemised quote, and schedule — all in one job thread.",
-  "Pay in-app on completion and leave a mutual review.",
+  "Post a job and let verified pros come to you, or search and shortlist them yourself.",
+  "Chat, get an itemised quote, and pick a time, all in one job thread.",
+  "Pay in-app when the job's done and leave a mutual review.",
 ];
 
 // ===========================================================================
@@ -126,10 +126,9 @@ function searchBody(): string {
     section(
       h1("Find a verified tradesperson in Canada") +
         p(
-          "Every tradesperson on Blue Seal is manually reviewed — government ID and trade " +
-            "certification verified by hand before they can take work, with insurance and " +
-            "workers'-comp badges on top. Search by trade and area, compare ratings, and start " +
-            "a job thread in minutes.",
+          "We check every tradesperson by hand: a government ID and trade ticket, verified " +
+            "before they can take work. Plenty add insurance and workers' comp badges too. " +
+            "Search by trade and area, compare ratings, and start a job thread in minutes.",
         ),
     ),
     section(`<h2>Browse by trade</h2>${ul(tradeLinks)}${link("/trades", "See all trades")}`),
@@ -140,7 +139,7 @@ export function helpCenterSeo(): SeoMeta {
   return {
     title: "Help Center",
     description:
-      "Guides and answers for clients and tradespeople using Blue Seal — getting verified, " +
+      "Guides and answers for clients and tradespeople using Blue Seal: getting verified, " +
       "finding a pro, posting a job, quotes, invoices, payments, safety and more.",
     path: "/help",
     jsonLd: [crumb({ name: "Help Center", path: "/help" })],
@@ -202,7 +201,7 @@ export function faqSeo(): SeoMeta {
   return {
     title: "Frequently asked questions",
     description:
-      "Answers to common questions about Blue Seal — how verification works, what it costs, " +
+      "Answers to common questions about Blue Seal: how verification works, what it costs, " +
       "the areas we cover, requesting quotes vs posting a job, payments and safety.",
     path: "/faq",
     jsonLd: [faqPageLd(faqs.map(faqText)), crumb({ name: "FAQ", path: "/faq" })],
@@ -240,7 +239,7 @@ export function tradesIndexSeo(): SeoMeta {
   return {
     title: "Find a tradesperson by trade",
     description:
-      "Browse every trade on Blue Seal — from plumbers and electricians to roofers, HVAC " +
+      "Browse every trade on Blue Seal, from plumbers and electricians to roofers, HVAC " +
       "techs and 50+ more. Find a verified, ID-checked pro near you across Canada.",
     path: "/trades",
     jsonLd: [crumb({ name: "Trades", path: "/trades" })],
@@ -253,8 +252,8 @@ function tradesIndexBody(): string {
     section(
       h1("Find a verified tradesperson by trade") +
         p(
-          "Every trade on Blue Seal is staffed by manually verified pros — government ID and " +
-            "trade certification checked by hand, with insurance and workers'-comp badges on top. " +
+          "Every trade on Blue Seal is staffed by verified pros. We check a government ID and " +
+            "trade ticket by hand, and plenty add insurance and workers' comp badges too. " +
             "Pick a trade to find one near you.",
         ),
     ) + section(`<h2>All trades</h2>${ul(links)}`)
@@ -264,7 +263,7 @@ function tradesIndexBody(): string {
 function tradeDescription(label: string): string {
   return (
     `Find a verified, ID-checked ${label.toLowerCase()} on Blue Seal. Compare certified ` +
-    `${label.toLowerCase()} pros across ${COUNTRY}, request quotes, schedule and pay — all in ` +
+    `${label.toLowerCase()} pros across ${COUNTRY}, request quotes, schedule and pay, all in ` +
     `one trusted job thread, with mutual reviews after every job.`
   );
 }

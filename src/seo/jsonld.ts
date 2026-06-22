@@ -36,7 +36,15 @@ export function organizationLd(): JsonLd {
     image: LOGO_URL,
     slogan: SITE_TAGLINE,
     description: DEFAULT_DESCRIPTION,
-    areaServed: { "@type": "Country", name: COUNTRY },
+    areaServed: [
+      { "@type": "Country", name: COUNTRY },
+      { "@type": "AdministrativeArea", name: "British Columbia" },
+      { "@type": "City", name: "Kelowna" },
+      { "@type": "City", name: "West Kelowna" },
+      { "@type": "City", name: "Vernon" },
+      { "@type": "City", name: "Penticton" },
+      { "@type": "City", name: "Kamloops" },
+    ],
   };
 }
 

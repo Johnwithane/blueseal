@@ -20,14 +20,14 @@ export const SITE_NAME = "Blue Seal";
 export const SITE_TAGLINE = "Trusted trades. Sealed with proof.";
 
 /** Default <title> shown on the homepage and used as the suffix elsewhere. */
-export const TITLE_DEFAULT = `${SITE_NAME} — Verified Canadian tradespeople`;
+export const TITLE_DEFAULT = `${SITE_NAME}: Verified Canadian Tradespeople`;
 /** Appended to per-page titles, e.g. "Find a plumber | Blue Seal". */
 export const TITLE_SUFFIX = ` | ${SITE_NAME}`;
 
 export const DEFAULT_DESCRIPTION =
-  "Blue Seal connects Canadian homeowners with verified tradespeople — every pro " +
-  "is checked for government ID, trade certification, insurance and WSIB. Search, " +
-  "quote, schedule, pay and review, all in one trusted job thread.";
+  "Hand-verified tradespeople across Canada. Blue Seal checks a pro's government ID " +
+  "and trade ticket before they can work, then runs the whole job in one place: post " +
+  "a job, compare quotes, schedule, pay and review.";
 
 /**
  * Default social-share image. Square 2048×2048 brand mark — an interim until a

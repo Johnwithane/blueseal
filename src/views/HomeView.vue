@@ -152,7 +152,7 @@ const steps = [
   {
     title: "Post a job, or search",
     blurb:
-      "Post your job and get bids from verified pros — or search and shortlist them yourself. Either way, you see who's verified up front.",
+      "Post your job and verified pros bid on it. Prefer to choose yourself? Search and shortlist instead. Either way, you see who's verified up front.",
   },
   {
     title: "Quote & schedule",
@@ -189,8 +189,8 @@ const standoutFeatures = [
     kicker: "Real verification",
     title: "Checked by a person, not a checkbox",
     blurb:
-      "Government ID and trade certification, verified by hand before a pro can take any work. Many pros add insurance and workers'-comp badges on top.",
-    points: ["Government ID — required", "Trade ticket — required", "Insurance + workers'-comp — added"],
+      "We check a government ID and trade certification by hand before a pro can take any work. Plenty of them add insurance and workers' comp badges on top of that.",
+    points: ["Government ID (required)", "Trade ticket (required)", "Insurance + workers' comp (optional)"],
     seal: "scene-verified",
   },
   {
@@ -218,12 +218,12 @@ const pipeline = [
 // as the standout features) and never names a competitor — the caption under
 // the table makes clear it describes the category, not one company.
 const comparisonRows = [
-  { feature: "Getting verified", blueSeal: "ID + trade ticket checked by a real person", others: "Anyone can list — or pay to appear" },
-  { feature: "After you match", blueSeal: "The whole job — quote, chat, schedule, invoice, pay", others: "A phone number, then you're on your own" },
-  { feature: "Leads", blueSeal: "Never charged for a job you didn't win", others: "Pros pay per lead — win or lose" },
+  { feature: "Getting verified", blueSeal: "ID + trade ticket checked by a real person", others: "Anyone can list, or pay to show up" },
+  { feature: "After you match", blueSeal: "The whole job: quote, chat, schedule, invoice, pay", others: "A phone number, then you're on your own" },
+  { feature: "Leads", blueSeal: "Never charged for a job you didn't win", others: "Pros pay per lead, win or lose" },
   { feature: "Your details", blueSeal: "Go to one verified pro you choose", others: "Sold to several contractors at once" },
-  { feature: "Reviews", blueSeal: "Both sides rated — clients and pros", others: "One-way only" },
-  { feature: "Tools", blueSeal: "AI quoting, invoicing & payments built in", others: "None — bring your own" },
+  { feature: "Reviews", blueSeal: "Clients and pros both get rated", others: "One-way only" },
+  { feature: "Tools", blueSeal: "AI quoting, invoicing & payments built in", others: "None. Bring your own" },
 ];
 
 // A short FAQ teaser pulled from the curated Help Center baseline.
@@ -266,8 +266,9 @@ onMounted(async () => {
 
             <p class="mt-6 max-w-xl text-lg leading-relaxed text-[color:var(--bs-blue-dark)]/80 sm:text-xl">
               A real person checks every tradesperson's government ID and trade ticket before they
-              take a job — so you know who's knocking. Then the whole job runs right here, from first
-              message to final payment — not a directory that hands you a phone number.
+              take a job, so you know exactly who's knocking. Then the whole job runs right here, from
+              the first message to the final payment. Not a directory that drops a phone number on you
+              and disappears.
             </p>
 
             <!-- Tradesperson view: straight to work. -->
@@ -331,7 +332,7 @@ onMounted(async () => {
 
           <!-- RIGHT: the official full-colour seal as the hero subject -->
           <div class="hidden justify-center lg:flex">
-            <BlueSealMark title="Blue Seal — verified" class="h-[24rem]" />
+            <BlueSealMark title="Blue Seal verified" class="h-[24rem]" />
           </div>
         </div>
 
@@ -372,8 +373,8 @@ onMounted(async () => {
             <span class="text-[color:var(--bs-blue)]">We go all the way to paid.</span>
           </h2>
           <p class="mt-4 text-lg leading-relaxed text-[color:var(--bs-blue-dark)]/80">
-            Most sites just point you at a phone number, then you're on your own. On Blue Seal the
-            entire job lives in one place — from the first message to the final payment.
+            Most sites just point you at a phone number, then leave you to it. With Blue Seal the
+            whole job lives in one place, from the first message to the final payment.
           </p>
         </div>
 
@@ -589,7 +590,7 @@ onMounted(async () => {
         </div>
 
         <p class="bs-reveal mt-5 text-center text-sm text-[color:var(--bs-muted)]">
-          Reflects how most online directories and lead-generation sites typically work — not any one company.
+          Reflects how most online directories and lead-generation sites typically work, not any one company.
         </p>
       </div>
     </section>
