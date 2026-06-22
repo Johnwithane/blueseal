@@ -22,6 +22,7 @@ interface ImportMetaEnv {
   readonly VITE_APP_NAME: string;
   readonly VITE_DEFAULT_CURRENCY: string;
   readonly VITE_DEFAULT_REGION: string;
+  readonly VITE_LAUNCH_PHASE: string;
   readonly VITE_GOOGLE_BUSINESS_ENABLED: string;
   readonly VITE_SUPPLIES_ENABLED: string;
 }

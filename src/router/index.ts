@@ -92,6 +92,19 @@ const routes: RouteRecordRaw[] = [
     component: () => import("@/views/TradePageView.vue"),
     meta: { layout: "hybrid" },
   },
+  // City landing pages (local-SEO discovery surface for Okanagan towns).
+  {
+    path: "/cities",
+    name: "CitiesIndex",
+    component: () => import("@/views/CitiesIndexView.vue"),
+    meta: { layout: "hybrid" },
+  },
+  {
+    path: "/cities/:city",
+    name: "CityPage",
+    component: () => import("@/views/CityView.vue"),
+    meta: { layout: "hybrid" },
+  },
   {
     path: "/request/:uid",
     name: "RequestQuote",

@@ -1,5 +1,14 @@
 import { test, expect, type Page } from "@playwright/test";
 
+// Launch phase mirrors the build (Vite inlines VITE_LAUNCH_PHASE from the same
+// process env). Default is supply-first "onboarding": the consumer marketplace
+// (search, trade + city pages) is noindex and out of the sitemap/llms.txt, and
+// the homepage recruits tradespeople. Set VITE_LAUNCH_PHASE=public to flip.
+const IS_ONBOARDING = (process.env.VITE_LAUNCH_PHASE ?? "onboarding") !== "public";
+const EXPECTED_HOME_TITLE = IS_ONBOARDING
+  ? "Get verified, get more work in the Okanagan | Blue Seal"
+  : "Blue Seal: Verified Canadian Tradespeople";
+
 // Real-browser smoke for the SEO/prerender work. Two halves:
 //  1. Raw HTTP (no JS) — proves the prerendered HTML + 200.html fallback are
 //     served, exactly as a non-JS crawler / LLM bot would see them.
@@ -49,18 +58,28 @@ test.describe("prerendered HTML (no JavaScript)", () => {
     expect(html).toContain('href="https://blueseal.app/"'); // default canonical, not a page-specific one
   });
 
-  test("sitemap lists content + trades, excludes noindex auth pages", async ({ request }) => {
+  test("sitemap lists indexed content, gates the marketplace by phase, excludes auth pages", async ({
+    request,
+  }) => {
     const xml = await (await request.get("/sitemap.xml")).text();
-    expect(xml).toContain("<loc>https://blueseal.app/trades/plumber</loc>");
     expect(xml).toContain("<loc>https://blueseal.app/help/get-verified</loc>");
     expect(xml).not.toContain("sign-in");
+    // Supply-first: the consumer marketplace is held out of the index while
+    // onboarding, then included once public.
+    if (IS_ONBOARDING) {
+      expect(xml).not.toContain("<loc>https://blueseal.app/trades/plumber</loc>");
+    } else {
+      expect(xml).toContain("<loc>https://blueseal.app/trades/plumber</loc>");
+    }
   });
 
   test("robots.txt + llms.txt resolve", async ({ request }) => {
     expect((await request.get("/robots.txt")).ok()).toBeTruthy();
     const llms = await (await request.get("/llms.txt")).text();
     expect(llms).toContain("# Blue Seal");
-    expect(llms).toContain("/trades/plumber");
+    // Trade pages appear in llms.txt only when the marketplace is public.
+    if (IS_ONBOARDING) expect(llms).not.toContain("/trades/plumber");
+    else expect(llms).toContain("/trades/plumber");
   });
 });
 
@@ -69,14 +88,15 @@ test.describe("hydrated app (@unhead active)", () => {
     await page.goto("/");
     await waitForHydration(page);
 
-    await expect(page).toHaveTitle("Blue Seal — Verified Canadian tradespeople");
+    await expect(page).toHaveTitle(EXPECTED_HOME_TITLE);
     const counts = await headCounts(page);
     // No duplicates after hydration: unhead adopted the baked tags in place.
     expect(counts.canonical).toBe(1);
     expect(counts.description).toBe(1);
     expect(counts.ogTitle).toBe(1);
-    // Home bakes Organization + WebSite + FAQPage; hydration must not double them.
-    expect(counts.jsonLd).toBe(3);
+    // Home bakes Organization + WebSite (+ FAQPage in the public phase);
+    // hydration must not double them.
+    expect(counts.jsonLd).toBe(IS_ONBOARDING ? 2 : 3);
   });
 
   test("a trade page boots and keeps single head tags", async ({ page }) => {

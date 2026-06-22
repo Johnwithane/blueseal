@@ -13,7 +13,15 @@
 
 import { HELP_CONTENT_SEED } from "../data/help";
 import { TRADES } from "../data/trades";
-import { SITE_NAME, SITE_TAGLINE, DEFAULT_DESCRIPTION, COUNTRY } from "./site";
+import { CITIES, findCity } from "../data/cities";
+import {
+  SITE_NAME,
+  SITE_TAGLINE,
+  DEFAULT_DESCRIPTION,
+  HOME_RECRUIT_DESCRIPTION,
+  COUNTRY,
+  IS_ONBOARDING,
+} from "./site";
 import {
   organizationLd,
   websiteLd,
@@ -21,6 +29,7 @@ import {
   faqPageLd,
   articleLd,
   serviceLd,
+  cityServiceLd,
   type JsonLd,
 } from "./jsonld";
 import { mdToHtml, mdToText, clampDescription, escapeHtml } from "./markdown";
@@ -65,9 +74,9 @@ export const TRUST_POINTS = [
 ];
 
 export const HOW_IT_WORKS = [
-  "Search verified pros by trade and area, or post a job and let pros come to you.",
-  "Chat, get an itemised quote, and schedule — all in one job thread.",
-  "Pay in-app on completion and leave a mutual review.",
+  "Post a job and let verified pros come to you, or search and shortlist them yourself.",
+  "Chat, get an itemised quote, and pick a time, all in one job thread.",
+  "Pay in-app when the job's done and leave a mutual review.",
 ];
 
 // ===========================================================================
@@ -75,6 +84,17 @@ export const HOW_IT_WORKS = [
 // ===========================================================================
 
 export function homeSeo(): SeoMeta {
+  // Supply-first: while onboarding, the homepage recruits tradespeople and is
+  // the indexed front door; the client marketplace pages are held noindex.
+  if (IS_ONBOARDING) {
+    return {
+      title: "Get verified, get more work in the Okanagan",
+      description: HOME_RECRUIT_DESCRIPTION,
+      path: "/",
+      type: "website",
+      jsonLd: [organizationLd(), websiteLd()],
+    };
+  }
   return {
     description: DEFAULT_DESCRIPTION,
     path: "/",
@@ -83,7 +103,35 @@ export function homeSeo(): SeoMeta {
   };
 }
 
+// Onboarding-phase homepage body (crawler/LLM view) — recruits tradespeople.
+function homeBodyRecruit(): string {
+  return [
+    section(h1("Get verified. Get more work.") + p(HOME_RECRUIT_DESCRIPTION)),
+    section(
+      `<h2>Why join Blue Seal</h2>${ul(
+        [
+          "A verified badge clients actually trust: government ID and trade ticket, checked by a person.",
+          "Win and run the whole job in one place: quotes, chat, scheduling, invoicing and payments.",
+          "An AI assistant that drafts quotes, replies and invoices in seconds.",
+          "Keep 100% of your invoice. Offline payments are free.",
+        ].map(escapeHtml),
+      )}`,
+    ),
+    section(
+      `<h2>How to join</h2>${ul(
+        [
+          "Apply and upload your trade ticket and government ID.",
+          "Our team verifies you by hand.",
+          "Go live and start winning work across the Okanagan.",
+        ].map(escapeHtml),
+      )}`,
+    ),
+    section(p("Ready?") + link("/sign-up?as=tradesperson", "Apply to get verified")),
+  ].join("");
+}
+
 function homeBody(): string {
+  if (IS_ONBOARDING) return homeBodyRecruit();
   const tradeLinks = TRADES.slice(0, 12).map((t) =>
     link(`/search?trade=${t.key}`, t.label),
   );
@@ -116,6 +164,7 @@ export function searchSeo(): SeoMeta {
       "location and rating. Compare certified pros, request quotes and book with confidence.",
     path: "/search",
     type: "website",
+    noindex: IS_ONBOARDING,
     jsonLd: [crumb({ name: "Find a tradesperson", path: "/search" })],
   };
 }
@@ -126,9 +175,9 @@ function searchBody(): string {
     section(
       h1("Find a verified tradesperson in Canada") +
         p(
-          "Every tradesperson on Blue Seal is manually reviewed — government ID, trade " +
-            "certification, insurance and WSIB — before they can take work. Search by trade " +
-            "and area, compare ratings, and start a job thread in minutes.",
+          "We check every tradesperson by hand: a government ID and trade ticket, verified " +
+            "before they can take work. Plenty add insurance and workers' comp badges too. " +
+            "Search by trade and area, compare ratings, and start a job thread in minutes.",
         ),
     ),
     section(`<h2>Browse by trade</h2>${ul(tradeLinks)}${link("/trades", "See all trades")}`),
@@ -139,7 +188,7 @@ export function helpCenterSeo(): SeoMeta {
   return {
     title: "Help Center",
     description:
-      "Guides and answers for clients and tradespeople using Blue Seal — getting verified, " +
+      "Guides and answers for clients and tradespeople using Blue Seal: getting verified, " +
       "finding a pro, posting a job, quotes, invoices, payments, safety and more.",
     path: "/help",
     jsonLd: [crumb({ name: "Help Center", path: "/help" })],
@@ -201,7 +250,7 @@ export function faqSeo(): SeoMeta {
   return {
     title: "Frequently asked questions",
     description:
-      "Answers to common questions about Blue Seal — how verification works, what it costs, " +
+      "Answers to common questions about Blue Seal: how verification works, what it costs, " +
       "the areas we cover, requesting quotes vs posting a job, payments and safety.",
     path: "/faq",
     jsonLd: [faqPageLd(faqs.map(faqText)), crumb({ name: "FAQ", path: "/faq" })],
@@ -239,9 +288,10 @@ export function tradesIndexSeo(): SeoMeta {
   return {
     title: "Find a tradesperson by trade",
     description:
-      "Browse every trade on Blue Seal — from plumbers and electricians to roofers, HVAC " +
+      "Browse every trade on Blue Seal, from plumbers and electricians to roofers, HVAC " +
       "techs and 50+ more. Find a verified, ID-checked pro near you across Canada.",
     path: "/trades",
+    noindex: IS_ONBOARDING,
     jsonLd: [crumb({ name: "Trades", path: "/trades" })],
   };
 }
@@ -252,8 +302,9 @@ function tradesIndexBody(): string {
     section(
       h1("Find a verified tradesperson by trade") +
         p(
-          "Every trade on Blue Seal is staffed by manually verified pros — ID, certification, " +
-            "insurance and WSIB checked. Pick a trade to find one near you.",
+          "Every trade on Blue Seal is staffed by verified pros. We check a government ID and " +
+            "trade ticket by hand, and plenty add insurance and workers' comp badges too. " +
+            "Pick a trade to find one near you.",
         ),
     ) + section(`<h2>All trades</h2>${ul(links)}`)
   );
@@ -262,7 +313,7 @@ function tradesIndexBody(): string {
 function tradeDescription(label: string): string {
   return (
     `Find a verified, ID-checked ${label.toLowerCase()} on Blue Seal. Compare certified ` +
-    `${label.toLowerCase()} pros across ${COUNTRY}, request quotes, schedule and pay — all in ` +
+    `${label.toLowerCase()} pros across ${COUNTRY}, request quotes, schedule and pay, all in ` +
     `one trusted job thread, with mutual reviews after every job.`
   );
 }
@@ -277,6 +328,7 @@ export function tradePageSeo(key: string): SeoMeta | null {
     description,
     path,
     type: "website",
+    noindex: IS_ONBOARDING,
     jsonLd: [
       serviceLd({ tradeLabel: trade.label, description, path }),
       crumb({ name: "Trades", path: "/trades" }, { name: trade.label, path }),
@@ -305,6 +357,86 @@ function tradePageBody(key: string): string {
   ].join("");
 }
 
+// --- City landing pages (local SEO) -----------------------------------------
+
+function cityDescription(name: string, region: string): string {
+  return (
+    `Looking for a tradesperson in ${name}, ${region}? Blue Seal verifies every pro's ` +
+    `government ID and trade ticket by hand. Post a job and compare quotes, or search local ` +
+    `pros, then run the whole job in one place: quote, schedule, pay and review.`
+  );
+}
+
+export function citySeo(slug: string): SeoMeta | null {
+  const c = findCity(slug);
+  if (!c) return null;
+  const path = `/cities/${c.slug}`;
+  const description = cityDescription(c.name, c.region);
+  return {
+    title: `Verified tradespeople in ${c.name}, ${c.region}`,
+    description,
+    path,
+    type: "website",
+    noindex: IS_ONBOARDING,
+    jsonLd: [
+      cityServiceLd({ city: c.name, region: c.region, description, path }),
+      crumb({ name: "Areas", path: "/cities" }, { name: c.name, path }),
+    ],
+  };
+}
+
+function cityBody(slug: string): string {
+  const c = findCity(slug);
+  if (!c) return "";
+  const tradeLinks = TRADES.slice(0, 12).map((t) => link(`/search?trade=${t.key}`, t.label));
+  const otherCities = CITIES.filter((x) => x.slug !== c.slug).map((x) =>
+    link(`/cities/${x.slug}`, `${x.name}, ${x.region}`),
+  );
+  return [
+    section(
+      `<nav>${link("/cities", "Areas")} › ${escapeHtml(c.name)}</nav>` +
+        h1(`Verified tradespeople in ${c.name}, ${c.region}`) +
+        p(c.intro),
+    ),
+    section(`<h2>Every ${escapeHtml(c.name)} pro, verified</h2>${ul(TRUST_POINTS.map(escapeHtml))}`),
+    section(`<h2>How Blue Seal works in ${escapeHtml(c.name)}</h2>${ul(HOW_IT_WORKS.map(escapeHtml))}`),
+    section(
+      `<h2>Popular trades in ${escapeHtml(c.name)}</h2>${ul(tradeLinks)}${link("/trades", "See all trades")}`,
+    ),
+    section(
+      p("Ready to start?") +
+        link("/jobs/post", "Post a job and get quotes") +
+        " · " +
+        link("/search", "Search verified pros"),
+    ),
+    section(`<h2>Other areas we cover</h2>${ul(otherCities)}`),
+  ].join("");
+}
+
+export function citiesIndexSeo(): SeoMeta {
+  return {
+    title: "Areas we cover in the Okanagan",
+    description:
+      "Find verified, ID-checked tradespeople across the Okanagan and Thompson-Okanagan: " +
+      "Kelowna, West Kelowna, Vernon, Penticton, Kamloops and more.",
+    path: "/cities",
+    noindex: IS_ONBOARDING,
+    jsonLd: [crumb({ name: "Areas", path: "/cities" })],
+  };
+}
+
+function citiesIndexBody(): string {
+  const links = CITIES.map((c) => link(`/cities/${c.slug}`, `${c.name}, ${c.region}`));
+  return section(
+    h1("Areas we cover") +
+      p(
+        "Blue Seal is built in the Okanagan. Find verified tradespeople in your town, post a job " +
+          "and compare quotes, and run the whole job in one place.",
+      ) +
+      `<h2>Towns and cities</h2>${ul(links)}`,
+  );
+}
+
 // ===========================================================================
 // The full set of prerendered routes (drives scripts/prerender.ts + sitemap)
 // ===========================================================================
@@ -327,6 +459,26 @@ export function getPrerenderRoutes(): PrerenderRoute[] {
         path: `/trades/${t.key}`,
         seo,
         body: tradePageBody(t.key),
+        priority: 0.7,
+        changefreq: "monthly",
+      });
+    }
+  }
+
+  routes.push({
+    path: "/cities",
+    seo: citiesIndexSeo(),
+    body: citiesIndexBody(),
+    priority: 0.7,
+    changefreq: "monthly",
+  });
+  for (const c of CITIES) {
+    const seo = citySeo(c.slug);
+    if (seo) {
+      routes.push({
+        path: `/cities/${c.slug}`,
+        seo,
+        body: cityBody(c.slug),
         priority: 0.7,
         changefreq: "monthly",
       });
