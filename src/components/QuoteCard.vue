@@ -8,8 +8,7 @@ import { ref as storageRef, getDownloadURL } from "firebase/storage";
 import { storage } from "@/firebase/config";
 import type { QuoteDoc, QuoteStatus, WithId } from "@/firebase/interfaces";
 import { useFormatters } from "@/composables/useFormatters";
-import { useToast } from "@/composables/useToast";
-import { humanizeError } from "@/utils/errors";
+import { usePdfDocument } from "@/composables/usePdfDocument";
 import PdfPreviewDialog from "@/components/PdfPreviewDialog.vue";
 import QuoteBreakdown from "@/components/QuoteBreakdown.vue";
 
@@ -36,29 +35,20 @@ watch(
   { immediate: true },
 );
 
-const toast = useToast();
-const renderingPdf = ref(false);
-const pdfBlob = ref<Blob | null>(null);
-const pdfFilename = ref("");
-const showPdfPreview = ref(false);
+// Preview on desktop; download to the OS viewer on touch (see usePdfDocument).
+const { renderingPdf, pdfBlob, pdfFilename, showPdfPreview, downloadMode, present } =
+  usePdfDocument();
 
-async function openPdfPreview() {
-  if (!quote.value || renderingPdf.value) return;
-  renderingPdf.value = true;
-  try {
+function openPdfPreview() {
+  const q = quote.value;
+  if (!q) return;
+  void present(async () => {
     const [{ renderQuotePdfBlob }, party] = await Promise.all([
       import("@/utils/pdfRender"),
       getInvoicePartyInfo(props.jobId),
     ]);
-    const { blob, filename } = await renderQuotePdfBlob(quote.value, party);
-    pdfBlob.value = blob;
-    pdfFilename.value = filename;
-    showPdfPreview.value = true;
-  } catch (e) {
-    toast.error("Couldn't render PDF", humanizeError(e));
-  } finally {
-    renderingPdf.value = false;
-  }
+    return renderQuotePdfBlob(q, party);
+  });
 }
 
 const emit = defineEmits<{
@@ -217,8 +207,8 @@ const STATUS_LABEL: Record<QuoteStatus, string> = {
         @click="emit('revise')"
       />
       <Button
-        label="View PDF"
-        icon="pi pi-file-pdf"
+        :label="downloadMode ? 'Download PDF' : 'View PDF'"
+        :icon="downloadMode ? 'pi pi-download' : 'pi pi-file-pdf'"
         outlined
         size="small"
         :loading="renderingPdf"

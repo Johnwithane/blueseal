@@ -30,6 +30,7 @@ import type {
   WithId,
 } from "@/firebase/interfaces";
 import { useFormatters } from "@/composables/useFormatters";
+import { usePdfDocument } from "@/composables/usePdfDocument";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 import SelectButton from "primevue/selectbutton";
@@ -46,10 +47,9 @@ const props = defineProps<{
   defaultCollapsed?: boolean;
 }>();
 
-const renderingPdf = ref(false);
-const pdfBlob = ref<Blob | null>(null);
-const pdfFilename = ref("");
-const showPdfPreview = ref(false);
+// Preview on desktop; download to the OS viewer on touch (see usePdfDocument).
+const { renderingPdf, pdfBlob, pdfFilename, showPdfPreview, downloadMode, present } =
+  usePdfDocument();
 
 // Collapsible state. Initialised from defaultCollapsed; user can toggle.
 const collapsed = ref(false);
@@ -61,23 +61,16 @@ watch(
   { immediate: true },
 );
 
-async function openPdfPreview() {
-  if (!invoice.value || renderingPdf.value) return;
-  renderingPdf.value = true;
-  try {
+function openPdfPreview() {
+  const inv = invoice.value;
+  if (!inv) return;
+  void present(async () => {
     const [{ renderInvoicePdfBlob }, party] = await Promise.all([
       import("@/utils/pdfRender"),
-      getInvoicePartyInfo(invoice.value.jobId),
+      getInvoicePartyInfo(inv.jobId),
     ]);
-    const { blob, filename } = await renderInvoicePdfBlob(invoice.value, party);
-    pdfBlob.value = blob;
-    pdfFilename.value = filename;
-    showPdfPreview.value = true;
-  } catch (e) {
-    toast.error("Couldn't render PDF", humanizeError(e));
-  } finally {
-    renderingPdf.value = false;
-  }
+    return renderInvoicePdfBlob(inv, party);
+  });
 }
 
 const invoice = ref<WithId<InvoiceDoc> | null>(null);
@@ -713,12 +706,12 @@ async function markPaid() {
       </div>
 
       <!-- View / download row: visible to both tradesperson and client.
-           Opens the PDF in an in-app preview modal with download +
-           open-in-new-tab from the modal footer. -->
+           Desktop opens an in-app preview modal (download + open-in-new-tab in
+           its footer); touch devices download the PDF straight to the OS. -->
       <div class="flex items-center mt-3">
         <Button
-          label="View PDF"
-          icon="pi pi-file-pdf"
+          :label="downloadMode ? 'Download PDF' : 'View PDF'"
+          :icon="downloadMode ? 'pi pi-download' : 'pi pi-file-pdf'"
           outlined
           size="small"
           :loading="renderingPdf"

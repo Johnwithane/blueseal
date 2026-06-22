@@ -64,9 +64,11 @@ const KIND_ICON: Record<LineItemKind, string> = {
       "{{ quote.noteToClient }}"
     </div>
 
-    <!-- Scroll the line-item table on narrow screens instead of squishing. -->
+    <!-- On mobile the Detail column is hidden, so the two remaining columns fit
+         without scrolling; keep the min-width (and scroll fallback) only from
+         sm up, where the third column appears. -->
     <div class="overflow-x-auto">
-      <table class="w-full text-sm border-t min-w-[28rem]">
+      <table class="w-full text-sm border-t sm:min-w-[28rem]">
         <thead>
           <tr class="text-left text-[color:var(--bs-muted)]">
             <th class="py-1 font-medium">Item</th>
@@ -95,7 +97,7 @@ const KIND_ICON: Record<LineItemKind, string> = {
                 <span class="min-w-0">{{ li.description }}</span>
               </div>
             </td>
-            <td class="py-1.5 text-right text-xs text-[color:var(--bs-muted)]">
+            <td class="py-1.5 text-right text-xs text-[color:var(--bs-muted)] hidden sm:table-cell">
               <template v-if="li.kind === 'hourly'">
                 {{ li.quantity }}h × {{ money(li.unitPrice) }}/hr
               </template>

@@ -9,3 +9,4 @@ export * from "./useActiveClock";
 export * from "./useHelpContent";
 export * from "./useSeo";
 export * from "./useFormErrors";
+export * from "./usePdfDocument";
