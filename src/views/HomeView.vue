@@ -62,6 +62,25 @@ function runSearch() {
   router.push({ name: "Search", query: { ...(q.value.trim() ? { q: q.value.trim() } : {}) } });
 }
 
+// Primary hero action: post a job and get bids. Carry the typed "what" over as
+// the job-post description via the existing jobPostDraft localStorage handoff
+// (PostJobView hydrates it on mount). The precise service address is collected
+// on the post form itself, so we deliberately don't carry the coarse "where".
+function postJob() {
+  const what = q.value.trim();
+  if (what) {
+    try {
+      const raw = localStorage.getItem("jobPostDraft");
+      const draft = (raw ? JSON.parse(raw) : {}) as Record<string, unknown>;
+      draft.description = what;
+      localStorage.setItem("jobPostDraft", JSON.stringify(draft));
+    } catch {
+      /* storage unavailable or corrupt draft — the post page still loads */
+    }
+  }
+  router.push("/jobs/post");
+}
+
 // Attach the Places autocomplete to the hero "where" field (client view only).
 onMounted(async () => {
   if (heroMode.value === "tradesperson") return;
@@ -131,9 +150,9 @@ onMounted(() => {
 // How it works — three steps, rendered as oversized editorial numerals.
 const steps = [
   {
-    title: "Search & shortlist",
+    title: "Post a job, or search",
     blurb:
-      "Filter by trade, distance and rating. You can see who's verified right there on their profile.",
+      "Post your job and get bids from verified pros — or search and shortlist them yourself. Either way, you see who's verified up front.",
   },
   {
     title: "Quote & schedule",
@@ -182,6 +201,16 @@ const standoutFeatures = [
     points: ["Itemised quotes", "Auto-invoicing", "In-app pay & payouts"],
     seal: "scene-invoice",
   },
+];
+
+// The whole-job pipeline — the core separator from a directory. Five stages
+// that all live inside Blue Seal, where a directory stops at the introduction.
+const pipeline = [
+  { icon: "pi-megaphone", label: "Post or request", sub: "Get bids, or message a pro direct" },
+  { icon: "pi-calculator", label: "Itemised quote", sub: "Clear pricing, drafted with AI" },
+  { icon: "pi-calendar", label: "Schedule", sub: "Pick a time, on a shared board" },
+  { icon: "pi-receipt", label: "Invoice", sub: "Auto-built when the job's done" },
+  { icon: "pi-check-circle", label: "Paid & reviewed", sub: "Pay in-app; both sides rate" },
 ];
 
 // "Blue Seal vs. the rest" — concrete, side-by-side contrast vs a generic
@@ -236,9 +265,9 @@ onMounted(async () => {
             </h1>
 
             <p class="mt-6 max-w-xl text-lg leading-relaxed text-[color:var(--bs-blue-dark)]/80 sm:text-xl">
-              A real person checks every tradesperson's government ID and trade ticket before they can
-              take a job — with insurance and workers'-comp badges on top. So you always know who's
-              knocking on your door.
+              A real person checks every tradesperson's government ID and trade ticket before they
+              take a job — so you know who's knocking. Then the whole job runs right here, from first
+              message to final payment — not a directory that hands you a phone number.
             </p>
 
             <!-- Tradesperson view: straight to work. -->
@@ -255,7 +284,7 @@ onMounted(async () => {
             <template v-else>
               <form
                 class="mt-8 flex flex-col gap-2 rounded-2xl bg-white p-2 shadow-[0_14px_44px_-14px_rgba(42,58,92,0.55)] sm:flex-row sm:items-center sm:rounded-full"
-                @submit.prevent="runSearch"
+                @submit.prevent="postJob"
               >
                 <label class="flex flex-1 items-center gap-2 px-3">
                   <i class="pi pi-wrench text-[color:var(--bs-muted)]" aria-hidden="true"></i>
@@ -281,14 +310,14 @@ onMounted(async () => {
                   />
                 </label>
                 <button type="submit" class="bs-btn bs-btn--red w-full justify-center sm:w-auto sm:!rounded-full">
-                  <i class="pi pi-search" aria-hidden="true"></i><span>Search</span>
+                  <i class="pi pi-megaphone" aria-hidden="true"></i><span>Post a job &amp; get bids</span>
                 </button>
               </form>
 
               <div class="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
-                <RouterLink to="/jobs/post" class="bs-btn bs-btn--text">
-                  or post a job and get bids →
-                </RouterLink>
+                <button type="button" class="bs-btn bs-btn--text" @click="runSearch">
+                  or search verified pros yourself →
+                </button>
                 <RouterLink
                   v-if="!auth.isAuthenticated"
                   to="/sign-up?as=tradesperson"
@@ -328,6 +357,46 @@ onMounted(async () => {
           <span class="flex items-center gap-2"><i class="pi pi-star text-[color:var(--bs-red)]"></i> Mutual reviews</span>
           <span class="flex items-center gap-2"><i class="pi pi-bolt text-[color:var(--bs-red)]"></i> AI quote helper</span>
         </span>
+      </div>
+    </section>
+
+    <!-- ══ CHAPTER 2.5 · THE WHOLE JOB — beige; the core separator from a directory ══ -->
+    <section class="bs-band bg-[color:var(--bs-beige)] py-20 sm:py-24">
+      <div class="bs-container">
+        <div class="bs-reveal mx-auto max-w-2xl text-center">
+          <span class="bs-kicker !text-[color:var(--bs-red)]">Run the whole job</span>
+          <h2
+            class="bs-display mt-3 text-4xl leading-[1.02] tracking-[-0.015em] text-[color:var(--bs-blue-dark)] sm:text-5xl"
+          >
+            A directory ends at “hello.”<br class="hidden sm:block" />
+            <span class="text-[color:var(--bs-blue)]">We go all the way to paid.</span>
+          </h2>
+          <p class="mt-4 text-lg leading-relaxed text-[color:var(--bs-blue-dark)]/80">
+            Most sites just point you at a phone number, then you're on your own. On Blue Seal the
+            entire job lives in one place — from the first message to the final payment.
+          </p>
+        </div>
+
+        <ol class="bs-reveal mt-12 flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between sm:gap-2">
+          <template v-for="(stage, i) in pipeline" :key="stage.label">
+            <li class="flex items-center gap-4 sm:flex-1 sm:flex-col sm:gap-3 sm:text-center">
+              <div
+                class="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-white text-xl text-[color:var(--bs-blue)] shadow-[0_8px_24px_-12px_rgba(42,58,92,0.5)]"
+              >
+                <i :class="`pi ${stage.icon}`" aria-hidden="true"></i>
+              </div>
+              <div class="min-w-0">
+                <div class="font-semibold text-[color:var(--bs-blue-dark)]">{{ stage.label }}</div>
+                <div class="mt-0.5 text-sm leading-snug text-[color:var(--bs-blue-dark)]/70">{{ stage.sub }}</div>
+              </div>
+            </li>
+            <i
+              v-if="i < pipeline.length - 1"
+              class="pi pi-arrow-right hidden shrink-0 self-center pt-7 text-[color:var(--bs-mid-blue)] sm:block"
+              aria-hidden="true"
+            ></i>
+          </template>
+        </ol>
       </div>
     </section>
 
@@ -654,11 +723,11 @@ onMounted(async () => {
           trusted trades across Canada.
         </p>
         <div class="mt-8 flex flex-wrap justify-center gap-3">
-          <RouterLink to="/search" class="bs-btn bs-btn--primary bs-btn--lg">
-            <i class="pi pi-search" aria-hidden="true"></i>Find a tradesperson
-          </RouterLink>
-          <RouterLink to="/jobs/post" class="bs-btn bs-btn--secondary bs-btn--lg">
+          <RouterLink to="/jobs/post" class="bs-btn bs-btn--primary bs-btn--lg">
             <i class="pi pi-megaphone" aria-hidden="true"></i>Post a job, get bids
+          </RouterLink>
+          <RouterLink to="/search" class="bs-btn bs-btn--secondary bs-btn--lg">
+            <i class="pi pi-search" aria-hidden="true"></i>Find a tradesperson
           </RouterLink>
         </div>
       </div>

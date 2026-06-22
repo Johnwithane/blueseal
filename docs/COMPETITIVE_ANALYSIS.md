@@ -142,6 +142,29 @@ Prioritized. **P0 = do now / cheap & high-leverage. P1 = next quarter. P2 = watc
 
 ---
 
+## 9. The local directory landscape (Okanagan)
+
+A scan of the Okanagan surfaces a *cluster* of local "trades directory" sites — okanagantradedirectory.ca, **okanagantradesdirectory.com**, okanagantrades.ca, okanaganlist.ca, okanaganthrive.com, theokanaganmarket.com, okanagan-local.ca — most following the identical pattern: **scrape business listings from Google/public sources → display them → let a business "claim" the listing and pay for a featured spot or ads.** A couple also run a "claim your profile" flow (the same mechanic as Blue Seal's prospects system).
+
+**Read this correctly — it is two signals, not one threat:**
+
+1. **The directory lane is saturated and commoditized.** Half a dozen near-identical sites exist *because the model is trivially cheap to stand up* (scrape Places, list, sell claims/ads). They compete on SEO and listing volume, not on doing anything hard. A seventh changes nothing.
+2. **The lane Blue Seal actually occupies is empty.** Not one of these directories verifies cert + government ID by a person, runs the job (quote → chat → schedule → invoice → paid), does mutual reviews, or gives the pro real tools. They hand over a phone number and stop. Confirmed against the earlier finding: **no BC-native verified, *transactional* trades platform exists.**
+
+So the crowding is entirely at the **bottom of the value stack** (discovery), where barriers are low — not where Blue Seal plays (trust + the whole transaction), which is hard and uncontested. The proliferation is actually validation that Okanagan homeowners search for "find a trade locally," plus a pile of low-quality noise Blue Seal can visibly rise above.
+
+**The trap to avoid:** marketing Blue Seal as "another site where you claim your listing" drops it *into* the saturated pile. The scrape-and-claim mechanic (our prospects system) is fine as a *sourcing* tactic, but it cannot be the headline — every directory already does it. The headline must be **everything that happens after the claim.**
+
+**Separation playbook (what they structurally can't copy):**
+- **Real verification** — "verified" elsewhere means "paid / claimed"; here it means a person checked a ticket + government ID.
+- **Run the whole job** — directories end at the intro; Blue Seal goes quote → chat → schedule → invoice → paid. This is real software, not a scrape.
+- **Mutual reviews**, **no pay-per-lead / capped fee**, and **AI + business tools** on top.
+- One-liner: **"A directory helps you get found. Blue Seal gets you hired, gets the job done, and gets you paid."**
+- **Don't fight them on directory SEO** (low-value, contested terms) — win on trust, outcome, and word-of-mouth (a Red Seal founder vouching beats any scraper site).
+- **They're a supply source, not just a rival** — their public listings are businesses the prospects system can compliantly invite into *verified* supply.
+
+---
+
 ### Sources
 
 Vendor pricing & comparison: getonecrew, myquoteiq, g2, housecallpro.com, schedulingkit, projul, fieldcamp.ai, softwaresuggest, serviceagent.ai, kickserv.com, itqlick, softwareconnect. Marketplaces: angi.com/faq, ftc.gov (HomeAdvisor orders 2023), consumeraffairs (Angi 2025 settlement), 7ten.marketing, pipelineon, sidehustles, help.bark.com, networx.com, homestars.com/go.homestars.com, trustedpros.ca, taskrabbit.ca, urbantasker, intact/newswire (Jiffy), handy.com. Trends/M&A: prnewswire (Jobber Copilot/AI; Housecall Pro fall-2025 AI), servicetitan.com/press (Titan Intelligence/Atlas/Pantheon 2025), cnbc/iposcoop (ServiceTitan IPO), hightechinvesting (Angi IAC spinoff), sacra (Jobber/ServiceTitan financials), marketsandmarkets/mordorintelligence/businessresearchinsights (FSM market size). Benchmarks: abovethecrowd.com (Gurley), pubsonline.informs.org (Hagiu & Wright 2023; Trust & Disintermediation), sharetribe, a16z 13 Metrics, openai.com/microsoft (AI anchors), stripe.com/en-ca, canada.ca Dept. of Finance (2024 interchange cut), chainstoreage/businesswire (Trua survey).

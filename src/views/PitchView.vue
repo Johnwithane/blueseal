@@ -156,7 +156,7 @@ function fmt(n: number): string {
               </div>
               <div class="cta-row">
                 <a class="btn btn--primary" href="#ask">The ask: $150K for a third →</a>
-                <a class="btn btn--ghost" href="https://blueseal.app/search" target="_blank" rel="noopener">Browse the live directory</a>
+                <a class="btn btn--ghost" href="https://blueseal.app/search" target="_blank" rel="noopener">See the live marketplace</a>
               </div>
             </div>
             <div class="charwrap">
@@ -455,6 +455,7 @@ function fmt(n: number): string {
               </tbody>
             </table>
           </div>
+          <p class="note">Locally, a cluster of scrape-and-list “Okanagan trades directory” sites has appeared — proof homeowners search for this, but none verify the pro or run the job. They compete on listings; we compete on the whole transaction.</p>
         </div>
       </section>
 
@@ -612,7 +613,7 @@ function fmt(n: number): string {
             <a class="btn btn--primary" href="#ask">Join as the third partner →</a>
             <a class="btn btn--outline" href="https://blueseal.app/search" target="_blank" rel="noopener">See the live app yourself</a>
           </div>
-          <p class="vision-foot">Browse the verified directory at <strong>blueseal.app/search</strong> — or create an account and look around.</p>
+          <p class="vision-foot">See the live marketplace at <strong>blueseal.app/search</strong> — or create an account and look around.</p>
         </div>
       </section>
 
