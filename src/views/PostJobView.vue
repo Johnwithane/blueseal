@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch, computed } from "vue";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import NumberField from "@/components/NumberField.vue";
@@ -42,6 +42,7 @@ useSeo({
 });
 
 const router = useRouter();
+const route = useRoute();
 const auth = useAuthStore();
 const toast = useToast();
 const { maybePromptForPush } = usePushPrompt();
@@ -178,6 +179,14 @@ onMounted(async () => {
     }
   } catch {
     /* corrupted draft — ignore */
+  }
+
+  // Hand-off from the homepage hero: ?describe=… seeds the plain-English entry
+  // so the client lands mid-momentum, trade suggestions already showing. Only
+  // fills a blank box, so a restored draft always wins.
+  const seed = route.query.describe;
+  if (typeof seed === "string" && seed.trim() && !describe.value.trim()) {
+    describe.value = seed.trim().slice(0, 200);
   }
 
   // Wire Google Places autocomplete on the address line.

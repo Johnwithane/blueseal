@@ -9,7 +9,6 @@ import { HELP_CONTENT_SEED } from "@/data/help";
 import SealCharacter from "@/components/SealCharacter.vue";
 import BlueSealMark from "@/components/brand/BlueSealMark.vue";
 import MarkdownProse from "@/components/help/MarkdownProse.vue";
-import { useGoogleMaps } from "@/composables/useGoogleMaps";
 import { useSeo } from "@/composables/useSeo";
 import { homeSeo } from "@/seo/content";
 
@@ -26,68 +25,16 @@ const heroMode = computed<"tradesperson" | "client-or-public">(() =>
     : "client-or-public",
 );
 
-// Search-as-hero (client view). "What" → /search's describe box via ?q.
-// "Where" → the same Google Places autocomplete used in /search, persisted to
-// the shared `searchLocation` key so /search restores it and runs immediately.
-const q = ref("");
-const whereInput = ref<HTMLInputElement | null>(null);
-const pickedLocation = ref<{ lat: number; lng: number; label: string } | null>(null);
-let whereAutocomplete: google.maps.places.Autocomplete | null = null;
-
-// When the Places suggestion list is open, Enter should PICK the suggestion
-// (letting place_changed capture the location), not submit the form early.
-function onWhereEnter(e: KeyboardEvent) {
-  const pac = document.querySelector<HTMLElement>(".pac-container");
-  if (pac && pac.offsetParent !== null && pac.querySelector(".pac-item")) {
-    e.preventDefault();
-  }
+// Post-as-hero (client view). The hero captures the job in plain English and
+// hands straight off to the post-a-job wizard (auth-at-submit), pre-filling its
+// first "describe" step via ?describe. Posting first is the intended path:
+// clients post, verified pros in their area apply with quotes, the client picks
+// one — no "go find a tradesperson" step in the way.
+const jobDescribe = ref("");
+function startPost() {
+  const describe = jobDescribe.value.trim();
+  router.push({ name: "PostJob", query: describe ? { describe } : {} });
 }
-
-function runSearch() {
-  if (pickedLocation.value) {
-    try {
-      localStorage.setItem(
-        "searchLocation",
-        JSON.stringify({
-          lat: pickedLocation.value.lat,
-          lng: pickedLocation.value.lng,
-          radiusKm: 50,
-          label: pickedLocation.value.label || undefined,
-        }),
-      );
-    } catch {
-      /* storage unavailable — /search still loads, just without the prefilled area */
-    }
-  }
-  router.push({ name: "Search", query: { ...(q.value.trim() ? { q: q.value.trim() } : {}) } });
-}
-
-// Attach the Places autocomplete to the hero "where" field (client view only).
-onMounted(async () => {
-  if (heroMode.value === "tradesperson") return;
-  try {
-    await useGoogleMaps().load();
-  } catch {
-    return; // Maps unavailable — the inputs still work as plain text.
-  }
-  if (!whereInput.value) return;
-  const country = (import.meta.env.VITE_DEFAULT_REGION || "").toLowerCase();
-  whereAutocomplete = new google.maps.places.Autocomplete(whereInput.value, {
-    fields: ["geometry", "formatted_address", "name"],
-    types: ["geocode"],
-    ...(country ? { componentRestrictions: { country } } : {}),
-  });
-  whereAutocomplete.addListener("place_changed", () => {
-    const place = whereAutocomplete?.getPlace();
-    const loc = place?.geometry?.location;
-    if (!loc) return;
-    pickedLocation.value = {
-      lat: loc.lat(),
-      lng: loc.lng(),
-      label: place?.formatted_address || place?.name || "",
-    };
-  });
-});
 
 const root = ref<HTMLElement | null>(null);
 let observer: IntersectionObserver | null = null;
@@ -110,7 +57,6 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   observer?.disconnect();
-  if (whereAutocomplete) google.maps.event.clearInstanceListeners(whereAutocomplete);
 });
 
 // Trades grid is progressively revealed — start with one batch, "Load more"
@@ -131,19 +77,19 @@ onMounted(() => {
 // How it works — three steps, rendered as oversized editorial numerals.
 const steps = [
   {
-    title: "Search & shortlist",
+    title: "Post your job",
     blurb:
-      "Filter by trade, distance and rating. You can see who's verified right there on their profile.",
+      "Describe what you need and add a few photos. It's free, and it only takes a couple of minutes.",
   },
   {
-    title: "Quote & schedule",
+    title: "Compare quotes",
     blurb:
-      "Send over a few photos and the details. You'll get a clear quote back, then pick a time that suits you.",
+      "Verified tradespeople in your area apply with quotes. Check their profiles and pick the one that suits you.",
   },
   {
     title: "Done & reviewed",
     blurb:
-      "Pay, leave a review, and you're done. The whole job stays in one place if you ever need to look back.",
+      "Chat, schedule and pay in one place, then leave a review. The whole job stays on record if you ever need it.",
   },
 ];
 
@@ -223,8 +169,9 @@ onMounted(async () => {
             </h1>
 
             <p class="mt-6 max-w-xl text-lg leading-relaxed text-[color:var(--bs-blue-dark)]/80 sm:text-xl">
-              We check every tradesperson's government ID, trade ticket, insurance and WSIB before
-              they can take a job. So you always know who's knocking on your door.
+              Tell us what you need. Verified tradespeople in your area come back with quotes, and
+              you choose who to hire. Every pro's ID, trade ticket, insurance and WSIB is checked
+              first.
             </p>
 
             <!-- Tradesperson view: straight to work. -->
@@ -241,40 +188,33 @@ onMounted(async () => {
             <template v-else>
               <form
                 class="mt-8 flex flex-col gap-2 rounded-2xl bg-white p-2 shadow-[0_14px_44px_-14px_rgba(42,58,92,0.55)] sm:flex-row sm:items-center sm:rounded-full"
-                @submit.prevent="runSearch"
+                @submit.prevent="startPost"
               >
                 <label class="flex flex-1 items-center gap-2 px-3">
-                  <i class="pi pi-wrench text-[color:var(--bs-muted)]" aria-hidden="true"></i>
+                  <i class="pi pi-pencil text-[color:var(--bs-muted)]" aria-hidden="true"></i>
                   <input
-                    v-model="q"
+                    v-model="jobDescribe"
                     type="text"
-                    placeholder="What do you need done?"
+                    maxlength="120"
+                    placeholder="What do you need done? e.g. Leaking kitchen tap"
                     aria-label="What do you need done?"
                     class="w-full bg-transparent py-2.5 text-[color:var(--bs-text)] outline-none placeholder:text-[color:var(--bs-muted)]"
                   />
                 </label>
-                <span class="mx-1 hidden h-7 w-px bg-[color:var(--bs-border)] sm:block" aria-hidden="true"></span>
-                <label class="flex flex-1 items-center gap-2 px-3">
-                  <i class="pi pi-map-marker text-[color:var(--bs-muted)]" aria-hidden="true"></i>
-                  <input
-                    ref="whereInput"
-                    type="text"
-                    autocomplete="off"
-                    placeholder="Where? (city or address)"
-                    aria-label="Where?"
-                    class="w-full bg-transparent py-2.5 text-[color:var(--bs-text)] outline-none placeholder:text-[color:var(--bs-muted)]"
-                    @keydown.enter="onWhereEnter"
-                  />
-                </label>
                 <button type="submit" class="bs-btn bs-btn--red w-full justify-center sm:w-auto sm:!rounded-full">
-                  <i class="pi pi-search" aria-hidden="true"></i><span>Search</span>
+                  <i class="pi pi-send" aria-hidden="true"></i><span>Post your job</span>
                 </button>
               </form>
 
-              <!-- Client alt-path: stays right under the search, part of the same "hire" flow. -->
-              <p class="mt-4">
-                <RouterLink to="/jobs/post" class="bs-btn bs-btn--text">
-                  or post a job and get bids →
+              <!-- Reassure, then offer the quieter "browse pros yourself" path.
+                   Posting is the lead; searching stays available but secondary. -->
+              <p class="mt-3 flex items-center gap-2 text-sm text-[color:var(--bs-blue-dark)]/75">
+                <i class="pi pi-check-circle text-[color:var(--bs-red)]" aria-hidden="true"></i>
+                Free to post. Verified tradespeople in your area come to you with quotes.
+              </p>
+              <p class="mt-1">
+                <RouterLink to="/search" class="bs-btn bs-btn--text">
+                  or browse verified tradespeople →
                 </RouterLink>
               </p>
 
@@ -585,15 +525,15 @@ onMounted(async () => {
           Ready to <span class="bs-mark">seal</span> the deal?
         </h2>
         <p class="mx-auto mt-4 max-w-2xl text-lg text-[color:var(--bs-blue-dark)]/80">
-          Find a verified tradesperson, or post a job and let vetted pros come to you. Blue Seal is
-          built for trusted trades across Canada.
+          Post your job and let verified tradespeople in your area come to you with quotes. Blue
+          Seal is built for trusted trades across Canada.
         </p>
         <div class="mt-8 flex flex-wrap justify-center gap-3">
-          <RouterLink to="/search" class="bs-btn bs-btn--primary bs-btn--lg">
-            <i class="pi pi-search" aria-hidden="true"></i>Find a tradesperson
+          <RouterLink to="/jobs/post" class="bs-btn bs-btn--primary bs-btn--lg">
+            <i class="pi pi-send" aria-hidden="true"></i>Post your job
           </RouterLink>
-          <RouterLink to="/jobs/post" class="bs-btn bs-btn--secondary bs-btn--lg">
-            <i class="pi pi-megaphone" aria-hidden="true"></i>Post a job, get bids
+          <RouterLink to="/search" class="bs-btn bs-btn--secondary bs-btn--lg">
+            <i class="pi pi-search" aria-hidden="true"></i>Browse tradespeople
           </RouterLink>
         </div>
         <p v-if="!auth.isAuthenticated" class="mt-6 text-[color:var(--bs-blue-dark)]/75">
