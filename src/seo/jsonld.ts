@@ -36,7 +36,15 @@ export function organizationLd(): JsonLd {
     image: LOGO_URL,
     slogan: SITE_TAGLINE,
     description: DEFAULT_DESCRIPTION,
-    areaServed: { "@type": "Country", name: COUNTRY },
+    areaServed: [
+      { "@type": "Country", name: COUNTRY },
+      { "@type": "AdministrativeArea", name: "British Columbia" },
+      { "@type": "City", name: "Kelowna" },
+      { "@type": "City", name: "West Kelowna" },
+      { "@type": "City", name: "Vernon" },
+      { "@type": "City", name: "Penticton" },
+      { "@type": "City", name: "Kamloops" },
+    ],
   };
 }
 
@@ -116,6 +124,26 @@ export function serviceLd(input: {
     description: input.description,
     url: absoluteUrl(input.path),
     areaServed: { "@type": "Country", name: COUNTRY },
+    provider: { "@id": ORG_ID },
+    category: "Home services",
+  };
+}
+
+/** Service — for per-city landing pages (e.g. tradespeople in Kelowna, BC). */
+export function cityServiceLd(input: {
+  city: string;
+  region: string;
+  description: string;
+  path: string;
+}): JsonLd {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Service",
+    serviceType: "Verified tradespeople",
+    name: `Verified tradespeople in ${input.city}, ${input.region}`,
+    description: input.description,
+    url: absoluteUrl(input.path),
+    areaServed: { "@type": "City", name: input.city },
     provider: { "@id": ORG_ID },
     category: "Home services",
   };

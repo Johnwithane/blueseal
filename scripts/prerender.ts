@@ -129,7 +129,9 @@ function buildLlmsTxt(routes: PrerenderRoute[]): string {
   const isTrade = (r: PrerenderRoute) => r.path.startsWith("/trades/");
   const isHelp = (r: PrerenderRoute) => r.path.startsWith("/help/");
   const core = routes.filter((r) => !r.seo.noindex && !isTrade(r) && !isHelp(r));
-  const trades = routes.filter(isTrade);
+  // Trade pages are noindex while onboarding (supply-first), so keep them out of
+  // llms.txt too — LLM crawlers shouldn't surface an empty marketplace either.
+  const trades = routes.filter((r) => isTrade(r) && !r.seo.noindex);
   const help = routes.filter(isHelp);
 
   return [

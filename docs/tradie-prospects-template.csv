@@ -1,0 +1,2 @@
+business_name,trade,town,public_phone,public_email,website,source,source_date,has_no_solicit_note,channel_used,first_contact_date,consent_basis,status,notes
+,,,,,,,,N,,,,,new — example row: fill source + source_date before any contact; if has_no_solicit_note=Y then phone only

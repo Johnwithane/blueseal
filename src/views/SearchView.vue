@@ -17,6 +17,7 @@ import { useAuthStore } from "@/stores/auth";
 import { TRADES, tradeLabel, tradePlural } from "@/data/trades";
 import type { TradeSuggestion } from "@/data/tradeKeywords";
 import { saveRequestPrefill } from "@/utils/requestPrefill";
+import { lookupIpRegion } from "@/utils/ipRegion";
 import type { AvatarMarkerData } from "@/utils/avatarMarker";
 import TradeDescribeBox from "@/components/TradeDescribeBox.vue";
 import TradieCard from "@/components/TradieCard.vue";
@@ -350,6 +351,34 @@ async function seedFromAccount(uid: string): Promise<boolean> {
   }
 }
 
+// Whether the browser already has geolocation permission, without prompting.
+// Drives the precise-vs-coarse fallback choice below.
+async function geolocationAlreadyGranted(): Promise<boolean> {
+  if (!navigator.geolocation || !navigator.permissions) return false;
+  try {
+    const status = await navigator.permissions.query({
+      name: "geolocation" as PermissionName,
+    });
+    return status.state === "granted";
+  } catch {
+    return false; // Permissions API doesn't support geolocation here
+  }
+}
+
+// Coarse region from the visitor's IP — the no-prompt last resort so a
+// first-time / logged-out visitor still lands on a search centred near them.
+// Best-effort: a null result (offline/blocked) just leaves the picker empty.
+async function seedFromIpRegion(): Promise<void> {
+  const region = await lookupIpRegion();
+  if (!region || hasLocation(location.value)) return;
+  location.value = {
+    lat: region.lat,
+    lng: region.lng,
+    radiusKm: location.value.radiusKm,
+    label: region.label,
+  };
+}
+
 // Use the device location ONLY when permission was already granted — so a
 // first-time / logged-out visitor never gets an unprompted browser GPS dialog.
 // The explicit "Use my location" button in LocationPicker covers the opt-in.
@@ -465,8 +494,13 @@ onMounted(async () => {
   await auth.init();
   const uid = auth.fbUser?.uid;
   if (uid && (await seedFromAccount(uid))) return;
-  // Last resort: device location, but only if already permitted.
-  await seedFromGeolocationIfGranted();
+  // Last resort, no permission prompt either way: precise device location when
+  // it's already permitted, otherwise a coarse IP-based region.
+  if (await geolocationAlreadyGranted()) {
+    await seedFromGeolocationIfGranted();
+  } else {
+    await seedFromIpRegion();
+  }
 });
 </script>
 
