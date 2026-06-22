@@ -14,7 +14,14 @@
 import { HELP_CONTENT_SEED } from "../data/help";
 import { TRADES } from "../data/trades";
 import { CITIES, findCity } from "../data/cities";
-import { SITE_NAME, SITE_TAGLINE, DEFAULT_DESCRIPTION, COUNTRY } from "./site";
+import {
+  SITE_NAME,
+  SITE_TAGLINE,
+  DEFAULT_DESCRIPTION,
+  HOME_RECRUIT_DESCRIPTION,
+  COUNTRY,
+  IS_ONBOARDING,
+} from "./site";
 import {
   organizationLd,
   websiteLd,
@@ -77,6 +84,17 @@ export const HOW_IT_WORKS = [
 // ===========================================================================
 
 export function homeSeo(): SeoMeta {
+  // Supply-first: while onboarding, the homepage recruits tradespeople and is
+  // the indexed front door; the client marketplace pages are held noindex.
+  if (IS_ONBOARDING) {
+    return {
+      title: "Get verified, get more work in the Okanagan",
+      description: HOME_RECRUIT_DESCRIPTION,
+      path: "/",
+      type: "website",
+      jsonLd: [organizationLd(), websiteLd()],
+    };
+  }
   return {
     description: DEFAULT_DESCRIPTION,
     path: "/",
@@ -85,7 +103,35 @@ export function homeSeo(): SeoMeta {
   };
 }
 
+// Onboarding-phase homepage body (crawler/LLM view) — recruits tradespeople.
+function homeBodyRecruit(): string {
+  return [
+    section(h1("Get verified. Get more work.") + p(HOME_RECRUIT_DESCRIPTION)),
+    section(
+      `<h2>Why join Blue Seal</h2>${ul(
+        [
+          "A verified badge clients actually trust: government ID and trade ticket, checked by a person.",
+          "Win and run the whole job in one place: quotes, chat, scheduling, invoicing and payments.",
+          "An AI assistant that drafts quotes, replies and invoices in seconds.",
+          "Keep 100% of your invoice. Offline payments are free.",
+        ].map(escapeHtml),
+      )}`,
+    ),
+    section(
+      `<h2>How to join</h2>${ul(
+        [
+          "Apply and upload your trade ticket and government ID.",
+          "Our team verifies you by hand.",
+          "Go live and start winning work across the Okanagan.",
+        ].map(escapeHtml),
+      )}`,
+    ),
+    section(p("Ready?") + link("/sign-up?as=tradesperson", "Apply to get verified")),
+  ].join("");
+}
+
 function homeBody(): string {
+  if (IS_ONBOARDING) return homeBodyRecruit();
   const tradeLinks = TRADES.slice(0, 12).map((t) =>
     link(`/search?trade=${t.key}`, t.label),
   );
@@ -118,6 +164,7 @@ export function searchSeo(): SeoMeta {
       "location and rating. Compare certified pros, request quotes and book with confidence.",
     path: "/search",
     type: "website",
+    noindex: IS_ONBOARDING,
     jsonLd: [crumb({ name: "Find a tradesperson", path: "/search" })],
   };
 }
@@ -244,6 +291,7 @@ export function tradesIndexSeo(): SeoMeta {
       "Browse every trade on Blue Seal, from plumbers and electricians to roofers, HVAC " +
       "techs and 50+ more. Find a verified, ID-checked pro near you across Canada.",
     path: "/trades",
+    noindex: IS_ONBOARDING,
     jsonLd: [crumb({ name: "Trades", path: "/trades" })],
   };
 }
@@ -280,6 +328,7 @@ export function tradePageSeo(key: string): SeoMeta | null {
     description,
     path,
     type: "website",
+    noindex: IS_ONBOARDING,
     jsonLd: [
       serviceLd({ tradeLabel: trade.label, description, path }),
       crumb({ name: "Trades", path: "/trades" }, { name: trade.label, path }),
@@ -328,6 +377,7 @@ export function citySeo(slug: string): SeoMeta | null {
     description,
     path,
     type: "website",
+    noindex: IS_ONBOARDING,
     jsonLd: [
       cityServiceLd({ city: c.name, region: c.region, description, path }),
       crumb({ name: "Areas", path: "/cities" }, { name: c.name, path }),
@@ -370,6 +420,7 @@ export function citiesIndexSeo(): SeoMeta {
       "Find verified, ID-checked tradespeople across the Okanagan and Thompson-Okanagan: " +
       "Kelowna, West Kelowna, Vernon, Penticton, Kamloops and more.",
     path: "/cities",
+    noindex: IS_ONBOARDING,
     jsonLd: [crumb({ name: "Areas", path: "/cities" })],
   };
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getPrerenderRoutes } from "@/seo/content";
+import { IS_ONBOARDING } from "@/seo/site";
 import { TRADES } from "@/data/trades";
 import { HELP_CONTENT_SEED } from "@/data/help";
 import { tradiePersonLd } from "@/seo/jsonld";
@@ -41,10 +42,12 @@ describe("getPrerenderRoutes", () => {
     }
   });
 
-  it("titles every page except the homepage", () => {
+  it("titles every page (the homepage title is phase-dependent)", () => {
     for (const r of routes) {
-      if (r.path === "/") expect(r.seo.title).toBeUndefined();
-      else expect(r.seo.title, `no title for ${r.path}`).toBeTruthy();
+      // Homepage: a recruitment title while onboarding, the default brand title
+      // (no explicit title) in the public phase — so don't assert on it here.
+      if (r.path === "/") continue;
+      expect(r.seo.title, `no title for ${r.path}`).toBeTruthy();
     }
   });
 
@@ -59,7 +62,9 @@ describe("getPrerenderRoutes", () => {
   it("emits the expected structured data", () => {
     expect(hasType("/", "Organization")).toBe(true);
     expect(hasType("/", "WebSite")).toBe(true);
-    expect(hasType("/", "FAQPage")).toBe(true);
+    // The homepage carries FAQ structured data only in the public phase; while
+    // onboarding it's the recruitment page (Organization + WebSite only).
+    expect(hasType("/", "FAQPage")).toBe(!IS_ONBOARDING);
     expect(hasType("/faq", "FAQPage")).toBe(true);
     expect(hasType("/trades/plumber", "Service")).toBe(true);
     expect(hasType("/help/what-is-blue-seal", "Article")).toBe(true);
