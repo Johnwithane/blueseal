@@ -15,10 +15,16 @@ export async function deliver(opts: {
   subject: string;
   title: string;
   bodyLines: string[];
-  ctaLabel: string;
-  ctaUrl: string;
+  // CTA button is optional — some transactional emails (e.g. an account-
+  // deletion confirmation) have no single next action and just confirm + tell
+  // the user to reply. When omitted, both the text and HTML drop the CTA line.
+  ctaLabel?: string;
+  ctaUrl?: string;
 }): Promise<void> {
-  const text = `${opts.bodyLines.join("\n\n")}\n\n${opts.ctaLabel}: ${opts.ctaUrl}\n`;
+  const hasCta = !!(opts.ctaLabel && opts.ctaUrl);
+  const text = hasCta
+    ? `${opts.bodyLines.join("\n\n")}\n\n${opts.ctaLabel}: ${opts.ctaUrl}\n`
+    : `${opts.bodyLines.join("\n\n")}\n`;
   await enqueueMail({
     to: opts.to,
     subject: opts.subject,
@@ -26,8 +32,7 @@ export async function deliver(opts: {
     html: brandedEmailHtml({
       title: opts.title,
       bodyLines: opts.bodyLines,
-      ctaLabel: opts.ctaLabel,
-      ctaUrl: opts.ctaUrl,
+      ...(hasCta ? { ctaLabel: opts.ctaLabel, ctaUrl: opts.ctaUrl } : {}),
     }),
   });
 }

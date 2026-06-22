@@ -6,7 +6,7 @@ import { z } from "zod";
 import { db } from "../lib/admin";
 import { requireAuth } from "../lib/auth";
 import { logAdminAction } from "../lib/audit";
-import { enqueueMail } from "../lib/mail";
+import { deliver } from "../lib/brandedMail";
 
 const Input = z.object({
   reason: z.string().trim().max(2000).optional(),
@@ -58,16 +58,16 @@ export const requestAccountDeletion = onCall(CALLABLE_OPTS, async (req) => {
   // accidental click. Mentions the grace window + the support email so
   // recovery is obvious.
   if (user.email) {
-    await enqueueMail({
+    await deliver({
       to: user.email,
       subject: "Your Blue Seal account is scheduled for deletion",
-      text:
-        `Hi ${user.displayName ?? "there"},\n\n` +
-        "You requested deletion of your Blue Seal account.\n\n" +
-        "Your profile is now hidden from search and you've been signed out. " +
-        "We'll wipe your account data permanently in 30 days.\n\n" +
-        "If this was a mistake, reply to this email within 30 days and we'll restore your account.\n\n" +
-        "— Blue Seal",
+      title: "Account scheduled for deletion",
+      bodyLines: [
+        `Hi ${user.displayName ?? "there"},`,
+        "You requested deletion of your Blue Seal account.",
+        "Your profile is now hidden from search and you've been signed out. We'll wipe your account data permanently in 30 days.",
+        "If this was a mistake, reply to this email within 30 days and we'll restore your account.",
+      ],
     });
   }
 

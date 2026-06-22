@@ -5,7 +5,6 @@ import { FieldValue } from "firebase-admin/firestore";
 import { db } from "../lib/admin";
 import { requireAdmin } from "../lib/auth";
 import { logAdminAction } from "../lib/audit";
-import { enqueueMail } from "../lib/mail";
 import { notify } from "../lib/notify";
 import { maybeMarkVisible } from "./visibility";
 
@@ -19,14 +18,13 @@ const RejectInput = z.object({
   reason: z.string().trim().min(1).max(2000),
 });
 
-async function requireTradieExists(tradieUid: string) {
+/** Load the tradie's current vetting state (throws if the doc is missing). */
+async function getTradieVetting(
+  tradieUid: string,
+): Promise<{ vettingStatus?: string; vettingNotes?: string }> {
   const snap = await db.doc(`tradespeople/${tradieUid}`).get();
   if (!snap.exists) throw new HttpsError("not-found", "Tradesperson not found.");
-}
-
-async function tradieEmail(uid: string): Promise<string | null> {
-  const u = await db.doc(`users/${uid}`).get();
-  return (u.data() as { email?: string } | undefined)?.email ?? null;
+  return snap.data() as { vettingStatus?: string; vettingNotes?: string };
 }
 
 export const approveApplication = onCall(CALLABLE_OPTS, async (req) => {
@@ -48,11 +46,6 @@ export const approveApplication = onCall(CALLABLE_OPTS, async (req) => {
     db.collection("certifications").where("tradespersonId", "==", tradieUid).get(),
   ]);
   if (!tradieSnap.exists) throw new HttpsError("not-found", "Tradesperson not found.");
-  // Whether this call is a real transition into "approved". Re-approving an
-  // already-approved tradie (impatient double-tap, or a later re-review) must
-  // NOT re-send the welcome email — that was the "20 approval emails" bug.
-  const wasAlreadyApproved =
-    (tradieSnap.data() as { vettingStatus?: string }).vettingStatus === "approved";
   if (!idSnap.exists) {
     throw new HttpsError("failed-precondition", "No ID document on file.");
   }
@@ -125,19 +118,12 @@ export const approveApplication = onCall(CALLABLE_OPTS, async (req) => {
     idVerified: true,
     verifiedTrades: FieldValue.arrayUnion(...Array.from(verifiedTrades)),
   });
+  // maybeMarkVisible owns the single "you're live" welcome email — it fires
+  // exactly once, transactionally, when the profile actually transitions to
+  // visible (it's also reached via the per-doc cert/ID approval triggers).
+  // Sending a second "approved" email from here is what produced the duplicate
+  // welcome emails, on top of the impatient-double-tap multiplier.
   await maybeMarkVisible(tradieUid);
-  // Only on the transition into approved — re-approving doesn't re-notify.
-  if (!wasAlreadyApproved) {
-    await notify({
-      userId: tradieUid,
-      type: "vetting_approved",
-      title: "You're approved — welcome to Blue Seal",
-      body: "Your profile is live and discoverable. Start receiving job requests today.",
-      link: "/dashboard/tradie",
-      recipientRole: "tradesperson",
-      priority: "high",
-    });
-  }
   await logAdminAction({
     actorUid: actor,
     action: "approveApplication",
@@ -152,20 +138,22 @@ export const requestApplicationInfo = onCall(CALLABLE_OPTS, async (req) => {
   const parsed = InfoInput.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);
   const { tradieUid, notes } = parsed.data;
-  await requireTradieExists(tradieUid);
+  const current = await getTradieVetting(tradieUid);
+
+  // Idempotent: re-issuing the SAME request (already info_requested with these
+  // exact notes) is a no-op, so an impatient double-tap can't email the tradie
+  // twice. A genuine follow-up with different notes still goes through.
+  if (current.vettingStatus === "info_requested" && (current.vettingNotes ?? "") === notes) {
+    return { ok: true };
+  }
 
   await db.doc(`tradespeople/${tradieUid}`).update({
     vettingStatus: "info_requested",
     vettingNotes: notes,
   });
-  const email = await tradieEmail(tradieUid);
-  if (email) {
-    await enqueueMail({
-      to: email,
-      subject: "Blue Seal: more info needed for your application",
-      text: notes,
-    });
-  }
+  // notify() sends ONE branded HTML email (plus the in-app row) — the bare
+  // plain-text enqueueMail that used to run alongside it was the duplicate
+  // "plain-text + HTML" email.
   await notify({
     userId: tradieUid,
     type: "vetting_info_requested",
@@ -189,7 +177,14 @@ export const rejectApplication = onCall(CALLABLE_OPTS, async (req) => {
   const parsed = RejectInput.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);
   const { tradieUid, reason } = parsed.data;
-  await requireTradieExists(tradieUid);
+  const current = await getTradieVetting(tradieUid);
+
+  // Idempotent: re-rejecting with the SAME reason is a no-op so a double-tap
+  // can't email the tradie twice. Re-rejecting with a different reason still
+  // sends (admin changed their mind on the wording).
+  if (current.vettingStatus === "rejected" && (current.vettingNotes ?? "") === reason) {
+    return { ok: true };
+  }
 
   await db.doc(`tradespeople/${tradieUid}`).update({
     vettingStatus: "rejected",
@@ -197,14 +192,9 @@ export const rejectApplication = onCall(CALLABLE_OPTS, async (req) => {
     isVisible: false,
     rejectedAt: FieldValue.serverTimestamp(),
   });
-  const email = await tradieEmail(tradieUid);
-  if (email) {
-    await enqueueMail({
-      to: email,
-      subject: "Blue Seal: application rejected",
-      text: reason,
-    });
-  }
+  // notify() sends ONE branded HTML email (plus the in-app row) — the bare
+  // plain-text enqueueMail that used to run alongside it was the duplicate
+  // "plain-text + HTML" email.
   await notify({
     userId: tradieUid,
     type: "vetting_rejected",

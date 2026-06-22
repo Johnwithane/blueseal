@@ -3,7 +3,7 @@ import { CALLABLE_OPTS } from "../lib/callable";
 import { logger } from "firebase-functions/v2";
 import { db, storage } from "../lib/admin";
 import { requireAuth } from "../lib/auth";
-import { enqueueMail } from "../lib/mail";
+import { deliver } from "../lib/brandedMail";
 
 /**
  * PIPEDA: assemble a JSON snapshot of every Firestore record the caller
@@ -109,14 +109,17 @@ export const exportMyData = onCall({ ...CALLABLE_OPTS, timeoutSeconds: 120 }, as
     // way to fetch the export off-platform.
     const profile = userSnap.data() as { email?: string; displayName?: string } | undefined;
     if (profile?.email) {
-      await enqueueMail({
+      await deliver({
         to: profile.email,
         subject: "Your Blue Seal data export is ready",
-        text:
-          `Hi ${profile.displayName ?? "there"},\n\n` +
-          `Here's your data export (link valid for 30 days):\n${url}\n\n` +
-          "If you didn't request this, please reply to this email so we can investigate.\n\n" +
-          "— Blue Seal",
+        title: "Your data export is ready",
+        bodyLines: [
+          `Hi ${profile.displayName ?? "there"},`,
+          "Your Blue Seal data export is ready. The download link below is valid for 30 days.",
+          "If you didn't request this, reply to this email so we can investigate.",
+        ],
+        ctaLabel: "Download your data",
+        ctaUrl: url,
       });
     }
 

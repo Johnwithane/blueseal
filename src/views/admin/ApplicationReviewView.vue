@@ -89,6 +89,11 @@ const notesInput = ref("");
 // welcome emails: the button spins and is disabled until the callable resolves
 // (then we navigate away). The callable is idempotent too — belt and braces.
 const approvingAll = ref(false);
+// Same guard for the "Request info" / "Reject" dialog submits: each fires an
+// email, so the button must spin + disable until the callable resolves or the
+// admin's impatient re-taps email the applicant once per click.
+const requestingInfo = ref(false);
+const rejectingApp = ref(false);
 
 // Per-cert and ID rejection live in modals (no native prompt()).
 const showRejectCert = ref(false);
@@ -258,17 +263,32 @@ async function approveAll() {
 }
 
 async function submitRequestInfo() {
-  await requestApplicationInfo({ tradieUid: uid, notes: notesInput.value });
-  showRequestInfo.value = false;
-  toast.info("Info requested", "Tradesperson has been emailed.");
-  router.replace({ name: "AdminVetting" });
+  if (requestingInfo.value || !notesInput.value.trim()) return;
+  requestingInfo.value = true;
+  try {
+    await requestApplicationInfo({ tradieUid: uid, notes: notesInput.value.trim() });
+    showRequestInfo.value = false;
+    toast.info("Info requested", "Tradesperson has been emailed.");
+    router.replace({ name: "AdminVetting" });
+    // Leave the flag set on success — we navigate away and the view unmounts.
+  } catch (e) {
+    toast.error("Couldn't send request", (e as Error).message);
+    requestingInfo.value = false;
+  }
 }
 
 async function submitReject() {
-  await rejectApplication({ tradieUid: uid, reason: notesInput.value });
-  showReject.value = false;
-  toast.warn("Application rejected");
-  router.replace({ name: "AdminVetting" });
+  if (rejectingApp.value || !notesInput.value.trim()) return;
+  rejectingApp.value = true;
+  try {
+    await rejectApplication({ tradieUid: uid, reason: notesInput.value.trim() });
+    showReject.value = false;
+    toast.warn("Application rejected");
+    router.replace({ name: "AdminVetting" });
+  } catch (e) {
+    toast.error("Couldn't reject", (e as Error).message);
+    rejectingApp.value = false;
+  }
 }
 
 
@@ -610,16 +630,29 @@ const approveBlockerHint = computed(() => {
     <Dialog v-model:visible="showRequestInfo" modal header="Request more information" :style="{ width: '32rem', maxWidth: '92vw' }">
       <Textarea v-model="notesInput" rows="5" class="w-full" placeholder="What do they need to fix?" />
       <template #footer>
-        <Button label="Cancel" text @click="showRequestInfo = false" />
-        <Button label="Send request" icon="pi pi-send" :disabled="!notesInput" @click="submitRequestInfo" />
+        <Button label="Cancel" text :disabled="requestingInfo" @click="showRequestInfo = false" />
+        <Button
+          label="Send request"
+          icon="pi pi-send"
+          :loading="requestingInfo"
+          :disabled="!notesInput.trim() || requestingInfo"
+          @click="submitRequestInfo"
+        />
       </template>
     </Dialog>
 
     <Dialog v-model:visible="showReject" modal header="Reject application" :style="{ width: '32rem', maxWidth: '92vw' }">
       <Textarea v-model="notesInput" rows="5" class="w-full" placeholder="Reason (sent to applicant)" maxlength="2000" />
       <template #footer>
-        <Button label="Cancel" text @click="showReject = false" />
-        <Button label="Reject" icon="pi pi-ban" severity="danger" :disabled="!notesInput.trim()" @click="submitReject" />
+        <Button label="Cancel" text :disabled="rejectingApp" @click="showReject = false" />
+        <Button
+          label="Reject"
+          icon="pi pi-ban"
+          severity="danger"
+          :loading="rejectingApp"
+          :disabled="!notesInput.trim() || rejectingApp"
+          @click="submitReject"
+        />
       </template>
     </Dialog>
 
