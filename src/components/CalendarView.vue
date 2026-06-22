@@ -12,11 +12,22 @@ import type {
   WithId,
 } from "@/firebase/interfaces";
 
-const props = defineProps<{
-  jobs: WithId<JobDoc>[];
-  availability: WeeklyAvailability;
-  blocks?: WithId<BookingDoc>[];
-}>();
+const props = withDefaults(
+  defineProps<{
+    jobs: WithId<JobDoc>[];
+    availability: WeeklyAvailability;
+    blocks?: WithId<BookingDoc>[];
+    /**
+     * Whether the viewer may change this calendar. Only the tradesperson
+     * viewing their OWN calendar (dashboard, or their own public profile) may
+     * block / unblock days — clients, admins and the public see it read-only.
+     * Defaults to read-only so a new mount can't leak the block controls by
+     * forgetting the prop.
+     */
+    isEditable?: boolean;
+  }>(),
+  { blocks: () => [], isEditable: false },
+);
 const emit = defineEmits<{
   "remove-block": [bookingId: string];
   "block-day": [day: Date];
@@ -164,6 +175,8 @@ function isPast(d: Date): boolean {
   return startOfDay(d).getTime() < today.value.getTime();
 }
 function canBlock(d: Date, inCurrentMonth = true): boolean {
+  // Read-only viewers (clients, admins, public) never get the block affordance.
+  if (!props.isEditable) return false;
   if (!inCurrentMonth) return false;
   if (isPast(d)) return false;
   if (blocksForDay(d).length > 0) return false;
@@ -266,6 +279,7 @@ function confirmBlock() {
             <span>Blocked</span>
           </span>
           <button
+            v-if="props.isEditable"
             type="button"
             class="text-[color:var(--bs-danger)] hover:text-[color:var(--bs-danger-text)]"
             aria-label="Remove block"

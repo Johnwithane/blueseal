@@ -494,6 +494,7 @@ const awaitingVerificationMessage = computed(() => {
       :jobs="jobs"
       :availability="tradie.weeklyAvailability"
       :blocks="bookings"
+      is-editable
       @remove-block="removeBlock"
       @block-day="blockDay"
     />

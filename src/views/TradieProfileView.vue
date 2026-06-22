@@ -458,7 +458,11 @@ onMounted(async () => {
         <p class="mb-3 text-xs text-[color:var(--bs-muted)]">
           Weekly availability pattern — toggle to month view to plan ahead.
         </p>
-        <CalendarView :jobs="[]" :availability="tradie.weeklyAvailability" />
+        <CalendarView
+          :jobs="[]"
+          :availability="tradie.weeklyAvailability"
+          :is-editable="isOwnProfile"
+        />
       </section>
 
       <section
