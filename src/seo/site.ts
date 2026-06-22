@@ -21,16 +21,28 @@ export const SITE_TAGLINE = "Trusted trades. Sealed with proof.";
 
 /**
  * Launch phase (supply-first go-to-market). While `onboarding`, the consumer
- * marketplace (search, trade + city pages) is kept OUT of the search index and
- * the homepage is oriented to recruiting Okanagan tradespeople — so we never
- * rank an empty shelf. Flip to `public` (set VITE_LAUNCH_PHASE=public) to index
- * the marketplace and show the client-first homepage. Defaults to `onboarding`
- * so a deploy never accidentally indexes an under-stocked marketplace.
+ * marketplace (search, trade + city pages) is kept OUT of the search index, so
+ * we never rank an empty shelf. Flip to `public` (set VITE_LAUNCH_PHASE=public)
+ * to index the marketplace. Defaults to `onboarding` so a deploy never
+ * accidentally indexes an under-stocked marketplace. The homepage's own
+ * orientation (recruit vs. client-first) is controlled separately — see
+ * `RECRUIT_HOMEPAGE` below — so we can run a client-first "post a job" homepage
+ * while the marketplace is still held back from the index.
  */
 export type LaunchPhase = "onboarding" | "public";
 export const LAUNCH_PHASE: LaunchPhase =
   env?.VITE_LAUNCH_PHASE === "public" ? "public" : "onboarding";
 export const IS_ONBOARDING = LAUNCH_PHASE === "onboarding";
+
+/**
+ * Homepage orientation, decoupled from the index gate above. The homepage hero,
+ * its prerendered crawler body, and its <title> lead clients to "post a job" by
+ * default; set `VITE_HOMEPAGE_HERO=recruit` to show the tradesperson-recruitment
+ * homepage instead (e.g. to run a supply-first recruiting push). Independent of
+ * `LAUNCH_PHASE` so the two decisions — what the homepage says vs. whether the
+ * marketplace is indexed — can be made separately.
+ */
+export const RECRUIT_HOMEPAGE = env?.VITE_HOMEPAGE_HERO === "recruit";
 
 /** Default <title> shown on the homepage and used as the suffix elsewhere. */
 export const TITLE_DEFAULT = `${SITE_NAME}: Verified Canadian Tradespeople`;

@@ -21,6 +21,7 @@ import {
   HOME_RECRUIT_DESCRIPTION,
   COUNTRY,
   IS_ONBOARDING,
+  RECRUIT_HOMEPAGE,
 } from "./site";
 import {
   organizationLd,
@@ -84,9 +85,10 @@ export const HOW_IT_WORKS = [
 // ===========================================================================
 
 export function homeSeo(): SeoMeta {
-  // Supply-first: while onboarding, the homepage recruits tradespeople and is
-  // the indexed front door; the client marketplace pages are held noindex.
-  if (IS_ONBOARDING) {
+  // The homepage is always the indexed front door; its orientation is set by
+  // RECRUIT_HOMEPAGE (independent of the marketplace index gate). Recruit mode
+  // pitches tradespeople; the default client mode leads with "post a job".
+  if (RECRUIT_HOMEPAGE) {
     return {
       title: "Get verified, get more work in the Okanagan",
       description: HOME_RECRUIT_DESCRIPTION,
@@ -131,7 +133,7 @@ function homeBodyRecruit(): string {
 }
 
 function homeBody(): string {
-  if (IS_ONBOARDING) return homeBodyRecruit();
+  if (RECRUIT_HOMEPAGE) return homeBodyRecruit();
   const tradeLinks = TRADES.slice(0, 12).map((t) =>
     link(`/search?trade=${t.key}`, t.label),
   );

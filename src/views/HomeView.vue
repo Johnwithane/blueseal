@@ -11,7 +11,7 @@ import BlueSealMark from "@/components/brand/BlueSealMark.vue";
 import MarkdownProse from "@/components/help/MarkdownProse.vue";
 import { useSeo } from "@/composables/useSeo";
 import { homeSeo } from "@/seo/content";
-import { IS_ONBOARDING } from "@/seo/site";
+import { RECRUIT_HOMEPAGE } from "@/seo/site";
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -26,7 +26,7 @@ const heroMode = computed<"tradesperson" | "client-or-public">(() =>
 
 // Supply-first phase: a public visitor (anyone who isn't an authed tradesperson)
 // sees the tradesperson-recruitment hero instead of the client post-a-job hero.
-const showRecruitHero = computed(() => IS_ONBOARDING && heroMode.value !== "tradesperson");
+const showRecruitHero = computed(() => RECRUIT_HOMEPAGE && heroMode.value !== "tradesperson");
 
 // Post-as-hero (client view). The hero captures the job in plain English and
 // hands straight off to the post-a-job wizard (auth-at-submit), pre-filling its

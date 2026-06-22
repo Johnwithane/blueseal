@@ -5,7 +5,11 @@ import { test, expect, type Page } from "@playwright/test";
 // (search, trade + city pages) is noindex and out of the sitemap/llms.txt, and
 // the homepage recruits tradespeople. Set VITE_LAUNCH_PHASE=public to flip.
 const IS_ONBOARDING = (process.env.VITE_LAUNCH_PHASE ?? "onboarding") !== "public";
-const EXPECTED_HOME_TITLE = IS_ONBOARDING
+// Homepage orientation is decoupled from the index gate (see seo/site.ts
+// RECRUIT_HOMEPAGE): the homepage leads clients to "post a job" by default and
+// only pitches tradespeople when VITE_HOMEPAGE_HERO=recruit.
+const RECRUIT_HOMEPAGE = process.env.VITE_HOMEPAGE_HERO === "recruit";
+const EXPECTED_HOME_TITLE = RECRUIT_HOMEPAGE
   ? "Get verified, get more work in the Okanagan | Blue Seal"
   : "Blue Seal: Verified Canadian Tradespeople";
 
@@ -94,9 +98,9 @@ test.describe("hydrated app (@unhead active)", () => {
     expect(counts.canonical).toBe(1);
     expect(counts.description).toBe(1);
     expect(counts.ogTitle).toBe(1);
-    // Home bakes Organization + WebSite (+ FAQPage in the public phase);
+    // Home bakes Organization + WebSite (+ FAQPage on the client-first homepage);
     // hydration must not double them.
-    expect(counts.jsonLd).toBe(IS_ONBOARDING ? 2 : 3);
+    expect(counts.jsonLd).toBe(RECRUIT_HOMEPAGE ? 2 : 3);
   });
 
   test("a trade page boots and keeps single head tags", async ({ page }) => {

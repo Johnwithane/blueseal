@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getPrerenderRoutes } from "@/seo/content";
-import { IS_ONBOARDING } from "@/seo/site";
+import { RECRUIT_HOMEPAGE } from "@/seo/site";
 import { TRADES } from "@/data/trades";
 import { HELP_CONTENT_SEED } from "@/data/help";
 import { tradiePersonLd } from "@/seo/jsonld";
@@ -62,9 +62,9 @@ describe("getPrerenderRoutes", () => {
   it("emits the expected structured data", () => {
     expect(hasType("/", "Organization")).toBe(true);
     expect(hasType("/", "WebSite")).toBe(true);
-    // The homepage carries FAQ structured data only in the public phase; while
-    // onboarding it's the recruitment page (Organization + WebSite only).
-    expect(hasType("/", "FAQPage")).toBe(!IS_ONBOARDING);
+    // The homepage carries FAQ structured data on the client-first homepage; in
+    // recruit mode it's the recruitment page (Organization + WebSite only).
+    expect(hasType("/", "FAQPage")).toBe(!RECRUIT_HOMEPAGE);
     expect(hasType("/faq", "FAQPage")).toBe(true);
     expect(hasType("/trades/plumber", "Service")).toBe(true);
     expect(hasType("/help/what-is-blue-seal", "Article")).toBe(true);
