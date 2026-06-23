@@ -649,3 +649,10 @@ record; only App Check enforcement (and the optional `ping` cleanup) remain.
   3. Only then set `ENFORCE_APP_CHECK=true` on the Cloud Functions runtime and `firebase deploy --only functions`.
   4. For local testing, set `VITE_APPCHECK_DEBUG_TOKEN` and register the printed debug token in the console.
 - **Verify:** With enforcement on, a call from a non-attested client (curl/Postman, no App Check token) returns `unauthenticated`; the real web app keeps working.
+
+### [ ] Add the Unsplash Access Key to the production build (image picker)
+
+- **Why:** Tradespeople can pick a banner / portfolio image from Unsplash (profile inline editor + onboarding/account image fields). The picker reads `VITE_UNSPLASH_ACCESS_KEY` at build time and **hides itself when it's unset**, so it works locally (key in the gitignored `.env`) but is invisible in prod until the key ships in the build.
+- **What:** Add `VITE_UNSPLASH_ACCESS_KEY` to the CI build env. Per `.github/workflows/deploy.yml`, public `VITE_*` config is inlined as literals (it ships in the browser bundle) — add the Unsplash **Access Key** there the same way (read-only Search/Download API; never the Secret Key). Then redeploy hosting.
+- **Compliance note (Unsplash API Guidelines):** we trigger the required download endpoint on selection and credit the photographer in the picker, and we re-host the chosen image to our own Storage rather than hot-linking. Persistent on-profile attribution + any hotlink-vs-rehost decision should get a quick review before heavy use. Production apps also need Unsplash to approve the app beyond the 50 req/hr demo limit.
+- **Verify:** In prod, open a tradesperson's profile as the owner → Edit → the banner / portfolio image controls show a "Choose from Unsplash" button; searching returns results and picking one sets the image.
