@@ -13,6 +13,7 @@ import Tag from "primevue/tag";
 import type { ProspectContact, ProspectDoc, WithId } from "@/firebase/interfaces";
 import {
   getProspectContact,
+  previewProspectOutreach,
   sendProspectOutreach,
   setProspectConspicuous,
   setProspectContact,
@@ -43,6 +44,9 @@ const subject = ref("");
 const message = ref("");
 const recipientEmail = ref("");
 const ccText = ref("");
+const previewVisible = ref(false);
+const previewHtml = ref("");
+const previewLoading = ref(false);
 
 async function initFor(p: WithId<ProspectDoc>) {
   conspicuous.value = p.emailConspicuouslyPublished === true;
@@ -68,6 +72,30 @@ function parseCc(): string[] {
     .split(/[\s,;]+/)
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+async function previewEmail() {
+  const p = props.prospect;
+  if (!p) return;
+  const lines = messageToLines(message.value);
+  if (subject.value.trim().length < 1 || lines.length === 0) {
+    toast.warn("Add a subject and message first.");
+    return;
+  }
+  previewLoading.value = true;
+  try {
+    const { html } = await previewProspectOutreach({
+      prospectId: p.id,
+      subject: subject.value.trim(),
+      bodyLines: lines,
+    });
+    previewHtml.value = html;
+    previewVisible.value = true;
+  } catch (e) {
+    toast.error("Couldn't build preview", humanizeError(e));
+  } finally {
+    previewLoading.value = false;
+  }
 }
 
 watch(
@@ -243,14 +271,24 @@ const profileTrades = computed(() =>
 
     <template #footer>
       <div class="flex items-center justify-between w-full gap-2">
-        <a
-          v-if="prospect"
-          :href="`/tradies/${prospect.id}`"
-          target="_blank"
-          rel="noopener"
-          class="text-xs underline text-[color:var(--bs-muted)]"
-          >Preview profile</a
-        >
+        <div class="flex items-center gap-3">
+          <Button
+            label="Preview email"
+            icon="pi pi-eye"
+            text
+            size="small"
+            :loading="previewLoading"
+            @click="previewEmail"
+          />
+          <a
+            v-if="prospect"
+            :href="`/p/${prospect.id}`"
+            target="_blank"
+            rel="noopener"
+            class="text-xs underline text-[color:var(--bs-muted)]"
+            >Preview profile</a
+          >
+        </div>
         <div class="flex gap-2">
           <Button label="Close" text @click="emit('update:visible', false)" />
           <Button
@@ -263,5 +301,20 @@ const profileTrades = computed(() =>
         </div>
       </div>
     </template>
+  </Dialog>
+
+  <!-- Branded email preview (the exact HTML that will send) -->
+  <Dialog
+    v-model:visible="previewVisible"
+    modal
+    header="Email preview"
+    :style="{ width: '44rem', maxWidth: '95vw' }"
+  >
+    <iframe
+      :srcdoc="previewHtml"
+      title="Email preview"
+      class="w-full rounded border border-[color:var(--bs-border)]"
+      style="height: 70vh; border: 0"
+    />
   </Dialog>
 </template>

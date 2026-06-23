@@ -202,6 +202,49 @@ export async function setProspectConspicuous(prospectId: string, value: boolean)
   await updateDoc(doc(db, "prospects", prospectId), { emailConspicuouslyPublished: value });
 }
 
+// Public-safe profile shown on /p/:id (no contact, no provenance internals).
+export interface ProspectPreview {
+  displayName: string;
+  companyName: string | null;
+  bio: string;
+  trades: string[];
+  yearsExperience: Record<string, number>;
+  pricingModel: ProspectDoc["pricingModel"];
+  hourlyRate: number | null;
+  languages: string[];
+  serviceRadiusKm: number | null;
+  locationLabel: string | null;
+  website: string | null;
+  photoURL: string | null;
+  companyLogoUrl: string | null;
+  portfolioPhotos: string[];
+  claimed: boolean;
+}
+
+/** Public: the drafted profile for the shareable preview page (/p/:id). */
+export async function getProspectPreview(prospectId: string): Promise<ProspectPreview> {
+  const callable = httpsCallable<{ prospectId: string }, ProspectPreview>(
+    functions,
+    "getProspectPreview",
+  );
+  const { data } = await callable({ prospectId });
+  return data;
+}
+
+/** Admin: render the outreach email as branded HTML for preview (no send). */
+export async function previewProspectOutreach(input: {
+  prospectId: string;
+  subject: string;
+  bodyLines: string[];
+}): Promise<{ subject: string; html: string }> {
+  const callable = httpsCallable<typeof input, { subject: string; html: string }>(
+    functions,
+    "previewProspectOutreach",
+  );
+  const { data } = await callable(input);
+  return data;
+}
+
 export interface SendProspectOutreachInput {
   prospectId: string;
   subject: string;

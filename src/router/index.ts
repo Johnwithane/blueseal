@@ -78,6 +78,14 @@ const routes: RouteRecordRaw[] = [
     // see the public marketing chrome.
     meta: { layout: "hybrid" },
   },
+  {
+    // Public profile-preview for a seeded prospect, shown from the outreach
+    // email (claim link rides in ?c=) and from the admin composer's preview.
+    path: "/p/:id",
+    name: "ProspectPreview",
+    component: () => import("@/views/ProspectPreviewView.vue"),
+    meta: { layout: "hybrid", title: "Profile preview" },
+  },
   // Public trade landing pages (SEO discovery surface). Hybrid so a signed-in
   // user browsing trades stays in their app shell; visitors get marketing chrome.
   {

@@ -136,10 +136,16 @@ export const sendProspectOutreach = onCall(CALLABLE_OPTS, async (req) => {
   );
   const unsubUrl = `${appBaseUrl()}/p/unsubscribe?p=${encodeURIComponent(prospectId)}&t=${unsubToken}`;
 
+  // CTA -> the public profile-preview page, with the magic sign-in link carried
+  // in `c`. So the recipient SEES the profile we drafted first, then claims +
+  // gets verified from that page (the page's claim button uses `c` to sign them
+  // in). One email, profile-first, deliberate claim.
+  const previewUrl = `${appBaseUrl()}/p/${prospectId}?c=${encodeURIComponent(signinLink)}`;
+
   const { html, text } = buildProspectOutreachEmail({
     bodyLines,
     ctaLabel: "See your free profile",
-    ctaUrl: signinLink,
+    ctaUrl: previewUrl,
     senderName: SENDER_NAME(),
     mailingAddress,
     basisSentence,

@@ -180,6 +180,10 @@ export { requestProspectOutreach } from "./prospects/requestProspectOutreach";
 // admin edits subject + message; the server appends the claim CTA + CASL footer
 // and refuses to send unless the listing is sendable and outreach is configured.
 export { sendProspectOutreach } from "./prospects/sendProspectOutreach";
+// Branded email preview (admin) + the public profile-preview page data (/p/:id),
+// shown to the prospect from the email and to admins via "Preview profile".
+export { previewProspectOutreach } from "./prospects/previewProspectOutreach";
+export { getProspectPreview } from "./prospects/getProspectPreview";
 export { suppressProspect } from "./prospects/suppressProspect";
 export { selfServeRemoveProspect } from "./prospects/selfServeRemoveProspect";
 export { claimProspect } from "./prospects/claimProspect";
