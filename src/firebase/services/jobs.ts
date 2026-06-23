@@ -512,6 +512,8 @@ export interface InvoicePartyInfo {
   tradesperson: {
     name: string;
     companyName: string | null;
+    // One-line profile headline — free for everyone, shown on the letterhead.
+    tagline: string | null;
     companyLogoUrl: string | null;
     // Custom branding (Pro) — already gated server-side: these are null unless
     // the tradesperson is Pro.

@@ -30,6 +30,9 @@ interface UserData {
 interface TradespersonData {
   displayName?: string | null;
   companyName?: string | null;
+  // One-line profile headline. Free for everyone (profile content, like bio),
+  // so it's returned ungated and shows on the quote/invoice letterhead.
+  tagline?: string | null;
   companyLogoUrl?: string | null;
   // Custom branding (Pro). Applied only when isPro — gated here so non-Pro
   // PDFs never even receive the branding.
@@ -50,6 +53,7 @@ interface PartyInfoResult {
   tradesperson: {
     name: string;
     companyName: string | null;
+    tagline: string | null;
     companyLogoUrl: string | null;
     brandColor: string | null;
     bannerUrl: string | null;
@@ -146,6 +150,8 @@ export const getInvoicePartyInfo = onCall(
       tradesperson: {
         name: tradespersonName,
         companyName: tradieDoc.companyName?.trim() || null,
+        // Tagline is free profile content — never Pro-gated.
+        tagline: tradieDoc.tagline?.trim() || null,
         companyLogoUrl: tradieIsPro ? tradieDoc.companyLogoUrl?.trim() || null : null,
         brandColor: tradieIsPro ? tradieDoc.brandColor?.trim() || null : null,
         bannerUrl: tradieIsPro ? tradieDoc.bannerUrl?.trim() || null : null,
