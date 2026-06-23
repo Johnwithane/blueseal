@@ -296,6 +296,15 @@ export interface TradespersonDoc {
   bio: string;
   trades: string[]; // canonical keys, primary at [0]
   yearsExperience: Record<string, number>;
+  // Free-text list of the specific services this tradesperson offers (e.g.
+  // "Boiler installation", "Emergency callout") — finer-grained than `trades`.
+  // Entered by the tradesperson in onboarding + their account dashboard (and
+  // pre-fillable by an admin on a seeded prospect, carried over on claim).
+  // Shown as a checklist on the public profile. Owner-writable — NOT in the
+  // server-managed field-lock list in firestore.rules. Optional/absent on docs
+  // predating the field; readers treat undefined as []. Normalised + capped via
+  // src/utils/services.ts (SERVICES_MAX entries, SERVICE_NAME_MAX chars each).
+  services?: string[];
   pricingModel: PricingModel;
   hourlyRate: number | null; // cents
   // Optional separate rate for billing travel/callout time on hourly jobs.
@@ -508,6 +517,10 @@ export interface ProspectDoc {
   bio: string;
   trades: string[]; // canonical keys (src/data/trades.ts), primary at [0]
   yearsExperience: Record<string, number>;
+  // Free-text "services offered" list, same shape + meaning as
+  // TradespersonDoc.services. An admin enriches it on the prospect editor; it
+  // carries over to the claimed tradesperson draft. Optional on older docs.
+  services?: string[];
   pricingModel: PricingModel;
   hourlyRate: number | null; // cents
   languages: string[];

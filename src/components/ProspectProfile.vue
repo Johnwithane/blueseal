@@ -58,6 +58,9 @@ const tradesWithYears = computed(() =>
     years: props.prospect.yearsExperience?.[key] ?? null,
   })),
 );
+// Free-text services offered. Neutral styling (no "verified" green check) — a
+// seeded listing is unclaimed, so nothing here should read as trust-verified.
+const services = computed(() => props.prospect.services?.filter((s) => s?.trim()) ?? []);
 </script>
 
 <template>
@@ -185,6 +188,20 @@ const tradesWithYears = computed(() =>
           <i class="pi pi-external-link mr-1"></i>Visit website
         </a>
       </div>
+    </section>
+
+    <section v-if="services.length" class="bs-card p-5 mt-4">
+      <h2 class="font-semibold mb-3">Services offered</h2>
+      <ul class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <li
+          v-for="(s, i) in services"
+          :key="i"
+          class="flex items-start gap-2 rounded-md border border-[color:var(--bs-border)] bg-[color:var(--bs-surface-alt)] px-3 py-2 text-sm font-medium"
+        >
+          <i class="pi pi-wrench text-[color:var(--bs-muted)] mt-0.5" aria-hidden="true"></i>
+          <span>{{ s }}</span>
+        </li>
+      </ul>
     </section>
 
     <section

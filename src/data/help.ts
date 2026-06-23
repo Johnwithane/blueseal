@@ -896,7 +896,14 @@ const faqs: FaqItem[] = [
   {
     question: "What makes a strong profile?",
     answer:
-      "Complete verification, a clear bio, a portfolio of past work, your service area and availability, and good reviews. Clients can see all of this at a glance, and a complete profile wins more work.",
+      "Complete verification, a clear bio, the specific services you offer, a portfolio of past work, your service area and availability, and good reviews. Clients can see all of this at a glance, and a complete profile wins more work.",
+    categoryId: "for-tradespeople",
+    audience: "tradesperson",
+  },
+  {
+    question: "Can I list the specific services I offer?",
+    answer:
+      "Yes. Alongside your trades, you can add a free-text list of the specific jobs you take on, like \"Boiler installation\" or \"Emergency callout\". Add them on the **Trades** step of the onboarding wizard, or anytime from the **Tradesperson** tab in your account. They show as a clear checklist on your public profile so clients can tell at a glance whether you do the job they need.",
     categoryId: "for-tradespeople",
     audience: "tradesperson",
   },

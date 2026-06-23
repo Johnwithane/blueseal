@@ -154,6 +154,7 @@ export type ProspectProfileEdit = Partial<
     | "companyName"
     | "bio"
     | "trades"
+    | "services"
     | "locationLabel"
     | "website"
     | "pricingModel"
@@ -208,6 +209,9 @@ export interface ProspectPreview {
   companyName: string | null;
   bio: string;
   trades: string[];
+  // Optional: present only once the getProspectPreview callable that returns it
+  // is deployed. Older deploys omit it, so the preview page guards on it.
+  services?: string[];
   yearsExperience: Record<string, number>;
   pricingModel: ProspectDoc["pricingModel"];
   hourlyRate: number | null;

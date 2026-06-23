@@ -13,6 +13,7 @@ import Select from "primevue/select";
 import Button from "primevue/button";
 import ProspectImageField from "@/components/admin/ProspectImageField.vue";
 import ProspectGalleryField from "@/components/admin/ProspectGalleryField.vue";
+import ServicesEditor from "@/components/ServicesEditor.vue";
 import type { ProspectDoc, WithId } from "@/firebase/interfaces";
 import {
   getProspectContact,
@@ -21,6 +22,7 @@ import {
   type ProspectProfileEdit,
 } from "@/firebase/services/prospects";
 import { TRADES } from "@/data/trades";
+import { normalizeServices } from "@/utils/services";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 
@@ -41,6 +43,7 @@ const form = reactive({
   companyName: "",
   bio: "",
   trades: [] as string[],
+  services: [] as string[],
   pricingModel: "quote" as ProspectDoc["pricingModel"],
   hourlyRateDollars: null as number | null,
   serviceRadiusKm: 25,
@@ -62,6 +65,7 @@ async function initFor(p: WithId<ProspectDoc>) {
   form.companyName = p.companyName ?? "";
   form.bio = p.bio ?? "";
   form.trades = [...(p.trades ?? [])];
+  form.services = [...(p.services ?? [])];
   form.pricingModel = p.pricingModel ?? "quote";
   form.hourlyRateDollars = typeof p.hourlyRate === "number" ? p.hourlyRate / 100 : null;
   form.serviceRadiusKm = p.serviceRadiusKm ?? 25;
@@ -106,6 +110,7 @@ async function save() {
       companyName: form.companyName.trim() || null,
       bio: form.bio.trim(),
       trades: form.trades,
+      services: normalizeServices(form.services),
       pricingModel: form.pricingModel,
       hourlyRate: form.hourlyRateDollars != null ? Math.round(form.hourlyRateDollars * 100) : null,
       serviceRadiusKm: form.serviceRadiusKm,
@@ -175,6 +180,11 @@ async function save() {
           placeholder="Select trades"
           class="w-full"
         />
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-[color:var(--bs-muted)] mb-1">Services offered</label>
+        <ServicesEditor v-model="form.services" />
       </div>
 
       <div>

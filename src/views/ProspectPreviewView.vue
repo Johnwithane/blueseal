@@ -96,6 +96,21 @@ const yearsPrimary = computed(() => {
         >
       </div>
 
+      <!-- Services offered -->
+      <div v-if="profile.services?.length" class="mt-4">
+        <h2 class="text-sm font-semibold mb-2">Services offered</h2>
+        <ul class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <li
+            v-for="(s, i) in profile.services"
+            :key="i"
+            class="flex items-start gap-2 rounded-md border border-[color:var(--bs-border)] bg-[color:var(--bs-surface-alt)] px-3 py-2 text-sm font-medium"
+          >
+            <i class="pi pi-wrench text-[color:var(--bs-muted)] mt-0.5" aria-hidden="true"></i>
+            <span>{{ s }}</span>
+          </li>
+        </ul>
+      </div>
+
       <!-- Portfolio -->
       <div v-if="profile.portfolioPhotos.length" class="mt-4">
         <h2 class="text-sm font-semibold mb-2">Recent work</h2>

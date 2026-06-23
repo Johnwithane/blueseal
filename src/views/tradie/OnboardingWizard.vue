@@ -32,6 +32,8 @@ import { updateUserPhoto, updateUserProfile } from "@/firebase/services/users";
 import { compressToWebp } from "@/utils/image";
 import { COMMON_LANGUAGES } from "@/data/languages";
 import PortfolioEditor from "@/components/PortfolioEditor.vue";
+import ServicesEditor from "@/components/ServicesEditor.vue";
+import { normalizeServices } from "@/utils/services";
 import {
   createCertification,
   deleteCertification,
@@ -178,6 +180,8 @@ const bio = ref("");
 const primaryTrade = ref<string>("");
 const secondaryTrades = ref<string[]>([]);
 const yearsByTrade = ref<Record<string, number>>({});
+// Free-text services offered (finer-grained than trades). See ServicesEditor.
+const services = ref<string[]>([]);
 
 // Pricing
 const pricingModel = ref<PricingModel>("both");
@@ -423,6 +427,7 @@ async function hydrate() {
     primaryTrade.value = t.trades[0] ?? "";
     secondaryTrades.value = t.trades.slice(1);
     yearsByTrade.value = { ...t.yearsExperience };
+    services.value = Array.isArray(t.services) ? [...t.services] : [];
     pricingModel.value = t.pricingModel;
     hourlyRateDollars.value = t.hourlyRate ? t.hourlyRate / 100 : null;
     travelRateDollars.value = t.travelRate ? t.travelRate / 100 : null;
@@ -521,6 +526,7 @@ async function saveDraft(opts: { silent?: boolean } = {}): Promise<void> {
       bio: bio.value,
       trades: trades(),
       yearsExperience: yearsByTrade.value,
+      services: normalizeServices(services.value),
       pricingModel: pricingModel.value,
       hourlyRate:
         hourlyRateDollars.value != null ? Math.round(hourlyRateDollars.value * 100) : null,
@@ -632,6 +638,7 @@ watch(
     primaryTrade,
     secondaryTrades,
     yearsByTrade,
+    services,
     pricingModel,
     hourlyRateDollars,
     travelRateDollars,
@@ -1153,6 +1160,18 @@ async function withdrawForEdits() {
                     class="flex-1"
                   />
                 </div>
+              </div>
+
+              <div class="border-t pt-4">
+                <label class="text-sm font-medium">
+                  Services you offer
+                  <span class="bs-label-optional">Optional</span>
+                </label>
+                <p class="mt-1 mb-2 text-xs text-[color:var(--bs-muted)]">
+                  List the specific jobs you take on (e.g. "Boiler installation",
+                  "Emergency callout"). Clients see these as a checklist on your profile.
+                </p>
+                <ServicesEditor v-model="services" />
               </div>
             </fieldset>
             <div class="bs-step-nav flex justify-between">

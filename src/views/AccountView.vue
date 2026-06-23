@@ -52,6 +52,8 @@ import { humanizeError } from "@/utils/errors";
 import { forgotPasswordSchema } from "@/validation/schemas";
 import { COMMON_LANGUAGES } from "@/data/languages";
 import PortfolioEditor from "@/components/PortfolioEditor.vue";
+import ServicesEditor from "@/components/ServicesEditor.vue";
+import { normalizeServices } from "@/utils/services";
 import TradieDocsManager from "@/components/TradieDocsManager.vue";
 import VouchesPanel from "@/components/VouchesPanel.vue";
 import PayoutsPanel from "@/components/PayoutsPanel.vue";
@@ -104,6 +106,8 @@ const fileInput = ref<HTMLInputElement | null>(null);
 // user doc (see `bio` above) so it shows on the Profile tab for everyone.
 const companyName = ref("");
 const languages = ref<string[]>([]);
+// Free-text services offered (finer-grained than trades). See ServicesEditor.
+const services = ref<string[]>([]);
 // Billing-side contact info shown on quotes + invoices. businessAddress
 // optionally overrides the primary address; blank falls back to it.
 const businessAddress = ref("");
@@ -409,6 +413,7 @@ onMounted(async () => {
     if (t) {
       companyName.value = t.companyName ?? "";
       languages.value = Array.isArray(t.languages) ? [...t.languages] : [];
+      services.value = Array.isArray(t.services) ? [...t.services] : [];
       // `undefined` (pre-cutover docs) counts as listed/public.
       discoverableOn.value = t.discoverable !== false;
       invoicePrefix.value = t.invoicePrefix ?? "INV";
@@ -513,6 +518,7 @@ async function saveTradieProfile() {
     await createOrUpdateDraft(auth.fbUser.uid, {
       companyName: companyName.value.trim() || null,
       languages: languages.value,
+      services: normalizeServices(services.value),
     });
     // Billing contact (address override / phone / GST) is private — subdoc.
     await setContactInfo(auth.fbUser.uid, {
@@ -523,6 +529,7 @@ async function saveTradieProfile() {
     if (tradie.value) {
       tradie.value.companyName = companyName.value.trim() || null;
       tradie.value.languages = [...languages.value];
+      tradie.value.services = normalizeServices(services.value);
     }
     toast.success("Tradesperson profile saved");
   } catch (e) {
@@ -1147,6 +1154,17 @@ async function grantAllTrades() {
                 <p class="mt-1 text-xs text-[color:var(--bs-muted)]">
                   Helps clients who'd prefer to be served in a specific language.
                 </p>
+              </div>
+              <div>
+                <label class="text-sm font-medium">
+                  Services you offer
+                  <span class="text-xs text-[color:var(--bs-muted)] font-normal">Optional</span>
+                </label>
+                <p class="mt-1 mb-2 text-xs text-[color:var(--bs-muted)]">
+                  The specific jobs you take on (e.g. "Boiler installation",
+                  "Emergency callout"). Shown as a checklist on your public profile.
+                </p>
+                <ServicesEditor v-model="services" />
               </div>
 
               <!-- Billing info block. The text on quotes and invoices uses

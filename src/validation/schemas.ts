@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { TRADES } from "@/data/trades";
 import { SUPPORT_TOPICS } from "@/data/support";
+import { SERVICES_MAX, SERVICE_NAME_MAX } from "@/utils/services";
 
 const tradeKeys = TRADES.map((t) => t.key) as [string, ...string[]];
 // Friendly fallback so an empty/invalid trade surfaces as "Please choose a
@@ -57,11 +58,18 @@ export const profileBasicsSchema = z.object({
   photoURL: z.string().url().nullable().optional(),
 });
 
+// Free-text "services offered" list (e.g. "Boiler installation"). Bounds mirror
+// src/utils/services.ts so the editor, this schema, and the normalizer agree.
+export const servicesSchema = z
+  .array(z.string().trim().min(1).max(SERVICE_NAME_MAX))
+  .max(SERVICES_MAX, `Up to ${SERVICES_MAX} services`);
+
 export const tradieTradesSchema = z
   .object({
     primaryTrade: tradeKeyEnum,
     secondaryTrades: z.array(tradeKeyEnum).max(3, "Up to 3 secondary trades"),
     yearsExperience: z.record(z.number().int().min(0).max(80)),
+    services: servicesSchema.optional(),
     bio: z.string().trim().min(20, "Tell clients a bit about your work").max(2000),
   })
   .refine(
