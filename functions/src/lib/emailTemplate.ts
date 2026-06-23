@@ -58,6 +58,17 @@ export interface BrandedEmailOpts {
    * Used for the itemized quote/invoice breakdown (see lib/emailBreakdown.ts).
    */
   contentHtml?: string;
+  /**
+   * Optional footer override. The default footer ("You're receiving this because
+   * you have a Blue Seal account. Manage notifications.") is TRUE only for
+   * transactional mail to existing members. Cold outreach to a seeded prospect
+   * has no account, so it must supply its own CASL-compliant footer instead
+   * (legal name + physical mailing address + consent basis + unsubscribe). When
+   * present, this HTML replaces ONLY the account-line paragraph; the signature
+   * logo + tagline above it are kept. Must be inline-styled + pre-escaped — it is
+   * injected verbatim, NOT escaped here.
+   */
+  footerHtml?: string;
 }
 
 /**
@@ -151,8 +162,9 @@ export function brandedEmailHtml(opts: BrandedEmailOpts): string {
     `<tr><td align="center" style="padding:22px 16px 8px;">` +
     `<a href="${BASE}"><img src="${SIGNATURE_URL}" width="180" alt="Blue Seal" style="display:block;border:0;width:180px;max-width:60%;height:auto;margin:0 auto 12px;"></a>` +
     `<p style="margin:0 0 6px;font-size:12px;line-height:1.5;color:${MUTED};">Verified Canadian tradespeople.</p>` +
-    `<p style="margin:0;font-size:12px;line-height:1.5;color:${MUTED};">You're receiving this because you have a Blue Seal account. ` +
-    `<a href="${BASE}/account" style="color:${BLUE};text-decoration:underline;">Manage notifications</a></p>` +
+    (opts.footerHtml ??
+      `<p style="margin:0;font-size:12px;line-height:1.5;color:${MUTED};">You're receiving this because you have a Blue Seal account. ` +
+        `<a href="${BASE}/account" style="color:${BLUE};text-decoration:underline;">Manage notifications</a></p>`) +
     `</td></tr>` +
     `</table></td></tr></table></body></html>`
   );

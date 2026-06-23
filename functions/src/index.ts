@@ -176,6 +176,10 @@ export { bulkImportProspects } from "./seed/bulkImportProspects";
 // Claim is an authenticated callable gated on a VERIFIED email (magic-link
 // sign-in), not a trigger trusting an attacker-writable email field.
 export { requestProspectOutreach } from "./prospects/requestProspectOutreach";
+// Admin-initiated, manually-reviewed "claim your free listing" outreach. The
+// admin edits subject + message; the server appends the claim CTA + CASL footer
+// and refuses to send unless the listing is sendable and outreach is configured.
+export { sendProspectOutreach } from "./prospects/sendProspectOutreach";
 export { suppressProspect } from "./prospects/suppressProspect";
 export { selfServeRemoveProspect } from "./prospects/selfServeRemoveProspect";
 export { claimProspect } from "./prospects/claimProspect";

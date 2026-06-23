@@ -67,8 +67,14 @@ export const bulkImportProspects = onCall(
   async (req): Promise<ImportResult> => {
     const actor = requireAdmin(req);
 
-    const data = req.data as { rows?: unknown; dryRun?: unknown } | undefined;
+    const data = req.data as { rows?: unknown; dryRun?: unknown; listOnImport?: unknown } | undefined;
     const dryRun = data?.dryRun === true;
+    // Imports land PRIVATE by default (isListed=false): visible only to admins
+    // for outreach, never in public search. A scraped business is never made
+    // public without an explicit opt-in — it becomes a real listing only when
+    // the owner claims it (per the 2026-06-08 consent decision). Pass
+    // listOnImport:true to publish on import (not the default; needs sign-off).
+    const listOnImport = data?.listOnImport === true;
     if (!Array.isArray(data?.rows)) {
       throw new HttpsError("invalid-argument", "rows must be an array.");
     }
@@ -180,7 +186,7 @@ export const bulkImportProspects = onCall(
           locationLabel: row.locationLabel,
           website: row.website,
           status: "listed",
-          isListed: true,
+          isListed: listOnImport,
           emailHash: p.emailHash,
           source: row.source,
           sourceUrl: row.sourceUrl,

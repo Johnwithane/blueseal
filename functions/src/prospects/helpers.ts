@@ -1,6 +1,7 @@
 import { FieldValue, GeoPoint } from "firebase-admin/firestore";
 import { createHash, createHmac } from "node:crypto";
 import { enqueueMail } from "../lib/mail";
+import { brandedEmailHtml } from "../lib/emailTemplate";
 
 export const sha256 = (s: string): string => createHash("sha256").update(s).digest("hex");
 export const emailHashOf = (email: string): string => sha256(email.trim().toLowerCase());
@@ -52,6 +53,85 @@ export function caslBasisSentence(dataConsentBasis: string, source: string, trad
     default:
       return `You're receiving this because your ${tradeName} business is publicly listed (${src}) and a real customer asked to contact you.`;
   }
+}
+
+// CASL consent-basis sentence for ADMIN-INITIATED outreach ("we built you a free
+// listing, come claim it") — distinct from caslBasisSentence above, which says a
+// real customer asked to contact you (true only for the client-request flow).
+// This one must not overstate: it's a publicly-listed business + an invitation.
+export function caslOutreachBasisSentence(
+  dataConsentBasis: string,
+  source: string,
+  tradeName: string,
+): string {
+  const src = source && source.trim() ? source.trim() : "a public source";
+  switch (dataConsentBasis) {
+    case "open_data":
+    case "public_registry":
+      return `You're receiving this because your ${tradeName} business is listed in public business records (${src}).`;
+    case "industry_association":
+      return `You're receiving this because your ${tradeName} business is publicly listed by ${src}.`;
+    default:
+      return `You're receiving this because your ${tradeName} business email is publicly published online (${src}).`;
+  }
+}
+
+// The CASL-compliant footer for a cold outreach email: sender's legal name, a
+// valid physical mailing address, the truthful consent basis, and a working
+// unsubscribe link. Replaces the branded shell's default "you have an account"
+// footer (which would be false for a prospect). Pre-escaped + inline-styled.
+function caslOutreachFooterHtml(args: {
+  senderName: string;
+  mailingAddress: string;
+  basisSentence: string;
+  unsubUrl: string;
+}): string {
+  return (
+    `<p style="margin:0;font-size:12px;line-height:1.5;color:#6B6862;">` +
+    `${escapeHtml(args.senderName)} · ${escapeHtml(args.mailingAddress)}<br/>` +
+    `${escapeHtml(args.basisSentence)} ` +
+    `<a href="${escapeHtml(args.unsubUrl)}" style="color:#374C76;text-decoration:underline;">Unsubscribe</a> ` +
+    `or <a href="${escapeHtml(args.unsubUrl)}" style="color:#374C76;text-decoration:underline;">remove this listing</a>.` +
+    `</p>`
+  );
+}
+
+/**
+ * Build the admin outreach email (text + branded HTML) from the admin-edited
+ * subject + body paragraphs. The personal message is whatever the admin typed;
+ * the CTA (claim link), the sign-off, and the CASL footer (legal name + mailing
+ * address + basis + unsubscribe) are ALWAYS appended by the server, so a manual
+ * send is still a compliant send no matter what the admin edited.
+ */
+export function buildProspectOutreachEmail(args: {
+  bodyLines: string[];
+  ctaLabel: string;
+  ctaUrl: string;
+  senderName: string;
+  mailingAddress: string;
+  basisSentence: string;
+  unsubUrl: string;
+}): { html: string; text: string } {
+  const footerHtml = caslOutreachFooterHtml({
+    senderName: args.senderName,
+    mailingAddress: args.mailingAddress,
+    basisSentence: args.basisSentence,
+    unsubUrl: args.unsubUrl,
+  });
+  const html = brandedEmailHtml({
+    title: args.bodyLines[0] ?? "A free Blue Seal listing for your business",
+    // First line becomes the heading; remaining lines are the body paragraphs.
+    bodyLines: args.bodyLines.slice(1),
+    ctaLabel: args.ctaLabel,
+    ctaUrl: args.ctaUrl,
+    footerHtml,
+  });
+  const text =
+    `${args.bodyLines.join("\n\n")}\n\n` +
+    `${args.ctaLabel}: ${args.ctaUrl}\n\n` +
+    `—\n${args.senderName}\n${args.mailingAddress}\n` +
+    `${args.basisSentence} Unsubscribe / remove this listing: ${args.unsubUrl}\n`;
+  return { html, text };
 }
 
 /**
