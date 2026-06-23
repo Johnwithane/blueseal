@@ -256,6 +256,26 @@ const profileTrades = computed(() =>
         <Textarea v-model="message" class="w-full mt-1" :rows="12" auto-resize />
       </div>
 
+      <!-- Preview actions (prominent, not buried in the footer) -->
+      <div class="flex flex-wrap items-center gap-2">
+        <Button
+          label="Preview email"
+          icon="pi pi-eye"
+          outlined
+          size="small"
+          :loading="previewLoading"
+          @click="previewEmail"
+        />
+        <a
+          v-if="prospect"
+          :href="`/p/${prospect.id}`"
+          target="_blank"
+          rel="noopener"
+          class="text-sm text-[color:var(--bs-blue)] underline"
+          ><i class="pi pi-external-link mr-1" />View their profile page</a
+        >
+      </div>
+
       <Message severity="info" :closable="false">
         <span class="text-xs">
           We automatically add a <strong>See your free profile</strong> button (a one-click sign-in
@@ -270,35 +290,15 @@ const profileTrades = computed(() =>
     </div>
 
     <template #footer>
-      <div class="flex items-center justify-between w-full gap-2">
-        <div class="flex items-center gap-3">
-          <Button
-            label="Preview email"
-            icon="pi pi-eye"
-            text
-            size="small"
-            :loading="previewLoading"
-            @click="previewEmail"
-          />
-          <a
-            v-if="prospect"
-            :href="`/p/${prospect.id}`"
-            target="_blank"
-            rel="noopener"
-            class="text-xs underline text-[color:var(--bs-muted)]"
-            >Preview profile</a
-          >
-        </div>
-        <div class="flex gap-2">
-          <Button label="Close" text @click="emit('update:visible', false)" />
-          <Button
-            label="Send email"
-            icon="pi pi-send"
-            :loading="sending"
-            :disabled="!canSend"
-            @click="send"
-          />
-        </div>
+      <div class="flex items-center justify-end w-full gap-2">
+        <Button label="Close" text @click="emit('update:visible', false)" />
+        <Button
+          label="Send email"
+          icon="pi pi-send"
+          :loading="sending"
+          :disabled="!canSend"
+          @click="send"
+        />
       </div>
     </template>
   </Dialog>

@@ -14,6 +14,9 @@ const props = defineProps<{
   bucket: "profile" | "logo";
   label: string;
   hint?: string;
+  // Shown (dimmed) when there's no image of our own yet — e.g. the logo field
+  // falls back to the profile photo, matching the claim-time behaviour.
+  fallback?: string | null;
 }>();
 const emit = defineEmits<{ "update:modelValue": [string | null] }>();
 
@@ -48,6 +51,13 @@ async function onFile(e: Event) {
         :src="modelValue"
         :alt="label"
         class="h-16 w-16 rounded border border-[color:var(--bs-border)] bg-white object-contain"
+      />
+      <img
+        v-else-if="fallback"
+        :src="fallback"
+        :alt="label"
+        title="Using the profile photo until you add a logo"
+        class="h-16 w-16 rounded border border-dashed border-[color:var(--bs-border)] bg-white object-contain opacity-60"
       />
       <div
         v-else

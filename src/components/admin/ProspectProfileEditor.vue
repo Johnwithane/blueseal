@@ -237,7 +237,8 @@ async function save() {
           :prospect-id="prospect.id"
           bucket="logo"
           label="Company logo"
-          hint="Appears on their quotes & invoices once claimed."
+          :fallback="form.photoURL"
+          hint="Defaults to the profile photo. Shown on their quotes & invoices once claimed."
         />
       </div>
       <ProspectGalleryField v-model="form.portfolioPhotos" :prospect-id="prospect.id" />

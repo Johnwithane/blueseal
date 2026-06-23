@@ -196,9 +196,14 @@ function prospectProfileFields(p: Record<string, unknown>): Record<string, unkno
     serviceRadiusKm: typeof p.serviceRadiusKm === "number" ? p.serviceRadiusKm : 25,
     locationApprox: (p.locationApprox as GeoPoint | null) ?? null,
     geohashPublic: typeof p.geohashPublic === "string" ? p.geohashPublic : "",
-    // Real media an admin uploaded (a generated dicebear avatar is NOT a logo,
-    // so only carry a real companyLogoUrl). Gallery + banner carry over too.
-    companyLogoUrl: typeof p.companyLogoUrl === "string" ? p.companyLogoUrl : null,
+    // Company logo. No dedicated logo? Fall back to a real uploaded profile
+    // photo (never the generated dicebear avatar) so the brand mark on
+    // quotes/invoices isn't blank. Gallery + banner carry over too.
+    companyLogoUrl:
+      (typeof p.companyLogoUrl === "string" ? p.companyLogoUrl : null) ??
+      (typeof p.photoURL === "string" && p.photoURL && !p.photoURL.includes("dicebear")
+        ? p.photoURL
+        : null),
     bannerUrl: typeof p.bannerUrl === "string" ? p.bannerUrl : null,
     portfolioPhotos: Array.isArray(p.portfolioPhotos) ? p.portfolioPhotos : [],
   };
