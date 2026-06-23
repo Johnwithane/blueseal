@@ -21,6 +21,7 @@ import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 import type { BugReportDoc, BugSeverity, BugStatus, WithId } from "@/firebase/interfaces";
 import LoadingState from "@/components/LoadingState.vue";
+import BugKanbanBoard from "@/components/admin/BugKanbanBoard.vue";
 
 const { relativeTime, dateTime } = useFormatters();
 const toast = useToast();
@@ -29,6 +30,11 @@ const reports = ref<WithId<BugReportDoc>[]>([]);
 const loading = ref(true);
 const errored = ref(false);
 const filter = ref<BugStatus | "all">("open");
+const view = ref<"board" | "list">("board");
+const VIEW_OPTIONS = [
+  { label: "Board", value: "board" },
+  { label: "List", value: "list" },
+];
 const savingId = ref<string | null>(null);
 const copyingId = ref<string | null>(null);
 
@@ -183,6 +189,27 @@ async function save(r: WithId<BugReportDoc>) {
     savingId.value = null;
   }
 }
+
+/**
+ * Board drag/drop or per-card status change. Optimistic: re-group the card
+ * immediately (the board keys off report.status), persist, and revert on
+ * failure. Notes are left untouched. Keeps the List view's edit buffer in sync
+ * so the two views never disagree on a card's status.
+ */
+async function onMove(id: string, status: BugStatus) {
+  const r = reports.value.find((x) => x.id === id);
+  if (!r || r.status === status) return;
+  const prev = r.status;
+  r.status = status;
+  if (edits[r.id]) edits[r.id].status = status;
+  try {
+    await setBugReportStatus(id, status, r.notes ?? "");
+  } catch (e) {
+    r.status = prev;
+    if (edits[r.id]) edits[r.id].status = prev;
+    toast.error("Couldn't move", humanizeError(e));
+  }
+}
 </script>
 
 <template>
@@ -205,14 +232,23 @@ async function save(r: WithId<BugReportDoc>) {
       />
     </div>
 
-    <SelectButton
-      v-model="filter"
-      :options="filterOptions"
-      option-label="label"
-      option-value="value"
-      :allow-empty="false"
-      class="mb-4"
-    />
+    <div class="mb-4 flex flex-wrap items-center gap-3">
+      <SelectButton
+        v-model="view"
+        :options="VIEW_OPTIONS"
+        option-label="label"
+        option-value="value"
+        :allow-empty="false"
+      />
+      <SelectButton
+        v-if="view === 'list'"
+        v-model="filter"
+        :options="filterOptions"
+        option-label="label"
+        option-value="value"
+        :allow-empty="false"
+      />
+    </div>
 
     <LoadingState v-if="loading" />
 
@@ -224,6 +260,8 @@ async function save(r: WithId<BugReportDoc>) {
         them, then refresh.
       </p>
     </div>
+
+    <BugKanbanBoard v-else-if="view === 'board'" :reports="reports" @move="onMove" />
 
     <div v-else-if="visible.length === 0" class="bs-empty">
       <i class="pi pi-check-circle mr-2 text-[color:var(--bs-success)]"></i>No
