@@ -1,6 +1,7 @@
 import {
   collection,
   doc,
+  getCountFromServer,
   getDoc,
   getDocs,
   limit as fbLimit,
@@ -13,6 +14,7 @@ import {
   where,
   writeBatch,
   GeoPoint,
+  type Timestamp,
 } from "firebase/firestore";
 import { geohashForLocation, geohashQueryBounds, distanceBetween } from "geofire-common";
 import { httpsCallable } from "firebase/functions";
@@ -402,4 +404,70 @@ export async function listIncompleteApprovals(): Promise<WithId<TradespersonDoc>
   );
   const snap = await getDocs(q);
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+// A tradesperson who started onboarding (a tradie doc exists) but never
+// submitted for vetting — still stuck at "draft". The signup time and contact
+// email live on the users/{uid} doc (the tradie doc has neither), so each row
+// is joined to it. Admin-only surface; admins can read both collections.
+export interface IncompleteOnboardingRow {
+  uid: string;
+  displayName: string;
+  email: string | null;
+  trades: string[];
+  /** Signup time, from users/{uid}.createdAt. Null if the user doc is gone. */
+  signedUpAt: Timestamp | null;
+  onboardingNudgedAt: Timestamp | null;
+  onboardingNudgeCount: number;
+}
+
+const INCOMPLETE_ONBOARDING_CAP = 200;
+
+/** Lightweight count for the admin dashboard tile (no user-doc joins). */
+export async function countIncompleteOnboarding(): Promise<number> {
+  const snap = await getCountFromServer(
+    query(tradiesCol(), where("vettingStatus", "==", "draft")),
+  );
+  return snap.data().count;
+}
+
+export async function listIncompleteOnboarding(): Promise<IncompleteOnboardingRow[]> {
+  const snap = await getDocs(
+    query(tradiesCol(), where("vettingStatus", "==", "draft"), fbLimit(INCOMPLETE_ONBOARDING_CAP)),
+  );
+  const rows = await Promise.all(
+    snap.docs.map(async (d) => {
+      const t = d.data();
+      const userSnap = await getDoc(doc(db, "users", d.id));
+      const u = userSnap.exists()
+        ? (userSnap.data() as { email?: string; displayName?: string; createdAt?: Timestamp })
+        : null;
+      return {
+        uid: d.id,
+        displayName: u?.displayName || t.displayName || "Unnamed",
+        email: u?.email ?? null,
+        trades: t.trades ?? [],
+        signedUpAt: u?.createdAt ?? null,
+        onboardingNudgedAt: t.onboardingNudgedAt ?? null,
+        onboardingNudgeCount: t.onboardingNudgeCount ?? 0,
+      };
+    }),
+  );
+  // Oldest signups first — those have been stalled longest and are the most
+  // overdue for a nudge.
+  rows.sort((a, b) => (a.signedUpAt?.toMillis() ?? 0) - (b.signedUpAt?.toMillis() ?? 0));
+  return rows;
+}
+
+/**
+ * Email a stalled tradesperson a "finish your application" nudge. Server-side
+ * callable (`nudgeOnboarding`) does the send + records the nudge on their doc.
+ */
+export async function nudgeOnboarding(uid: string): Promise<{ ok: boolean; sentTo: string }> {
+  const callable = httpsCallable<{ uid: string }, { ok: boolean; sentTo: string }>(
+    functions,
+    "nudgeOnboarding",
+  );
+  const { data } = await callable({ uid });
+  return data;
 }

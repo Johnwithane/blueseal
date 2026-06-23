@@ -431,6 +431,12 @@ const routes: RouteRecordRaw[] = [
     },
   },
   {
+    path: "/admin/onboarding",
+    name: "AdminOnboarding",
+    component: () => import("@/views/admin/IncompleteOnboardingView.vue"),
+    meta: { requiresAuth: true, role: "admin", layout: "app", title: "Incomplete signups" },
+  },
+  {
     path: "/admin/site-content",
     name: "AdminSiteContent",
     component: () => import("@/views/admin/AdminSiteContentView.vue"),

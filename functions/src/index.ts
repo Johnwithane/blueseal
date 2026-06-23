@@ -61,6 +61,7 @@ export { backfillJobPrivateNotes } from "./admin/backfillJobPrivateNotes";
 export { backfillTradieContact } from "./admin/backfillTradieContact";
 export { adminGrantFoundingPro } from "./admin/grantFoundingPro";
 export { adminModerateContent } from "./admin/moderation";
+export { nudgeOnboarding } from "./admin/nudgeOnboarding";
 
 // Admin support-desk account actions (verify email, password reset / temp pw,
 // suspend/restore, resend verification, edit contact, soft-delete/restore,

@@ -20,6 +20,10 @@ export async function deliver(opts: {
   // the user to reply. When omitted, both the text and HTML drop the CTA line.
   ctaLabel?: string;
   ctaUrl?: string;
+  // Optional Reply-To. Defaults to the no-reply From. Set this when the email
+  // invites a reply (e.g. an onboarding nudge that says "just reply if you're
+  // stuck") so the response lands in a monitored inbox rather than nowhere.
+  replyTo?: string;
 }): Promise<void> {
   const hasCta = !!(opts.ctaLabel && opts.ctaUrl);
   const text = hasCta
@@ -29,6 +33,7 @@ export async function deliver(opts: {
     to: opts.to,
     subject: opts.subject,
     text,
+    ...(opts.replyTo ? { replyTo: opts.replyTo } : {}),
     html: brandedEmailHtml({
       title: opts.title,
       bodyLines: opts.bodyLines,

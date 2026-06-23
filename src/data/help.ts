@@ -819,6 +819,13 @@ const faqs: FaqItem[] = [
     audience: "tradesperson",
   },
   {
+    question: "I started signing up but didn't finish. Can I come back?",
+    answer:
+      "Yes. Just sign back in and the onboarding wizard picks up right where you left off, with everything you'd already entered saved as a draft, and drops you on the first step you still need to finish. Nothing is submitted until you tap **Submit for review**, so take your time. If you go quiet for a while, we may email a friendly reminder to help you across the line; you can always reply to it if you got stuck.",
+    categoryId: "for-tradespeople",
+    audience: "tradesperson",
+  },
+  {
     question: "Can I work before I'm verified?",
     answer:
       "You can finish setting up your profile, portfolio, and availability while you wait, but you can't take jobs or appear in search until your verification is approved. You'll also need to **confirm your email** before you can submit your profile for review. We send a verification link when you sign up, and there's a Resend button in the banner if it didn't arrive. That gate is what makes the badges mean something.",

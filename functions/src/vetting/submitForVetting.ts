@@ -1,8 +1,10 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { logger } from "firebase-functions/v2";
 import { CALLABLE_OPTS } from "../lib/callable";
 import { FieldValue } from "firebase-admin/firestore";
 import { db } from "../lib/admin";
 import { requireRole } from "../lib/auth";
+import { notifyAdmins, appUrl } from "../lib/notifyAdmins";
 
 export const submitForVetting = onCall(CALLABLE_OPTS, async (req) => {
   const uid = requireRole(req, "tradesperson");
@@ -26,7 +28,11 @@ export const submitForVetting = onCall(CALLABLE_OPTS, async (req) => {
   if (!tradieSnap.exists) throw new HttpsError("failed-precondition", "Profile not started.");
   if (!idSnap.exists) throw new HttpsError("failed-precondition", "ID not uploaded.");
 
-  const tradie = tradieSnap.data() as { trades?: string[]; vettingStatus?: string };
+  const tradie = tradieSnap.data() as {
+    trades?: string[];
+    vettingStatus?: string;
+    displayName?: string;
+  };
   // Only draft / info_requested may submit. Already-pending and already-approved
   // tradies must not be able to reset queue position by re-submitting.
   if (tradie.vettingStatus && !["draft", "info_requested"].includes(tradie.vettingStatus)) {
@@ -53,5 +59,31 @@ export const submitForVetting = onCall(CALLABLE_OPTS, async (req) => {
     vettingStatus: "pending",
     submittedAt: FieldValue.serverTimestamp(),
   });
+
+  // Alert the admin team there's a fresh application to vet. Best-effort:
+  // notifyAdmins never throws, but guard anyway so nothing about the email
+  // path can fail the submission the tradesperson just completed.
+  try {
+    const name =
+      tradie.displayName?.trim() ||
+      (typeof req.auth?.token?.name === "string" ? req.auth.token.name : "") ||
+      req.auth?.token?.email ||
+      "A tradesperson";
+    const trades = (tradie.trades ?? []).join(", ") || "—";
+    await notifyAdmins({
+      subject: `New tradesperson application: ${name}`,
+      title: "New tradesperson application",
+      bodyLines: [
+        `${name} just submitted their profile for vetting.`,
+        `Trades: ${trades}`,
+        "Review their certifications, ID, and insurance to approve or request more info.",
+      ],
+      ctaLabel: "Review application",
+      ctaUrl: appUrl(`/admin/applications/${uid}`),
+    });
+  } catch (err) {
+    logger.error("submitForVetting: admin alert failed", { uid, err });
+  }
+
   return { ok: true };
 });

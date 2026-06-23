@@ -406,6 +406,12 @@ export interface TradespersonDoc {
   bannerUrl?: string | null;
   submittedAt: Timestamp | null;
   approvedAt: Timestamp | null;
+  // Admin outreach to a tradesperson who started onboarding but never
+  // submitted (still "draft"). Written server-side by the `nudgeOnboarding`
+  // callable so the /admin/onboarding view can show "nudged X ago" and avoid
+  // re-pinging the same person. Absent until the first nudge.
+  onboardingNudgedAt?: Timestamp | null;
+  onboardingNudgeCount?: number;
   // Stripe Connect Express state — mirrored from Stripe via the
   // `account.updated` webhook. Optional only while the data-model migration
   // is rolling out; the `backfillPayoutsField` admin callable seeds the

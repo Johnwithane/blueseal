@@ -2,7 +2,10 @@
 import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import Avatar from "primevue/avatar";
-import { listPendingApplications } from "@/firebase/services/tradespeople";
+import {
+  countIncompleteOnboarding,
+  listPendingApplications,
+} from "@/firebase/services/tradespeople";
 import { listOpenDisputes } from "@/firebase/services/disputes";
 import { listSupportTickets } from "@/firebase/services/support";
 import { listErrorLogs } from "@/firebase/services/errorReporting";
@@ -33,6 +36,7 @@ const supportCount = ref(0);
 const errorCount = ref(0);
 const bugCount = ref(0);
 const prospectCount = ref(0);
+const incompleteOnboardingCount = ref(0);
 
 const platform = ref<PlatformStatsDoc | null>(null);
 
@@ -57,6 +61,7 @@ const queueTiles = computed(() => {
     tone: Tone;
   }> = [
     { key: "vetting", to: "/admin/vetting", label: "Vetting queue", icon: "pi-shield", count: pending.value.length, tone: "info" },
+    { key: "onboarding", to: "/admin/onboarding", label: "Incomplete signups", icon: "pi-user-plus", count: incompleteOnboardingCount.value, tone: "warning" },
     { key: "disputes", to: "/admin/disputes", label: "Open disputes", icon: "pi-flag", count: disputeCount.value, tone: "danger" },
     { key: "support", to: "/admin/support", label: "Support tickets", icon: "pi-question-circle", count: supportCount.value, tone: "warning" },
     { key: "errors", to: "/admin/errors", label: "Unresolved errors", icon: "pi-exclamation-triangle", count: errorCount.value, tone: "danger" },
@@ -101,9 +106,10 @@ onMounted(async () => {
   loading.value = true;
   // One parallel fan-out; allSettled so a single denied/failed query degrades
   // that one tile to 0 rather than blanking the whole dashboard.
-  const [apps, disputes, tickets, errors, bugs, prospects, stats] =
+  const [apps, onboarding, disputes, tickets, errors, bugs, prospects, stats] =
     await Promise.allSettled([
       listPendingApplications(),
+      countIncompleteOnboarding(),
       listOpenDisputes(),
       listSupportTickets(),
       listErrorLogs(),
@@ -113,6 +119,7 @@ onMounted(async () => {
     ]);
 
   if (apps.status === "fulfilled") pending.value = apps.value;
+  if (onboarding.status === "fulfilled") incompleteOnboardingCount.value = onboarding.value;
   if (disputes.status === "fulfilled") disputeCount.value = disputes.value.length;
   if (tickets.status === "fulfilled")
     supportCount.value = tickets.value.filter(
