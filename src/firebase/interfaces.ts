@@ -305,6 +305,10 @@ export interface TradespersonDoc {
   // predating the field; readers treat undefined as []. Normalised + capped via
   // src/utils/services.ts (SERVICES_MAX entries, SERVICE_NAME_MAX chars each).
   services?: string[];
+  // One-line headline shown under the name on the public profile (e.g.
+  // "Red Seal plumbing & gas across the Okanagan"). Free for everyone — it's
+  // profile content like bio. Owner-writable; optional/absent on older docs.
+  tagline?: string;
   pricingModel: PricingModel;
   hourlyRate: number | null; // cents
   // Optional separate rate for billing travel/callout time on hourly jobs.

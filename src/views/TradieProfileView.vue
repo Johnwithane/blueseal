@@ -119,6 +119,27 @@ const pricingLabel = computed(() => {
   return t.hourlyRate ? `${money(t.hourlyRate)}/hr` : "Quote on request";
 });
 
+// One-line headline under the name. Free for everyone — it's content like bio.
+const tagline = computed(() => tradie.value?.tagline?.trim() || "");
+
+// Pro "company homepage" extras — banner image + brand colour + (later) the
+// vanity URL. `isPro` is the server-managed public mirror on the tradie doc,
+// authoritative for the profile being VIEWED (not the current viewer's
+// subscription). Prospects never get these.
+const isProActive = computed(() => !isProspect.value && tradie.value?.isPro === true);
+const brandColor = computed(() => (isProActive.value ? tradie.value?.brandColor || null : null));
+const bannerUrl = computed(() => (isProActive.value ? tradie.value?.bannerUrl || null : null));
+
+// Cascade the brand colour + banner image as CSS vars on the page root so the
+// hero and section accents pick them up. --brand defaults to Blue Seal blue in
+// CSS, so a free / non-Pro profile keeps the familiar navy treatment.
+const pageStyle = computed<Record<string, string>>(() => {
+  const s: Record<string, string> = {};
+  if (brandColor.value) s["--brand"] = brandColor.value;
+  if (bannerUrl.value) s["--hero-image"] = `url("${bannerUrl.value}")`;
+  return s;
+});
+
 // Per-dimension rating bars for the Reviews summary. Each dim is 0..5.
 const ratingDims = computed(() => {
   const d = tradie.value?.ratingDimensions;
@@ -482,7 +503,7 @@ onMounted(async () => {
     </button>
   </div>
 
-  <section class="bs-container profile-page py-5">
+  <section class="bs-container profile-page py-5" :style="pageStyle">
     <LoadingState v-if="loading" />
     <div v-else-if="!tradie" class="bs-empty">
       <i class="pi pi-times-circle text-3xl mb-2 block"></i>
@@ -542,73 +563,68 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- HERO -->
-      <header class="profile-hero">
-        <div class="profile-hero__banner"></div>
-        <div class="profile-hero__body">
-          <div class="profile-hero__avatar">
+      <!-- HERO — immersive banner. Pro tradies get their uploaded banner image
+           + brand-colour wash; everyone else gets a branded gradient (--brand
+           falls back to Blue Seal navy). White content sits over a scrim so it
+           stays legible on any banner. -->
+      <header class="profile-hero" :class="{ 'profile-hero--photo': !!bannerUrl }">
+        <div class="profile-hero__scrim" aria-hidden="true"></div>
+        <div class="profile-hero__tools">
+          <button
+            v-if="canSave"
+            type="button"
+            class="profile-hero__tool"
+            :class="{ 'is-saved': saved }"
+            :disabled="savingToggle"
+            :aria-label="saved ? 'Saved' : 'Save'"
+            @click="toggleSave"
+          >
+            <i :class="saved ? 'pi pi-heart-fill' : 'pi pi-heart'" aria-hidden="true"></i>
+          </button>
+          <button type="button" class="profile-hero__tool" aria-label="Share" @click="share">
+            <i class="pi pi-share-alt" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div class="profile-hero__content">
+          <div class="profile-hero__logo">
             <img v-if="tradie.photoURL" :src="tradie.photoURL" :alt="displayName" />
             <span v-else>{{ avatarInitial }}</span>
           </div>
-          <div class="profile-hero__id">
-            <h1 class="profile-hero__name">{{ displayName || tradeLabel(tradie.trades[0]) }}</h1>
-            <div v-if="tradie.companyName" class="profile-hero__company">
-              <i class="pi pi-building" aria-hidden="true"></i>
-              {{ tradie.companyName }}
-            </div>
-            <div class="profile-hero__meta">
-              <span v-if="tradie.ratingCount" class="profile-hero__rating">
-                <i class="pi pi-star-fill" aria-hidden="true"></i>
-                {{ tradie.ratingAvg.toFixed(1) }}
-                <span class="profile-hero__muted">
-                  · {{ tradie.ratingCount }} review{{ tradie.ratingCount === 1 ? "" : "s" }}
-                </span>
-              </span>
-              <span v-else class="profile-hero__muted">New to Blue Seal</span>
-              <span class="profile-hero__sep">·</span>
-              <span class="profile-hero__muted">
-                {{ tradesWithYears.map((t) => t.label).join(" · ") }}
-              </span>
-              <template v-if="tradie.serviceRadiusKm">
-                <span class="profile-hero__sep">·</span>
-                <span class="profile-hero__muted">
-                  <i class="pi pi-map-marker" aria-hidden="true"></i>
-                  {{ tradie.serviceRadiusKm }} km radius
-                </span>
-              </template>
-            </div>
-            <div class="mt-2 flex flex-wrap items-center gap-1">
-              <Tag v-if="isProspect" value="Unclaimed" severity="warn" />
-              <RedSealBadge v-if="showRedSeal" variant="tag" />
-              <Tag v-if="tradie.idVerified" value="ID verified" severity="success" />
-              <VerifiedBadge
-                v-if="insuranceLive"
-                kind="insurance"
-                :expires-at="tradie.insuranceExpiresAt"
-              />
-              <VerifiedBadge v-if="wsibLive" kind="wsib" :expires-at="tradie.wsibExpiresAt" />
-            </div>
+          <div v-if="!isProspect && tradie.isVisible" class="profile-hero__chips">
+            <span class="profile-hero__chip">
+              <i class="pi pi-verified" aria-hidden="true"></i> Verified on Blue Seal
+            </span>
           </div>
-          <div class="profile-hero__actions">
-            <Button
-              v-if="canSave"
-              :icon="saved ? 'pi pi-heart-fill' : 'pi pi-heart'"
-              severity="secondary"
-              outlined
-              rounded
-              :loading="savingToggle"
-              :class="{ 'bs-saved-btn': saved }"
-              :aria-label="saved ? 'Saved' : 'Save'"
-              @click="toggleSave"
+          <h1 class="profile-hero__name">{{ displayName || tradeLabel(tradie.trades[0]) }}</h1>
+          <div v-if="tradie.companyName" class="profile-hero__company">
+            <i class="pi pi-building" aria-hidden="true"></i> {{ tradie.companyName }}
+          </div>
+          <p v-if="tagline" class="profile-hero__tagline">{{ tagline }}</p>
+          <div class="profile-hero__meta">
+            <span v-if="tradie.ratingCount" class="profile-hero__rating">
+              <i class="pi pi-star-fill" aria-hidden="true"></i>
+              {{ tradie.ratingAvg.toFixed(1) }}
+              <span class="profile-hero__sub">
+                ({{ tradie.ratingCount }} review{{ tradie.ratingCount === 1 ? "" : "s" }})
+              </span>
+            </span>
+            <span v-else class="profile-hero__sub">New to Blue Seal</span>
+            <span class="profile-hero__dot" aria-hidden="true">·</span>
+            <span>{{ tradesWithYears.map((t) => t.label).join(" · ") }}</span>
+            <template v-if="tradie.serviceRadiusKm">
+              <span class="profile-hero__dot" aria-hidden="true">·</span>
+              <span><i class="pi pi-map-marker" aria-hidden="true"></i> {{ tradie.serviceRadiusKm }} km radius</span>
+            </template>
+          </div>
+          <div class="profile-hero__badges">
+            <RedSealBadge v-if="showRedSeal" variant="tag" />
+            <Tag v-if="tradie.idVerified" value="ID verified" severity="success" />
+            <VerifiedBadge
+              v-if="insuranceLive"
+              kind="insurance"
+              :expires-at="tradie.insuranceExpiresAt"
             />
-            <Button
-              icon="pi pi-share-alt"
-              severity="secondary"
-              outlined
-              rounded
-              aria-label="Share"
-              @click="share"
-            />
+            <VerifiedBadge v-if="wsibLive" kind="wsib" :expires-at="tradie.wsibExpiresAt" />
           </div>
         </div>
       </header>
@@ -1062,104 +1078,178 @@ onMounted(async () => {
   background: var(--bs-surface-alt);
 }
 
-/* --- Hero ----------------------------------------------------------------- */
+/* Brand colour drives the hero + section accents. Defaults to Blue Seal navy,
+   so free / non-Pro profiles look exactly as before; a Pro brandColor overrides
+   it via an inline --brand on the page root. */
+.profile-page {
+  --brand: var(--bs-blue);
+}
+
+/* --- Hero (immersive banner) ---------------------------------------------- */
 .profile-hero {
-  background: #fff;
-  border: 1px solid var(--bs-border);
-  border-radius: var(--bs-radius-lg);
-  box-shadow: var(--bs-shadow-sm);
-  overflow: hidden;
-}
-.profile-hero__banner {
-  height: 132px;
-  background: linear-gradient(120deg, var(--bs-blue-dark) 0%, var(--bs-blue) 55%, #46618f 100%);
   position: relative;
+  overflow: hidden;
+  border-radius: var(--bs-radius-lg);
+  border: 1px solid var(--bs-border);
+  box-shadow: var(--bs-shadow-sm);
+  color: #fff;
+  min-height: 300px;
+  display: flex;
+  align-items: flex-end;
+  /* Bottom is always darkened so white text stays legible even if a Pro picks
+     a pale brand colour. */
+  background: linear-gradient(
+    150deg,
+    color-mix(in srgb, var(--brand) 90%, #000 10%) 0%,
+    var(--brand) 48%,
+    color-mix(in srgb, var(--brand) 62%, #000 12%) 100%
+  );
 }
-.profile-hero__banner::after {
-  content: "";
+.profile-hero--photo {
+  background-image: var(--hero-image);
+  background-size: cover;
+  background-position: center;
+}
+.profile-hero__scrim {
   position: absolute;
   inset: 0;
-  background: radial-gradient(120% 140% at 85% -10%, rgba(179, 220, 255, 0.35), transparent 55%);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--brand) 28%, transparent) 0%,
+    rgba(20, 28, 40, 0.35) 42%,
+    rgba(18, 24, 36, 0.9) 100%
+  );
 }
-.profile-hero__body {
-  display: flex;
-  gap: 1.25rem;
-  align-items: flex-end;
-  flex-wrap: wrap;
-  padding: 0 1.5rem 1.25rem;
-}
-.profile-hero__avatar {
-  width: 108px;
-  height: 108px;
-  margin-top: -58px;
-  border-radius: 50%;
-  border: 5px solid #fff;
-  background: var(--bs-blue);
-  color: #fff;
-  flex: none;
+.profile-hero__content {
   position: relative;
   z-index: 2;
-  box-shadow: var(--bs-shadow-md);
+  width: 100%;
+  padding: 2rem 1.6rem 1.5rem;
+}
+.profile-hero__tools {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 3;
+  display: flex;
+  gap: 0.5rem;
+}
+.profile-hero__tool {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(6px);
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.profile-hero__tool:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+.profile-hero__tool.is-saved {
+  color: #ffb4b4;
+}
+.profile-hero__logo {
+  width: 84px;
+  height: 84px;
+  border-radius: 18px;
+  border: 3px solid #fff;
+  background: #fff;
+  color: var(--brand);
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: var(--bs-font-display);
   font-weight: 700;
-  font-size: 2.25rem;
-  overflow: hidden;
+  font-size: 2rem;
+  box-shadow: var(--bs-shadow-md);
+  margin-bottom: 0.9rem;
 }
-.profile-hero__avatar img {
+.profile-hero__logo img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
-.profile-hero__id {
-  flex: 1;
-  min-width: 220px;
-  padding-bottom: 0.1rem;
+.profile-hero__chips {
+  margin-bottom: 0.6rem;
+}
+.profile-hero__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+  font-size: 0.74rem;
+  font-weight: 600;
 }
 .profile-hero__name {
-  font-size: 1.85rem;
+  font-size: 2.4rem;
   font-weight: 700;
-  line-height: 1.1;
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.28);
 }
 .profile-hero__company {
-  color: var(--bs-muted);
-  font-size: 0.95rem;
-  margin-top: 0.15rem;
+  font-size: 1rem;
+  margin-top: 0.25rem;
+  opacity: 0.92;
 }
 .profile-hero__company .pi {
   font-size: 0.8rem;
+}
+.profile-hero__tagline {
+  font-size: 1.12rem;
+  font-weight: 300;
+  margin-top: 0.5rem;
+  max-width: 620px;
+  opacity: 0.95;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.25);
 }
 .profile-hero__meta {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-top: 0.5rem;
-  font-size: 0.875rem;
+  gap: 0.4rem 0.6rem;
+  margin-top: 0.9rem;
+  font-size: 0.92rem;
 }
 .profile-hero__rating {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
   font-weight: 700;
-  color: var(--bs-text);
 }
 .profile-hero__rating .pi {
   color: var(--bs-amber);
 }
-.profile-hero__muted {
-  color: var(--bs-muted);
+.profile-hero__sub {
+  opacity: 0.85;
+  font-weight: 400;
 }
-.profile-hero__sep {
-  color: var(--bs-border);
+.profile-hero__dot {
+  opacity: 0.55;
 }
-.profile-hero__actions {
+.profile-hero__badges {
   display: flex;
-  gap: 0.5rem;
-  align-self: flex-start;
-  margin-top: 1rem;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.9rem;
+}
+@media (max-width: 560px) {
+  .profile-hero__name {
+    font-size: 1.9rem;
+  }
+  .profile-hero__content {
+    padding: 1.6rem 1.15rem 1.25rem;
+  }
 }
 
 /* --- Layout: sticky aside + main ------------------------------------------ */
@@ -1207,7 +1297,7 @@ onMounted(async () => {
   margin-bottom: 0.85rem;
 }
 .profile-aside__title .pi {
-  color: var(--bs-blue);
+  color: var(--brand);
   font-size: 0.95rem;
 }
 .profile-aside__link {
@@ -1217,7 +1307,7 @@ onMounted(async () => {
   margin-top: 0.9rem;
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--bs-blue);
+  color: var(--brand);
 }
 .profile-aside__link:hover {
   text-decoration: underline;
@@ -1282,7 +1372,7 @@ onMounted(async () => {
 }
 .profile-week__bar i {
   display: block;
-  background: linear-gradient(180deg, var(--bs-mid-blue), var(--bs-blue));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--brand) 65%, #fff 12%), var(--brand));
 }
 .profile-week__bar.off {
   opacity: 0.5;
@@ -1321,7 +1411,7 @@ onMounted(async () => {
   margin-bottom: 0.85rem;
 }
 .profile-section__title .pi {
-  color: var(--bs-blue);
+  color: var(--brand);
   font-size: 1rem;
 }
 
