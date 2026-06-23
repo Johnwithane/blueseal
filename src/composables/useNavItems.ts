@@ -108,6 +108,20 @@ export function useNavItems(): {
           mobile: true,
           matches: prefix("/jobs/browse"),
         },
+        // The tradesperson's own public page — the thing clients see, and where
+        // they edit it in place. Easy to reach from the side panel (and the
+        // ProfileMenu) so it isn't buried in Account. Desktop-only here; on
+        // mobile it lives in the Profile tab's menu. Highlights on their own
+        // /tradies/<uid> or their vanity /u/<slug>.
+        {
+          key: "my-page",
+          label: "My page",
+          icon: "pi-id-card",
+          to: `/tradies/${auth.fbUser?.uid ?? ""}`,
+          mobile: false,
+          matches: (r) =>
+            r.path.startsWith("/u/") || r.path === `/tradies/${auth.fbUser?.uid ?? ""}`,
+        },
         // Applied is no longer its own nav destination — it's a view inside
         // Jobs (the SelectButton in TradieDashboard). The standalone
         // /my-applications route is kept alive for notification deep-links

@@ -134,6 +134,12 @@ const items = computed(() => {
   // inline header nav to keep the bar uncluttered. The status banner +
   // dashboard CTA give the other discovery paths.
   if (auth.hasTradieRole && auth.activeRole === "tradesperson") {
+    // Their own public page — one tap from the main menu, not buried in Account.
+    list.push({
+      label: "My page",
+      icon: "pi pi-id-card",
+      command: () => router.push(`/tradies/${auth.fbUser?.uid ?? ""}`),
+    });
     list.push({
       label: "Payouts",
       icon: "pi pi-credit-card",

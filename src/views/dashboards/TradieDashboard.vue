@@ -458,6 +458,15 @@ const awaitingVerificationMessage = computed(() => {
         size="small"
         @click="router.push('/jobs/new')"
       />
+      <!-- Quick jump to their own public page (view + edit in place), so it's
+           reachable from the dashboard, not buried in Account. -->
+      <Button
+        label="My page"
+        icon="pi pi-id-card"
+        size="small"
+        outlined
+        @click="router.push(`/tradies/${auth.fbUser?.uid ?? ''}`)"
+      />
       <Button
         label="Reports"
         icon="pi pi-chart-bar"
