@@ -69,11 +69,60 @@ const statusOptions: Array<{ label: string; value: ProspectStatus }> = [
   { label: "Suppressed", value: "suppressed" },
 ];
 
+// Google signal lives in extra fields not on the typed doc.
+function gOf(p: WithId<ProspectDoc>): { googleRating?: number; googleReviewCount?: number } {
+  return p as unknown as { googleRating?: number; googleReviewCount?: number };
+}
+
+// Eligibility = how complete + "ready to reach out" a listing is. Scraped
+// listings carry no email (Google never exposes one), so this leans on
+// description, photos, website + Google review strength. Higher = better.
+function eligibility(p: WithId<ProspectDoc>): number {
+  let s = 0;
+  const bio = (p.bio ?? "").trim();
+  if (bio.length > 60) s += 25;
+  else if (bio) s += 12;
+  if (p.portfolioPhotos?.length) s += 18;
+  if (p.photoURL) s += 8; // a real /p/ photo (null => initials avatar)
+  if (p.website) s += 14;
+  if (p.emailHash) s += 15; // has a usable email (claim + outreach ready)
+  const rc = gOf(p).googleReviewCount ?? 0;
+  if (rc >= 25) s += 20;
+  else if (rc > 0) s += 10;
+  return s;
+}
+
+// Rough distance (km) from the Kelowna core so we can work outward from it.
+const KELOWNA = { lat: 49.888, lng: -119.496 };
+function distKm(p: WithId<ProspectDoc>): number {
+  const loc = p.locationApprox as { latitude?: number; longitude?: number } | undefined;
+  if (!loc || typeof loc.latitude !== "number" || typeof loc.longitude !== "number") {
+    return Number.POSITIVE_INFINITY;
+  }
+  const dLat = (loc.latitude - KELOWNA.lat) * 111;
+  const dLng = (loc.longitude - KELOWNA.lng) * 111 * Math.cos((KELOWNA.lat * Math.PI) / 180);
+  return Math.hypot(dLat, dLng);
+}
+
+const sortMode = ref<"eligible" | "nearest" | "reviews">("eligible");
+const sortOptions = [
+  { label: "Most eligible", value: "eligible" },
+  { label: "Closest to Kelowna", value: "nearest" },
+  { label: "Most Google reviews", value: "reviews" },
+];
+const townFilter = ref<string | null>(null);
+const townOptions = computed(() => {
+  const set = new Set<string>();
+  for (const p of prospects.value) if (p.locationLabel) set.add(p.locationLabel);
+  return [...set].sort().map((t) => ({ label: t, value: t }));
+});
+
 const filtered = computed(() => {
   const q = search.value.trim().toLowerCase();
   return prospects.value.filter((p) => {
     if (tradeFilter.value && !p.trades.includes(tradeFilter.value)) return false;
     if (statusFilter.value && p.status !== statusFilter.value) return false;
+    if (townFilter.value && p.locationLabel !== townFilter.value) return false;
     if (q) {
       const hay = `${p.displayName} ${p.companyName ?? ""} ${p.locationLabel ?? ""}`.toLowerCase();
       if (!hay.includes(q)) return false;
@@ -82,21 +131,39 @@ const filtered = computed(() => {
   });
 });
 
+// Sort the filtered set by the chosen mode (eligibility, proximity, or reviews),
+// each with a sensible tie-breaker.
+const sorted = computed(() => {
+  const arr = [...filtered.value];
+  if (sortMode.value === "nearest") {
+    arr.sort((a, b) => distKm(a) - distKm(b) || eligibility(b) - eligibility(a));
+  } else if (sortMode.value === "reviews") {
+    arr.sort(
+      (a, b) =>
+        (gOf(b).googleReviewCount ?? 0) - (gOf(a).googleReviewCount ?? 0) ||
+        eligibility(b) - eligibility(a),
+    );
+  } else {
+    arr.sort((a, b) => eligibility(b) - eligibility(a) || distKm(a) - distKm(b));
+  }
+  return arr;
+});
+
 // Lazy rendering: with thousands of prospects, painting every card at once
 // freezes the tab. We render a growing window of the (already client-filtered)
 // list, extended on scroll via an IntersectionObserver + a "Load more" fallback.
 const PAGE = 50;
 const visibleCount = ref(PAGE);
-const visible = computed(() => filtered.value.slice(0, visibleCount.value));
-const hasMore = computed(() => visibleCount.value < filtered.value.length);
+const visible = computed(() => sorted.value.slice(0, visibleCount.value));
+const hasMore = computed(() => visibleCount.value < sorted.value.length);
 const loadMoreEl = ref<HTMLElement | null>(null);
 
 function showMore() {
-  visibleCount.value = Math.min(visibleCount.value + PAGE, filtered.value.length);
+  visibleCount.value = Math.min(visibleCount.value + PAGE, sorted.value.length);
 }
 
-// Any filter/search change resets the window to the top.
-watch([search, tradeFilter, statusFilter], () => {
+// Any filter / sort / search change resets the window to the top.
+watch([search, tradeFilter, statusFilter, townFilter, sortMode], () => {
   visibleCount.value = PAGE;
 });
 
@@ -193,7 +260,24 @@ function openEditor(p: WithId<ProspectDoc>) {
         option-value="value"
         placeholder="All statuses"
         show-clear
-        class="sm:w-48"
+        class="sm:w-44"
+      />
+      <Select
+        v-model="townFilter"
+        :options="townOptions"
+        option-label="label"
+        option-value="value"
+        placeholder="All towns"
+        filter
+        show-clear
+        class="sm:w-44"
+      />
+      <Select
+        v-model="sortMode"
+        :options="sortOptions"
+        option-label="label"
+        option-value="value"
+        class="sm:w-52"
       />
       <Button label="Refresh" icon="pi pi-refresh" outlined :loading="loading" @click="refresh" />
     </div>
@@ -220,6 +304,10 @@ function openEditor(p: WithId<ProspectDoc>) {
           <div class="text-xs text-[color:var(--bs-muted)] mt-0.5">
             {{ tradesLabel(p) }}
             <template v-if="p.locationLabel"> · {{ p.locationLabel }}</template>
+            <template v-if="gOf(p).googleReviewCount">
+              · <i class="pi pi-star-fill text-[10px] text-[color:var(--bs-amber)]" />
+              {{ gOf(p).googleRating }} ({{ gOf(p).googleReviewCount }})
+            </template>
             <template v-if="p.outreachCount > 0"> · contacted {{ relativeTime(p.lastOutreachAt) }}</template>
           </div>
         </div>
