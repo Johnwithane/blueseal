@@ -8,6 +8,7 @@ import { requireRole } from "../lib/auth";
 import { postSystemMessage } from "../lib/chatSystemMessage";
 import { notify } from "../lib/notify";
 import {
+  consolidateHourlyLines,
   extraDescriptionMap,
   rollUpApprovedExtras,
   rollUpExpenses,
@@ -240,7 +241,14 @@ export const submitJobForApproval = onCall(CALLABLE_OPTS, async (req) => {
   // Flat extras pulled as lines + hourly extras whose time was just billed.
   const extraStamps = [...extrasRoll.stampIds, ...timeRoll.billedExtraIds];
 
-  const mergedLines: LineItem[] = [...preservedLines, ...pulledLines, ...extraLineItems];
+  // Consolidate same-rate hourly lines so labour billed across an earlier pull
+  // + this wrap-up (or a prior submit + a re-submit) reads as one total-hours
+  // line per rate, not several. Subtotal/tax are unchanged.
+  const mergedLines: LineItem[] = consolidateHourlyLines([
+    ...preservedLines,
+    ...pulledLines,
+    ...extraLineItems,
+  ]);
   // Upfront fee credit — only honoured when the fee has actually been paid
   // (paidAt set by markUpfrontFeePaid / clientMarkUpfrontFeePaid).
   const upfrontFee = job.upfrontFee ?? null;

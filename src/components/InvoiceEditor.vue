@@ -33,6 +33,7 @@ import { useFormatters } from "@/composables/useFormatters";
 import { usePdfDocument } from "@/composables/usePdfDocument";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
+import { consolidateHourlyLines } from "@/utils/invoiceLines";
 import SelectButton from "primevue/selectbutton";
 import { lineItemSchema } from "@/validation/schemas";
 import { z } from "zod";
@@ -228,7 +229,10 @@ async function load() {
       tradieBrandColor.value = null;
     }
   }
-  items.value = (invoice.value?.lineItems ?? []).map((li) => ({
+  // Collapse same-rate labour/travel into one total-hours line on the way in,
+  // so an invoice whose hourly time was pulled across several wrap-ups reads as
+  // a single line per rate. Total is unchanged; a Save persists the merge.
+  items.value = consolidateHourlyLines(invoice.value?.lineItems ?? []).map((li) => ({
     id: li.id,
     description: li.description,
     quantity: li.quantity,
@@ -340,13 +344,15 @@ function removeItem(i: number) {
 }
 
 function snapshotForSave(): LineItem[] {
-  return items.value.map((li) => ({
-    ...(li.id ? { id: li.id } : {}),
-    description: li.description.trim(),
-    quantity: li.quantity,
-    unitPrice: cents(li.unitPriceDollars ?? 0),
-    taxRate: li.taxRate,
-  }));
+  return consolidateHourlyLines(
+    items.value.map((li) => ({
+      ...(li.id ? { id: li.id } : {}),
+      description: li.description.trim(),
+      quantity: li.quantity,
+      unitPrice: cents(li.unitPriceDollars ?? 0),
+      taxRate: li.taxRate,
+    })),
+  );
 }
 
 function validateLineItems(): LineItem[] | null {

@@ -6,6 +6,7 @@ import { z } from "zod";
 import { db } from "../lib/admin";
 import { requireRole } from "../lib/auth";
 import {
+  consolidateHourlyLines,
   extraDescriptionMap,
   rollUpApprovedExtras,
   rollUpExpenses,
@@ -117,8 +118,10 @@ export const pullBillablesFromJob = onCall(CALLABLE_OPTS, async (req) => {
 
   // ---------- recompute totals on the merged line set ----------
   // Apply the existing whole-invoice discount + upfront-fee credit so a
-  // pull doesn't accidentally wipe either deduction.
-  const merged: LineItem[] = [...invoice.lineItems, ...newLines];
+  // pull doesn't accidentally wipe either deduction. Consolidate first so the
+  // newly-pulled hours fold into any existing same-rate labour/travel line
+  // rather than stacking as a second line (subtotal is unchanged).
+  const merged: LineItem[] = consolidateHourlyLines([...invoice.lineItems, ...newLines]);
   let subtotal = 0;
   for (const li of merged) subtotal += li.quantity * li.unitPrice;
   let discountAmount = 0;

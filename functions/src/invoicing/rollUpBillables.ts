@@ -133,6 +133,56 @@ export function rollUpTimeEntries(
   return { lines, stampIds, billedExtraIds };
 }
 
+// Matches the auto-generated hourly time lines emitted above:
+//   "Labour: 23.27h @ $50.00/hr"  ·  "Travel: 0.5h @ $40.00/hr"  ·  "Labour: 5h"
+// Hand-typed labels ("Labour (kitchen): 5h") and change-order lines (which
+// carry the extra's own description) don't match, so they stay separate.
+const HOURLY_LINE_RE = /^(Labour|Travel): \d+(?:\.\d+)?h(?: @ \$\d+(?:\.\d+)?\/hr)?$/;
+
+/**
+ * Collapse same-rate hourly time lines into one "<label>: <total>h @ $rate/hr"
+ * line. Time billed by the hour can spread across several lines — each wrap-up
+ * / pull rolls up only the hours accrued since the last one, so labour at one
+ * rate ends up split. This re-merges them by (label, rate, taxRate): all
+ * $50/hr labour totals into a single line; a second distinct rate stays
+ * separate. Subtotal/tax are unchanged (quantity × unitPrice is additive) —
+ * it's purely how the bill reads. The first matching line keeps its id.
+ *
+ * Mirrored client-side in src/utils/invoiceLines.ts — keep the two in lockstep.
+ */
+export function consolidateHourlyLines(items: RollupLine[]): RollupLine[] {
+  const out: RollupLine[] = [];
+  const idxByKey = new Map<string, number>();
+  const mergedKeys = new Set<string>();
+
+  for (const li of items) {
+    const m = HOURLY_LINE_RE.exec((li.description ?? "").trim());
+    if (!m) {
+      out.push(li);
+      continue;
+    }
+    const key = `${m[1]}|${li.unitPrice}|${li.taxRate}`;
+    const at = idxByKey.get(key);
+    if (at === undefined) {
+      idxByKey.set(key, out.length);
+      out.push({ ...li });
+    } else {
+      out[at] = { ...out[at], quantity: round2(out[at].quantity + li.quantity) };
+      mergedKeys.add(key);
+    }
+  }
+
+  for (const key of mergedKeys) {
+    const at = idxByKey.get(key) as number;
+    const li = out[at];
+    const label = (HOURLY_LINE_RE.exec(li.description) as RegExpExecArray)[1];
+    const rateTail = li.unitPrice === 0 ? "" : ` @ $${(li.unitPrice / 100).toFixed(2)}/hr`;
+    out[at] = { ...li, description: `${label}: ${round2(li.quantity)}h${rateTail}` };
+  }
+
+  return out;
+}
+
 /**
  * Approved FLAT change orders → one line each. Hourly change orders aren't here
  * — their charge flows through clocked time (rollUpTimeEntries). Skips ones
