@@ -452,6 +452,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, role: "admin", layout: "app", title: "Disputes" },
   },
   {
+    path: "/admin/prospects",
+    name: "AdminProspects",
+    component: () => import("@/views/admin/AdminProspectsView.vue"),
+    meta: { requiresAuth: true, role: "admin", layout: "app", title: "Prospect outreach" },
+  },
+  {
     path: "/admin/support",
     name: "AdminSupport",
     component: () => import("@/views/admin/AdminSupportView.vue"),

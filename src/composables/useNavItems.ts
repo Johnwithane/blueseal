@@ -211,6 +211,14 @@ export function useNavItems(): {
           matches: prefix("/admin/disputes"),
         },
         {
+          key: "prospects",
+          label: "Prospect outreach",
+          icon: "pi-send",
+          to: "/admin/prospects",
+          mobile: false,
+          matches: prefix("/admin/prospects"),
+        },
+        {
           key: "users",
           label: "Users",
           icon: "pi-users",

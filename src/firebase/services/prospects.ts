@@ -12,13 +12,15 @@ import {
   getDocs,
   orderBy,
   query,
+  setDoc,
+  updateDoc,
   where,
 } from "firebase/firestore";
 import { distanceBetween, geohashQueryBounds } from "geofire-common";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/firebase/config";
 import { typedConverter } from "@/firebase/converters";
-import type { ProspectDoc, WithId } from "@/firebase/interfaces";
+import type { ProspectContact, ProspectDoc, WithId } from "@/firebase/interfaces";
 
 const prospectsCol = () =>
   collection(db, "prospects").withConverter(typedConverter<ProspectDoc>());
@@ -76,6 +78,132 @@ export async function searchProspects(
 
   out.sort((a, b) => a.distanceKm - b.distanceKm);
   return opts.limit ? out.slice(0, opts.limit) : out;
+}
+
+// ---------------------------------------------------------------------------
+// Admin outreach tooling. These run as an admin (firestore.rules gives admins
+// read/write on prospects + the private contact subdoc, and read on the leads),
+// so they read Firestore directly; only the actual send goes through a callable
+// (Admin SDK needed for the magic-link CTA + the Resend pipeline).
+// ---------------------------------------------------------------------------
+
+/**
+ * Admin: every prospect (listed AND unlisted), newest import first. Unlike
+ * searchProspects this does NOT filter on isListed — the admin tool manages the
+ * whole pool, most of which is private (unlisted) by design.
+ */
+export async function listAllProspects(): Promise<WithId<ProspectDoc>[]> {
+  const snap = await getDocs(prospectsCol());
+  const out = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  // Sort newest-imported first; tolerate docs missing importedAt (sort last).
+  out.sort((a, b) => (b.importedAt?.toMillis?.() ?? 0) - (a.importedAt?.toMillis?.() ?? 0));
+  return out;
+}
+
+/** Admin: the harvested email/phone for a prospect (private subdoc). */
+export async function getProspectContact(prospectId: string): Promise<ProspectContact | null> {
+  const snap = await getDoc(doc(db, "prospects", prospectId, "private", "contact"));
+  return snap.exists() ? (snap.data() as ProspectContact) : null;
+}
+
+async function sha256Hex(s: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * Admin: set/replace a prospect's harvested contact. Email is persisted to the
+ * private subdoc AND its SHA-256 written to emailHash on the public doc, so
+ * claim-by-email still matches (the same derivation the import + server use).
+ * Does NOT change emailConspicuouslyPublished — that stays a separate, explicit
+ * assertion. Use to add an email our crawler missed before reaching out.
+ */
+export async function setProspectContact(
+  prospectId: string,
+  contact: { email?: string; phone?: string | null },
+): Promise<void> {
+  const contactUpdates: { prospectEmail?: string; prospectPhone?: string | null } = {};
+  const prospectUpdates: { emailHash?: string } = {};
+  if (contact.email !== undefined) {
+    const normalized = contact.email.trim().toLowerCase();
+    contactUpdates.prospectEmail = normalized;
+    prospectUpdates.emailHash = normalized ? await sha256Hex(normalized) : "";
+  }
+  if (contact.phone !== undefined) contactUpdates.prospectPhone = contact.phone;
+
+  const ops: Promise<unknown>[] = [];
+  if (Object.keys(contactUpdates).length) {
+    ops.push(
+      setDoc(doc(db, "prospects", prospectId, "private", "contact"), contactUpdates, { merge: true }),
+    );
+  }
+  if (Object.keys(prospectUpdates).length) {
+    ops.push(updateDoc(doc(db, "prospects", prospectId), prospectUpdates));
+  }
+  await Promise.all(ops);
+}
+
+// The profile fields an admin can enrich on a seeded prospect (the crawl only
+// gets us part way). All optional — only the provided keys are written.
+export type ProspectProfileEdit = Partial<
+  Pick<
+    ProspectDoc,
+    | "displayName"
+    | "companyName"
+    | "bio"
+    | "trades"
+    | "locationLabel"
+    | "website"
+    | "pricingModel"
+    | "hourlyRate"
+    | "yearsExperience"
+    | "serviceRadiusKm"
+    | "languages"
+    | "photoURL"
+  >
+>;
+
+/** Admin: enrich a seeded prospect's public profile fields in place. */
+export async function updateProspectProfile(
+  prospectId: string,
+  fields: ProspectProfileEdit,
+): Promise<void> {
+  await updateDoc(doc(db, "prospects", prospectId), { ...fields });
+}
+
+/**
+ * Admin: assert (or retract) that the prospect's email was conspicuously
+ * published — the CASL implied-consent basis sendProspectOutreach requires.
+ * Setting it true is a legal assertion the admin makes after confirming the
+ * email is publicly posted with no "no unsolicited mail" notice.
+ */
+export async function setProspectConspicuous(prospectId: string, value: boolean): Promise<void> {
+  await updateDoc(doc(db, "prospects", prospectId), { emailConspicuouslyPublished: value });
+}
+
+export interface SendProspectOutreachInput {
+  prospectId: string;
+  subject: string;
+  bodyLines: string[];
+  cc?: string[];
+}
+
+/**
+ * Admin: send the (manually edited) outreach email to one prospect. The server
+ * appends the claim CTA + CASL footer and refuses to send unless the listing is
+ * sendable (conspicuous email, not suppressed/claimed) and outreach is
+ * configured (mailing address + unsub secret + email-link sign-in). Surfaces
+ * the server's failed-precondition message so the UI can explain what's missing.
+ */
+export async function sendProspectOutreach(
+  input: SendProspectOutreachInput,
+): Promise<{ status: "sent"; lastOutreachAt: number }> {
+  const callable = httpsCallable<SendProspectOutreachInput, { status: "sent"; lastOutreachAt: number }>(
+    functions,
+    "sendProspectOutreach",
+  );
+  const { data } = await callable(input);
+  return data;
 }
 
 export async function getProspect(id: string): Promise<WithId<ProspectDoc> | null> {
@@ -178,11 +306,12 @@ export interface BulkImportProspectsResult {
 export async function bulkImportProspects(
   rows: unknown[],
   dryRun = false,
+  listOnImport = false,
 ): Promise<BulkImportProspectsResult> {
   const callable = httpsCallable<
-    { rows: unknown[]; dryRun: boolean },
+    { rows: unknown[]; dryRun: boolean; listOnImport: boolean },
     BulkImportProspectsResult
   >(functions, "bulkImportProspects");
-  const { data } = await callable({ rows, dryRun });
+  const { data } = await callable({ rows, dryRun, listOnImport });
   return data;
 }

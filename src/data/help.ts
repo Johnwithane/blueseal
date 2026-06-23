@@ -589,6 +589,13 @@ const faqs: FaqItem[] = [
     audience: "tradesperson",
   },
   {
+    question: "I got an email saying Blue Seal set up a free profile for me. Is it real?",
+    answer:
+      "Yes, that's us. We build draft profiles for local tradespeople from publicly listed business information, then reach out to invite you to claim yours. The profile stays **private** until you claim it, so it isn't shown publicly in the meantime. Claiming is free: the link in the email signs you in without a password, shows you the profile we drafted, and lets you edit anything or add your trade ticket and ID to earn the verified badge. If you'd rather not be on Blue Seal at all, the same link lets you remove the listing for good. We never charge to be listed. Blue Seal makes money from payment service fees and optional Pro tools, not from directory fees.",
+    categoryId: "for-tradespeople",
+    audience: "tradesperson",
+  },
+  {
     question: "Do I need insurance to work on Blue Seal?",
     answer:
       "No. General-liability insurance is **optional**. But insured pros win more work: uploading proof earns a verified **Insured** badge on your profile, which most clients look for. If you try to bid or quote without proof of insurance on file, we'll show a gentle reminder. And if you're still not insured when it's time to start a job, you'll be asked to **sign a one-time waiver** before you can clock in, confirming you're choosing to work uninsured. Getting covered removes that step.",
