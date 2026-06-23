@@ -383,14 +383,46 @@ onMounted(() => {
           <li
             v-for="r in myReports"
             :key="r.id"
-            class="flex items-center justify-between rounded-lg border border-[color:var(--bs-border)] p-3 text-sm"
+            class="rounded-lg border border-[color:var(--bs-border)] text-sm"
           >
-            <span class="min-w-0 truncate font-medium">{{ r.title }}</span>
-            <span class="flex items-center gap-2">
-              <Tag :value="r.severity" severity="secondary" />
-              <Tag :value="r.status" />
-              <span class="text-xs text-[color:var(--bs-muted)]">{{ relativeTime(r.createdAt) }}</span>
-            </span>
+            <details class="qa-report">
+              <summary class="flex cursor-pointer items-center justify-between gap-2 p-3">
+                <span class="flex min-w-0 items-center gap-2">
+                  <i
+                    class="pi pi-chevron-right qa-report__chev text-xs text-[color:var(--bs-muted)]"
+                    aria-hidden="true"
+                  ></i>
+                  <span class="min-w-0 truncate font-medium">{{ r.title }}</span>
+                </span>
+                <span class="flex shrink-0 items-center gap-2">
+                  <Tag :value="r.severity" severity="secondary" />
+                  <Tag :value="r.status" />
+                  <span class="text-xs text-[color:var(--bs-muted)]">{{ relativeTime(r.createdAt) }}</span>
+                </span>
+              </summary>
+              <dl class="space-y-2 border-t border-[color:var(--bs-border)] px-3 pb-3 pt-2">
+                <div v-if="r.stepsToReproduce">
+                  <dt class="text-xs font-semibold text-[color:var(--bs-muted)]">Steps to reproduce</dt>
+                  <dd class="whitespace-pre-wrap">{{ r.stepsToReproduce }}</dd>
+                </div>
+                <div class="flex flex-wrap gap-4">
+                  <div v-if="r.expected" class="min-w-[8rem] flex-1">
+                    <dt class="text-xs font-semibold text-[color:var(--bs-muted)]">Expected</dt>
+                    <dd class="whitespace-pre-wrap">{{ r.expected }}</dd>
+                  </div>
+                  <div v-if="r.actual" class="min-w-[8rem] flex-1">
+                    <dt class="text-xs font-semibold text-[color:var(--bs-muted)]">Actual</dt>
+                    <dd class="whitespace-pre-wrap">{{ r.actual }}</dd>
+                  </div>
+                </div>
+                <p
+                  v-if="!r.stepsToReproduce && !r.expected && !r.actual"
+                  class="text-xs text-[color:var(--bs-muted)]"
+                >
+                  No reproduction detail was captured for this report.
+                </p>
+              </dl>
+            </details>
           </li>
         </ul>
         <p v-else class="text-sm text-[color:var(--bs-muted)]">No bug reports yet.</p>
@@ -485,6 +517,22 @@ onMounted(() => {
   border-top: 0;
   border-radius: 0 0 0.5rem 0.5rem;
   padding: 0.25rem 0.85rem 0.5rem;
+}
+
+/* My bug reports: each report expands to reveal the detail captured at file time
+   (steps / expected / actual). Hide the native disclosure triangle and rotate
+   our own chevron on open. */
+.qa-report > summary {
+  list-style: none;
+}
+.qa-report > summary::-webkit-details-marker {
+  display: none;
+}
+.qa-report__chev {
+  transition: transform 0.15s ease;
+}
+.qa-report[open] .qa-report__chev {
+  transform: rotate(90deg);
 }
 
 /* MarkdownProse doesn't style tables/checkboxes; the runbook uses both. */
