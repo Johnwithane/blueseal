@@ -22,6 +22,7 @@ import {
 import {
   sendVerificationEmail as callSendVerificationEmail,
   requestPasswordReset as callRequestPasswordReset,
+  requestSignInLink as callRequestSignInLink,
   requestEmailChange as callRequestEmailChange,
 } from "@/firebase/services/authEmails";
 import type { Role, UserDoc, WithId } from "@/firebase/interfaces";
@@ -457,6 +458,15 @@ export const useAuthStore = defineStore("auth", {
       // client SDK. The callable already returns ok for an unknown address, so
       // account existence never leaks and there's no error to swallow here.
       await callRequestPasswordReset(email);
+    },
+
+    /**
+     * Send a passwordless sign-in link (for return logins without a password —
+     * notably tradespeople invited via a magic link who never set one). Branded
+     * email via the callable; lands on /finish-signin to complete sign-in.
+     */
+    async sendSignInLink(email: string) {
+      await callRequestSignInLink(email);
     },
 
     /**

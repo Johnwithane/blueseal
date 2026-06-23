@@ -157,6 +157,55 @@ export const requestPasswordReset = onCall(CALLABLE_OPTS, async (req) => {
   return { ok: true as const };
 });
 
+const SignInLinkInput = z.object({
+  email: z.string().trim().toLowerCase().email().max(200),
+});
+
+/**
+ * Send a branded passwordless SIGN-IN link. UNauthenticated by design — it's for
+ * logged-out users on the sign-in page, and especially for invited tradespeople
+ * who were onboarded via a magic link and never set a password. Unlike
+ * reset/verify (Firebase's hosted handler), a sign-in link MUST complete in-app,
+ * so it carries handleCodeInApp + lands on /finish-signin, which calls
+ * signInWithEmailLink. App Check (CALLABLE_OPTS) + a per-email daily cap guard
+ * abuse; always returns ok so account existence never leaks.
+ */
+export const requestSignInLink = onCall(CALLABLE_OPTS, async (req) => {
+  const parsed = SignInLinkInput.safeParse(req.data);
+  if (!parsed.success) throw new HttpsError("invalid-argument", "Enter a valid email.");
+  const { email } = parsed.data;
+
+  await enforceRateLimit(
+    emailHashOf(email),
+    "signin_link",
+    8,
+    "Too many sign-in link requests. Please try again later.",
+  );
+
+  try {
+    const link = await adminAuth.generateSignInWithEmailLink(email, {
+      url: `${appBaseUrl()}/finish-signin?email=${encodeURIComponent(email)}`,
+      handleCodeInApp: true,
+    });
+    await deliver({
+      to: email,
+      subject: "Your Blue Seal sign-in link",
+      title: "Sign in to Blue Seal",
+      bodyLines: [
+        "Tap the button below to sign in. No password needed.",
+        "This link signs you in once and expires shortly. If you didn't request it, you can safely ignore this email.",
+      ],
+      ctaLabel: "Sign in",
+      ctaUrl: link,
+    });
+  } catch (err) {
+    // Throttle or any error must not leak — succeed silently.
+    logger.info("requestSignInLink: not sent", { code: firebaseAuthCode(err) });
+  }
+
+  return { ok: true as const };
+});
+
 const ChangeInput = z.object({
   newEmail: z.string().trim().toLowerCase().email().max(200),
 });

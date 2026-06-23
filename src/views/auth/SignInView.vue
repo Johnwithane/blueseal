@@ -25,6 +25,29 @@ const password = ref("");
 const fieldErrors = ref<{ email?: string; password?: string }>({});
 const formError = ref<string | null>(null);
 
+// Passwordless sign-in link — for return logins without a password (e.g.
+// tradespeople invited via a magic link who never set one).
+const sendingLink = ref(false);
+const linkSent = ref(false);
+async function emailSignInLink() {
+  formError.value = null;
+  fieldErrors.value = {};
+  const e = email.value.trim().toLowerCase();
+  if (!e || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
+    fieldErrors.value.email = "Enter your email to get a sign-in link.";
+    return;
+  }
+  sendingLink.value = true;
+  try {
+    await auth.sendSignInLink(e);
+    linkSent.value = true;
+  } catch (err) {
+    formError.value = humanizeError(err);
+  } finally {
+    sendingLink.value = false;
+  }
+}
+
 async function submit() {
   fieldErrors.value = {};
   formError.value = null;
@@ -142,6 +165,22 @@ function onRoleDialogHide() {
         class="w-full"
         @click="googleSignIn"
       />
+
+      <Message v-if="linkSent" severity="success" :closable="false">
+        Check your email for a sign-in link. No password needed.
+      </Message>
+      <Button
+        v-else
+        label="Email me a sign-in link"
+        icon="pi pi-envelope"
+        text
+        class="w-full"
+        :loading="sendingLink"
+        @click="emailSignInLink"
+      />
+      <p v-if="!linkSent" class="text-xs text-center text-[color:var(--bs-muted)] -mt-2">
+        No password? Get a one-click link emailed to you.
+      </p>
 
       <p class="text-sm text-center">
         No account?

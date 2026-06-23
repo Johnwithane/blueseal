@@ -14,7 +14,12 @@ export { grantAllTradesForAdminTesting } from "./auth/grantAllTradesForAdminTest
 
 // Branded auth emails — verification, password reset, email change — routed
 // through Resend (not Firebase's built-in mailer) so they're branded + inbox-safe.
-export { sendVerificationEmail, requestPasswordReset, requestEmailChange } from "./auth/authEmails";
+export {
+  sendVerificationEmail,
+  requestPasswordReset,
+  requestEmailChange,
+  requestSignInLink,
+} from "./auth/authEmails";
 
 // QA toolkit — self-serve test provisioning, gated to the qa role (granted only
 // by an admin). The two fabrication callables are additionally env-gated by

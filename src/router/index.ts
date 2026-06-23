@@ -217,6 +217,13 @@ const routes: RouteRecordRaw[] = [
     component: () => import("@/views/auth/ForgotPasswordView.vue"),
     meta: { layout: "public" },
   },
+  {
+    // Completes a passwordless sign-in link (no password / no claim).
+    path: "/finish-signin",
+    name: "FinishSignIn",
+    component: () => import("@/views/auth/FinishSignInView.vue"),
+    meta: { layout: "public", title: "Signing in" },
+  },
 
   // Account
   {

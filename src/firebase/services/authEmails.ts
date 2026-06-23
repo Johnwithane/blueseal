@@ -27,3 +27,13 @@ export async function requestEmailChange(newEmail: string): Promise<void> {
   const fn = httpsCallable<{ newEmail: string }, { ok: true }>(functions, "requestEmailChange");
   await fn({ newEmail });
 }
+
+/**
+ * Request a passwordless sign-in link. Always resolves (the callable returns ok
+ * even for an unknown address) so callers never leak account existence. The link
+ * lands on /finish-signin to complete sign-in in-app.
+ */
+export async function requestSignInLink(email: string): Promise<void> {
+  const fn = httpsCallable<{ email: string }, { ok: true }>(functions, "requestSignInLink");
+  await fn({ email });
+}
