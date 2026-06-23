@@ -11,6 +11,8 @@ import InputNumber from "primevue/inputnumber";
 import MultiSelect from "primevue/multiselect";
 import Select from "primevue/select";
 import Button from "primevue/button";
+import ProspectImageField from "@/components/admin/ProspectImageField.vue";
+import ProspectGalleryField from "@/components/admin/ProspectGalleryField.vue";
 import type { ProspectDoc, WithId } from "@/firebase/interfaces";
 import {
   getProspectContact,
@@ -45,7 +47,9 @@ const form = reactive({
   languagesText: "",
   website: "",
   locationLabel: "",
-  photoURL: "",
+  photoURL: null as string | null,
+  companyLogoUrl: null as string | null,
+  portfolioPhotos: [] as string[],
   yearsPrimary: null as number | null,
   email: "",
   phone: "",
@@ -64,7 +68,9 @@ async function initFor(p: WithId<ProspectDoc>) {
   form.languagesText = (p.languages ?? []).join(", ");
   form.website = p.website ?? "";
   form.locationLabel = p.locationLabel ?? "";
-  form.photoURL = p.photoURL ?? "";
+  form.photoURL = p.photoURL ?? null;
+  form.companyLogoUrl = p.companyLogoUrl ?? null;
+  form.portfolioPhotos = [...(p.portfolioPhotos ?? [])];
   form.yearsPrimary = p.trades?.[0] ? (p.yearsExperience?.[p.trades[0]] ?? null) : null;
   form.email = "";
   form.phone = "";
@@ -109,7 +115,9 @@ async function save() {
         .filter(Boolean),
       website: form.website.trim() || null,
       locationLabel: form.locationLabel.trim() || null,
-      photoURL: form.photoURL.trim() || null,
+      photoURL: form.photoURL,
+      companyLogoUrl: form.companyLogoUrl,
+      portfolioPhotos: form.portfolioPhotos,
       yearsExperience: primary && form.yearsPrimary != null ? { [primary]: form.yearsPrimary } : {},
     };
     await updateProspectProfile(p.id, edit);
@@ -210,16 +218,29 @@ async function save() {
         </div>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label class="block text-xs font-medium text-[color:var(--bs-muted)] mb-1">Website</label>
-          <InputText v-model="form.website" class="w-full" />
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-[color:var(--bs-muted)] mb-1">Photo / logo URL</label>
-          <InputText v-model="form.photoURL" class="w-full" />
-        </div>
+      <div>
+        <label class="block text-xs font-medium text-[color:var(--bs-muted)] mb-1">Website</label>
+        <InputText v-model="form.website" class="w-full" />
       </div>
+
+      <!-- Media: upload + preview the actual images (carry over on claim) -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <ProspectImageField
+          v-model="form.photoURL"
+          :prospect-id="prospect.id"
+          bucket="profile"
+          label="Profile photo"
+          hint="Square works best. Shows on the profile + search card."
+        />
+        <ProspectImageField
+          v-model="form.companyLogoUrl"
+          :prospect-id="prospect.id"
+          bucket="logo"
+          label="Company logo"
+          hint="Appears on their quotes & invoices once claimed."
+        />
+      </div>
+      <ProspectGalleryField v-model="form.portfolioPhotos" :prospect-id="prospect.id" />
 
       <div class="border-t border-[color:var(--bs-border)] pt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>

@@ -34,7 +34,7 @@ export async function resolveFileUrl(fileRef: string): Promise<string> {
 }
 
 export function makeStoragePath(opts: {
-  scope: "users" | "tradespeople" | "jobs" | "chats" | "invoices";
+  scope: "users" | "tradespeople" | "jobs" | "chats" | "invoices" | "prospects";
   id: string;
   bucket?:
     | "profile"

@@ -21,6 +21,8 @@ import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/firebase/config";
 import { typedConverter } from "@/firebase/converters";
 import type { ProspectContact, ProspectDoc, WithId } from "@/firebase/interfaces";
+import { compressToWebp } from "@/utils/image";
+import { makeStoragePath, uploadFile } from "@/firebase/services/storage";
 
 const prospectsCol = () =>
   collection(db, "prospects").withConverter(typedConverter<ProspectDoc>());
@@ -160,6 +162,9 @@ export type ProspectProfileEdit = Partial<
     | "serviceRadiusKm"
     | "languages"
     | "photoURL"
+    | "companyLogoUrl"
+    | "bannerUrl"
+    | "portfolioPhotos"
   >
 >;
 
@@ -169,6 +174,22 @@ export async function updateProspectProfile(
   fields: ProspectProfileEdit,
 ): Promise<void> {
   await updateDoc(doc(db, "prospects", prospectId), { ...fields });
+}
+
+/**
+ * Admin: compress + upload an image for a seeded prospect and return its public
+ * download URL. Writes to prospects/{id}/{bucket} (admin-write, world-read).
+ * The URL carries over to the real profile when the prospect claims.
+ */
+export async function uploadProspectImage(
+  prospectId: string,
+  file: File,
+  bucket: "profile" | "logo" | "banner" | "portfolio",
+  maxDimension: number,
+): Promise<string> {
+  const compressed = await compressToWebp(file, { maxDimension, quality: 0.9 });
+  const path = makeStoragePath({ scope: "prospects", id: prospectId, bucket, filename: compressed.name });
+  return uploadFile(path, compressed);
 }
 
 /**

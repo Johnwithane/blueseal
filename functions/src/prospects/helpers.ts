@@ -196,7 +196,11 @@ function prospectProfileFields(p: Record<string, unknown>): Record<string, unkno
     serviceRadiusKm: typeof p.serviceRadiusKm === "number" ? p.serviceRadiusKm : 25,
     locationApprox: (p.locationApprox as GeoPoint | null) ?? null,
     geohashPublic: typeof p.geohashPublic === "string" ? p.geohashPublic : "",
-    companyLogoUrl: typeof p.photoURL === "string" ? p.photoURL : null,
+    // Real media an admin uploaded (a generated dicebear avatar is NOT a logo,
+    // so only carry a real companyLogoUrl). Gallery + banner carry over too.
+    companyLogoUrl: typeof p.companyLogoUrl === "string" ? p.companyLogoUrl : null,
+    bannerUrl: typeof p.bannerUrl === "string" ? p.bannerUrl : null,
+    portfolioPhotos: Array.isArray(p.portfolioPhotos) ? p.portfolioPhotos : [],
   };
 }
 
@@ -215,9 +219,15 @@ export function buildProspectDraft(
       (typeof user.displayName === "string" && user.displayName) ||
       (typeof p.displayName === "string" ? p.displayName : "") ||
       "",
-    photoURL: (typeof user.photoURL === "string" ? user.photoURL : null) ?? null,
+    // Prefer a real profile photo an admin uploaded (skip the generated dicebear
+    // placeholder); otherwise fall back to the claiming user's auth photo.
+    photoURL:
+      (typeof p.photoURL === "string" && p.photoURL && !p.photoURL.includes("dicebear")
+        ? p.photoURL
+        : null) ??
+      (typeof user.photoURL === "string" ? user.photoURL : null) ??
+      null,
     providesFreeQuotes: true,
-    portfolioPhotos: [],
     ratingAvg: 0,
     ratingCount: 0,
     ratingDimensions: {

@@ -100,6 +100,16 @@ service firebase.storage {
       allow write: if isOwner(tradieId) && smallSizeOk() && isCompressedImage();
     }
 
+    // Seeded prospect images (profile photo / logo / portfolio / banner) —
+    // ADMIN write (the prospect has no account yet, so there's no owner), world
+    // read so the drafted profile + the outreach email can show them. These
+    // carry straight over to the real tradesperson profile when the prospect
+    // claims. Same compressed-image + size pipeline as the tradesperson buckets.
+    match /prospects/{prospectId}/{bucket}/{file=**} {
+      allow read: if true;
+      allow write: if isAdmin() && smallSizeOk() && isCompressedImage();
+    }
+
     // Certifications — owner write, admin + owner read. WebP or PDF.
     match /tradespeople/{tradieId}/certs/{file=**} {
       allow read: if isOwner(tradieId) || isAdmin();

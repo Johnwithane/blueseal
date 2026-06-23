@@ -524,6 +524,11 @@ export interface ProspectDoc {
   // Re-hosted "our work" / gallery photos pulled from the business's own site
   // (best-effort — many won't have any). Storage URLs (CSP-allowed).
   portfolioPhotos?: string[];
+  // Real company logo + letterhead banner an admin uploads while enriching the
+  // listing (distinct from photoURL, which is the profile avatar). Both carry
+  // over to the claimed tradesperson profile. Stored at prospects/{id}/logo|banner.
+  companyLogoUrl?: string | null;
+  bannerUrl?: string | null;
 
   // Listing state. `isListed` is the prospect analogue of isVisible, but means
   // "unvetted seeded listing", never "trusted". searchProspects filters on it.
