@@ -5,10 +5,12 @@ import Button from "primevue/button";
 import Tag from "primevue/tag";
 import Rating from "primevue/rating";
 import Avatar from "primevue/avatar";
+import Dialog from "primevue/dialog";
+import Textarea from "primevue/textarea";
 import { getTradesperson } from "@/firebase/services/tradespeople";
 import { isTradieSaved, saveTradie, unsaveTradie } from "@/firebase/services/savedTradies";
 import { humanizeError } from "@/utils/errors";
-import { getProspect } from "@/firebase/services/prospects";
+import { getProspect, selfServeRemoveProspect } from "@/firebase/services/prospects";
 import { listReviewsFor } from "@/firebase/services/reviews";
 import {
   listAcceptedVouchesFor,
@@ -33,7 +35,6 @@ import CalendarView from "@/components/CalendarView.vue";
 import VerifiedBadge from "@/components/VerifiedBadge.vue";
 import RedSealBadge from "@/components/RedSealBadge.vue";
 import VerifiedCredentials from "@/components/VerifiedCredentials.vue";
-import ProspectProfile from "@/components/ProspectProfile.vue";
 import LoadingState from "@/components/LoadingState.vue";
 import { hasRedSeal } from "@/utils/credentials";
 
@@ -52,6 +53,10 @@ const tradie = ref<WithId<TradespersonDoc> | null>(null);
 // we render the unverified ProspectProfile at this same URL (prospects share
 // the /tradies/:id profile route — there's no separate /prospects/ page).
 const prospect = ref<WithId<ProspectDoc> | null>(null);
+// True when the :id resolved to a seeded prospect. It renders through this SAME
+// profile shell, just flagged "Unclaimed": no trust badges, no availability /
+// credentials, and reviews sourced from the business's public Google listing.
+const isProspect = ref(false);
 const reviews = ref<WithId<ReviewDoc>[]>([]);
 // Two-direction peer-endorsement chips. vouchesFrom = people this tradie
 // vouches for; vouchesFor = people who've vouched for this tradie. Both
@@ -201,6 +206,21 @@ const isOwnProfile = computed(
 // (they can't request a quote without the client role).
 const primaryCta = computed(() => {
   if (!tradie.value) return null;
+  // Unclaimed prospect: a client can request them; a visitor signs up. The
+  // tradesperson themselves claims via the email link, not this CTA.
+  if (isProspect.value) {
+    if (auth.isAuthenticated && auth.hasClientRole) {
+      return {
+        label: "Request this pro",
+        icon: "pi pi-send",
+        to: { name: "RequestProspect", params: { id: tradie.value.id } },
+      };
+    }
+    if (!auth.isAuthenticated) {
+      return { label: "Sign up to contact", icon: "pi pi-user-plus", to: { name: "SignUp" } };
+    }
+    return null;
+  }
   if (isOwnProfile.value) {
     return { label: "Edit your profile", icon: "pi pi-pencil", to: { name: "TradieOnboarding" } };
   }
@@ -322,7 +342,7 @@ function googleAuthorInitial(name: string): string {
 const saved = ref(false);
 const savingToggle = ref(false);
 const canSave = computed(
-  () => !!auth.fbUser && !!tradie.value && auth.fbUser.uid !== tradie.value.id,
+  () => !isProspect.value && !!auth.fbUser && !!tradie.value && auth.fbUser.uid !== tradie.value.id,
 );
 
 async function toggleSave() {
@@ -343,6 +363,68 @@ async function toggleSave() {
     toast.error("Couldn't update your saved list", humanizeError(e));
   } finally {
     savingToggle.value = false;
+  }
+}
+
+// --- Seeded prospect support -------------------------------------------------
+// A prospect is mapped onto the tradie shape so this exact template renders it.
+// ratingDimensions is intentionally absent (the dimension bars stay hidden) and
+// the trust/availability fields default falsy/empty; `isProspect` drives the
+// honest differences in the template.
+function mapProspectToTradie(p: WithId<ProspectDoc>): WithId<TradespersonDoc> {
+  const g = p as unknown as { googleRating?: number; googleReviewCount?: number };
+  return {
+    ...(p as unknown as WithId<TradespersonDoc>),
+    ratingAvg: typeof g.googleRating === "number" ? g.googleRating : 0,
+    ratingCount: typeof g.googleReviewCount === "number" ? g.googleReviewCount : 0,
+    providesFreeQuotes: false,
+    verifiedTrades: [],
+    idVerified: false,
+    isVisible: false,
+    portfolioPhotos: p.portfolioPhotos ?? [],
+  } as unknown as WithId<TradespersonDoc>;
+}
+
+// The business's public Google reviews, mapped into the review list shape.
+function mapGoogleReviews(p: WithId<ProspectDoc>): WithId<ReviewDoc>[] {
+  const g = p as unknown as {
+    googleReviews?: Array<{ text?: string; author?: string; rating?: number }>;
+  };
+  return (g.googleReviews ?? [])
+    .filter((r) => r && (r.text || r.author))
+    .map(
+      (r, i) =>
+        ({
+          id: `g${i}`,
+          rating: typeof r.rating === "number" ? r.rating : 5,
+          text: r.text ?? "",
+          clientName: r.author ?? "Google user",
+          clientPhotoURL: null,
+          createdAt: null,
+        }) as unknown as WithId<ReviewDoc>,
+    );
+}
+
+// Self-serve takedown ("Not you? Remove this listing") — the consent escape
+// hatch for a business listed from public info without consent. Errs toward
+// removal; the server hides it immediately and never re-imports it.
+const showRemove = ref(false);
+const removing = ref(false);
+const removed = ref(false);
+const removeReason = ref("");
+const removeError = ref("");
+async function confirmRemove() {
+  if (!tradie.value) return;
+  removing.value = true;
+  removeError.value = "";
+  try {
+    await selfServeRemoveProspect(tradie.value.id, removeReason.value.trim() || undefined);
+    removed.value = true;
+    showRemove.value = false;
+  } catch {
+    removeError.value = "Couldn't remove the listing just now. Please try again, or email support.";
+  } finally {
+    removing.value = false;
   }
 }
 
@@ -375,7 +457,15 @@ onMounted(async () => {
       vouchesFor.value = vFor;
     } else {
       // Not a readable tradesperson — maybe a seeded prospect on this route.
-      prospect.value = await getProspect(uid).catch(() => null);
+      // Render it through THIS same profile shell (unclaimed), mapping its
+      // fields + public Google reviews onto the tradie shape.
+      const pr = await getProspect(uid).catch(() => null);
+      if (pr) {
+        prospect.value = pr;
+        isProspect.value = true;
+        tradie.value = mapProspectToTradie(pr);
+        reviews.value = mapGoogleReviews(pr);
+      }
     }
   } finally {
     loading.value = false;
@@ -392,16 +482,48 @@ onMounted(async () => {
     </button>
   </div>
 
-  <!-- Prospect (seeded, unverified) profile shares this route — render its full
-       body instead of the tradesperson layout when the id resolves to one. -->
-  <ProspectProfile v-if="!loading && prospect" :prospect="prospect" />
-  <section v-else class="bs-container profile-page py-5">
+  <section class="bs-container profile-page py-5">
     <LoadingState v-if="loading" />
     <div v-else-if="!tradie" class="bs-empty">
       <i class="pi pi-times-circle text-3xl mb-2 block"></i>
       <p>Profile not found.</p>
     </div>
     <template v-else>
+      <!-- Unclaimed prospect: success state after a self-serve takedown. -->
+      <div
+        v-if="isProspect && removed"
+        class="mb-4 flex items-start gap-3 rounded-lg border border-[color:var(--bs-success)] bg-[color:var(--bs-success-tint)] p-3"
+      >
+        <i class="pi pi-check-circle text-lg mt-0.5 text-[color:var(--bs-success)]" aria-hidden="true"></i>
+        <div class="text-sm">
+          <div class="font-semibold text-[color:var(--bs-success-text)]">Listing removed</div>
+          <p class="text-[color:var(--bs-success-text)]">
+            This listing has been taken down and won't be re-added. If this was a mistake, email support.
+          </p>
+        </div>
+      </div>
+      <!-- Unclaimed prospect: this profile was built from public info + isn't verified yet. -->
+      <div
+        v-else-if="isProspect"
+        class="mb-4 flex items-start gap-3 rounded-lg border border-[color:var(--bs-warning)] bg-[color:var(--bs-warning-tint)] p-3"
+      >
+        <i class="pi pi-info-circle text-lg mt-0.5 text-[color:var(--bs-warning)]" aria-hidden="true"></i>
+        <div class="flex-1 text-sm">
+          <div class="font-semibold text-[color:var(--bs-warning-text)]">Unclaimed listing</div>
+          <p class="text-[color:var(--bs-warning-text)]">
+            Blue Seal created this listing from public business information. This business hasn't
+            joined or been verified yet.
+          </p>
+          <button
+            type="button"
+            class="mt-1 text-xs text-[color:var(--bs-warning-text)] underline"
+            @click="showRemove = true"
+          >
+            Not you? Remove this listing
+          </button>
+        </div>
+      </div>
+
       <!-- Preview banner — only the owner sees this, and only while the
            profile isn't publicly visible (pre-vetting or admin-suspended).
            Rules let the owner read their own doc regardless of isVisible,
@@ -456,6 +578,7 @@ onMounted(async () => {
               </template>
             </div>
             <div class="mt-2 flex flex-wrap items-center gap-1">
+              <Tag v-if="isProspect" value="Unclaimed" severity="warn" />
               <RedSealBadge v-if="showRedSeal" variant="tag" />
               <Tag v-if="tradie.idVerified" value="ID verified" severity="success" />
               <VerifiedBadge
@@ -505,7 +628,7 @@ onMounted(async () => {
           </div>
 
           <!-- Schedule / availability at a glance -->
-          <div class="bs-card profile-aside__card">
+          <div v-if="!isProspect" class="bs-card profile-aside__card">
             <h2 class="profile-aside__title">
               <i class="pi pi-calendar" aria-hidden="true"></i> Availability
             </h2>
@@ -609,10 +732,10 @@ onMounted(async () => {
             </div>
           </section>
 
-          <VerifiedCredentials :tradie="tradie" />
+          <VerifiedCredentials v-if="!isProspect" :tradie="tradie" />
 
           <!-- Full interactive availability calendar (owner-editable) -->
-          <section id="availability" class="bs-card profile-section">
+          <section v-if="!isProspect" id="availability" class="bs-card profile-section">
             <h2 class="profile-section__title">
               <i class="pi pi-calendar" aria-hidden="true"></i> Availability
             </h2>
@@ -655,6 +778,10 @@ onMounted(async () => {
               </ul>
             </div>
 
+            <p v-if="isProspect && reviews.length" class="-mt-1 mb-3 text-xs text-[color:var(--bs-muted)]">
+              <i class="pi pi-google mr-1" aria-hidden="true"></i>
+              From this business's public Google listing.
+            </p>
             <div v-if="!reviews.length" class="text-sm text-[color:var(--bs-muted)]">
               No reviews yet.
             </div>
@@ -688,7 +815,7 @@ onMounted(async () => {
                     />
                   </div>
                 </div>
-                <span class="text-xs text-[color:var(--bs-muted)] flex-none">
+                <span v-if="r.createdAt" class="text-xs text-[color:var(--bs-muted)] flex-none">
                   {{ relativeTime(r.createdAt) }}
                 </span>
               </header>
@@ -698,7 +825,7 @@ onMounted(async () => {
 
           <!-- Recommendations -->
           <section
-            v-if="vouchesFrom.length || vouchesFor.length || isOwnProfile"
+            v-if="!isProspect && (vouchesFrom.length || vouchesFor.length || isOwnProfile)"
             class="bs-card profile-section"
           >
             <div class="mb-2 flex items-center justify-between gap-2">
@@ -862,6 +989,56 @@ onMounted(async () => {
           <Button :label="primaryCta.label" :icon="primaryCta.icon" />
         </RouterLink>
       </div>
+
+      <!-- Self-serve takedown for an unclaimed prospect listing. -->
+      <Dialog
+        v-model:visible="showRemove"
+        modal
+        header="Remove this listing?"
+        :style="{ width: '92vw', maxWidth: '440px' }"
+        :dismissable-mask="true"
+      >
+        <div class="space-y-3 text-sm">
+          <p>
+            Blue Seal created this listing for
+            <strong>{{ displayName || tradie.companyName || "this business" }}</strong>
+            from public business information — it isn't a claimed account. If this is your business
+            and you'd like it taken down, we'll remove it right away and won't re-add it.
+          </p>
+          <p class="text-[color:var(--bs-muted)]">
+            You can always join Blue Seal later to set up a verified profile.
+          </p>
+          <div>
+            <label for="removeReason" class="mb-1 block text-xs text-[color:var(--bs-muted)]">
+              Anything you'd like us to know? (optional)
+            </label>
+            <Textarea
+              id="removeReason"
+              v-model="removeReason"
+              rows="2"
+              class="w-full"
+              :maxlength="500"
+              auto-resize
+            />
+          </div>
+          <p v-if="removeError" class="text-xs text-[color:var(--bs-danger)]">{{ removeError }}</p>
+        </div>
+        <template #footer>
+          <Button
+            label="Cancel"
+            text
+            severity="secondary"
+            :disabled="removing"
+            @click="showRemove = false"
+          />
+          <Button
+            label="Remove my listing"
+            severity="danger"
+            :loading="removing"
+            @click="confirmRemove"
+          />
+        </template>
+      </Dialog>
     </template>
   </section>
 </template>
