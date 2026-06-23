@@ -33,6 +33,7 @@ import { compressToWebp } from "@/utils/image";
 import { COMMON_LANGUAGES } from "@/data/languages";
 import PortfolioEditor from "@/components/PortfolioEditor.vue";
 import ServicesEditor from "@/components/ServicesEditor.vue";
+import ClaimListingPrompt from "@/components/tradie/ClaimListingPrompt.vue";
 import { normalizeServices } from "@/utils/services";
 import {
   createCertification,
@@ -77,6 +78,12 @@ const auth = useAuthStore();
 const router = useRouter();
 const toast = useToast();
 const { relativeTime } = useFormatters();
+
+// After claiming a seeded listing, the server has pre-filled this draft — reload
+// so the wizard re-reads it and every field shows populated.
+function onListingClaimed() {
+  window.location.reload();
+}
 
 // Field-level validation errors (rendered under the field) + scroll-to-first.
 // `error` (below) stays for save/submit failures shown in the top banner.
@@ -871,6 +878,14 @@ async function withdrawForEdits() {
     </header>
 
     <Message v-if="error" severity="error" :closable="false" class="mb-3">{{ error }}</Message>
+
+    <!-- Claim an existing seeded listing to autofill the form. Only on a fresh,
+         unsubmitted draft so it never offers to overwrite a started application. -->
+    <ClaimListingPrompt
+      v-if="vettingStatus === 'draft' && !submittedAt"
+      class="mb-4"
+      @claimed="onListingClaimed"
+    />
 
     <!-- Status banners. Only one is rendered at a time. -->
     <div

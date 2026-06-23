@@ -352,6 +352,39 @@ export async function claimProspect(): Promise<ClaimProspectResult> {
   return data;
 }
 
+// A seeded listing surfaced when a tradesperson searches for their own business
+// during signup (private listings, so this comes back via a callable).
+export interface ProspectMatch {
+  id: string;
+  displayName: string;
+  companyName: string | null;
+  locationLabel: string | null;
+  trades: string[];
+  photoURL: string | null;
+  googleRating: number | null;
+  googleReviewCount: number;
+}
+
+/** Find your own seeded listing by business name + town (claim-in-signup). */
+export async function findMyProspect(name: string, locationLabel: string): Promise<ProspectMatch[]> {
+  const callable = httpsCallable<{ name: string; locationLabel: string }, { matches: ProspectMatch[] }>(
+    functions,
+    "findMyProspect",
+  );
+  const { data } = await callable({ name, locationLabel });
+  return data.matches;
+}
+
+/** Claim a specific seeded listing by id — pre-fills the tradesperson draft. */
+export async function claimProspectById(prospectId: string): Promise<{ status: "claimed" }> {
+  const callable = httpsCallable<{ prospectId: string }, { status: "claimed" }>(
+    functions,
+    "claimProspectById",
+  );
+  const { data } = await callable({ prospectId });
+  return data;
+}
+
 export interface BulkImportProspectsResult {
   received: number;
   imported: number; // for dryRun: the count that WOULD import

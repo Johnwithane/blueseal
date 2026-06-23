@@ -187,6 +187,10 @@ export { getProspectPreview } from "./prospects/getProspectPreview";
 export { suppressProspect } from "./prospects/suppressProspect";
 export { selfServeRemoveProspect } from "./prospects/selfServeRemoveProspect";
 export { claimProspect } from "./prospects/claimProspect";
+// Claim-during-signup: find your own seeded listing by name+town, then claim it
+// by id (the scraped set has no email, so the email-hash path can't match).
+export { findMyProspect } from "./prospects/findMyProspect";
+export { claimProspectById } from "./prospects/claimProspectById";
 export { scheduledProspectExpiry } from "./prospects/scheduledProspectExpiry";
 
 // Messaging (WhatsApp Cloud API queue processor)
