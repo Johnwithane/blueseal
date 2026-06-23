@@ -57,3 +57,23 @@ export async function requireAiEntitlement(uid: string, feature: AiFeature): Pro
 export async function requireInviteJobEntitlement(_uid: string): Promise<void> {
   return;
 }
+
+/**
+ * Generic Blue Seal Pro gate for NON-AI features (currently the vanity profile
+ * URL). Same provenance as requireAiEntitlement: admins hold every entitlement,
+ * otherwise the caller must be Pro (trialing / active / past_due grace or an
+ * unexpired comp). Throws the stable BLUESEAL_PRO_REQUIRED token so the client's
+ * global paywall can distinguish it from other failed-precondition errors. The
+ * caller passes the feature-specific sentence shown in the paywall.
+ */
+export async function requireProEntitlement(uid: string, message: string): Promise<void> {
+  const snap = await db.doc(`users/${uid}`).get();
+  const data = snap.data() ?? {};
+  const roles = Array.isArray(data.roles) ? (data.roles as unknown[]) : [];
+  if (roles.includes("admin")) return;
+
+  const sub = (data.subscription ?? null) as SubscriptionState | null;
+  if (deriveIsPro(sub, Timestamp.now())) return;
+
+  throw new HttpsError("failed-precondition", `BLUESEAL_PRO_REQUIRED: ${message}`);
+}

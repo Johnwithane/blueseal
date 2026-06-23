@@ -253,6 +253,11 @@ service cloud.firestore {
         // the client. `.get(field, null)` for safe access on docs predating it.
         && request.resource.data.get('googleReviews', null)
              == resource.data.get('googleReviews', null)
+        // Vanity profile handle is server-managed (claimProfileSlug callable,
+        // which enforces uniqueness via the profileSlugs registry). Owner can't
+        // set it directly. `.get(field, null)` for docs predating the field.
+        && request.resource.data.get('slug', null)
+             == resource.data.get('slug', null)
         && (resource.data.vettingStatus == 'approved'
             ? request.resource.data.vettingStatus == 'approved'
             : request.resource.data.vettingStatus in ['draft','pending','info_requested']);
@@ -1461,6 +1466,15 @@ service cloud.firestore {
     // callables (bulkImportProspects / suppressProspect) on the Admin SDK, which
     // bypasses rules; client-side writes are limited to admins. The harvested
     // email/phone are NOT on this doc — only emailHash + the private subdoc.
+    // Vanity profile handle registry: doc id == the slug, value { uid, claimedAt }.
+    // World-readable so /u/:slug can resolve to a tradesperson uid; written only
+    // by the claimProfileSlug callable (Admin SDK bypasses these rules), never by
+    // clients, so the uniqueness guarantee can't be subverted.
+    match /profileSlugs/{slug} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     match /prospects/{prospectId} {
       allow read: if (resource != null && resource.data.isListed == true) || isAdmin();
       allow create, update, delete: if isAdmin();
