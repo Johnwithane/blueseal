@@ -12,6 +12,7 @@ import { humanizeError } from "@/utils/errors";
 import { inviteTag, statusLabel, STATUS_SEVERITY } from "@/utils/jobStatus";
 import { tradeLabel } from "@/data/trades";
 import JobCounterparty from "@/components/JobCounterparty.vue";
+import JobNotificationsBell from "@/components/JobNotificationsBell.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -307,6 +308,7 @@ function counterpartyPhoto(job: WithId<JobDoc>): string | null | undefined {
                 </div>
               </div>
               <div class="flex shrink-0 items-center gap-1.5">
+                <JobNotificationsBell :job-id="job.id" />
                 <Tag v-if="inviteTag(job)" :value="inviteTag(job)!" severity="secondary" />
                 <Tag
                   v-if="changeTag(job)"

@@ -161,6 +161,19 @@ export const useNotificationsStore = defineStore("notifications", {
     },
 
     /**
+     * Mark only one job's notifications as read — backs the per-job bell on
+     * each job card. Scoped to docs carrying this jobId so clearing one job's
+     * feed never touches another's. No-op when nothing's unread for the job.
+     */
+    async markJobRead(jobId: string) {
+      const unreadIds = this.items
+        .filter((n) => !n.read && n.jobId === jobId)
+        .map((n) => n.id);
+      if (unreadIds.length === 0) return;
+      await markAllRead(unreadIds);
+    },
+
+    /**
      * Clear the "new jobs in your area" badge — the tradesperson just opened
      * the board. Optimistically zero the local count so the badge disappears
      * instantly; the snapshot listener reconciles. Fire-and-forget so a slow

@@ -5,6 +5,7 @@ import Tag from "primevue/tag";
 import type { JobDoc, JobStatus, WithId } from "@/firebase/interfaces";
 import { useFormatters } from "@/composables/useFormatters";
 import JobCounterparty from "@/components/JobCounterparty.vue";
+import JobNotificationsBell from "@/components/JobNotificationsBell.vue";
 import { inviteTag } from "@/utils/jobStatus";
 
 const props = defineProps<{ jobs: WithId<JobDoc>[] }>();
@@ -109,7 +110,10 @@ function openJob(id: string) {
             :name="job.clientName"
             :photo-url="job.clientPhotoURL"
           />
-          <Tag v-if="inviteTag(job)" :value="inviteTag(job)!" severity="secondary" />
+          <div class="flex shrink-0 items-center gap-1.5">
+            <Tag v-if="inviteTag(job)" :value="inviteTag(job)!" severity="secondary" />
+            <JobNotificationsBell :job-id="job.id" />
+          </div>
         </div>
       </article>
 

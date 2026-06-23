@@ -500,6 +500,8 @@ Once installed, Blue Seal opens full-screen like a normal app and updates itself
     keywords: ["notifications", "alerts", "bell", "email", "push", "updates"],
     body: `The **bell** icon shows your in-app notifications: new messages, quote and application updates, and job status changes. Tap one to jump straight to the job it's about.
 
+Every job also has its **own bell** on its card in your Jobs list, with a red count when that job has unread activity. Tap it to see just that job's updates without sifting through everything else.
+
 **When you're not in the app, email is how we reach you.** We'll email you about anything that needs your attention: a **new message**, a **quote sent or accepted**, an **invoice sent or paid**, a **job status change**, **application updates**, **verification decisions**, and **job invites**. (For a busy back-and-forth chat we send one "new message" email per lull, not one per line.) There's nothing to set up; just add Blue Seal to your contacts so our emails land in your inbox, not spam.
 
 For instant, on-device alerts on those same updates, turn on **push notifications**: they reach you even when Blue Seal is closed. We'll offer to switch push on when you create your account and again when you come back until it's on for the device you're using; you stay in control and can toggle it any time per device from **Account → Notifications**. Your browser asks permission once. On iPhone, add Blue Seal to your home screen first (see "Install Blue Seal"), then enable push from inside the installed app. (We also use **WhatsApp** for a few time-critical events if you've added your phone number.)
@@ -1133,7 +1135,7 @@ const faqs: FaqItem[] = [
   {
     question: "How do notifications work?",
     answer:
-      "The bell shows new messages, quotes, applications, and job status changes inside the app. When you're away, we **email** you about the important stuff (new messages, quotes, invoices, job status changes, verification decisions, and invites) so you don't miss anything even without the app installed. (Busy chat threads are batched: you get one new-message email per lull, not one per line.) You can also turn on **push notifications** in Account settings for instant on-device alerts, and we use WhatsApp for a few time-critical events.",
+      "The bell shows new messages, quotes, applications, and job status changes inside the app. Every job card in your Jobs list also has its own bell that filters to just that job's updates, with a red count when it has unread activity. When you're away, we **email** you about the important stuff (new messages, quotes, invoices, job status changes, verification decisions, and invites) so you don't miss anything even without the app installed. (Busy chat threads are batched: you get one new-message email per lull, not one per line.) You can also turn on **push notifications** in Account settings for instant on-device alerts, and we use WhatsApp for a few time-critical events.",
     categoryId: "account-app",
     audience: "all",
   },

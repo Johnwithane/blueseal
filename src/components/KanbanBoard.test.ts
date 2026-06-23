@@ -26,7 +26,7 @@ function job(partial: Partial<WithId<JobDoc>> & { id: string; status: string }):
 function mountBoard(jobs: WithId<JobDoc>[]) {
   return mount(KanbanBoard, {
     props: { jobs },
-    global: { stubs: { JobCounterparty: true } },
+    global: { stubs: { JobCounterparty: true, JobNotificationsBell: true } },
   });
 }
 
