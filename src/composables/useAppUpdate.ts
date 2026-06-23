@@ -1,64 +1,47 @@
-import { ref, watch, type Ref } from "vue";
+import { ref, type Ref } from "vue";
 import { useRegisterSW } from "virtual:pwa-register/vue";
 import { evaluateVersion, type RemoteVersion } from "@/utils/appVersion";
 
 /**
- * Keeps every Blue Seal client on the latest deploy — and gives the user a
- * visible way to update when the automatic path can't.
+ * Tells a running Blue Seal client when a newer build has shipped, and gives the
+ * user a one-tap way to move to it.
  *
- * The long-standing pain: a backgrounded/mobile-browser session keeps serving
- * the old build until it's manually hard-refreshed. The cache *headers* are
- * already correct (index.html / sw.js are `no-cache`), and a new service worker
- * IS detected — the failure is purely in *applying* it. The previous version
- * only ever applied silently at a "safe moment" (app backgrounded or idle),
- * which never arrives in an actively-used foreground browser tab; and when the
- * tab is backgrounded, mobile browsers freeze it before the off-screen reload
- * can finish. So it landed for installed apps but not browser tabs. This is the
- * exact gap Johnny hit.
+ * Single source of truth: `/version.json`. The app bakes its own build id in at
+ * compile time (`__APP_VERSION__`) and polls this tiny, network-only manifest
+ * (served `no-cache`, kept out of the precache) to learn the build the server is
+ * actually serving. If the two differ, we're behind — show the banner. A
+ * `critical` flag escalates to a blocking "Update required" overlay.
  *
- * The fix is three parts, all owned here (a module-level singleton; call
- * `useAppUpdate()` once at the app root, then anywhere else for its state):
+ * Why not the service worker's `needRefresh` signal? Because `index.html` is
+ * served `no-cache`, the browser always loads the freshest HTML → freshest
+ * hashed JS, so the *running code already is the latest build*. The SW precache,
+ * though, refreshes on its own schedule and would flip `needRefresh` (→ a banner)
+ * even when we're already current. That's a false positive. `version.json` is an
+ * exact build-id comparison, so it never cries wolf. The SW is still registered
+ * (install + offline) — we just don't use it to *detect* updates.
  *
- *   1. DETECT (two independent signals, belt and braces):
- *      - vite-plugin-pwa's `needRefresh` — flips when a new SW is waiting.
- *      - a poll of `/version.json` — a tiny, network-only manifest (no service
- *        worker involved, so it's reliable even when the SW is wedged) that also
- *        carries a `critical` flag for forced updates. Re-checked on resume
- *        (visibilitychange/focus) and on a timer.
+ * Applying is a guaranteed reload that can never hang the spinner: skip-waiting
+ * the new worker if one's ready, otherwise drop the SW caches and hard-reload —
+ * and a failsafe timer reloads regardless if neither path completes in time.
  *
- *   2. SURFACE — `updateAvailable` drives a visible "Update" banner the user can
- *      tap (AppUpdatePrompt.vue). `updateRequired` (a critical release) drives a
- *      blocking "Update required" overlay so a known-dangerous build can't keep
- *      being used. The tap applies the update in the foreground, by a real user
- *      gesture — which sidesteps the frozen-tab problem entirely.
- *
- *   3. AUTO-APPLY (bonus) — still silently swaps versions when it WON'T interrupt
- *      anyone (app backgrounded, or idle a few minutes). Installed PWAs hit this
- *      constantly and self-heal with zero friction; browser tabs fall back to the
- *      banner.
+ * Module-level singleton: call `useAppUpdate()` once at the app root, then
+ * anywhere else for its reactive state.
  */
 
 // Build id baked in at compile time by vite's `define` (see vite.config.ts).
-// `typeof` guard so unit tests / any context where `define` isn't applied don't
-// throw a ReferenceError — they just read "dev" and never prompt.
+// `typeof` guard so unit tests / any context where `define` isn't applied just
+// read "dev" and never prompt.
 const LOCAL_VERSION = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "dev";
 
 const VERSION_URL = "/version.json";
-const UPDATE_CHECK_INTERVAL_MS = 30 * 60 * 1000; // backstop re-check every 30 min
-const IDLE_BEFORE_RELOAD_MS = 3 * 60 * 1000; // "idle" = 3 min with no input
-const PENDING_SWEEP_MS = 30 * 1000; // retry cadence for a deferred auto-apply
+const CHECK_INTERVAL_MS = 30 * 60 * 1000; // backstop re-check every 30 min
+const RELOAD_FAILSAFE_MS = 2500; // hard ceiling: the spinner never hangs past this
 
 // ── singleton state, shared across every useAppUpdate() caller ───────────────
 const updateAvailable = ref(false); // a newer build exists → show the banner
 const updateRequired = ref(false); // newer build is critical → blocking overlay
 const applying = ref(false); // an apply is in flight (button spinner)
 let started = false;
-
-// Service-worker handles, populated once the SW registers. applyUpdate() reads
-// them; null until then (and in dev, where no SW is registered).
-let registration: ServiceWorkerRegistration | undefined;
-let swNeedRefresh: Ref<boolean> | null = null;
-let swUpdate: ((reload?: boolean) => Promise<void>) | null = null;
 
 export function useAppUpdate(): {
   updateAvailable: Ref<boolean>;
@@ -74,102 +57,69 @@ export function useAppUpdate(): {
 }
 
 function start(): void {
-  let lastInteraction = performance.now();
-
-  const reg = useRegisterSW({
-    immediate: true,
-    onRegisteredSW(_swUrl, r) {
-      registration = r;
-    },
-  });
-  swNeedRefresh = reg.needRefresh;
-  swUpdate = reg.updateServiceWorker;
-
-  // A waiting SW is itself a "new build available" signal — mirror it so the
-  // banner shows even before the version.json poll has run.
-  watch(reg.needRefresh, (waiting) => {
-    if (waiting) updateAvailable.value = true;
-  });
-
-  const isIdle = () => performance.now() - lastInteraction >= IDLE_BEFORE_RELOAD_MS;
-  const isSafeToReload = () => document.hidden || isIdle();
-
-  async function checkVersion() {
-    try {
-      const res = await fetch(VERSION_URL, { cache: "no-store" });
-      if (!res.ok) return;
-      const remote = (await res.json()) as RemoteVersion;
-      const verdict = evaluateVersion(LOCAL_VERSION, remote);
-      if (verdict.updateAvailable) updateAvailable.value = true;
-      if (verdict.critical) updateRequired.value = true;
-    } catch {
-      // Offline, blocked, or version.json not deployed yet — ignore and retry
-      // on the next tick. Never let an update check surface an error to the user.
-    }
-  }
-
-  function checkForUpdate() {
-    void registration?.update(); // re-fetch sw.js + byte-compare
-    void checkVersion();
-  }
-
-  // Silent auto-apply, but only when it won't yank the page out from under
-  // someone (backgrounded, or idle). A critical update self-heals here too.
-  function autoApplyIfSafe() {
-    if (applying.value) return;
-    if (!updateAvailable.value && !updateRequired.value) return;
-    if (!isSafeToReload()) return;
-    void applyUpdate();
-  }
-
-  function onVisibilityChange() {
-    if (document.hidden) autoApplyIfSafe(); // ideal moment to swap, off-screen
-    else checkForUpdate(); // resumed → re-check (the mobile gap)
-  }
-  function markInteraction() {
-    lastInteraction = performance.now();
-  }
-
-  document.addEventListener("visibilitychange", onVisibilityChange);
-  window.addEventListener("focus", checkForUpdate);
-  window.addEventListener("pointerdown", markInteraction, { passive: true });
-  window.addEventListener("keydown", markInteraction, { passive: true });
-
-  // Singleton lives for the app's lifetime, so these timers never need clearing.
-  setInterval(checkForUpdate, UPDATE_CHECK_INTERVAL_MS);
-  setInterval(autoApplyIfSafe, PENDING_SWEEP_MS);
+  // Register the service worker (for install + offline). We deliberately ignore
+  // its needRefresh/updateServiceWorker hooks — version.json owns detection, and
+  // applyUpdate() drives activation directly so it can guarantee a reload.
+  useRegisterSW({ immediate: true });
 
   void checkVersion(); // first check shortly after boot
+  window.setInterval(() => void checkVersion(), CHECK_INTERVAL_MS);
+
+  // The mobile gap: a backgrounded tab keeps serving the old build until
+  // something forces a re-check. Re-check whenever the tab returns to the front.
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) void checkVersion();
+  });
+  window.addEventListener("focus", () => void checkVersion());
+}
+
+async function checkVersion(): Promise<void> {
+  try {
+    const res = await fetch(VERSION_URL, { cache: "no-store" });
+    if (!res.ok) return;
+    const remote = (await res.json()) as RemoteVersion;
+    const verdict = evaluateVersion(LOCAL_VERSION, remote);
+    updateAvailable.value = verdict.updateAvailable;
+    updateRequired.value = verdict.critical;
+  } catch {
+    // Offline, blocked, or version.json not deployed yet — ignore and retry on
+    // the next tick. An update check must never surface an error to the user.
+  }
 }
 
 /**
- * Apply the pending update now, in the foreground. Triggered by the user tapping
- * "Update" (or by the safe-moment auto-apply). Navigates the page, so anything
- * after the reload won't run.
+ * Move to the newest build now, in the foreground, by an explicit user tap.
+ * Guarantees forward progress: whatever the service worker does (or doesn't),
+ * the page reloads — so the button can never spin forever.
  */
 async function applyUpdate(): Promise<void> {
   if (applying.value) return;
   applying.value = true;
+
+  // Failsafe: no matter which path below stalls (a worker that never takes
+  // control, a slow cache wipe), we still reload within a few seconds. This is
+  // what kills the "spinner hangs forever" bug.
+  window.setTimeout(() => window.location.reload(), RELOAD_FAILSAFE_MS);
+
   try {
-    // Make sure we've fetched the freshest sw.js and, if it changed, it's waiting.
-    try {
-      await registration?.update();
-    } catch {
-      /* ignore — fall through to the checks below */
+    const reg = await navigator.serviceWorker?.getRegistration();
+    if (reg?.waiting) {
+      // A new worker is ready: ask it to take over, reload when it does. The
+      // vite-plugin-pwa service worker handles this SKIP_WAITING message.
+      navigator.serviceWorker.addEventListener(
+        "controllerchange",
+        () => window.location.reload(),
+        { once: true },
+      );
+      reg.waiting.postMessage({ type: "SKIP_WAITING" });
+      return; // controllerchange (or the failsafe) reloads us
     }
-
-    // Clean path: a worker is waiting → skip-waiting + reload via the plugin.
-    if (registration?.waiting || swNeedRefresh?.value) {
-      await swUpdate?.(true); // reloads on controllerchange; code below won't run
-      return;
-    }
-
-    // Fallback: no waiting worker (SW unsupported, or wedged on a stale
-    // precache). Drop every SW + cache and hard-reload so the no-cache shell and
-    // sw.js are refetched from the network — the bulletproof "get unstuck" path.
+    // No worker waiting but version.json says we're behind → the SW precache is
+    // serving a stale shell. Drop every SW + cache so the reload refetches the
+    // no-cache index.html (and fresh hashed assets) from the network.
     await hardReset();
-  } finally {
-    applying.value = false;
+  } catch {
+    window.location.reload();
   }
 }
 

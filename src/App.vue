@@ -29,8 +29,9 @@ const auth = useAuthStore();
 const primeToast = primeUseToast();
 
 // Keep installed/mobile PWAs on the latest deploy without a manual hard-refresh:
-// re-checks for a new build on resume + hourly, and applies it only when it
-// won't interrupt the user (app backgrounded, or idle). See useAppUpdate.
+// polls /version.json (on resume + periodically) and surfaces a one-tap update
+// banner the moment the served build differs from the running one. See
+// useAppUpdate.
 useAppUpdate();
 // Push is essential (job requests / quotes / messages are time-critical), so
 // every signed-in session — signup, sign-in, returning — gets the soft-ask
