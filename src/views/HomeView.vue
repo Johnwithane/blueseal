@@ -9,6 +9,7 @@ import { HELP_CONTENT_SEED } from "@/data/help";
 import SealCharacter from "@/components/SealCharacter.vue";
 import BlueSealMark from "@/components/brand/BlueSealMark.vue";
 import MarkdownProse from "@/components/help/MarkdownProse.vue";
+import { useGoogleMaps } from "@/composables/useGoogleMaps";
 import { useSeo } from "@/composables/useSeo";
 import { homeSeo } from "@/seo/content";
 import { RECRUIT_HOMEPAGE } from "@/seo/site";
@@ -28,16 +29,93 @@ const heroMode = computed<"tradesperson" | "client-or-public">(() =>
 // sees the tradesperson-recruitment hero instead of the client post-a-job hero.
 const showRecruitHero = computed(() => RECRUIT_HOMEPAGE && heroMode.value !== "tradesperson");
 
-// Post-as-hero (client view). The hero captures the job in plain English and
-// hands straight off to the post-a-job wizard (auth-at-submit), pre-filling its
-// first "describe" step via ?describe. Posting first is the intended path:
-// clients post, verified pros in their area apply with quotes, the client picks
-// one, with no "go find a tradesperson" step in the way.
+// Post-as-hero (client view). The hero captures the job in plain English PLUS a
+// location (just like search) and hands straight off to the post-a-job wizard
+// (auth-at-submit): the "what" seeds the wizard's first "describe" step via
+// ?describe, and the "where" prefills its location step via the jobPostDraft
+// handoff. Posting first is the intended path: clients post, verified pros in
+// their area apply with quotes, the client picks one.
 const jobDescribe = ref("");
+const whereInput = ref<HTMLInputElement | null>(null);
+const pickedAddress = ref<{
+  addressLine1: string;
+  city: string;
+  region: string;
+  postalCode: string;
+  lat: number | null;
+  lng: number | null;
+} | null>(null);
+let whereAutocomplete: google.maps.places.Autocomplete | null = null;
+
+// When the Places suggestion list is open, Enter should PICK the suggestion
+// (letting place_changed capture the location), not submit the form early.
+function onWhereEnter(e: KeyboardEvent) {
+  const pac = document.querySelector<HTMLElement>(".pac-container");
+  if (pac && pac.offsetParent !== null && pac.querySelector(".pac-item")) {
+    e.preventDefault();
+  }
+}
+
 function startPost() {
+  // Carry the picked location into the post draft so the wizard's location step
+  // lands prefilled. Merge only the address keys — any other in-progress draft
+  // fields stay untouched. (PostJobView hydrates jobPostDraft on mount.)
+  const addr = pickedAddress.value;
+  if (addr) {
+    try {
+      const raw = localStorage.getItem("jobPostDraft");
+      const draft = (raw ? JSON.parse(raw) : {}) as Record<string, unknown>;
+      Object.assign(draft, {
+        addressLine1: addr.addressLine1,
+        city: addr.city,
+        region: addr.region,
+        postalCode: addr.postalCode,
+        lat: addr.lat,
+        lng: addr.lng,
+      });
+      localStorage.setItem("jobPostDraft", JSON.stringify(draft));
+    } catch {
+      /* storage unavailable or corrupt draft — the wizard still loads */
+    }
+  }
   const describe = jobDescribe.value.trim();
   router.push({ name: "PostJob", query: describe ? { describe } : {} });
 }
+
+// Attach Places autocomplete to the hero "where" field (client post hero only).
+// Parses the picked place into the same address shape the wizard's draft uses,
+// so a city-only pick fills city/region and a full address fills everything.
+onMounted(async () => {
+  if (showRecruitHero.value || heroMode.value === "tradesperson") return;
+  try {
+    await useGoogleMaps().load();
+  } catch {
+    return; // Maps unavailable — the input still works as plain text.
+  }
+  if (!whereInput.value) return;
+  const country = (import.meta.env.VITE_DEFAULT_REGION || "").toLowerCase();
+  whereAutocomplete = new google.maps.places.Autocomplete(whereInput.value, {
+    fields: ["address_components", "formatted_address", "geometry", "name"],
+    types: ["geocode"],
+    ...(country ? { componentRestrictions: { country } } : {}),
+  });
+  whereAutocomplete.addListener("place_changed", () => {
+    const place = whereAutocomplete?.getPlace();
+    if (!place) return;
+    const comp = (type: string) =>
+      place.address_components?.find((c) => c.types.includes(type))?.long_name ?? "";
+    const short = (type: string) =>
+      place.address_components?.find((c) => c.types.includes(type))?.short_name ?? "";
+    pickedAddress.value = {
+      addressLine1: [comp("street_number"), comp("route")].filter(Boolean).join(" ").trim(),
+      city: comp("locality") || comp("sublocality") || "",
+      region: short("administrative_area_level_1") || "",
+      postalCode: comp("postal_code") || "",
+      lat: place.geometry?.location?.lat() ?? null,
+      lng: place.geometry?.location?.lng() ?? null,
+    };
+  });
+});
 const root = ref<HTMLElement | null>(null);
 let observer: IntersectionObserver | null = null;
 
@@ -59,6 +137,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   observer?.disconnect();
+  if (whereAutocomplete) google.maps.event.clearInstanceListeners(whereAutocomplete);
 });
 
 // Trades grid is progressively revealed — start with one batch, "Load more"
@@ -283,6 +362,22 @@ onMounted(async () => {
                       class="w-full bg-transparent py-2.5 text-[color:var(--bs-text)] outline-none placeholder:text-[color:var(--bs-muted)]"
                     />
                   </label>
+                  <span
+                    class="mx-1 hidden h-7 w-px bg-[color:var(--bs-border)] sm:block"
+                    aria-hidden="true"
+                  ></span>
+                  <label class="flex flex-1 items-center gap-2 px-3">
+                    <i class="pi pi-map-marker text-[color:var(--bs-muted)]" aria-hidden="true"></i>
+                    <input
+                      ref="whereInput"
+                      type="text"
+                      autocomplete="off"
+                      placeholder="Where? (city or address)"
+                      aria-label="Where?"
+                      class="w-full bg-transparent py-2.5 text-[color:var(--bs-text)] outline-none placeholder:text-[color:var(--bs-muted)]"
+                      @keydown.enter="onWhereEnter"
+                    />
+                  </label>
                   <button
                     type="submit"
                     class="bs-btn bs-btn--red w-full justify-center sm:w-auto sm:!rounded-full"
@@ -291,13 +386,9 @@ onMounted(async () => {
                   </button>
                 </form>
 
-                <!-- Reassure, then offer the quieter "browse pros yourself" path.
-                     Posting is the lead; searching stays available but secondary. -->
-                <p class="mt-3 flex items-center gap-2 text-sm text-[color:var(--bs-blue-dark)]/75">
-                  <i class="pi pi-check-circle text-[color:var(--bs-red)]" aria-hidden="true"></i>
-                  Free to post. Verified tradespeople in your area come to you with quotes.
-                </p>
-                <p class="mt-1">
+                <!-- The quieter "browse pros yourself" path. Posting is the lead;
+                     searching stays available but secondary. -->
+                <p class="mt-4">
                   <RouterLink to="/search" class="bs-btn bs-btn--text">
                     or browse verified tradespeople →
                   </RouterLink>
