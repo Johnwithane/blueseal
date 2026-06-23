@@ -8,7 +8,12 @@ import Avatar from "primevue/avatar";
 import Dialog from "primevue/dialog";
 import Textarea from "primevue/textarea";
 import InputText from "primevue/inputtext";
-import { getTradesperson, createOrUpdateDraft } from "@/firebase/services/tradespeople";
+import {
+  getTradesperson,
+  createOrUpdateDraft,
+  resolveSlugToUid,
+  claimProfileSlug,
+} from "@/firebase/services/tradespeople";
 import { isTradieSaved, saveTradie, unsaveTradie } from "@/firebase/services/savedTradies";
 import { humanizeError } from "@/utils/errors";
 import { getProspect, selfServeRemoveProspect } from "@/firebase/services/prospects";
@@ -42,6 +47,8 @@ import BrandingPanel from "@/components/BrandingPanel.vue";
 import PortfolioEditor from "@/components/PortfolioEditor.vue";
 import { hasRedSeal } from "@/utils/credentials";
 import { normalizeServices } from "@/utils/services";
+import { slugError, suggestSlug } from "@/utils/slug";
+import { usePaywallStore } from "@/stores/paywall";
 
 const route = useRoute();
 const router = useRouter();
@@ -73,6 +80,7 @@ const loading = ref(true);
 const { money, relativeTime } = useFormatters();
 const auth = useAuthStore();
 const toast = useToast();
+const paywall = usePaywallStore();
 
 const displayName = computed(() => tradie.value?.displayName?.trim() || "");
 const avatarInitial = computed(() => {
@@ -161,6 +169,8 @@ function startEditing() {
   editTagline.value = tradie.value.tagline ?? "";
   editBio.value = tradie.value.bio ?? "";
   editServices.value = [...(tradie.value.services ?? [])];
+  slugDraft.value =
+    tradie.value.slug || suggestSlug(tradie.value.companyName || tradie.value.displayName || "");
   editing.value = true;
 }
 function cancelEditing() {
@@ -202,6 +212,30 @@ async function reloadTradie() {
   if (!tradie.value) return;
   const t = await getTradesperson(tradie.value.id).catch(() => null);
   if (t) tradie.value = t;
+}
+
+// --- Vanity handle (Pro) -----------------------------------------------------
+const slugDraft = ref("");
+const savingSlug = ref(false);
+// Live validity message for the handle input (null = valid / empty).
+const slugErr = computed(() => (slugDraft.value.trim() ? slugError(slugDraft.value.trim()) : null));
+
+async function claimSlug() {
+  const candidate = slugDraft.value.trim().toLowerCase();
+  if (!tradie.value || slugError(candidate)) return;
+  savingSlug.value = true;
+  try {
+    const { slug } = await claimProfileSlug(candidate);
+    tradie.value.slug = slug;
+    slugDraft.value = slug;
+    toast.success("Your link is live", `blueseal.app/u/${slug}`);
+  } catch (e) {
+    // Non-Pro → global upgrade popup; otherwise a friendly toast (e.g. taken).
+    if (paywall.fromError(e)) return;
+    toast.error("Couldn't set your link", humanizeError(e));
+  } finally {
+    savingSlug.value = false;
+  }
 }
 
 // Per-dimension rating bars for the Reviews summary. Each dim is 0..5.
@@ -281,8 +315,10 @@ const topExperienceYears = computed(() => {
   return years.length ? Math.max(...years) : 0;
 });
 
+// Compare against the LOADED doc id, not the route param, so it's correct on
+// both /tradies/:uid and the /u/:slug vanity route (where there's no :uid).
 const isOwnProfile = computed(
-  () => !!auth.fbUser && auth.fbUser.uid === (route.params.uid as string),
+  () => !!auth.fbUser && !!tradie.value && !isProspect.value && auth.fbUser.uid === tradie.value.id,
 );
 
 // The primary call-to-action, shared by the sticky desktop panel and the mobile
@@ -361,7 +397,8 @@ useSeo(() => {
   }
   const primaryTrade = tradeLabel(t.trades[0] ?? "");
   const name = displayName.value || primaryTrade;
-  const path = `/tradies/${t.id}`;
+  // Canonical to the vanity URL when the tradesperson has claimed one.
+  const path = t.slug ? `/u/${t.slug}` : `/tradies/${t.id}`;
   const description = clampDescription(
     `${name} is a verified ${t.trades.map(tradeLabel).join(", ")} on Blue Seal — ` +
       `ID-checked, certified and reviewed. ${t.bio ?? ""}`.replace(/\s+/g, " ").trim(),
@@ -514,8 +551,18 @@ async function confirmRemove() {
 }
 
 onMounted(async () => {
-  const uid = route.params.uid as string;
   try {
+    // Resolve the target uid. On /u/:slug we look the handle up in the public
+    // profileSlugs registry; on /tradies/:uid we use the param directly.
+    let uid = route.params.uid as string | undefined;
+    const slugParam = route.params.slug as string | undefined;
+    if (!uid && slugParam) {
+      uid = (await resolveSlugToUid(slugParam).catch(() => null)) ?? undefined;
+    }
+    if (!uid) {
+      loading.value = false;
+      return; // unknown handle / no id → "Profile not found"
+    }
     // getTradesperson REJECTS (not resolves null) when the doc isn't publicly
     // readable: a prospect id (no tradespeople doc), or a draft/rejected
     // profile a non-owner can't read — the tradespeople read rule has no
@@ -524,6 +571,12 @@ onMounted(async () => {
     // lookup, instead of letting the rejection hang the page on "Loading…".
     const t = await getTradesperson(uid).catch(() => null);
     if (t) {
+      // Canonical vanity URL: a slugged profile redirects /tradies/:uid → /u/slug
+      // (never from /u/, so no loop). The replace re-mounts + re-resolves.
+      if (route.name === "TradieProfile" && t.slug) {
+        void router.replace({ name: "TradieHome", params: { slug: t.slug } });
+        return;
+      }
       tradie.value = t;
       // Best-effort: heart state for signed-in viewers. Never blocks the page.
       if (auth.fbUser && auth.fbUser.uid !== uid) {
@@ -831,6 +884,32 @@ onMounted(async () => {
                 About you
               </label>
               <Textarea v-model="editBio" :rows="6" auto-resize class="w-full" />
+
+              <label class="mt-3 block text-xs font-medium text-[color:var(--bs-muted)] mb-1">
+                Your link <span class="font-normal">(Blue Seal Pro)</span>
+              </label>
+              <div class="flex items-center gap-1">
+                <span class="text-sm text-[color:var(--bs-muted)] whitespace-nowrap">blueseal.app/u/</span>
+                <InputText
+                  v-model="slugDraft"
+                  placeholder="your-business"
+                  class="flex-1"
+                  :maxlength="30"
+                />
+                <Button
+                  label="Save"
+                  :loading="savingSlug"
+                  :disabled="!!slugErr || !slugDraft.trim()"
+                  @click="claimSlug"
+                />
+              </div>
+              <p v-if="slugErr" class="mt-1 text-xs text-[color:var(--bs-danger)]">{{ slugErr }}</p>
+              <p v-else-if="tradie.slug" class="mt-1 text-xs text-[color:var(--bs-muted)]">
+                Live at <strong>blueseal.app/u/{{ tradie.slug }}</strong>
+              </p>
+              <p v-else class="mt-1 text-xs text-[color:var(--bs-muted)]">
+                A clean custom address for your page, e.g. blueseal.app/u/your-business.
+              </p>
             </template>
             <p v-else class="text-sm whitespace-pre-wrap">{{ tradie.bio }}</p>
             <div v-if="tradesWithYears.length" class="mt-3 flex flex-wrap items-center gap-1">

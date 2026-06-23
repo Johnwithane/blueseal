@@ -406,6 +406,24 @@ export async function listIncompleteApprovals(): Promise<WithId<TradespersonDoc>
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
+// --- Vanity profile handle (Pro) --------------------------------------------
+
+// Resolve a vanity handle to a tradesperson uid via the public profileSlugs
+// registry (doc id == slug). Returns null when the handle is unclaimed.
+export async function resolveSlugToUid(slug: string): Promise<string | null> {
+  const snap = await getDoc(doc(db, "profileSlugs", slug.trim().toLowerCase()));
+  return snap.exists() ? ((snap.data().uid as string | undefined) ?? null) : null;
+}
+
+// Pro: claim/change the signed-in tradesperson's vanity handle. The callable
+// enforces uniqueness + the Pro gate; it throws BLUESEAL_PRO_REQUIRED (caught by
+// the global paywall) for non-Pro users and a friendly message when taken.
+export async function claimProfileSlug(slug: string): Promise<{ slug: string }> {
+  const callable = httpsCallable<{ slug: string }, { slug: string }>(functions, "claimProfileSlug");
+  const { data } = await callable({ slug });
+  return data;
+}
+
 // A tradesperson who started onboarding (a tradie doc exists) but never
 // submitted for vetting — still stuck at "draft". The signup time and contact
 // email live on the users/{uid} doc (the tradie doc has neither), so each row

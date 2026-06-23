@@ -199,6 +199,10 @@ export { findMyProspect } from "./prospects/findMyProspect";
 export { claimProspectById } from "./prospects/claimProspectById";
 export { scheduledProspectExpiry } from "./prospects/scheduledProspectExpiry";
 
+// Vanity profile handle (Pro): claim/change blueseal.app/u/<slug>, uniqueness
+// enforced via the profileSlugs registry.
+export { claimProfileSlug } from "./profile/claimProfileSlug";
+
 // Messaging (WhatsApp Cloud API queue processor)
 export { processWhatsAppMessage } from "./messaging/processWhatsAppMessage";
 

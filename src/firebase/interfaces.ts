@@ -309,6 +309,12 @@ export interface TradespersonDoc {
   // "Red Seal plumbing & gas across the Okanagan"). Free for everyone — it's
   // profile content like bio. Owner-writable; optional/absent on older docs.
   tagline?: string;
+  // Vanity profile handle — the profile resolves at /u/<slug> and /tradies/:uid
+  // redirects to it. SERVER-MANAGED: set only by the claimProfileSlug callable
+  // (which enforces uniqueness via the profileSlugs registry) and locked for
+  // owner writes in firestore.rules. A Blue Seal Pro feature; optional/absent
+  // until claimed. Lowercase [a-z0-9-], 3-30 chars (see src/utils/slug.ts).
+  slug?: string;
   pricingModel: PricingModel;
   hourlyRate: number | null; // cents
   // Optional separate rate for billing travel/callout time on hourly jobs.

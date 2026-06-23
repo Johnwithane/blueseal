@@ -79,6 +79,15 @@ const routes: RouteRecordRaw[] = [
     meta: { layout: "hybrid" },
   },
   {
+    // Vanity profile URL (Blue Seal Pro). Same view as /tradies/:uid, resolved
+    // by handle: the component reads profileSlugs/<slug> for the uid. A profile
+    // with a claimed slug redirects /tradies/:uid here.
+    path: "/u/:slug",
+    name: "TradieHome",
+    component: () => import("@/views/TradieProfileView.vue"),
+    meta: { layout: "hybrid" },
+  },
+  {
     // Public profile-preview for a seeded prospect, shown from the outreach
     // email (claim link rides in ?c=) and from the admin composer's preview.
     path: "/p/:id",
@@ -550,7 +559,9 @@ router.beforeEach(async (to) => {
   const requiredRole = (to.meta.role as RoleGuard | undefined) ?? "any";
 
   if (requiresAuth && !auth.isAuthenticated) {
-    return { name: "Home" };
+    // Preserve where they were headed (e.g. a notification deep link) so sign-in
+    // drops them right back there instead of on Home.
+    return { name: "SignIn", query: { redirect: to.fullPath } };
   }
   if (requiresAuth && requiredRole !== "any") {
     // Multi-role: gate on "do you have this role at all?", not "is it active?".
