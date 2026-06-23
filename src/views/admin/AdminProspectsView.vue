@@ -4,7 +4,7 @@
 // who's been contacted / claimed. Reads Firestore directly (admins have
 // read/write on prospects per firestore.rules); the send goes through the
 // sendProspectOutreach callable.
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
@@ -81,6 +81,40 @@ const filtered = computed(() => {
     return true;
   });
 });
+
+// Lazy rendering: with thousands of prospects, painting every card at once
+// freezes the tab. We render a growing window of the (already client-filtered)
+// list, extended on scroll via an IntersectionObserver + a "Load more" fallback.
+const PAGE = 50;
+const visibleCount = ref(PAGE);
+const visible = computed(() => filtered.value.slice(0, visibleCount.value));
+const hasMore = computed(() => visibleCount.value < filtered.value.length);
+const loadMoreEl = ref<HTMLElement | null>(null);
+
+function showMore() {
+  visibleCount.value = Math.min(visibleCount.value + PAGE, filtered.value.length);
+}
+
+// Any filter/search change resets the window to the top.
+watch([search, tradeFilter, statusFilter], () => {
+  visibleCount.value = PAGE;
+});
+
+let observer: IntersectionObserver | null = null;
+onMounted(() => {
+  observer = new IntersectionObserver(
+    (entries) => {
+      if (entries[0]?.isIntersecting && hasMore.value) showMore();
+    },
+    { rootMargin: "600px" },
+  );
+});
+// Re-observe whenever the sentinel mounts/unmounts (it's v-if'd on hasMore).
+watch(loadMoreEl, (el, prev) => {
+  if (prev) observer?.unobserve(prev);
+  if (el) observer?.observe(el);
+});
+onBeforeUnmount(() => observer?.disconnect());
 
 function statusSeverity(s: ProspectStatus): string {
   return { listed: "secondary", outreach_sent: "info", claimed: "success", suppressed: "danger" }[s];
@@ -168,12 +202,16 @@ function openEditor(p: WithId<ProspectDoc>) {
     <div v-else-if="filtered.length === 0" class="bs-empty">
       <i class="pi pi-inbox mr-2" />No prospects match.
     </div>
-    <ul v-else class="space-y-2">
-      <li
-        v-for="p in filtered"
-        :key="p.id"
-        class="bs-card p-3 flex flex-wrap items-center justify-between gap-3"
-      >
+    <template v-else>
+      <p class="text-xs text-[color:var(--bs-muted)] mb-2">
+        Showing {{ visible.length }} of {{ filtered.length }}
+      </p>
+      <ul class="space-y-2">
+        <li
+          v-for="p in visible"
+          :key="p.id"
+          class="bs-card p-3 flex flex-wrap items-center justify-between gap-3"
+        >
         <div class="min-w-0">
           <div class="flex flex-wrap items-center gap-2">
             <span class="text-sm font-medium">{{ p.companyName || p.displayName }}</span>
@@ -198,8 +236,17 @@ function openEditor(p: WithId<ProspectDoc>) {
             @click="openComposer(p)"
           />
         </div>
-      </li>
-    </ul>
+        </li>
+      </ul>
+
+      <div v-if="hasMore" ref="loadMoreEl" class="py-4 text-center">
+        <Button
+          :label="`Load more (${filtered.length - visibleCount} remaining)`"
+          text
+          @click="showMore"
+        />
+      </div>
+    </template>
 
     <ProspectOutreachComposer
       v-model:visible="composerVisible"
