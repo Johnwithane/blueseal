@@ -224,7 +224,7 @@ function openEditor(p: WithId<ProspectDoc>) {
           </div>
         </div>
         <div class="flex gap-2">
-          <a :href="`/p/${p.id}`" target="_blank" rel="noopener">
+          <a :href="`/tradies/${p.id}`" target="_blank" rel="noopener">
             <Button label="View" icon="pi pi-eye" size="small" text />
           </a>
           <Button label="Edit" icon="pi pi-pencil" size="small" text @click="openEditor(p)" />

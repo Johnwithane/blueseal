@@ -268,7 +268,7 @@ const profileTrades = computed(() =>
         />
         <a
           v-if="prospect"
-          :href="`/p/${prospect.id}`"
+          :href="`/tradies/${prospect.id}`"
           target="_blank"
           rel="noopener"
           class="text-sm text-[color:var(--bs-blue)] underline"
