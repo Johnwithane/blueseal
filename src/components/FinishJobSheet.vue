@@ -10,6 +10,7 @@ import Message from "primevue/message";
 import Tag from "primevue/tag";
 import ManualTimeEntryDialog from "@/components/ManualTimeEntryDialog.vue";
 import AddExpenseDialog from "@/components/AddExpenseDialog.vue";
+import InvoiceBreakdown from "@/components/InvoiceBreakdown.vue";
 import { submitJobForApproval } from "@/firebase/services/jobs";
 import { recomputeTotals } from "@/firebase/services/invoices";
 import { getQuoteByJobId } from "@/firebase/services/quotes";
@@ -470,6 +471,23 @@ const belowUpfrontFloor = computed(
 const amountDueAfterCredit = computed(() =>
   Math.max(0, totals.value.total - upfrontCredit.value),
 );
+
+// Preview: assemble the exact in-memory shape InvoiceBreakdown renders for the
+// client, from the same synthesized lines + totals the submit callable will use.
+// `total` is the post-credit amount due (InvoiceBreakdown shows the upfront-fee
+// credit row, then "Total due"), mirroring the stored invoice doc. The server
+// builds plain {description,quantity,unitPrice,taxRate} lines too (no `kind`),
+// so the preview is faithful to what the client will see — not an approximation.
+const showPreview = ref(false);
+const previewInvoice = computed(() => ({
+  lineItems: previewLines.value,
+  subtotal: totals.value.subtotal,
+  discount: discountForCallable.value,
+  discountAmount: totals.value.discountAmount,
+  taxTotal: totals.value.taxTotal,
+  total: amountDueAfterCredit.value,
+  upfrontFeeCredit: upfrontCredit.value > 0 ? { amountCents: upfrontCredit.value } : null,
+}));
 
 const canSubmit = computed(
   () =>
@@ -996,7 +1014,17 @@ function close() {
         class="rounded-lg border-2 border-[color:var(--bs-blue)] p-3"
         style="background: color-mix(in srgb, var(--bs-blue-light) 30%, transparent);"
       >
-        <h4 class="font-semibold text-sm mb-2">Summary</h4>
+        <div class="flex items-center justify-between gap-2 mb-2">
+          <h4 class="font-semibold text-sm">Summary</h4>
+          <Button
+            v-if="previewLines.length"
+            label="Preview invoice"
+            icon="pi pi-eye"
+            size="small"
+            outlined
+            @click="showPreview = true"
+          />
+        </div>
         <dl class="text-sm space-y-1">
           <div class="flex items-center justify-between">
             <dt class="text-[color:var(--bs-muted)]">Subtotal</dt>
@@ -1109,6 +1137,34 @@ function close() {
     :client-id="props.clientId"
     :cost-tracking-only="costTrackingOnly"
   />
+
+  <!-- Invoice preview — renders the client-facing InvoiceBreakdown from the same
+       synthesized lines + totals the submit will use, so the tradesperson sees
+       every charge on one page exactly as the client will once it's sent. -->
+  <Dialog
+    v-model:visible="showPreview"
+    modal
+    header="Invoice preview"
+    :draggable="false"
+    :style="{ width: '34rem', maxWidth: '94vw' }"
+  >
+    <p class="text-xs text-[color:var(--bs-muted)] mb-3">
+      This is exactly what your client will see when you send the invoice for approval.
+    </p>
+    <InvoiceBreakdown :invoice="previewInvoice" />
+    <div
+      v-if="noteToClient.trim()"
+      class="mt-4 rounded-lg bg-[color:var(--bs-surface-alt,#f9fafb)] p-3"
+    >
+      <div class="text-xs font-semibold text-[color:var(--bs-muted)] mb-1">
+        Your note to the client
+      </div>
+      <p class="text-sm whitespace-pre-wrap">{{ noteToClient.trim() }}</p>
+    </div>
+    <template #footer>
+      <Button label="Close" text @click="showPreview = false" />
+    </template>
+  </Dialog>
 </template>
 
 <style>

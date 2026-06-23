@@ -4,7 +4,7 @@
 // instructions. Pure presentational: takes an in-memory invoice object so the
 // client-facing card and any future surfaces can share it. Unlike the quote,
 // nothing here is an estimate — the lines bill actual time and charges.
-import type { InvoiceDiscount, InvoiceUpfrontFeeCredit, LineItem, LineItemKind } from "@/firebase/interfaces";
+import type { InvoiceDiscount, LineItem, LineItemKind } from "@/firebase/interfaces";
 import { useFormatters } from "@/composables/useFormatters";
 
 defineProps<{
@@ -15,7 +15,9 @@ defineProps<{
     discountAmount: number;
     taxTotal: number;
     total: number;
-    upfrontFeeCredit?: InvoiceUpfrontFeeCredit | null;
+    // Only amountCents is read here, so accept any object that carries it —
+    // the full InvoiceDoc credit and the FinishJobSheet preview both satisfy it.
+    upfrontFeeCredit?: { amountCents: number } | null;
     paymentInstructions?: string;
     dueAt?: { toDate(): Date } | null;
   };
