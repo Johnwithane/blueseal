@@ -60,14 +60,14 @@ const STUBS = {
   AddExpenseDialog: true,
 };
 
-function mountSheet(visible = false) {
+function mountSheet(visible = false, billingType: "fixed" | "hourly" = "fixed") {
   return mount(FinishJobSheet, {
     props: {
       visible,
       jobId: "job1",
       tradespersonId: "tp1",
       clientId: "c1",
-      billingType: "fixed" as const,
+      billingType,
       extras: [] as WithId<JobExtraDoc>[],
       upfrontFeePaidCents: 0,
     },
@@ -108,18 +108,19 @@ describe("FinishJobSheet", () => {
 
     // Still 4 steps — the quote is no longer one of them.
     expect(w.text()).toContain("Step 1 of 4");
-    // The reference panel shows the FIXED rows (hourly is billed from time).
-    expect(w.text()).toContain("From your quote");
+    // On a fixed job the panel is relabelled the agreed price (it IS the bill).
+    expect(w.text()).toContain("Agreed fixed price");
+    // The panel shows the FIXED rows (hourly is billed from time).
     expect(w.text()).toContain("Install mixer");
     expect(w.text()).toContain("Membrane");
     expect(w.text()).not.toContain("On-site labour");
   });
 
-  it("only bills quote items the tradesperson taps to add", async () => {
+  it("auto-adds the agreed quote price on a fixed-price job", async () => {
     getQuoteByJobId.mockResolvedValueOnce({
       id: "q1",
       lineItems: [
-        { kind: "labour", description: "Install mixer", quantity: 1, unitPrice: 18000, taxRate: 0.13 },
+        { kind: "materials", description: "Install mixer", quantity: 1, unitPrice: 18000, taxRate: 0 },
       ],
     });
     const w = mountSheet(false);
@@ -129,12 +130,54 @@ describe("FinishJobSheet", () => {
     // Jump to the full form so the send button (with its total state) shows.
     const skip = w.findAll("button").find((b) => b.text().includes("Skip"));
     await skip!.trigger("click");
-    // Nothing added yet → invoice is empty.
-    expect(w.text()).toContain("Add something to bill first");
+    // Pre-added: the agreed price is already on the invoice, no tap needed.
+    expect(w.text()).toContain("Send for approval");
+    expect(w.text()).toContain("$180.00");
 
-    // Tap the quote item's Add chip → it now counts toward the invoice.
+    // The tradesperson can still tap a line off if it no longer applies.
     const addChip = w.find(".finish-sheet-quote-add");
     await addChip.trigger("click");
+    expect(w.text()).toContain("Add something to bill first");
+  });
+
+  it("carries the quote's own discount so the auto-filled total matches the agreed price", async () => {
+    getQuoteByJobId.mockResolvedValueOnce({
+      id: "q1",
+      lineItems: [
+        { kind: "materials", description: "Install mixer", quantity: 1, unitPrice: 18000, taxRate: 0 },
+      ],
+      // $20 off was baked into the agreed quote — the line is stored pre-discount.
+      discount: { type: "fixed", value: 2000, label: "Repeat customer" },
+    });
+    const w = mountSheet(false);
+    await w.setProps({ visible: true });
+    await flushPromises();
+
+    const skip = w.findAll("button").find((b) => b.text().includes("Skip"));
+    await skip!.trigger("click");
+    // $180 agreed − $20 quote discount = $160, not the pre-discount $180.
+    expect(w.text()).toContain("Send for approval");
+    expect(w.text()).toContain("$160.00");
+  });
+
+  it("keeps quote rows opt-in on an hourly job (labour bills from clocked time)", async () => {
+    getQuoteByJobId.mockResolvedValueOnce({
+      id: "q1",
+      lineItems: [
+        { kind: "materials", description: "Membrane", quantity: 1, unitPrice: 9500, taxRate: 0 },
+      ],
+    });
+    const w = mountSheet(false, "hourly");
+    await w.setProps({ visible: true });
+    await flushPromises();
+
+    // Hourly keeps the original "From your quote" framing.
+    expect(w.text()).toContain("From your quote");
+    const skip = w.findAll("button").find((b) => b.text().includes("Skip"));
+    await skip!.trigger("click");
+    // Not pre-added — the tradie opts in by tapping.
+    expect(w.text()).toContain("Add something to bill first");
+    await w.find(".finish-sheet-quote-add").trigger("click");
     expect(w.text()).toContain("Send for approval");
   });
 });

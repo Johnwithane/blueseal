@@ -94,10 +94,11 @@ const EXTRA_PRESETS = [
   "Sourcing fee",
 ] as const;
 
-// Fixed (materials / flat labour) line items from the accepted quote, kept as a
-// REFERENCE the tradie pulls from rather than a pre-filled invoice section —
-// each row lands on the invoice only when they tap "Add" (default off). HOURLY
-// quote rows are deliberately EXCLUDED: that labour is billed from clocked time
+// Fixed (materials / flat labour) line items from the accepted quote. On a
+// FIXED-price job the agreed quote IS the bill, so its rows are PRE-ADDED to the
+// invoice (the tradesperson can still tap one off); on an HOURLY job they stay
+// an opt-in reference — each row lands on the invoice only when tapped "Add".
+// HOURLY quote rows are always EXCLUDED: that labour is billed from clocked time
 // via the time-tracker rollup, so surfacing the quote's estimated hours would
 // invite billing the estimate instead of the hours actually worked. The panel
 // stays visible on every wizard step. See hydrateFromQuote.
@@ -114,6 +115,11 @@ const quoteRefOpen = ref(true);
 const addedQuoteCount = computed(() => quoteRefRows.value.filter((r) => r.added).length);
 const allQuoteAdded = computed(
   () => quoteRefRows.value.length > 0 && quoteRefRows.value.every((r) => r.added),
+);
+// On a fixed job the panel IS the agreed price (pre-added); on hourly it's an
+// opt-in reference. The label/copy follow so neither side is misread.
+const quotePanelLabel = computed(() =>
+  props.billingType === "fixed" ? "Agreed fixed price" : "From your quote",
 );
 
 type DiscountMode = "off" | "percent" | "fixed";
@@ -241,11 +247,14 @@ async function hydrateFromQuote() {
       quoteRefRows.value = [];
       return;
     }
+    // Fixed-price job: the agreed quote IS the bill, so pre-add its rows. Hourly
+    // job: keep them an opt-in reference (added only when tapped) — that labour
+    // bills from clocked time, so auto-adding the estimate would double-charge.
+    const preAdd = props.billingType === "fixed";
     // Skip hourly rows — they're billed from clocked time (the Time section
     // above / the server's time rollup), NOT the quote's estimate. Surfacing
     // them here would invite billing quoted hours and ignoring the tracked ones.
-    // Fixed rows (materials, flat labour) are the real agreed charges — offered
-    // as reference, added to the invoice only when the tradie taps them.
+    // Fixed rows (materials, flat labour) are the real agreed charges.
     quoteRefRows.value = q.lineItems
       .filter((li) => li.kind !== "hourly")
       .map((li) => {
@@ -255,9 +264,20 @@ async function hydrateFromQuote() {
           description: li.description ?? "",
           amountDollars: (qty * unit) / 100,
           taxRate: li.taxRate ?? 0,
-          added: false,
+          added: preAdd,
         };
       });
+    // Carry the quote's own discount onto the invoice so the auto-filled total
+    // matches the agreed price exactly — the rows above are stored PRE-discount,
+    // so without this a discounted fixed quote would over-bill. Fixed jobs only,
+    // and only when the tradesperson hasn't already set a discount on this sheet
+    // (they can still adjust it afterwards to take more off).
+    if (preAdd && q.discount && discountMode.value === "off") {
+      discountMode.value = q.discount.type;
+      discountValue.value =
+        q.discount.type === "fixed" ? q.discount.value / 100 : q.discount.value;
+      discountLabel.value = q.discount.label ?? "";
+    }
   } catch {
     // Quote read can fail (legacy job without a quote, permission edge).
     // Leave the reference empty — sheet still works from time + expenses + extras.
@@ -889,10 +909,11 @@ function close() {
         />
       </section>
 
-      <!-- From your quote — an ever-present reference, NOT a wizard step. It
-           stays visible on every step so the tradie can pull the items the
-           client agreed to onto the invoice (or ignore them) at any point.
-           Nothing here bills until it's tapped "Add". -->
+      <!-- The accepted quote — an ever-present panel, NOT a wizard step, so it
+           stays visible on every step. On a fixed-price job its rows are
+           pre-added (the agreed price is the bill); on an hourly job they're an
+           opt-in reference the tradie pulls from. Either way, tapping a row
+           toggles whether it counts toward the invoice. -->
       <section
         v-if="loadingQuote || quoteRefRows.length > 0"
         class="rounded-lg border border-dashed border-[color:var(--bs-blue)] p-3"
@@ -906,7 +927,7 @@ function close() {
             @click="quoteRefOpen = !quoteRefOpen"
           >
             <i class="pi pi-file text-[color:var(--bs-blue)]"></i>
-            <span class="font-semibold text-sm">From your quote</span>
+            <span class="font-semibold text-sm">{{ quotePanelLabel }}</span>
             <span
               v-if="addedQuoteCount > 0"
               class="rounded-full bg-[color:var(--bs-blue)] px-1.5 py-0.5 text-[10px] font-semibold text-white"
@@ -932,7 +953,13 @@ function close() {
         </div>
         <template v-else-if="quoteRefOpen">
           <p class="mt-1 mb-2 text-[11px] leading-snug text-[color:var(--bs-muted)]">
-            What the client agreed to. Add what belongs on this invoice — tap again to remove.
+            <template v-if="props.billingType === 'fixed'">
+              The price the client agreed to — already on the invoice. Tap a line to
+              take it off if it no longer applies, then add a discount or extras below.
+            </template>
+            <template v-else>
+              What the client agreed to. Add what belongs on this invoice — tap again to remove.
+            </template>
           </p>
           <ul class="space-y-1.5">
             <li

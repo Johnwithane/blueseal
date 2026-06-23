@@ -1033,7 +1033,7 @@ const faqs: FaqItem[] = [
   {
     question: "What does an invoice include?",
     answer:
-      "Itemised line items from the agreed quote, plus tracked time, materials, and any extra charges (travel, callout, tool rental, disposal, or changes that came up on the job), with totals and any applicable tax. You review and approve the whole invoice, extras included, before you pay, so nothing appears that you haven't agreed to.",
+      "Itemised line items from the agreed quote, plus tracked time, materials, and any extra charges (travel, callout, tool rental, disposal, or changes that came up on the job), with totals and any applicable tax. On a fixed-price job the agreed price is filled in for you automatically, and the tradesperson can choose to apply a discount, which only ever lowers what you owe. You review and approve the whole invoice, extras included, before you pay, so nothing appears that you haven't agreed to.",
     categoryId: "payments-invoices",
     audience: "all",
   },
