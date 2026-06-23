@@ -189,6 +189,8 @@ function prospectProfileFields(p: Record<string, unknown>): Record<string, unkno
     languages: Array.isArray(p.languages) ? p.languages : [],
     bio: typeof p.bio === "string" ? p.bio : "",
     trades: Array.isArray(p.trades) ? p.trades : [],
+    // Free-text services offered — already normalised when the admin saved.
+    services: Array.isArray(p.services) ? p.services : [],
     yearsExperience:
       p.yearsExperience && typeof p.yearsExperience === "object" ? p.yearsExperience : {},
     pricingModel: typeof p.pricingModel === "string" ? p.pricingModel : "quote",

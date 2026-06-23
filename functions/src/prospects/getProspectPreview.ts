@@ -29,6 +29,7 @@ export const getProspectPreview = onCall(CALLABLE_OPTS, async (req) => {
     companyName: (p.companyName as string | null) ?? null,
     bio: typeof p.bio === "string" ? p.bio : "",
     trades: Array.isArray(p.trades) ? p.trades : [],
+    services: Array.isArray(p.services) ? p.services : [],
     yearsExperience:
       p.yearsExperience && typeof p.yearsExperience === "object" ? p.yearsExperience : {},
     pricingModel: typeof p.pricingModel === "string" ? p.pricingModel : "quote",
