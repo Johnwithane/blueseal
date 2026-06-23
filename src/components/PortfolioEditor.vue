@@ -5,6 +5,9 @@ import Message from "primevue/message";
 import { getTradesperson, setPortfolioPhotos, PORTFOLIO_MAX } from "@/firebase/services/tradespeople";
 import { deleteFile, makeStoragePath, uploadFile } from "@/firebase/services/storage";
 import { compressToWebp } from "@/utils/image";
+import { tradeLabel } from "@/data/trades";
+import { isUnsplashEnabled } from "@/api/unsplash";
+import UnsplashPickerDialog from "@/components/UnsplashPickerDialog.vue";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 
@@ -22,6 +25,10 @@ const photos = ref<string[]>([]);
 const loading = ref(true);
 const uploading = ref(false);
 const fileInput = ref<HTMLInputElement | null>(null);
+const showUnsplash = ref(false);
+const unsplashEnabled = isUnsplashEnabled();
+// Seeds the Unsplash picker so it opens on something relevant to their trade.
+const tradeQuery = ref("");
 
 onMounted(async () => {
   await load();
@@ -31,16 +38,15 @@ async function load() {
   loading.value = true;
   const tradie = await getTradesperson(props.tradieUid);
   photos.value = tradie?.portfolioPhotos ?? [];
+  tradeQuery.value = tradie?.trades?.[0] ? tradeLabel(tradie.trades[0]) : "";
   loading.value = false;
 }
 
-async function onFile(e: Event) {
-  const target = e.target as HTMLInputElement;
-  const file = target.files?.[0];
-  if (!file) return;
+// Shared add pipeline for both an uploaded File and an Unsplash pick (which the
+// picker also hands us as a File), so they compress + store identically.
+async function addFile(file: File) {
   if (photos.value.length >= PORTFOLIO_MAX) {
     toast.warn("Max reached", `You can show up to ${PORTFOLIO_MAX} photos.`);
-    target.value = "";
     return;
   }
   uploading.value = true;
@@ -62,8 +68,15 @@ async function onFile(e: Event) {
     toast.error("Upload failed", humanizeError(err));
   } finally {
     uploading.value = false;
-    target.value = "";
   }
+}
+
+async function onFile(e: Event) {
+  const target = e.target as HTMLInputElement;
+  const file = target.files?.[0];
+  if (!file) return;
+  await addFile(file);
+  target.value = "";
 }
 
 async function removeAt(idx: number) {
@@ -115,14 +128,26 @@ async function move(idx: number, delta: -1 | 1) {
       <p v-else class="text-sm text-[color:var(--bs-muted)]">
         Up to {{ PORTFOLIO_MAX }} photos. First photo shows biggest on your profile.
       </p>
-      <Button
-        icon="pi pi-upload"
-        label="Add photo"
-        class="shrink-0 whitespace-nowrap"
-        :loading="uploading"
-        :disabled="photos.length >= PORTFOLIO_MAX"
-        @click="fileInput?.click()"
-      />
+      <div class="flex shrink-0 gap-2">
+        <Button
+          v-if="unsplashEnabled"
+          icon="pi pi-images"
+          label="Unsplash"
+          severity="secondary"
+          outlined
+          class="whitespace-nowrap"
+          :disabled="uploading || photos.length >= PORTFOLIO_MAX"
+          @click="showUnsplash = true"
+        />
+        <Button
+          icon="pi pi-upload"
+          label="Add photo"
+          class="whitespace-nowrap"
+          :loading="uploading"
+          :disabled="photos.length >= PORTFOLIO_MAX"
+          @click="fileInput?.click()"
+        />
+      </div>
       <input
         ref="fileInput"
         type="file"
@@ -131,6 +156,14 @@ async function move(idx: number, delta: -1 | 1) {
         @change="onFile"
       />
     </div>
+
+    <UnsplashPickerDialog
+      v-if="unsplashEnabled"
+      v-model:visible="showUnsplash"
+      :default-query="tradeQuery"
+      title="Add a portfolio photo from Unsplash"
+      @picked="addFile"
+    />
 
     <Message v-if="loading" severity="info" :closable="false" class="mt-3">Loading…</Message>
 

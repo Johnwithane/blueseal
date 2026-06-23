@@ -14,6 +14,9 @@ import { useSubscriptionStore } from "@/stores/subscription";
 import { createOrUpdateDraft, getTradesperson } from "@/firebase/services/tradespeople";
 import { uploadFile, makeStoragePath } from "@/firebase/services/storage";
 import { compressToWebp } from "@/utils/image";
+import { tradeLabel } from "@/data/trades";
+import { isUnsplashEnabled } from "@/api/unsplash";
+import UnsplashPickerDialog from "@/components/UnsplashPickerDialog.vue";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 
@@ -39,6 +42,9 @@ const removingBanner = ref(false);
 const savingColor = ref(false);
 const logoInput = ref<HTMLInputElement | null>(null);
 const bannerInput = ref<HTMLInputElement | null>(null);
+const showBannerUnsplash = ref(false);
+const unsplashEnabled = isUnsplashEnabled();
+const tradeQuery = ref("");
 
 async function load() {
   if (!auth.fbUser) {
@@ -49,6 +55,7 @@ async function load() {
     const t = await getTradesperson(auth.fbUser.uid);
     companyLogoUrl.value = t?.companyLogoUrl ?? null;
     bannerUrl.value = t?.bannerUrl ?? null;
+    tradeQuery.value = t?.trades?.[0] ? tradeLabel(t.trades[0]) : "";
     if (t?.brandColor) {
       brandColor.value = t.brandColor;
       hasBrandColor.value = true;
@@ -102,10 +109,9 @@ async function removeLogo() {
     removingLogo.value = false;
   }
 }
-async function onBannerChange(e: Event) {
-  const input = e.target as HTMLInputElement;
-  const file = input.files?.[0];
-  if (!file || !auth.fbUser) return;
+// Shared banner pipeline for an uploaded File and an Unsplash pick alike.
+async function applyBanner(file: File) {
+  if (!auth.fbUser) return;
   uploadingBanner.value = true;
   try {
     const url = await uploadImage(file, "banner", 1600);
@@ -116,8 +122,14 @@ async function onBannerChange(e: Event) {
     toast.error(humanizeError(err));
   } finally {
     uploadingBanner.value = false;
-    input.value = "";
   }
+}
+async function onBannerChange(e: Event) {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  await applyBanner(file);
+  input.value = "";
 }
 async function removeBanner() {
   if (!auth.fbUser) return;
@@ -169,8 +181,8 @@ async function resetColor() {
       <span class="text-[10px] font-semibold uppercase rounded-full bg-[color:var(--bs-blue)] text-white px-2 py-0.5">Pro</span>
     </div>
     <p class="text-xs text-[color:var(--bs-muted)] mb-3">
-      Your logo, a letterhead banner, and a brand colour on the header of every quote and
-      invoice — on the PDF and on screen.
+      Your logo, a banner, and a brand colour — on your public profile, and on the header of
+      every quote and invoice (PDF and on screen).
     </p>
 
     <div v-if="loading" class="text-sm text-[color:var(--bs-muted)]">
@@ -242,7 +254,7 @@ async function resetColor() {
         <div v-else class="w-full h-16 rounded border border-dashed border-[color:var(--bs-border)] flex items-center justify-center text-[color:var(--bs-muted)] bg-white mb-2 text-xs">
           No banner — a wide image (e.g. 1600×400)
         </div>
-        <div class="flex gap-2">
+        <div class="flex gap-2 flex-wrap">
           <Button
             :label="bannerUrl ? 'Replace' : 'Upload banner'"
             icon="pi pi-upload"
@@ -250,6 +262,16 @@ async function resetColor() {
             size="small"
             :loading="uploadingBanner"
             @click="bannerInput?.click()"
+          />
+          <Button
+            v-if="unsplashEnabled"
+            label="Unsplash"
+            icon="pi pi-images"
+            outlined
+            severity="secondary"
+            size="small"
+            :disabled="uploadingBanner"
+            @click="showBannerUnsplash = true"
           />
           <Button
             v-if="bannerUrl"
@@ -263,6 +285,13 @@ async function resetColor() {
           />
           <input ref="bannerInput" type="file" accept="image/*" class="hidden" @change="onBannerChange" />
         </div>
+        <UnsplashPickerDialog
+          v-if="unsplashEnabled"
+          v-model:visible="showBannerUnsplash"
+          :default-query="tradeQuery"
+          title="Choose a banner from Unsplash"
+          @picked="applyBanner"
+        />
       </div>
 
       <!-- Brand colour -->

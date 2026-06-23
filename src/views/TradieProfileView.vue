@@ -7,7 +7,8 @@ import Rating from "primevue/rating";
 import Avatar from "primevue/avatar";
 import Dialog from "primevue/dialog";
 import Textarea from "primevue/textarea";
-import { getTradesperson } from "@/firebase/services/tradespeople";
+import InputText from "primevue/inputtext";
+import { getTradesperson, createOrUpdateDraft } from "@/firebase/services/tradespeople";
 import { isTradieSaved, saveTradie, unsaveTradie } from "@/firebase/services/savedTradies";
 import { humanizeError } from "@/utils/errors";
 import { getProspect, selfServeRemoveProspect } from "@/firebase/services/prospects";
@@ -36,7 +37,11 @@ import VerifiedBadge from "@/components/VerifiedBadge.vue";
 import RedSealBadge from "@/components/RedSealBadge.vue";
 import VerifiedCredentials from "@/components/VerifiedCredentials.vue";
 import LoadingState from "@/components/LoadingState.vue";
+import ServicesEditor from "@/components/ServicesEditor.vue";
+import BrandingPanel from "@/components/BrandingPanel.vue";
+import PortfolioEditor from "@/components/PortfolioEditor.vue";
 import { hasRedSeal } from "@/utils/credentials";
+import { normalizeServices } from "@/utils/services";
 
 const route = useRoute();
 const router = useRouter();
@@ -140,6 +145,65 @@ const pageStyle = computed<Record<string, string>>(() => {
   return s;
 });
 
+// --- Owner inline editing ----------------------------------------------------
+// The owner edits their page in place: tagline, bio + services save together;
+// banner/logo/brand colour reuse BrandingPanel (Pro-gated) and portfolio reuses
+// PortfolioEditor, both in a dialog, so we don't re-implement uploads here.
+const editing = ref(false);
+const savingEdits = ref(false);
+const showAppearance = ref(false);
+const editTagline = ref("");
+const editBio = ref("");
+const editServices = ref<string[]>([]);
+
+function startEditing() {
+  if (!tradie.value) return;
+  editTagline.value = tradie.value.tagline ?? "";
+  editBio.value = tradie.value.bio ?? "";
+  editServices.value = [...(tradie.value.services ?? [])];
+  editing.value = true;
+}
+function cancelEditing() {
+  editing.value = false;
+  // Portfolio + appearance edits persist via their own components, so re-sync
+  // the local doc to reflect anything changed during the session.
+  void reloadTradie();
+}
+async function saveEdits() {
+  if (!tradie.value || !auth.fbUser) return;
+  savingEdits.value = true;
+  try {
+    // bio lives on the tradespeople doc here (what the public profile reads),
+    // matching the onboarding wizard's saveDraft.
+    const cleanServices = normalizeServices(editServices.value);
+    const cleanTagline = editTagline.value.trim();
+    await createOrUpdateDraft(auth.fbUser.uid, {
+      tagline: cleanTagline,
+      bio: editBio.value,
+      services: cleanServices,
+    });
+    tradie.value.tagline = cleanTagline;
+    tradie.value.bio = editBio.value;
+    tradie.value.services = cleanServices;
+    editing.value = false;
+    toast.success("Page updated");
+    // Pick up portfolio / appearance changes made via their own components.
+    void reloadTradie();
+  } catch (e) {
+    toast.error("Couldn't save your changes", humanizeError(e));
+  } finally {
+    savingEdits.value = false;
+  }
+}
+// Re-pull the doc after editing appearance / portfolio in their dialogs (those
+// components save directly) so the hero + grids reflect the change without a
+// full page reload.
+async function reloadTradie() {
+  if (!tradie.value) return;
+  const t = await getTradesperson(tradie.value.id).catch(() => null);
+  if (t) tradie.value = t;
+}
+
 // Per-dimension rating bars for the Reviews summary. Each dim is 0..5.
 const ratingDims = computed(() => {
   const d = tradie.value?.ratingDimensions;
@@ -242,9 +306,9 @@ const primaryCta = computed(() => {
     }
     return null;
   }
-  if (isOwnProfile.value) {
-    return { label: "Edit your profile", icon: "pi pi-pencil", to: { name: "TradieOnboarding" } };
-  }
+  // Owner gets inline edit controls (rendered in the aside / mobile bar / hero),
+  // not a quote CTA — so return null and let those branches handle it.
+  if (isOwnProfile.value) return null;
   if (auth.isAuthenticated && auth.hasClientRole) {
     return {
       label: "Request a quote",
@@ -571,6 +635,16 @@ onMounted(async () => {
         <div class="profile-hero__scrim" aria-hidden="true"></div>
         <div class="profile-hero__tools">
           <button
+            v-if="isOwnProfile && !editing"
+            type="button"
+            class="profile-hero__tool profile-hero__tool--edit"
+            aria-label="Edit your page"
+            @click="startEditing"
+          >
+            <i class="pi pi-pencil" aria-hidden="true"></i>
+            <span>Edit page</span>
+          </button>
+          <button
             v-if="canSave"
             type="button"
             class="profile-hero__tool"
@@ -632,8 +706,48 @@ onMounted(async () => {
       <!-- LAYOUT: sticky left panel + scrolling main column -->
       <div class="profile-layout">
         <aside class="profile-aside">
-          <!-- Always-in-view CTA + pricing -->
-          <div v-if="primaryCta || pricingLabel" class="bs-card profile-cta">
+          <!-- Owner: inline edit controls. Everyone else: pricing + quote CTA. -->
+          <div v-if="isOwnProfile" class="bs-card profile-cta">
+            <template v-if="editing">
+              <div class="profile-cta__price">Editing your page</div>
+              <p class="profile-cta__note">Tweak your tagline, bio and services, then save.</p>
+              <Button
+                label="Save changes"
+                icon="pi pi-check"
+                class="w-full mt-3"
+                :loading="savingEdits"
+                @click="saveEdits"
+              />
+              <Button
+                label="Cancel"
+                text
+                severity="secondary"
+                class="w-full mt-1"
+                :disabled="savingEdits"
+                @click="cancelEditing"
+              />
+            </template>
+            <template v-else>
+              <div class="profile-cta__price">Your page</div>
+              <p class="profile-cta__note">Edit it in place. Changes show to clients straight away.</p>
+              <Button
+                label="Edit your page"
+                icon="pi pi-pencil"
+                class="w-full mt-3"
+                @click="startEditing"
+              />
+              <Button
+                label="Banner, logo &amp; colours"
+                icon="pi pi-palette"
+                severity="secondary"
+                outlined
+                class="w-full mt-2"
+                @click="showAppearance = true"
+              />
+            </template>
+          </div>
+          <!-- Always-in-view CTA + pricing (visitors / clients). -->
+          <div v-else-if="primaryCta || pricingLabel" class="bs-card profile-cta">
             <div class="profile-cta__price">{{ pricingLabel }}</div>
             <div v-if="tradie.providesFreeQuotes" class="profile-cta__note">
               <i class="pi pi-check-circle" aria-hidden="true"></i> Free quotes
@@ -703,7 +817,22 @@ onMounted(async () => {
             <h2 class="profile-section__title">
               <i class="pi pi-user" aria-hidden="true"></i> About
             </h2>
-            <p class="text-sm whitespace-pre-wrap">{{ tradie.bio }}</p>
+            <template v-if="editing">
+              <label class="block text-xs font-medium text-[color:var(--bs-muted)] mb-1">
+                Tagline <span class="font-normal">(the headline on your banner)</span>
+              </label>
+              <InputText
+                v-model="editTagline"
+                :maxlength="120"
+                class="w-full"
+                placeholder="e.g. Red Seal plumbing &amp; gas across the Okanagan"
+              />
+              <label class="mt-3 block text-xs font-medium text-[color:var(--bs-muted)] mb-1">
+                About you
+              </label>
+              <Textarea v-model="editBio" :rows="6" auto-resize class="w-full" />
+            </template>
+            <p v-else class="text-sm whitespace-pre-wrap">{{ tradie.bio }}</p>
             <div v-if="tradesWithYears.length" class="mt-3 flex flex-wrap items-center gap-1">
               <span
                 v-for="t in tradesWithYears"
@@ -719,11 +848,12 @@ onMounted(async () => {
           </section>
 
           <!-- Services offered (free-text checklist) -->
-          <section v-if="services.length" class="bs-card profile-section">
+          <section v-if="services.length || editing" class="bs-card profile-section">
             <h2 class="profile-section__title">
               <i class="pi pi-list-check" aria-hidden="true"></i> Services offered
             </h2>
-            <ul class="profile-services">
+            <ServicesEditor v-if="editing" v-model="editServices" />
+            <ul v-else class="profile-services">
               <li v-for="(s, i) in services" :key="i">
                 <i class="pi pi-check-circle" aria-hidden="true"></i>
                 <span>{{ s }}</span>
@@ -731,8 +861,9 @@ onMounted(async () => {
             </ul>
           </section>
 
-          <!-- Portfolio -->
-          <section v-if="tradie.portfolioPhotos.length" class="bs-card profile-section">
+          <!-- Portfolio — full editor (own card) while editing, static grid otherwise -->
+          <PortfolioEditor v-if="editing" :tradie-uid="tradie.id" />
+          <section v-else-if="tradie.portfolioPhotos.length" class="bs-card profile-section">
             <h2 class="profile-section__title">
               <i class="pi pi-images" aria-hidden="true"></i> Recent work
             </h2>
@@ -995,8 +1126,33 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- Mobile sticky CTA — always visible at the bottom on small screens. -->
-      <div v-if="primaryCta" class="profile-mobilebar">
+      <!-- Mobile sticky bar — owner edit controls, or the quote CTA for visitors. -->
+      <div v-if="isOwnProfile" class="profile-mobilebar">
+        <template v-if="editing">
+          <Button
+            label="Cancel"
+            text
+            severity="secondary"
+            :disabled="savingEdits"
+            @click="cancelEditing"
+          />
+          <Button
+            label="Save changes"
+            icon="pi pi-check"
+            class="ml-auto"
+            :loading="savingEdits"
+            @click="saveEdits"
+          />
+        </template>
+        <template v-else>
+          <div class="profile-mobilebar__price">
+            <strong>Your page</strong>
+            <span>Edit it in place</span>
+          </div>
+          <Button label="Edit" icon="pi pi-pencil" @click="startEditing" />
+        </template>
+      </div>
+      <div v-else-if="primaryCta" class="profile-mobilebar">
         <div class="profile-mobilebar__price">
           <strong>{{ pricingLabel }}</strong>
           <span v-if="tradie.providesFreeQuotes">Free quotes</span>
@@ -1005,6 +1161,20 @@ onMounted(async () => {
           <Button :label="primaryCta.label" :icon="primaryCta.icon" />
         </RouterLink>
       </div>
+
+      <!-- Owner: banner, logo + brand colour editor (Pro-gated inside the panel).
+           Re-sync the doc on close so the hero reflects new banner/colour. -->
+      <Dialog
+        v-if="isOwnProfile"
+        v-model:visible="showAppearance"
+        modal
+        header="Page appearance"
+        :style="{ width: '34rem', maxWidth: '95vw' }"
+        :dismissable-mask="true"
+        @hide="reloadTradie"
+      >
+        <BrandingPanel />
+      </Dialog>
 
       <!-- Self-serve takedown for an unclaimed prospect listing. -->
       <Dialog
@@ -1152,6 +1322,13 @@ onMounted(async () => {
 }
 .profile-hero__tool.is-saved {
   color: #ffb4b4;
+}
+.profile-hero__tool--edit {
+  width: auto;
+  gap: 0.4rem;
+  padding: 0 0.9rem;
+  font-size: 0.82rem;
+  font-weight: 600;
 }
 .profile-hero__logo {
   width: 84px;

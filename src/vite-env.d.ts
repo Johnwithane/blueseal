@@ -26,6 +26,7 @@ interface ImportMetaEnv {
   readonly VITE_HOMEPAGE_HERO: string;
   readonly VITE_GOOGLE_BUSINESS_ENABLED: string;
   readonly VITE_SUPPLIES_ENABLED: string;
+  readonly VITE_UNSPLASH_ACCESS_KEY: string;
 }
 
 interface ImportMeta {
