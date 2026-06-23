@@ -10,6 +10,7 @@ import InputText from "primevue/inputtext";
 import Message from "primevue/message";
 import { useAuthStore } from "@/stores/auth";
 import { humanizeError } from "@/utils/errors";
+import { safeRedirect } from "@/utils/redirect";
 import { useSeo } from "@/composables/useSeo";
 
 useSeo({ title: "Signing in", noindex: true });
@@ -32,8 +33,7 @@ async function run() {
   try {
     await auth.init();
     await auth.completeEmailLinkSignIn(email.value.trim().toLowerCase(), { role: "client" });
-    const redirect = (route.query.redirect as string) || "/dashboard";
-    router.replace(redirect);
+    router.replace(safeRedirect(route.query.redirect));
   } catch (e) {
     error.value = humanizeError(e);
     status.value = "error";

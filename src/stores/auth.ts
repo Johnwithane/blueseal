@@ -465,8 +465,8 @@ export const useAuthStore = defineStore("auth", {
      * notably tradespeople invited via a magic link who never set one). Branded
      * email via the callable; lands on /finish-signin to complete sign-in.
      */
-    async sendSignInLink(email: string) {
-      await callRequestSignInLink(email);
+    async sendSignInLink(email: string, redirect?: string) {
+      await callRequestSignInLink(email, redirect);
     },
 
     /**

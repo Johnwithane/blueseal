@@ -33,7 +33,10 @@ export async function requestEmailChange(newEmail: string): Promise<void> {
  * even for an unknown address) so callers never leak account existence. The link
  * lands on /finish-signin to complete sign-in in-app.
  */
-export async function requestSignInLink(email: string): Promise<void> {
-  const fn = httpsCallable<{ email: string }, { ok: true }>(functions, "requestSignInLink");
-  await fn({ email });
+export async function requestSignInLink(email: string, redirect?: string): Promise<void> {
+  const fn = httpsCallable<{ email: string; redirect?: string }, { ok: true }>(
+    functions,
+    "requestSignInLink",
+  );
+  await fn({ email, redirect });
 }

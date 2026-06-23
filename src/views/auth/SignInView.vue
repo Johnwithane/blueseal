@@ -11,6 +11,7 @@ import { useAuthStore } from "@/stores/auth";
 import { signInSchema } from "@/validation/schemas";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
+import { safeRedirect } from "@/utils/redirect";
 import { useSeo } from "@/composables/useSeo";
 
 useSeo({ title: "Sign in", noindex: true });
@@ -39,7 +40,7 @@ async function emailSignInLink() {
   }
   sendingLink.value = true;
   try {
-    await auth.sendSignInLink(e);
+    await auth.sendSignInLink(e, typeof route.query.redirect === "string" ? route.query.redirect : undefined);
     linkSent.value = true;
   } catch (err) {
     formError.value = humanizeError(err);
@@ -62,7 +63,7 @@ async function submit() {
   try {
     await auth.signIn(parsed.data.email, parsed.data.password);
     toast.success("Signed in");
-    const redirect = (route.query.redirect as string) || "/dashboard";
+    const redirect = safeRedirect(route.query.redirect);
     router.replace(redirect);
   } catch (e) {
     formError.value = humanizeError(e);
@@ -87,7 +88,7 @@ async function googleSignIn() {
       showRoleChoice.value = true;
       return;
     }
-    const redirect = (route.query.redirect as string) || "/dashboard";
+    const redirect = safeRedirect(route.query.redirect);
     router.replace(redirect);
   } catch (e) {
     formError.value = humanizeError(e);

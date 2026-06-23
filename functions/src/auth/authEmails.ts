@@ -159,7 +159,18 @@ export const requestPasswordReset = onCall(CALLABLE_OPTS, async (req) => {
 
 const SignInLinkInput = z.object({
   email: z.string().trim().toLowerCase().email().max(200),
+  // Optional post-login destination (e.g. a notification deep link). Validated
+  // below to a same-origin relative path so it can't become an open redirect.
+  redirect: z.string().trim().max(512).optional(),
 });
+
+// Only allow a relative path ("/jobs/123"), never an absolute or
+// protocol-relative URL — otherwise the link could bounce the user off-site
+// after sign-in.
+function safeRelative(path: string | undefined): string | null {
+  if (!path || !path.startsWith("/") || path.startsWith("//") || path.startsWith("/\\")) return null;
+  return path;
+}
 
 /**
  * Send a branded passwordless SIGN-IN link. UNauthenticated by design — it's for
@@ -174,6 +185,7 @@ export const requestSignInLink = onCall(CALLABLE_OPTS, async (req) => {
   const parsed = SignInLinkInput.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", "Enter a valid email.");
   const { email } = parsed.data;
+  const redirect = safeRelative(parsed.data.redirect);
 
   await enforceRateLimit(
     emailHashOf(email),
@@ -183,8 +195,11 @@ export const requestSignInLink = onCall(CALLABLE_OPTS, async (req) => {
   );
 
   try {
+    const continueUrl =
+      `${appBaseUrl()}/finish-signin?email=${encodeURIComponent(email)}` +
+      (redirect ? `&redirect=${encodeURIComponent(redirect)}` : "");
     const link = await adminAuth.generateSignInWithEmailLink(email, {
-      url: `${appBaseUrl()}/finish-signin?email=${encodeURIComponent(email)}`,
+      url: continueUrl,
       handleCodeInApp: true,
     });
     await deliver({
