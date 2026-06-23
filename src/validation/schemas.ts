@@ -619,15 +619,36 @@ export type SupportTicketInput = z.infer<typeof supportTicketSchema>;
 // ---------------------------------------------------------------------------
 // Bug report (bugReports/{id}) — the in-app QA "Report a bug" form. Only the
 // human-entered fields live here; the bugReports service stamps reporter /
-// route / status / timestamps. Caps mirror the Firestore rules (defence in depth).
+// route / status / timestamps. Caps mirror the Firestore rules — but we
+// TRUNCATE rather than reject, so a tester who pastes a paragraph into a field
+// (or types the whole bug into the title box) still files cleanly instead of
+// hitting a "something went wrong". The only hard requirement is a 3+ char
+// title, and the Report-a-bug button derives one from any other content when
+// the box is left blank — so a report goes through as long as there's content
+// somewhere.
 // ---------------------------------------------------------------------------
+const trimCap = (max: number) =>
+  z
+    .string()
+    .trim()
+    .transform((s) => s.slice(0, max));
+
 export const bugReportSchema = z.object({
-  title: z.string().trim().min(3, "Add a short title").max(140),
-  severity: z.enum(["low", "medium", "high", "critical"]),
-  stepsToReproduce: z.string().trim().max(4000).default(""),
-  expected: z.string().trim().max(2000).default(""),
-  actual: z.string().trim().max(2000).default(""),
-  area: z.string().trim().max(60).default(""),
-  screenshotPaths: z.array(z.string().max(400)).max(5).default([]),
+  // min(3) runs on the full trimmed string (so a too-short title is still
+  // caught), THEN we cap to 140 — an over-long title is trimmed, never rejected.
+  title: z
+    .string()
+    .trim()
+    .min(3, "Give the bug a short title (at least 3 characters).")
+    .transform((s) => s.slice(0, 140)),
+  severity: z.enum(["low", "medium", "high", "critical"]).default("medium"),
+  stepsToReproduce: trimCap(4000).default(""),
+  expected: trimCap(2000).default(""),
+  actual: trimCap(2000).default(""),
+  area: trimCap(60).default(""),
+  screenshotPaths: z
+    .array(z.string().transform((s) => s.slice(0, 400)))
+    .default([])
+    .transform((a) => a.slice(0, 5)),
 });
 export type BugReportInput = z.infer<typeof bugReportSchema>;

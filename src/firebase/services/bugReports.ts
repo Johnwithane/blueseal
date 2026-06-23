@@ -50,11 +50,15 @@ export async function submitBugReport(
   const uid = fbAuth.currentUser?.uid;
   if (!uid) throw new Error("Sign in required to file a bug.");
   const data = bugReportSchema.parse(input);
+  // Truncate every captured-context field to the cap the Firestore rules
+  // enforce. The rules reject (not trim) anything over the limit, so a long page
+  // URL or display name would silently fail the write — clamp here so a report
+  // can never be blocked by auto-captured context.
   const ref = await addDoc(reportsCol(), {
     reporterUid: uid,
-    reporterName: ctx.reporterName,
-    url: ctx.url,
-    route: ctx.route,
+    reporterName: ctx.reporterName.slice(0, 120),
+    url: ctx.url.slice(0, 500),
+    route: ctx.route.slice(0, 200),
     activeRole: ctx.activeRole,
     environment: ctx.environment.slice(0, 4000),
     severity: data.severity,
@@ -64,7 +68,7 @@ export async function submitBugReport(
     actual: data.actual,
     screenshotPaths: data.screenshotPaths,
     area: data.area,
-    appVersion: import.meta.env.VITE_APP_VERSION || "",
+    appVersion: (import.meta.env.VITE_APP_VERSION || "").slice(0, 60),
     status: "open",
     triagedBy: null,
     notes: "",

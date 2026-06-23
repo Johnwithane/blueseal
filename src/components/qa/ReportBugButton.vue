@@ -182,10 +182,28 @@ function captureEnvironment(): string {
   return lines.join("\n").slice(0, 4000);
 }
 
+// The title is the only required field — but a report should go through as long
+// as there's content SOMEWHERE. If the title box is left blank (or too short),
+// fall back to the first line of whatever the tester did fill in, then to a
+// generic label if they only attached a screenshot. Only a truly empty report
+// is blocked.
+function deriveTitle(): string {
+  const explicit = title.value.trim();
+  if (explicit.length >= 3) return explicit;
+  const firstLine = (s: string) => s.trim().split("\n")[0]?.trim() ?? "";
+  for (const source of [actual.value, steps.value, expected.value, area.value]) {
+    const line = firstLine(source);
+    if (line.length >= 3) return line;
+  }
+  if (shots.value.length > 0) return "Screenshot bug report";
+  return "";
+}
+
 async function submit() {
   error.value = null;
-  if (title.value.trim().length < 3) {
-    error.value = "Give the bug a short title (at least 3 characters).";
+  const finalTitle = deriveTitle();
+  if (finalTitle.length < 3) {
+    error.value = "Add a title, or a line of detail, so we know what the bug is.";
     return;
   }
   submitting.value = true;
@@ -199,7 +217,7 @@ async function submit() {
     };
     await submitBugReport(
       {
-        title: title.value,
+        title: finalTitle,
         severity: severity.value,
         stepsToReproduce: steps.value,
         expected: expected.value,
@@ -248,7 +266,11 @@ async function submit() {
 
         <div>
           <label class="mb-1 block text-sm font-medium">Title</label>
-          <InputText v-model="title" class="w-full" placeholder="Short summary of the bug" />
+          <InputText
+            v-model="title"
+            class="w-full"
+            placeholder="What went wrong? (this is all we need)"
+          />
         </div>
 
         <div class="flex gap-3">
