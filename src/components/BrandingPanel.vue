@@ -43,6 +43,7 @@ const savingColor = ref(false);
 const logoInput = ref<HTMLInputElement | null>(null);
 const bannerInput = ref<HTMLInputElement | null>(null);
 const showBannerUnsplash = ref(false);
+const showLogoUnsplash = ref(false);
 const unsplashEnabled = isUnsplashEnabled();
 const tradeQuery = ref("");
 
@@ -79,10 +80,8 @@ async function uploadImage(file: File, bucket: "logo" | "banner", maxDim: number
   return uploadFile(path, compressed);
 }
 
-async function onLogoChange(e: Event) {
-  const input = e.target as HTMLInputElement;
-  const file = input.files?.[0];
-  if (!file || !auth.fbUser) return;
+async function applyLogo(file: File) {
+  if (!auth.fbUser) return;
   uploadingLogo.value = true;
   try {
     const url = await uploadImage(file, "logo", 1024);
@@ -93,8 +92,14 @@ async function onLogoChange(e: Event) {
     toast.error(humanizeError(err));
   } finally {
     uploadingLogo.value = false;
-    input.value = "";
   }
+}
+async function onLogoChange(e: Event) {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  await applyLogo(file);
+  input.value = "";
 }
 async function removeLogo() {
   if (!auth.fbUser) return;
@@ -227,6 +232,16 @@ async function resetColor() {
               @click="logoInput?.click()"
             />
             <Button
+              v-if="unsplashEnabled"
+              label="Unsplash"
+              icon="pi pi-images"
+              outlined
+              severity="secondary"
+              size="small"
+              :disabled="uploadingLogo"
+              @click="showLogoUnsplash = true"
+            />
+            <Button
               v-if="companyLogoUrl"
               label="Remove"
               icon="pi pi-times"
@@ -238,6 +253,13 @@ async function resetColor() {
             />
           </div>
           <input ref="logoInput" type="file" accept="image/*" class="hidden" @change="onLogoChange" />
+          <UnsplashPickerDialog
+            v-if="unsplashEnabled"
+            v-model:visible="showLogoUnsplash"
+            :default-query="tradeQuery"
+            title="Choose a logo image from Unsplash"
+            @picked="applyLogo"
+          />
         </div>
         <p class="text-[11px] text-[color:var(--bs-muted)] mt-1">Square works best.</p>
       </div>

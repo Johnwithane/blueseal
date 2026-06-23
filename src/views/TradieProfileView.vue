@@ -49,6 +49,12 @@ import { hasRedSeal } from "@/utils/credentials";
 import { normalizeServices } from "@/utils/services";
 import { slugError, suggestSlug } from "@/utils/slug";
 import { usePaywallStore } from "@/stores/paywall";
+import { uploadFile, makeStoragePath } from "@/firebase/services/storage";
+import { compressToWebp } from "@/utils/image";
+import { updateUserPhoto } from "@/firebase/services/users";
+import { updateProfile } from "firebase/auth";
+import { isUnsplashEnabled } from "@/api/unsplash";
+import UnsplashPickerDialog from "@/components/UnsplashPickerDialog.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -236,6 +242,46 @@ async function claimSlug() {
   } finally {
     savingSlug.value = false;
   }
+}
+
+// --- Profile photo (free; upload or Unsplash) --------------------------------
+// Mirrors AccountView's avatar upload: store under users/<uid>/profile, then
+// updateUserPhoto (which mirrors photoURL onto the tradespeople doc the profile
+// reads) + Firebase Auth. Unsplash picks arrive here as a File too.
+const photoInput = ref<HTMLInputElement | null>(null);
+const uploadingPhoto = ref(false);
+const showPhotoUnsplash = ref(false);
+const unsplashEnabled = isUnsplashEnabled();
+
+async function applyPhoto(file: File) {
+  if (!tradie.value || !auth.fbUser) return;
+  uploadingPhoto.value = true;
+  try {
+    const compressed = await compressToWebp(file, { maxDimension: 512, quality: 0.9 });
+    const path = makeStoragePath({
+      scope: "users",
+      id: auth.fbUser.uid,
+      bucket: "profile",
+      filename: compressed.name,
+    });
+    const url = await uploadFile(path, compressed);
+    await updateUserPhoto(auth.fbUser.uid, url);
+    await updateProfile(auth.fbUser, { photoURL: url });
+    if (auth.user) auth.user.photoURL = url;
+    tradie.value.photoURL = url;
+    toast.success("Photo updated");
+  } catch (e) {
+    toast.error("Couldn't update your photo", humanizeError(e));
+  } finally {
+    uploadingPhoto.value = false;
+  }
+}
+async function onPhotoFile(e: Event) {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  await applyPhoto(file);
+  input.value = "";
 }
 
 // Per-dimension rating bars for the Reviews summary. Each dim is 0..5.
@@ -872,6 +918,41 @@ onMounted(async () => {
             </h2>
             <template v-if="editing">
               <label class="block text-xs font-medium text-[color:var(--bs-muted)] mb-1">
+                Profile photo
+              </label>
+              <div class="mb-3 flex items-center gap-3">
+                <div class="profile-photo-thumb">
+                  <img v-if="tradie.photoURL" :src="tradie.photoURL" alt="" />
+                  <span v-else>{{ avatarInitial }}</span>
+                </div>
+                <Button
+                  label="Upload"
+                  icon="pi pi-upload"
+                  size="small"
+                  outlined
+                  :loading="uploadingPhoto"
+                  @click="photoInput?.click()"
+                />
+                <Button
+                  v-if="unsplashEnabled"
+                  label="Unsplash"
+                  icon="pi pi-images"
+                  size="small"
+                  outlined
+                  severity="secondary"
+                  :disabled="uploadingPhoto"
+                  @click="showPhotoUnsplash = true"
+                />
+                <input
+                  ref="photoInput"
+                  type="file"
+                  accept="image/*"
+                  class="hidden"
+                  @change="onPhotoFile"
+                />
+              </div>
+
+              <label class="block text-xs font-medium text-[color:var(--bs-muted)] mb-1">
                 Tagline <span class="font-normal">(the headline on your banner)</span>
               </label>
               <InputText
@@ -1254,6 +1335,15 @@ onMounted(async () => {
       >
         <BrandingPanel />
       </Dialog>
+
+      <!-- Profile photo from Unsplash (owner edit mode). -->
+      <UnsplashPickerDialog
+        v-if="isOwnProfile && unsplashEnabled"
+        v-model:visible="showPhotoUnsplash"
+        default-query="portrait"
+        title="Choose a profile photo from Unsplash"
+        @picked="applyPhoto"
+      />
 
       <!-- Self-serve takedown for an unclaimed prospect listing. -->
       <Dialog
@@ -1669,6 +1759,26 @@ onMounted(async () => {
 .profile-section__title .pi {
   color: var(--brand);
   font-size: 1rem;
+}
+.profile-photo-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex: none;
+  background: var(--brand);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--bs-font-display);
+  font-weight: 700;
+  border: 1px solid var(--bs-border);
+}
+.profile-photo-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 /* Services checklist */
