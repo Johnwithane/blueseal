@@ -102,6 +102,9 @@ Deploy Firebase changes (IF rules / indexes / storage / functions touched):
 Help/FAQ check: did this add/change something users can see or do?
   → if so, update the Help Center / FAQ (src/data/help.ts). See below.
   ↓
+QA toolkit check: did this add/change a feature or flow?
+  → if so, update the QA happy paths (docs/QA_HAPPY_PATHS.md). See below.
+  ↓
 Commit: "Phase N: short feature description"
   ↓
 Pattern check: did anything repeat 3+ times? Extract to skills/
@@ -401,6 +404,18 @@ Guidelines when editing:
 
 When a feature is big enough to warrant its own walkthrough, add a full **article** (not just an FAQ) and mark it `popular: true` if it's a top task.
 
+### QA toolkit upkeep
+
+The self-serve QA toolkit at `/qa` ([`src/views/qa/QaToolkitView.vue`](./src/views/qa/QaToolkitView.vue)) embeds **one runbook**: [`docs/QA_HAPPY_PATHS.md`](./docs/QA_HAPPY_PATHS.md) (imported `?raw` and rendered as collapsible sections). It's the checklist a tester (or the `qa-runner` agent) walks to confirm the app works end to end.
+
+**The rule (same discipline as the Help Center):** whenever you ship a new feature or change a flow, **update `docs/QA_HAPPY_PATHS.md` in the same feature commit** so the toolkit covers it. Ask: "If a tester opened `/qa` right now, is there a happy path that exercises what I just built, with the right steps and expected result?" If not, add or edit one.
+
+Guidelines:
+- Keep each path **role-scoped** (which role drives it) and **step-by-step with an expected outcome**, so it's runnable without tribal knowledge.
+- Cover the **money / permission-sensitive seams** a unit test can't fully prove (e.g. a rep can only vet their own region, commission accrues on payment, the referral free month starts at go-live).
+- Note the **mobile (375px)** check where the surface is user-facing.
+- It's Markdown embedded `?raw` — no schema/test gates it, so keep headings and structure consistent with what's already there.
+
 ---
 
 ## What this project is NOT (sanity check list)
@@ -425,6 +440,7 @@ If you find yourself building any of the above, stop and ask.
 - [ ] **If `firestore.rules` / `storage.rules` / `firestore.indexes.json` / `functions/` changed → `firebase deploy --only ...` ran successfully BEFORE this commit** (see [Firebase deployment discipline](#firebase-deployment-discipline))
 - [ ] If a new pattern emerged 3+ times, it's been promoted (skill or note here)
 - [ ] **If the change affects what users see/do → Help Center / FAQ (`src/data/help.ts`) updated** (see [Help Center & FAQ upkeep](#help-center--faq-upkeep))
+- [ ] **If the change added/changed a feature or flow → QA happy paths (`docs/QA_HAPPY_PATHS.md`) updated** (see [QA toolkit upkeep](#qa-toolkit-upkeep))
 - [ ] If an open question got answered, `design.md` § 14 reflects it
 - [ ] Mobile (375px) tested
 - [ ] Commit message follows convention
