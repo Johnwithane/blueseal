@@ -74,9 +74,10 @@ const routes: RouteRecordRaw[] = [
     path: "/tradies/:uid",
     name: "TradieProfile",
     component: () => import("@/views/TradieProfileView.vue"),
-    // Hybrid: signed-in clients browse profiles from inside the app; visitors
-    // see the public marketing chrome.
-    meta: { layout: "hybrid" },
+    // Chromeless: the profile is a full-page, standalone "company homepage" — no
+    // app sidebar / bottom nav and no marketing chrome wrapping it. It carries
+    // its own Back button + footer.
+    meta: { layout: "chromeless" },
   },
   {
     // Vanity profile URL (Blue Seal Pro). Same view as /tradies/:uid, resolved
@@ -85,7 +86,7 @@ const routes: RouteRecordRaw[] = [
     path: "/u/:slug",
     name: "TradieHome",
     component: () => import("@/views/TradieProfileView.vue"),
-    meta: { layout: "hybrid" },
+    meta: { layout: "chromeless" },
   },
   {
     // Public profile-preview for a seeded prospect, shown from the outreach

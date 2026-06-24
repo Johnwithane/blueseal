@@ -145,7 +145,15 @@ const tagline = computed(() => tradie.value?.tagline?.trim() || "");
 // vanity URL. `isPro` is the server-managed public mirror on the tradie doc,
 // authoritative for the profile being VIEWED (not the current viewer's
 // subscription). Prospects never get these.
-const isProActive = computed(() => !isProspect.value && tradie.value?.isPro === true);
+// Pro visuals (banner + brand colour) show to the PUBLIC only on a real Pro
+// profile, but the OWNER always previews their own — so what they set in the
+// Branding panel is visible to them while editing, even before subscribing.
+const isProActive = computed(
+  () =>
+    !isProspect.value &&
+    (tradie.value?.isPro === true ||
+      (!!auth.fbUser && tradie.value?.id === auth.fbUser.uid)),
+);
 const brandColor = computed(() => (isProActive.value ? tradie.value?.brandColor || null : null));
 const bannerUrl = computed(() => (isProActive.value ? tradie.value?.bannerUrl || null : null));
 
