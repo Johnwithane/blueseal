@@ -292,6 +292,14 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    appears in **My bug reports** (`/qa`) and in **admin triage** (`/admin/bug-reports`).
 5. **Error log** — trigger nothing special; just confirm `/qa` → *Error log* lists
    recent captured errors and you can mark one **Resolved**.
+6. **Browse-area override (job board).** Provision yourself as a tradesperson,
+   then open **Browse open jobs**. Use the QA-only **"QA: browse area"** dropdown
+   (only the qa role sees it) to pick a preset city (e.g. Toronto).
+   **Expected:** the feed re-centres on that city **without** changing your saved
+   service area; the radius slider goes up to **5000 km for QA** (500 km for a
+   normal tradesperson). "My saved area" returns to your own location, and the
+   pick **sticks across navigation** (reload the page → still set). This lets you
+   test postings in any region without editing your profile.
 
 ---
 
@@ -385,7 +393,7 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 - [ ] 8.2 AI paywall + receipt OCR free
 - [ ] 8.3 Recurring billing drafts (never auto-sends)
 - [ ] 9 Role switch / notifications / PWA install / Help Center
-- [ ] 10 QA toolkit: provision / Pro toggle / reset / bug / error log
+- [ ] 10 QA toolkit: provision / Pro toggle / reset / bug / error log / browse-area override
 - [ ] 11.1 Sales rep first-login agreement gate (blocks until signed)
 - [ ] 11.2 Sales rep claims a vanity referral code (+ link)
 - [ ] 11.3 Referral signup via /join?ref= (banner + free month at go-live)

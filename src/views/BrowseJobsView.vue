@@ -22,6 +22,7 @@ import { useFormatters } from "@/composables";
 import JobCounterparty from "@/components/JobCounterparty.vue";
 import LoadingState from "@/components/LoadingState.vue";
 import ReferJobDialog from "@/components/jobPost/ReferJobDialog.vue";
+import { QA_TEST_CITIES } from "@/data/qaTestCities";
 
 const auth = useAuthStore();
 const notifs = useNotificationsStore();
@@ -42,6 +43,40 @@ const hasServiceArea = computed(
 const tradeFilter = ref<string | "any">("any");
 const radiusKm = ref(25);
 
+// QA-only: re-centre the feed on a preset city without touching the tradie's
+// saved service area. "self" = use my real area. Gated on hasQaRole here AND in
+// the template, and persisted (localStorage) so the override survives navigation.
+const QA_SELF = "self";
+const qaCity = ref<string>(QA_SELF);
+const qaCityOptions = [
+  { label: "My saved area", value: QA_SELF },
+  ...QA_TEST_CITIES.map((c) => ({ label: c.label, value: c.key })),
+];
+
+// Radius ceiling for the feed filter: tradespeople up to 500 km, QA testers
+// effectively unlimited so they can sweep a whole region while testing.
+const maxRadiusKm = computed(() => (auth.hasQaRole ? 5000 : 500));
+
+// QA override centre, or null when off / not QA.
+const qaOverrideCenter = computed(() => {
+  if (!auth.hasQaRole || qaCity.value === QA_SELF) return null;
+  const city = QA_TEST_CITIES.find((c) => c.key === qaCity.value);
+  return city ? { lat: city.lat, lng: city.lng } : null;
+});
+
+// The point the feed is centred on: QA override wins, else the tradie's coarse
+// public location. Null when neither exists (feed can't run).
+const effectiveCenter = computed(() => {
+  if (qaOverrideCenter.value) return qaOverrideCenter.value;
+  if (hasServiceArea.value) {
+    return {
+      lat: tradie.value!.locationApprox.latitude,
+      lng: tradie.value!.locationApprox.longitude,
+    };
+  }
+  return null;
+});
+
 let unsubFeed: (() => void) | null = null;
 let unsubApps: (() => void) | null = null;
 
@@ -55,33 +90,52 @@ onMounted(async () => {
   // They're looking at the board now — clear the "new jobs in your area"
   // badge. Fire-and-forget; don't block the feed load on the reset write.
   notifs.resetJobBoardCount();
+  // Restore the QA city override (QA only) so it sticks across visits.
+  if (auth.hasQaRole) {
+    const saved = localStorage.getItem("qa_browseCity");
+    if (saved && (saved === QA_SELF || QA_TEST_CITIES.some((c) => c.key === saved))) {
+      qaCity.value = saved;
+    }
+  }
   tradie.value = await getTradesperson(auth.fbUser.uid);
   loadingTradie.value = false;
 
-  if (!tradie.value || !tradie.value.isVisible || !hasServiceArea.value) return;
+  if (!tradie.value || !tradie.value.isVisible) return;
 
   // Default trade filter to primary trade.
   tradeFilter.value = tradie.value.trades[0] ?? "any";
 
-  // Track this tradie's own applications so we can filter the feed.
+  // Track this tradie's own applications so we can filter the feed. Independent
+  // of the service area, so it runs even when only a QA override sets the centre.
   unsubApps = subscribeMyApplications(auth.fbUser.uid, (apps: WithId<ApplicationDoc>[]) => {
     appliedPostIds.value = new Set(apps.map((a) => a.postId));
   });
 
-  startFeed();
+  maybeStartFeed();
 });
 
-watch([tradeFilter, radiusKm], () => {
-  if (tradie.value?.isVisible && hasServiceArea.value) startFeed();
+// Persist the QA city override (QA only).
+watch(qaCity, (val) => {
+  if (auth.hasQaRole) localStorage.setItem("qa_browseCity", val);
 });
+
+// Any change to trade, radius, or the effective centre (incl. the QA override)
+// restarts the feed.
+watch([tradeFilter, radiusKm, effectiveCenter], () => maybeStartFeed());
+
+function maybeStartFeed() {
+  if (tradie.value?.isVisible && effectiveCenter.value) startFeed();
+  else {
+    unsubFeed?.();
+    unsubFeed = null;
+    posts.value = [];
+  }
+}
 
 function startFeed() {
   unsubFeed?.();
-  if (!tradie.value || !hasServiceArea.value) return;
-  const center = {
-    lat: tradie.value.locationApprox.latitude,
-    lng: tradie.value.locationApprox.longitude,
-  };
+  const center = effectiveCenter.value;
+  if (!center) return;
   unsubFeed = subscribeJobPostFeed(
     {
       trade: tradeFilter.value === "any" ? null : tradeFilter.value,
@@ -135,6 +189,28 @@ function openRefer(post: WithId<JobPostDoc>) {
       Jobs posted by clients in your area. Apply with a message and your proposed price.
     </p>
 
+    <!-- QA-only: re-centre the feed on a preset city without editing your saved
+         service area. Hidden from real tradespeople. -->
+    <div
+      v-if="auth.hasQaRole && !loadingTradie && tradie?.isVisible"
+      class="bs-card mt-4 border border-dashed border-[color:var(--bs-warning)] p-4"
+    >
+      <label class="flex items-center gap-2 text-sm font-medium">
+        <i class="pi pi-compass text-[color:var(--bs-warning-text)]"></i>
+        QA: browse area
+      </label>
+      <Select
+        v-model="qaCity"
+        :options="qaCityOptions"
+        option-label="label"
+        option-value="value"
+        class="mt-1 w-full sm:w-72"
+      />
+      <p class="mt-1 text-xs text-[color:var(--bs-muted)]">
+        QA only. Overrides the feed's centre point; your saved service area is unchanged.
+      </p>
+    </div>
+
     <LoadingState v-if="loadingTradie" class="mt-6" label="Loading your profile…" />
 
     <Message
@@ -158,7 +234,7 @@ function openRefer(post: WithId<JobPostDoc>) {
       You'll be able to browse and apply to open jobs once your application is approved (typically 1–2 business days).
     </Message>
 
-    <Message v-else-if="!hasServiceArea" severity="warn" :closable="false" class="mt-6">
+    <Message v-else-if="!hasServiceArea && !qaOverrideCenter" severity="warn" :closable="false" class="mt-6">
       <strong>Service area not set.</strong>
       We need your address and service radius to show jobs near you.
       <RouterLink :to="{ name: 'Account' }" class="underline ml-1">Update your profile</RouterLink>
@@ -179,7 +255,7 @@ function openRefer(post: WithId<JobPostDoc>) {
         </div>
         <div>
           <label class="text-sm font-medium">Within {{ radiusKm }} km</label>
-          <Slider v-model="radiusKm" :min="5" :max="100" class="mt-2 w-full" />
+          <Slider v-model="radiusKm" :min="5" :max="maxRadiusKm" class="mt-2 w-full" />
         </div>
       </div>
 
