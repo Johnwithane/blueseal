@@ -233,11 +233,27 @@ async function reloadTradie() {
 // --- Vanity handle (Pro) -----------------------------------------------------
 const slugDraft = ref("");
 const savingSlug = ref(false);
-// Live validity message for the handle input (null = valid / empty).
+// Client-side format/reserved check (null = valid / empty). The server
+// re-validates + enforces uniqueness; `slugServerError` holds what it rejects.
 const slugErr = computed(() => (slugDraft.value.trim() ? slugError(slugDraft.value.trim()) : null));
+const slugServerError = ref<string | null>(null);
+
+// Map the claim callable's error to a clear, field-level message.
+function slugClaimError(e: unknown): string {
+  const code = String((e as { code?: unknown }).code ?? "");
+  if (code.includes("already-exists")) return "That handle is taken — try another one.";
+  if (code.includes("invalid-argument"))
+    return "That handle isn't allowed. Use 3-30 lowercase letters, numbers or hyphens.";
+  if (code.includes("permission-denied") || code.includes("unauthenticated"))
+    return "You need a verified tradesperson account to set a custom link.";
+  if (code.includes("unavailable") || code.includes("deadline-exceeded"))
+    return "Connection issue — check your network and try again.";
+  return humanizeError(e);
+}
 
 async function claimSlug() {
   const candidate = slugDraft.value.trim().toLowerCase();
+  slugServerError.value = null;
   if (!tradie.value || slugError(candidate)) return;
   savingSlug.value = true;
   try {
@@ -246,9 +262,10 @@ async function claimSlug() {
     slugDraft.value = slug;
     toast.success("Your link is live", `blueseal.app/u/${slug}`);
   } catch (e) {
-    // Non-Pro → global upgrade popup; otherwise a friendly toast (e.g. taken).
+    // Non-Pro → global upgrade popup; everything else → an inline field message
+    // (taken, bad format, network) right under the input, not just a toast.
     if (paywall.fromError(e)) return;
-    toast.error("Couldn't set your link", humanizeError(e));
+    slugServerError.value = slugClaimError(e);
   } finally {
     savingSlug.value = false;
   }
@@ -1052,6 +1069,8 @@ onMounted(async () => {
                   placeholder="your-business"
                   class="flex-1"
                   :maxlength="30"
+                  @input="slugServerError = null"
+                  @keydown.enter="claimSlug"
                 />
                 <Button
                   label="Save"
@@ -1061,6 +1080,9 @@ onMounted(async () => {
                 />
               </div>
               <p v-if="slugErr" class="mt-1 text-xs text-[color:var(--bs-danger)]">{{ slugErr }}</p>
+              <p v-else-if="slugServerError" class="mt-1 text-xs text-[color:var(--bs-danger)]">
+                {{ slugServerError }}
+              </p>
               <p v-else-if="tradie.slug" class="mt-1 text-xs text-[color:var(--bs-muted)]">
                 Live at <strong>blueseal.app/u/{{ tradie.slug }}</strong>
               </p>

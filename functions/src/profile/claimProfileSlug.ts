@@ -14,14 +14,16 @@ import { logger } from "firebase-functions/v2";
 import { FieldValue } from "firebase-admin/firestore";
 import { CALLABLE_OPTS } from "../lib/callable";
 import { db } from "../lib/admin";
-import { requireRole } from "../lib/auth";
+import { requireRoleOrAdmin } from "../lib/auth";
 import { requireProEntitlement } from "../lib/entitlements";
 import { isValidSlug } from "../lib/slug";
 
 const Input = z.object({ slug: z.string().trim().toLowerCase().min(1).max(64) });
 
 export const claimProfileSlug = onCall(CALLABLE_OPTS, async (req) => {
-  const uid = requireRole(req, "tradesperson");
+  // Tradesperson claiming their own handle (admins allowed, for support/testing).
+  // Either way it only ever writes to tradespeople/{their own uid}.
+  const uid = requireRoleOrAdmin(req, "tradesperson");
 
   const parsed = Input.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", "Invalid handle.");
