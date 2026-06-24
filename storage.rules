@@ -100,6 +100,14 @@ service firebase.storage {
       allow write: if isOwner(tradieId) && smallSizeOk() && isCompressedImage();
     }
 
+    // Tradesperson profile COVER image — owner write, world read. The wide hero
+    // background on their public page (/u/<slug>), distinct from the invoice
+    // letterhead above. Same compressed-image pipeline.
+    match /tradespeople/{tradieId}/cover/{file=**} {
+      allow read: if true;
+      allow write: if isOwner(tradieId) && smallSizeOk() && isCompressedImage();
+    }
+
     // Seeded prospect images (profile photo / logo / portfolio / banner) —
     // ADMIN write (the prospect has no account yet, so there's no owner), world
     // read so the drafted profile + the outreach email can show them. These

@@ -17,6 +17,7 @@ import { compressToWebp } from "@/utils/image";
 import { tradeLabel } from "@/data/trades";
 import { isUnsplashEnabled } from "@/api/unsplash";
 import UnsplashPickerDialog from "@/components/UnsplashPickerDialog.vue";
+import BrandingInvoicePreview from "@/components/BrandingInvoicePreview.vue";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 
@@ -46,6 +47,7 @@ const showBannerUnsplash = ref(false);
 const showLogoUnsplash = ref(false);
 const unsplashEnabled = isUnsplashEnabled();
 const tradeQuery = ref("");
+const businessName = ref("Your business");
 
 async function load() {
   if (!auth.fbUser) {
@@ -57,6 +59,8 @@ async function load() {
     companyLogoUrl.value = t?.companyLogoUrl ?? null;
     bannerUrl.value = t?.bannerUrl ?? null;
     tradeQuery.value = t?.trades?.[0] ? tradeLabel(t.trades[0]) : "";
+    businessName.value =
+      t?.companyName || t?.displayName || auth.user?.displayName || "Your business";
     if (t?.brandColor) {
       brandColor.value = t.brandColor;
       hasBrandColor.value = true;
@@ -186,8 +190,8 @@ async function resetColor() {
       <span class="text-[10px] font-semibold uppercase rounded-full bg-[color:var(--bs-blue)] text-white px-2 py-0.5">Pro</span>
     </div>
     <p class="text-xs text-[color:var(--bs-muted)] mb-3">
-      Your logo, a banner, and a brand colour — on your public profile, and on the header of
-      every quote and invoice (PDF and on screen).
+      Your logo, a letterhead banner and a brand colour on every quote and invoice you send —
+      on the PDF and on screen. Preview it below.
     </p>
 
     <div v-if="loading" class="text-sm text-[color:var(--bs-muted)]">
@@ -340,6 +344,20 @@ async function resetColor() {
         </div>
         <p class="text-[11px] text-[color:var(--bs-muted)] mt-1">
           Drives the header band; text stays readable automatically.
+        </p>
+      </div>
+
+      <!-- Live sample invoice with the branding applied. -->
+      <div>
+        <label class="block text-xs font-medium mb-1">Preview</label>
+        <BrandingInvoicePreview
+          :logo-url="companyLogoUrl"
+          :banner-url="bannerUrl"
+          :brand-color="brandColor"
+          :business-name="businessName"
+        />
+        <p class="text-[11px] text-[color:var(--bs-muted)] mt-1">
+          A sample of how your branding looks on a quote or invoice.
         </p>
       </div>
     </div>

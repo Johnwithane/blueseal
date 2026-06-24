@@ -410,6 +410,13 @@ export interface TradespersonDoc {
   // `tradespeople/{uid}/banner/...`. Both null/absent until set.
   brandColor?: string | null;
   bannerUrl?: string | null;
+  // PUBLIC profile-page COVER image — the wide hero background on /u/<slug> and
+  // /tradies/:uid. Deliberately distinct from `bannerUrl` (the invoice/quote
+  // letterhead): a tradesperson's web page and their paperwork are different
+  // surfaces with different crops. Blue Seal Pro for public display (the owner
+  // always previews it). Stored at `tradespeople/{uid}/cover/...`. Owner-
+  // writable; optional/null until set.
+  coverUrl?: string | null;
   submittedAt: Timestamp | null;
   approvedAt: Timestamp | null;
   // Admin outreach to a tradesperson who started onboarding but never

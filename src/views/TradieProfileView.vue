@@ -155,7 +155,9 @@ const isProActive = computed(
       (!!auth.fbUser && tradie.value?.id === auth.fbUser.uid)),
 );
 const brandColor = computed(() => (isProActive.value ? tradie.value?.brandColor || null : null));
-const bannerUrl = computed(() => (isProActive.value ? tradie.value?.bannerUrl || null : null));
+// The profile-page COVER image (Pro display; owner always previews). Distinct
+// from the invoice/quote letterhead (tradie.bannerUrl), which never shows here.
+const coverUrl = computed(() => (isProActive.value ? tradie.value?.coverUrl || null : null));
 
 // Cascade the brand colour + banner image as CSS vars on the page root so the
 // hero and section accents pick them up. --brand defaults to Blue Seal blue in
@@ -163,7 +165,7 @@ const bannerUrl = computed(() => (isProActive.value ? tradie.value?.bannerUrl ||
 const pageStyle = computed<Record<string, string>>(() => {
   const s: Record<string, string> = {};
   if (brandColor.value) s["--brand"] = brandColor.value;
-  if (bannerUrl.value) s["--hero-image"] = `url("${bannerUrl.value}")`;
+  if (coverUrl.value) s["--hero-image"] = `url("${coverUrl.value}")`;
   return s;
 });
 
@@ -290,6 +292,50 @@ async function onPhotoFile(e: Event) {
   if (!file) return;
   await applyPhoto(file);
   input.value = "";
+}
+
+// --- Profile cover banner (Pro display; upload or Unsplash, edited on the hero)
+const coverInput = ref<HTMLInputElement | null>(null);
+const uploadingCover = ref(false);
+const showCoverUnsplash = ref(false);
+
+async function applyCover(file: File) {
+  if (!tradie.value || !auth.fbUser) return;
+  uploadingCover.value = true;
+  try {
+    const compressed = await compressToWebp(file, { maxDimension: 1600, quality: 0.85 });
+    const path = makeStoragePath({
+      scope: "tradespeople",
+      id: auth.fbUser.uid,
+      bucket: "cover",
+      filename: compressed.name,
+    });
+    const url = await uploadFile(path, compressed);
+    await createOrUpdateDraft(auth.fbUser.uid, { coverUrl: url });
+    tradie.value.coverUrl = url;
+    toast.success("Cover image updated");
+  } catch (e) {
+    toast.error("Couldn't update your cover image", humanizeError(e));
+  } finally {
+    uploadingCover.value = false;
+  }
+}
+async function onCoverFile(e: Event) {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  await applyCover(file);
+  input.value = "";
+}
+async function removeCover() {
+  if (!tradie.value || !auth.fbUser) return;
+  try {
+    await createOrUpdateDraft(auth.fbUser.uid, { coverUrl: null });
+    tradie.value.coverUrl = null;
+    toast.success("Cover image removed");
+  } catch (e) {
+    toast.error("Couldn't remove the cover image", humanizeError(e));
+  }
 }
 
 // Per-dimension rating bars for the Reviews summary. Each dim is 0..5.
@@ -738,8 +784,30 @@ onMounted(async () => {
            + brand-colour wash; everyone else gets a branded gradient (--brand
            falls back to Blue Seal navy). White content sits over a scrim so it
            stays legible on any banner. -->
-      <header class="profile-hero" :class="{ 'profile-hero--photo': !!bannerUrl }">
+      <header class="profile-hero" :class="{ 'profile-hero--photo': !!coverUrl }">
         <div class="profile-hero__scrim" aria-hidden="true"></div>
+        <!-- Edit the cover image right on the banner (owner, edit mode). -->
+        <div v-if="isOwnProfile && editing" class="profile-hero__cover-edit">
+          <span class="profile-hero__cover-edit__label"><i class="pi pi-image"></i> Cover image</span>
+          <button type="button" :disabled="uploadingCover" @click="coverInput?.click()">
+            <i :class="uploadingCover ? 'pi pi-spin pi-spinner' : 'pi pi-upload'"></i> Upload
+          </button>
+          <button
+            v-if="unsplashEnabled"
+            type="button"
+            :disabled="uploadingCover"
+            @click="showCoverUnsplash = true"
+          >
+            <i class="pi pi-images"></i> Unsplash
+          </button>
+          <button v-if="tradie.coverUrl" type="button" @click="removeCover">
+            <i class="pi pi-times"></i> Remove
+          </button>
+          <span v-if="!tradie.isPro" class="profile-hero__cover-edit__hint">
+            Shown to clients on Pro
+          </span>
+          <input ref="coverInput" type="file" accept="image/*" class="hidden" @change="onCoverFile" />
+        </div>
         <div class="profile-hero__tools">
           <button
             v-if="isOwnProfile && !editing"
@@ -844,7 +912,7 @@ onMounted(async () => {
                 @click="startEditing"
               />
               <Button
-                label="Banner, logo &amp; colours"
+                label="Invoice &amp; quote branding"
                 icon="pi pi-palette"
                 severity="secondary"
                 outlined
@@ -1336,8 +1404,8 @@ onMounted(async () => {
         v-if="isOwnProfile"
         v-model:visible="showAppearance"
         modal
-        header="Page appearance"
-        :style="{ width: '34rem', maxWidth: '95vw' }"
+        header="Branding"
+        :style="{ width: '48rem', maxWidth: '95vw' }"
         :dismissable-mask="true"
         @hide="reloadTradie"
       >
@@ -1351,6 +1419,15 @@ onMounted(async () => {
         default-query="portrait"
         title="Choose a profile photo from Unsplash"
         @picked="applyPhoto"
+      />
+
+      <!-- Cover image from Unsplash (owner edit mode). -->
+      <UnsplashPickerDialog
+        v-if="isOwnProfile && unsplashEnabled"
+        v-model:visible="showCoverUnsplash"
+        :default-query="tradeLabel(tradie.trades[0] || '')"
+        title="Choose a cover image from Unsplash"
+        @picked="applyCover"
       />
 
       <!-- Self-serve takedown for an unclaimed prospect listing. -->
@@ -1506,6 +1583,57 @@ onMounted(async () => {
   padding: 0 0.9rem;
   font-size: 0.82rem;
   font-weight: 600;
+}
+.profile-hero__cover-edit {
+  position: absolute;
+  z-index: 3;
+  top: 1rem;
+  left: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(20, 28, 40, 0.55);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+.profile-hero__cover-edit__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fff;
+  opacity: 0.9;
+  padding-left: 0.25rem;
+}
+.profile-hero__cover-edit button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border-radius: 999px;
+  padding: 0.28rem 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.profile-hero__cover-edit button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.24);
+}
+.profile-hero__cover-edit button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.profile-hero__cover-edit__hint {
+  font-size: 0.7rem;
+  color: #fff;
+  opacity: 0.75;
+  padding-right: 0.25rem;
 }
 .profile-hero__logo {
   width: 84px;
