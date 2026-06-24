@@ -1384,6 +1384,16 @@ onMounted(async () => {
         </div>
       </div>
 
+      <!-- Powered-by footer — the only Blue Seal mark on the chromeless page, and
+           the brand anchor for a future custom-domain tier. -->
+      <footer class="profile-foot">
+        <RouterLink to="/" class="profile-foot__brand">
+          <i class="pi pi-verified" aria-hidden="true"></i>
+          Powered by <strong>Blue Seal</strong>
+        </RouterLink>
+        <span class="profile-foot__sub">Verified Canadian tradespeople</span>
+      </footer>
+
       <!-- Mobile sticky bar — owner edit controls, or the quote CTA for visitors. -->
       <div v-if="isOwnProfile" class="profile-mobilebar">
         <template v-if="editing">
@@ -1937,6 +1947,36 @@ onMounted(async () => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+/* Powered-by footer. Always Blue Seal navy (var(--bs-blue), NOT the tradie's
+   --brand) so the platform mark stays Blue Seal even on a brand-themed page. */
+.profile-foot {
+  margin-top: 1.5rem;
+  padding: 1.25rem 0 0.5rem;
+  border-top: 1px solid var(--bs-border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+.profile-foot__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--bs-blue);
+}
+.profile-foot__brand strong {
+  font-family: var(--bs-font-display);
+}
+.profile-foot__brand .pi {
+  color: var(--bs-blue);
+}
+.profile-foot__sub {
+  font-size: 0.72rem;
+  color: var(--bs-muted);
 }
 
 /* Services checklist */
