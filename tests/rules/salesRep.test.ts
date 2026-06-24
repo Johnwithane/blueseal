@@ -126,3 +126,17 @@ describe("users.salesRep — owner cannot write it", () => {
     await assertSucceeds(updateDoc(doc(fs, "users", REP_UID), { "salesRep.active": false }));
   });
 });
+
+describe("users.referredByRepId — owner cannot set it", () => {
+  it("the owner cannot self-attribute their account to a rep", async () => {
+    await seedRepUser();
+    const fs = env.authenticatedContext(REP_UID, REP_CLAIMS).firestore();
+    await assertFails(updateDoc(doc(fs, "users", REP_UID), { referredByRepId: "some-rep" }));
+  });
+
+  it("the owner cannot set referralSignal", async () => {
+    await seedRepUser();
+    const fs = env.authenticatedContext(REP_UID, REP_CLAIMS).firestore();
+    await assertFails(updateDoc(doc(fs, "users", REP_UID), { referralSignal: "link" }));
+  });
+});

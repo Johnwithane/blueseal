@@ -51,6 +51,20 @@ const routes: RouteRecordRaw[] = [
     redirect: { path: "/search", query: { utm_source: "business_card", utm_medium: "print" } },
   },
   {
+    // Referral landing: a rep's shareable link (blueseal.app/join?ref=CODE).
+    // Drops into tradesperson signup with the code pre-filled + the free-month
+    // banner. Preserves the ref code; tags the traffic as a referral.
+    path: "/join",
+    redirect: (to) => ({
+      path: "/sign-up",
+      query: {
+        as: "tradesperson",
+        utm_source: "referral",
+        ...(typeof to.query.ref === "string" ? { ref: to.query.ref } : {}),
+      },
+    }),
+  },
+  {
     path: "/search",
     name: "Search",
     component: () => import("@/views/SearchView.vue"),

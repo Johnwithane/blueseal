@@ -116,3 +116,35 @@ export async function syncSubscriptionMirror(
     await tradieRef.set({ isPro }, { merge: true });
   }
 }
+
+/**
+ * Grant a Pro comp through `proCompUntil` (no Stripe). Merges onto any existing
+ * subscription so a comp never wipes Stripe ids/dates. No-ops when the user is
+ * already Pro via a real Stripe subscription (they don't need a comp), or
+ * already holds an equal/longer comp (so a re-run never shortens it). Used by
+ * the referral free-month grant at go-live and by adminGrantFoundingPro-style
+ * comps. Idempotent.
+ */
+export async function grantProComp(uid: string, until: Timestamp): Promise<void> {
+  const snap = await db.doc(`users/${uid}`).get();
+  const existing = (snap.data()?.subscription ?? null) as SubscriptionState | null;
+  // Already Pro via a real Stripe subscription (trialing/active/past_due) — a
+  // comp would be redundant, so leave their paid state untouched.
+  if (existing && existing.status !== "none" && existing.status !== "canceled") return;
+  // Already has an equal-or-longer comp — don't shorten it.
+  if (existing?.proCompUntil && existing.proCompUntil.toMillis() >= until.toMillis()) return;
+
+  const sub: SubscriptionState = {
+    status: existing?.status ?? "none",
+    plan: existing?.plan ?? null,
+    trialEndsAt: existing?.trialEndsAt ?? null,
+    currentPeriodEnd: existing?.currentPeriodEnd ?? null,
+    cancelAtPeriodEnd: existing?.cancelAtPeriodEnd ?? false,
+    stripeCustomerId: existing?.stripeCustomerId ?? null,
+    stripeSubscriptionId: existing?.stripeSubscriptionId ?? null,
+    everTrialedAt: existing?.everTrialedAt ?? null,
+    proCompUntil: until,
+    updatedAt: Timestamp.now(),
+  };
+  await syncSubscriptionMirror(uid, sub);
+}

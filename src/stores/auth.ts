@@ -306,6 +306,8 @@ export const useAuthStore = defineStore("auth", {
       password: string;
       displayName: string;
       role: Role;
+      referralCode?: string;
+      referralSignal?: "link" | "code" | "name";
     }) {
       this.pending = true;
       this.error = null;
@@ -330,6 +332,8 @@ export const useAuthStore = defineStore("auth", {
           role: opts.role,
           displayName: opts.displayName,
           termsAcceptedVersion: LEGAL_VERSION,
+          referralCode: opts.referralCode,
+          referralSignal: opts.referralSignal,
         });
         // Refresh so the token carries the claims the callable just set. If the
         // claim write lagged (handled server-side by the setRoleOnSignup
@@ -369,7 +373,10 @@ export const useAuthStore = defineStore("auth", {
      * this to offer a role correction (a new tradesperson tapping "Continue
      * with Google" there would otherwise be silently created as a client).
      */
-    async signInWithGoogle(intendedRole: Role = "client"): Promise<{ isNew: boolean }> {
+    async signInWithGoogle(
+      intendedRole: Role = "client",
+      referral?: { referralCode?: string; referralSignal?: "link" | "code" | "name" },
+    ): Promise<{ isNew: boolean }> {
       this.pending = true;
       this.error = null;
       // Guard applyAuthState's self-heal from racing our provisioning below
@@ -389,6 +396,8 @@ export const useAuthStore = defineStore("auth", {
             displayName: cred.user.displayName ?? "Anonymous",
             termsAcceptedVersion: LEGAL_VERSION,
             photoURL: cred.user.photoURL,
+            referralCode: referral?.referralCode,
+            referralSignal: referral?.referralSignal,
           });
           await cred.user.getIdToken(true);
           this.roles = roles;

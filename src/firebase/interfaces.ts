@@ -169,6 +169,14 @@ export interface UserDoc {
   // claimReferralCode callables + admin) and locked in firestore.rules — the
   // owner can never write it. Absent on every non-rep account.
   salesRep?: SalesRepState | null;
+  // Referral attribution captured at signup: the sales rep whose code/link/name
+  // this user joined through (the CANONICAL attribution; the tradesperson doc
+  // gets a mirror at submitForVetting for rep-scoped reads). SERVER-MANAGED
+  // (provisionAccount resolves the code to an active+signed rep) and locked in
+  // firestore.rules — the owner can never set or change it. null when not
+  // referred. `referralSignal` records how it arrived.
+  referredByRepId?: string | null;
+  referralSignal?: "link" | "code" | "name" | null;
 }
 
 // ---------------------------------------------------------------------------

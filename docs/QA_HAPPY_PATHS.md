@@ -313,6 +313,16 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    too-short code → **Expected:** a clear error, no save.
 4. **Mobile (375px).** Re-run steps 1 + 3 at 375px. **Expected:** the agreement
    dialog scrolls, the signature pad draws with touch, and the code form is usable.
+5. **Referral signup (the link).** Copy your `/sales` referral link
+   (`/join?ref=CODE`) and open it in a private window. **Expected:** it lands on
+   tradesperson signup with the code pre-filled and a green "first month free"
+   banner. Complete signup, then take that tradesperson through vetting to
+   **live** (cert + ID approved). **Expected:** on go-live they are Pro for one
+   month with NO card on file (Pro badge shows / the client service fee is
+   waived on their jobs).
+6. **Direct signup unchanged.** Sign up as a tradesperson WITHOUT a code.
+   **Expected:** no free-month banner, and the normal 30-day card trial path
+   applies (no auto-comp).
 
 ---
 
@@ -346,3 +356,5 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 - [ ] 10 QA toolkit: provision / Pro toggle / reset / bug / error log
 - [ ] 11.1 Sales rep first-login agreement gate (blocks until signed)
 - [ ] 11.2 Sales rep claims a vanity referral code (+ link)
+- [ ] 11.3 Referral signup via /join?ref= (banner + free month at go-live)
+- [ ] 11.4 Direct signup unchanged (no comp, card trial)

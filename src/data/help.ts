@@ -591,6 +591,13 @@ const faqs: FaqItem[] = [
     audience: "tradesperson",
   },
   {
+    question: "I have a referral code. What do I get?",
+    answer:
+      "If you sign up with a Blue Seal sales rep's referral code (or through their referral link), your **first month of Blue Seal Pro is free, with no credit card needed**. The free month starts when your profile is approved and goes live, so none of it is used up while we review your documents. When it ends you can subscribe to keep Pro or carry on with the free plan. There are no surprise charges, because there is no card on file.",
+    categoryId: "for-tradespeople",
+    audience: "tradesperson",
+  },
+  {
     question: "I got an email saying Blue Seal set up a free profile for me. Is it real?",
     answer:
       "Yes, that's us. We build draft profiles for local tradespeople from publicly listed business information, then reach out to invite you to claim yours. The profile stays **private** until you claim it, so it isn't shown publicly in the meantime. Claiming is free: the link in the email signs you in without a password, shows you the profile we drafted, and lets you edit anything or add your trade ticket and ID to earn the verified badge. If you'd rather not be on Blue Seal at all, the same link lets you remove the listing for good. We never charge to be listed. Blue Seal makes money from payment service fees and optional Pro tools, not from directory fees.",

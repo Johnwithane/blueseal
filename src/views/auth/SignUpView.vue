@@ -10,6 +10,7 @@ import Divider from "primevue/divider";
 import { useAuthStore } from "@/stores/auth";
 import { signUpSchema } from "@/validation/schemas";
 import { humanizeError } from "@/utils/errors";
+import { normalizeReferralCode } from "@/utils/referralCode";
 import { useSeo } from "@/composables/useSeo";
 
 useSeo({ title: "Create your account", noindex: true });
@@ -25,6 +26,17 @@ const route = useRoute();
 // Preselect tradesperson when arriving via /sign-up?as=tradesperson (or the
 // old /sign-up/tradie route, which now redirects here).
 const isTradie = ref(route.query.as === "tradesperson");
+
+// Referral capture: a rep's vanity code arrives via ?ref=CODE (the /join link)
+// or is typed by hand. We thread it to provisionAccount, which resolves it to
+// the owning rep and grants the referred tradesperson a free month at go-live.
+// The signal records how it arrived ("link" when it came pre-filled, else "code").
+const refFromLink = typeof route.query.ref === "string" ? normalizeReferralCode(route.query.ref) : "";
+const referralCode = ref(refFromLink);
+const referralSignal = computed<"link" | "code" | undefined>(() => {
+  if (!referralCode.value) return undefined;
+  return referralCode.value === refFromLink ? "link" : "code";
+});
 
 const displayName = ref("");
 // Prefill the email field when arriving via a vouch invite link
@@ -70,7 +82,11 @@ async function submit() {
     return;
   }
   try {
-    await auth.signUp(parsed.data);
+    await auth.signUp({
+      ...parsed.data,
+      referralCode: referralCode.value || undefined,
+      referralSignal: referralSignal.value,
+    });
     router.replace(redirectTo.value);
   } catch (e) {
     formError.value = humanizeError(e);
@@ -88,7 +104,10 @@ async function google() {
   fieldErrors.value = {};
   formError.value = null;
   try {
-    await auth.signInWithGoogle(role.value);
+    await auth.signInWithGoogle(role.value, {
+      referralCode: referralCode.value || undefined,
+      referralSignal: referralSignal.value,
+    });
     router.replace(redirectTo.value);
   } catch (e) {
     formError.value = humanizeError(e);
@@ -104,6 +123,10 @@ async function google() {
     </div>
     <h1 class="text-2xl font-bold">{{ heading }}</h1>
     <p class="text-[color:var(--bs-muted)] mb-6">{{ subtitle }}</p>
+
+    <Message v-if="isTradie && referralCode" severity="success" :closable="false" class="mb-6">
+      Your first month of Blue Seal Pro is free, no credit card needed.
+    </Message>
 
     <form class="bs-form bs-card p-6 space-y-4" @submit.prevent="submit">
       <fieldset class="space-y-2">
@@ -156,6 +179,16 @@ async function google() {
           autocomplete="new-password"
         />
         <small v-if="fieldErrors.password" class="text-[color:var(--bs-danger)]">{{ fieldErrors.password }}</small>
+      </div>
+
+      <div v-if="isTradie">
+        <label class="text-sm font-medium">
+          Referral code <span class="text-[color:var(--bs-muted)] font-normal">(optional)</span>
+        </label>
+        <InputText v-model="referralCode" class="mt-1" placeholder="e.g. JOHNNYK" />
+        <small class="text-[color:var(--bs-muted)] block mt-1">
+          Got a code from a Blue Seal rep? Enter it for a free first month.
+        </small>
       </div>
 
       <div>

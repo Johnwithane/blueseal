@@ -5,12 +5,19 @@ import { z } from "zod";
 import { FieldValue } from "firebase-admin/firestore";
 import { adminAuth, db } from "../lib/admin";
 import { requireAuth } from "../lib/auth";
+import { resolveReferralRepId } from "../lib/referralResolve";
 
 const Input = z.object({
   role: z.enum(["client", "tradesperson"]),
   displayName: z.string().trim().min(1).max(120),
   termsAcceptedVersion: z.string().min(1).max(40),
   photoURL: z.string().url().max(2048).nullable().optional(),
+  // Optional referral captured at signup (a rep's vanity code from ?ref= or a
+  // typed code). Resolved server-side to the owning rep; an unknown/inactive
+  // code is silently ignored (never blocks signup). referralSignal records how
+  // it arrived, for attribution analytics.
+  referralCode: z.string().trim().max(40).optional(),
+  referralSignal: z.enum(["link", "code", "name"]).optional(),
 });
 
 /**
@@ -64,6 +71,14 @@ export const provisionAccount = onCall(CALLABLE_OPTS, async (req) => {
   } else {
     roles = role === "tradesperson" ? ["tradesperson", "client"] : ["client"];
     activeRole = role;
+    // Resolve the referral code to its rep (only an active, signed rep counts).
+    // Frozen on the user doc here — the canonical attribution. The free month is
+    // granted at go-live (maybeMarkVisible); the tradesperson-doc mirror for
+    // rep-scoped reads is stamped server-side at submitForVetting.
+    const referredByRepId = parsed.data.referralCode
+      ? await resolveReferralRepId(parsed.data.referralCode)
+      : null;
+    const referralSignal = referredByRepId ? (parsed.data.referralSignal ?? "code") : null;
     await userRef.set({
       roles,
       activeRole,
@@ -81,8 +96,10 @@ export const provisionAccount = onCall(CALLABLE_OPTS, async (req) => {
       termsAcceptedVersion,
       deletedAt: null,
       notificationPrefs: { emailEnabled: true, whatsappEnabled: true },
+      referredByRepId,
+      referralSignal,
     });
-    logger.info("Provisioned account", { uid, roles });
+    logger.info("Provisioned account", { uid, roles, referredByRepId });
   }
 
   // Mirror roles → claims immediately so the client's next getIdToken(true)

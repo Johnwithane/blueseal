@@ -116,6 +116,12 @@ service cloud.firestore {
         // gate (requireRepActive) trusts this field. `.get(field, null)` so
         // non-rep docs (no field) stay editable.
         && request.resource.data.get('salesRep', null) == resource.data.get('salesRep', null)
+        // Referral attribution is server-managed (provisionAccount resolves the
+        // code to an active+signed rep). The owner can never set or change it —
+        // that would let someone self-attribute to a rep (or steal/transfer a
+        // referral). `.get(field, null)` so non-referred docs stay editable.
+        && request.resource.data.get('referredByRepId', null) == resource.data.get('referredByRepId', null)
+        && request.resource.data.get('referralSignal', null) == resource.data.get('referralSignal', null)
         // Account suspension mirror is server-managed (adminSetUserDisabled, admin
         // SDK). The owner can never write it — that's the support-side lock, not a
         // self-serve toggle. `.get(field, null)` so docs predating it stay editable.
