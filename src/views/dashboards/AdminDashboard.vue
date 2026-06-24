@@ -83,6 +83,7 @@ const queueTiles = computed(() => {
 // Management areas — CRUD / tools with no actionable count, just a way in.
 const manageTiles = [
   { to: "/admin/users", label: "Users", icon: "pi-users", desc: "Search & 360 view" },
+  { to: "/admin/jobs", label: "Jobs & postings", icon: "pi-briefcase", desc: "All jobs by region" },
   { to: "/admin/site-content", label: "Site content", icon: "pi-file-edit", desc: "Help & legal pages" },
   { to: "/admin/business-cards", label: "Business cards", icon: "pi-id-card", desc: "Generate cards" },
   { to: "/admin/rebate-programs", label: "Rebates", icon: "pi-gift", desc: "Rebate programs" },

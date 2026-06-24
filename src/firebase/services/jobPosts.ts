@@ -62,6 +62,21 @@ export async function listJobPostsForClient(
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
+/**
+ * Admin-only: the most recent job-board posts across ALL clients/regions and
+ * every status (open/closed/cancelled/expired/admin_hidden), newest first. The
+ * jobPosts read rule ORs in isAdmin() (resource-independent), so an admin's
+ * unfiltered collection query is authorized for every doc — see
+ * tests/rules/adminBrowse.test.ts. Region/status/text filtering happens
+ * client-side in AdminJobsView; `max` caps the scan.
+ */
+export async function listAllJobPosts(max = 300): Promise<WithId<JobPostDoc>[]> {
+  const snap = await getDocs(
+    query(postsCol(), orderBy("createdAt", "desc"), limit(max)),
+  );
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
 export function subscribeMyJobPosts(
   clientId: string,
   cb: (posts: WithId<JobPostDoc>[]) => void,

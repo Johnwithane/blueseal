@@ -604,3 +604,18 @@ export async function listJobsForClient(
   const snap = await getDocs(q);
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
+
+/**
+ * Admin-only: the most recent jobs across ALL clients/tradespeople/regions,
+ * newest first. The jobs read rule ORs in isAdmin() (resource-independent), so
+ * an admin's unfiltered collection query is authorized for every doc — see
+ * tests/rules/adminBrowse.test.ts. Region/status/text filtering happens
+ * client-side in AdminJobsView, so this stays index-free (single-field
+ * createdAt order). `max` caps the scan; the view surfaces when the cap is hit.
+ */
+export async function listAllJobs(max = 300): Promise<WithId<JobDoc>[]> {
+  const snap = await getDocs(
+    query(jobsCol(), orderBy("createdAt", "desc"), limit(max)),
+  );
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}

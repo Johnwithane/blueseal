@@ -326,6 +326,38 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 
 ---
 
+## 12. Admin — all jobs & postings  → (admin-internal; no public help article)
+
+> Requires the **admin** role. Open **Admin → Manage → Jobs & postings**
+> (`/admin/jobs`). This is the system-wide view of every job and every job-board
+> posting across **all** regions — admin-only (a sales rep does **not** get it).
+
+1. **See everything.** Seed a couple of jobs + postings in different provinces
+   (use two QA accounts, or existing data). Open `/admin/jobs`.
+   **Expected:** the **Active jobs** tab lists pipeline jobs newest-first across
+   every client/tradesperson; toggle to **Posted jobs** to list job-board
+   postings (every status: open/closed/cancelled/expired/hidden).
+2. **Filter to one province.** Pick a province in the **Province** filter.
+   **Expected:** only jobs/postings whose address is in that province remain;
+   clearing it ("x") restores all.
+3. **Filter to a sales territory.** Pick a **Sales territory** (these come from
+   Admin → Regions; the dropdown is empty/disabled if no regions exist).
+   **Expected:** only jobs/postings whose postal code falls in that territory's
+   FSA prefixes remain. A job whose postal matches a more specific territory is
+   attributed to that one (longest-prefix wins), not a broader overlapping one.
+4. **Status + search.** Choose a **Status** (options change with the tab) and
+   type in **Search** (title / trade / client / tradesperson / city).
+   **Expected:** filters combine (AND); the count line updates; switching tabs
+   resets the status filter but keeps province/territory/search.
+5. **Open a record.** Click a job → opens its **job detail**; click a posting →
+   opens the **job post detail**. **Expected:** admin can open any record even
+   though they're not a party.
+6. **Cap honesty + mobile (375px).** If more than 300 of a surface exist, the
+   count line says so ("most recent 300"). Re-run the filters at 375px.
+   **Expected:** the filter controls stack and stay usable; cards read cleanly.
+
+---
+
 ## Coverage checklist (tick as you complete a full pass)
 
 - [ ] 1.1 Client sign-up
@@ -358,3 +390,4 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 - [ ] 11.2 Sales rep claims a vanity referral code (+ link)
 - [ ] 11.3 Referral signup via /join?ref= (banner + free month at go-live)
 - [ ] 11.4 Direct signup unchanged (no comp, card trial)
+- [ ] 12 Admin jobs & postings browse (province + territory + status + search, all regions)
