@@ -83,6 +83,10 @@ export {
 // commission. Region writes are admin-only callables (validated + audited).
 export { adminUpsertRegion } from "./sales/upsertRegion";
 export { adminDeleteRegion } from "./sales/deleteRegion";
+// Sales rep self-service: e-sign the liability agreement (inert until signed),
+// then claim a unique vanity referral code.
+export { signSalesAgreement } from "./sales/signAgreement";
+export { claimReferralCode } from "./sales/claimReferralCode";
 
 // Chat
 export { onMessageCreated } from "./chat/onMessageCreated";

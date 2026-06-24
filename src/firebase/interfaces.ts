@@ -59,6 +59,40 @@ export interface RegionDoc {
 }
 
 // ---------------------------------------------------------------------------
+// Sales reps — rep identity lives on users/{uid}.salesRep (see UserDoc). A rep
+// is INERT until they sign the liability agreement: no referral code, no
+// vetting. The vanity referral code is unique via the referralCodes registry.
+// ---------------------------------------------------------------------------
+export interface SalesRepLiability {
+  /** Agreement version signed (see src/sales/agreement.ts REP_AGREEMENT_VERSION). */
+  version: string;
+  signedAt: Timestamp;
+  /** Storage path of the drawn signature (server-written audit artifact). */
+  signatureStoragePath: string;
+}
+
+export interface SalesRepState {
+  /** Vanity referral code, uppercase display form; "" until claimed. */
+  referralCode: string;
+  /** Admin can deactivate a rep; commission then falls back to the region rep. */
+  active: boolean;
+  /** Null until the rep signs; re-signed when the agreement version bumps. */
+  liability: SalesRepLiability | null;
+  createdAt: Timestamp;
+  // M6 adds Stripe Connect payout fields (stripeAccountId, payouts, balances).
+}
+
+// referralCodes/{codeLower} — uniqueness registry (mirrors profileSlugs). Maps a
+// lowercased code to the rep who owns it; resolved at signup to attribute a new
+// tradesperson + grant the free month. World-readable, server-only writes.
+export interface ReferralCodeDoc {
+  uid: string;
+  /** Uppercase display form of the code. */
+  code: string;
+  claimedAt: Timestamp;
+}
+
+// ---------------------------------------------------------------------------
 // platformStats/current — public marketing counts shown on the /pitch deck.
 // World-readable COUNTS ONLY (never any personal data). Written exclusively by
 // the recomputePlatformStats scheduled Cloud Function (Admin SDK).
@@ -130,6 +164,11 @@ export interface UserDoc {
   // boolean mirror lives on tradespeople/{uid}.isPro for applicant sorting —
   // this private object is the source of truth (Stripe ids, trial dates).
   subscription?: SubscriptionState;
+  // Sales rep identity + liability + vanity code. Present only on accounts
+  // granted the `sales` role. SERVER-MANAGED (signSalesAgreement /
+  // claimReferralCode callables + admin) and locked in firestore.rules — the
+  // owner can never write it. Absent on every non-rep account.
+  salesRep?: SalesRepState | null;
 }
 
 // ---------------------------------------------------------------------------

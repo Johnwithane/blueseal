@@ -282,6 +282,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import("@/views/dashboards/AdminDashboard.vue"),
     meta: { requiresAuth: true, role: "admin", layout: "app", title: "Admin dashboard" },
   },
+  {
+    path: "/sales",
+    name: "SalesDashboard",
+    component: () => import("@/views/sales/SalesRepDashboardView.vue"),
+    meta: { requiresAuth: true, role: "sales", layout: "app", title: "Sales" },
+  },
 
   // Tradesperson onboarding wizard
   {

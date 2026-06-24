@@ -15,6 +15,7 @@ onMounted(async () => {
   const query = router.currentRoute.value.query;
   if (auth.isAdmin) router.replace({ name: "AdminDashboard", query });
   else if (auth.isTradie) router.replace({ name: "TradieDashboard", query });
+  else if (auth.isSales) router.replace({ name: "SalesDashboard", query });
   else if (auth.isClient) router.replace({ name: "ClientDashboard", query });
   else router.replace({ name: "Home" });
 });

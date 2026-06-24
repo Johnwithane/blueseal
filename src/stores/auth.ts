@@ -77,7 +77,11 @@ function rolesFromClaims(claims: Record<string, unknown>): Role[] {
   if (Array.isArray(raw)) {
     return raw.filter(
       (r): r is Role =>
-        r === "client" || r === "tradesperson" || r === "admin" || r === "qa",
+        r === "client" ||
+        r === "tradesperson" ||
+        r === "admin" ||
+        r === "qa" ||
+        r === "sales",
     );
   }
   const legacy = claims.role;
@@ -85,7 +89,8 @@ function rolesFromClaims(claims: Record<string, unknown>): Role[] {
     legacy === "client" ||
     legacy === "tradesperson" ||
     legacy === "admin" ||
-    legacy === "qa"
+    legacy === "qa" ||
+    legacy === "sales"
   ) {
     return [legacy];
   }
@@ -117,11 +122,15 @@ export const useAuthStore = defineStore("auth", {
     isClient: (s) => s.activeRole === "client",
     isTradie: (s) => s.activeRole === "tradesperson",
     isAdmin: (s) => s.activeRole === "admin",
+    // "Currently viewing as a sales rep." Sales IS a view-mode (unlike qa), with
+    // its own /sales dashboard.
+    isSales: (s) => s.activeRole === "sales",
     // "Has the X role at all" — for offering switchers, CTAs, or admin-only
     // affordances that should stay visible regardless of the active view.
     hasClientRole: (s) => s.roles.includes("client"),
     hasTradieRole: (s) => s.roles.includes("tradesperson"),
     hasAdminRole: (s) => s.roles.includes("admin"),
+    hasSalesRole: (s) => s.roles.includes("sales"),
     // "Holds the qa capability" — unlocks the /qa toolkit and the global
     // Report-a-bug button. There is no qa activeRole, so there's no `isQa`
     // view-mode getter to match isClient/isTradie/isAdmin.
@@ -494,6 +503,17 @@ export const useAuthStore = defineStore("auth", {
       const tokenResult = await this.fbUser.getIdTokenResult(true);
       const next = rolesFromClaims(tokenResult.claims as Record<string, unknown>);
       if (next.length > 0) this.roles = next;
+    },
+
+    /**
+     * Re-read the user doc into state after a server callable mutated a
+     * server-managed field (e.g. salesRep.liability after signSalesAgreement,
+     * salesRep.referralCode after claimReferralCode). Reactive — components
+     * reading auth.user re-render, so the rep-agreement gate clears.
+     */
+    async reloadUserDoc() {
+      if (!this.fbUser) return;
+      this.user = await getUser(this.fbUser.uid);
     },
 
     /**

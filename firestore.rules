@@ -109,6 +109,13 @@ service cloud.firestore {
         // Pro to dodge the platform service fee + unlock the AI gate.
         // `.get(field, null)` so docs predating it (every account) stay editable.
         && request.resource.data.get('subscription', null) == resource.data.get('subscription', null)
+        // Sales rep identity (referral code + liability signature + active flag)
+        // is server-managed (signSalesAgreement / claimReferralCode callables +
+        // admin). The owner can never write it — that would let a rep forge a
+        // signed agreement or grab a referral code without the registry. The
+        // gate (requireRepActive) trusts this field. `.get(field, null)` so
+        // non-rep docs (no field) stay editable.
+        && request.resource.data.get('salesRep', null) == resource.data.get('salesRep', null)
         // Account suspension mirror is server-managed (adminSetUserDisabled, admin
         // SDK). The owner can never write it — that's the support-side lock, not a
         // self-serve toggle. `.get(field, null)` so docs predating it stay editable.
@@ -414,6 +421,17 @@ service cloud.firestore {
     // (its filter matches the rule, so it isn't a "rules are not filters" trap).
     match /regions/{regionId} {
       allow read: if isAdmin() || (resource != null && resource.data.repId == uid());
+      allow create, update, delete: if false;
+    }
+
+    // ---------- referralCodes (vanity code -> rep registry; server-only writes) --
+    // Maps a lowercased referral code (the doc id) to the rep who owns it.
+    // World-readable so the signup flow can resolve "?ref=CODE" to a rep + grant
+    // the free month (codes are meant to be shared publicly). Written only by the
+    // claimReferralCode callable (admin SDK) inside a uniqueness transaction, so
+    // all client writes are denied. Mirrors profileSlugs.
+    match /referralCodes/{codeLower} {
+      allow read: if true;
       allow create, update, delete: if false;
     }
 

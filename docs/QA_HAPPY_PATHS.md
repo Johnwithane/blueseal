@@ -295,6 +295,27 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 
 ---
 
+## 11. Sales reps  → (rep-internal; no public help article)
+
+> Requires an admin to grant your account the **sales** role (Admin → Users →
+> your user → tick **sales** → Save). The sales tools live under **/sales** (use
+> the role switcher → **Sales**).
+
+1. **First-login liability gate.** After being granted the sales role, switch to
+   **Sales** view. **Expected:** a blocking **Sales representative agreement**
+   dialog appears and cannot be dismissed. Draw a signature → **Agree & sign**.
+   **Expected:** the dialog closes and you land on **/sales**.
+2. **Gate persists until signed.** Before signing, reload the page in Sales view.
+   **Expected:** the agreement dialog is still there (you stay inert until signed).
+3. **Claim a referral code.** On **/sales**, choose a vanity code (e.g. `JOHNNYK`,
+   3-20 letters/numbers) → **Save**. **Expected:** the code saves and a shareable
+   referral link (`/join?ref=JOHNNYK`) appears with a copy button. Try a taken or
+   too-short code → **Expected:** a clear error, no save.
+4. **Mobile (375px).** Re-run steps 1 + 3 at 375px. **Expected:** the agreement
+   dialog scrolls, the signature pad draws with touch, and the code form is usable.
+
+---
+
 ## Coverage checklist (tick as you complete a full pass)
 
 - [ ] 1.1 Client sign-up
@@ -323,3 +344,5 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 - [ ] 8.3 Recurring billing drafts (never auto-sends)
 - [ ] 9 Role switch / notifications / PWA install / Help Center
 - [ ] 10 QA toolkit: provision / Pro toggle / reset / bug / error log
+- [ ] 11.1 Sales rep first-login agreement gate (blocks until signed)
+- [ ] 11.2 Sales rep claims a vanity referral code (+ link)

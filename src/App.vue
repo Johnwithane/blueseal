@@ -12,6 +12,8 @@ import ReportBugButton from "@/components/qa/ReportBugButton.vue";
 import PaywallDialog from "@/components/PaywallDialog.vue";
 import InsuranceReminderDialog from "@/components/InsuranceReminderDialog.vue";
 import RoleSwitchOverlay from "@/components/RoleSwitchOverlay.vue";
+import RepAgreementDialog from "@/components/sales/RepAgreementDialog.vue";
+import { REP_AGREEMENT_VERSION } from "@/sales/agreement";
 import AppUpdatePrompt from "@/components/AppUpdatePrompt.vue";
 import AppShell from "@/components/shell/AppShell.vue";
 import ActiveClockBanner from "@/components/ActiveClockBanner.vue";
@@ -50,6 +52,14 @@ const layout = computed<"public" | "app" | "chromeless">(() => {
   if (declared === "hybrid") return auth.isAuthenticated ? "app" : "public";
   return declared;
 });
+
+// Blocking gate: a sales rep must e-sign the current liability agreement before
+// acting as a rep. Only shown while in sales view (activeRole === "sales"), so a
+// rep using the app as a client/tradesperson isn't nagged. Reps are inert until
+// signed server-side too (requireRepActive), so this is the UX half of the gate.
+const needsRepAgreement = computed(
+  () => auth.isSales && auth.user?.salesRep?.liability?.version !== REP_AGREEMENT_VERSION,
+);
 
 // Start the notifications subscription as soon as the app mounts. The store
 // itself watches auth.fbUser.uid so it survives sign-in/out without us having
@@ -211,6 +221,10 @@ function openFromToast(notifId: string) {
          component shows/hides itself based on the role-switch animation
          store, which `auth.switchActiveRole` drives. -->
     <RoleSwitchOverlay />
+    <!-- Blocking sales-rep liability agreement. Mounted only when a rep is in
+         their sales view and hasn't signed the current version; a rep is inert
+         until they sign (no referral code, no vetting). -->
+    <RepAgreementDialog v-if="needsRepAgreement" />
     <!-- "Update available" banner + critical "Update required" overlay. Driven
          by useAppUpdate() (also initialised above); shows a tappable update path
          the moment a new build is detected, so nobody is stuck on a stale build
