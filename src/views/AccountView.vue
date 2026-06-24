@@ -547,7 +547,7 @@ async function saveTradieProfile() {
 // only adjusted the radius).
 async function saveServiceArea() {
   if (!auth.fbUser || !auth.hasTradieRole) return;
-  const { lat, lng, radiusKm, label } = serviceLocation.value;
+  const { lat, lng, radiusKm, label, postalCode } = serviceLocation.value;
   if (lat == null || lng == null) {
     toast.warn("Pick a point on the map (or use 'My location') before saving.");
     return;
@@ -560,7 +560,7 @@ async function saveServiceArea() {
     });
     // Exact pin + address label go to the private subdoc; setLocation also
     // writes the coarse locationApprox + geohashPublic to the public doc.
-    await setLocation(auth.fbUser.uid, lat, lng, label ?? "");
+    await setLocation(auth.fbUser.uid, lat, lng, label ?? "", postalCode);
     if (tradie.value) {
       tradie.value.serviceRadiusKm = radiusKm;
     }

@@ -5,6 +5,40 @@ import { FieldValue } from "firebase-admin/firestore";
 import { db } from "../lib/admin";
 import { requireRole } from "../lib/auth";
 import { notifyAdmins, appUrl } from "../lib/notifyAdmins";
+import { logAdminAction } from "../lib/audit";
+import { matchRegionId, type RegionLike } from "../lib/regionMatch";
+
+/**
+ * Resolve a tradesperson's sales attribution at submit time: the region matched
+ * from their postal-code FSA, plus a mirror of the referral fields off the
+ * (server-locked) user doc. Stamped onto the tradesperson doc so rep-scoped
+ * vetting + commission can read them. Best-effort: a lookup failure leaves the
+ * fields null rather than blocking the submission.
+ */
+async function resolveSalesAttribution(
+  uid: string,
+): Promise<{ regionId: string | null; referredByRepId: string | null; referralSignal: string | null }> {
+  try {
+    const [contactSnap, userSnap, regionsSnap] = await Promise.all([
+      db.doc(`tradespeople/${uid}/private/contact`).get(),
+      db.doc(`users/${uid}`).get(),
+      db.collection("regions").where("status", "==", "active").get(),
+    ]);
+    const postalCode = (contactSnap.get("postalCode") as string | undefined) ?? "";
+    const regions: RegionLike[] = regionsSnap.docs.map((d) => ({
+      id: d.id,
+      fsaPrefixes: (d.get("fsaPrefixes") as string[] | undefined) ?? [],
+    }));
+    return {
+      regionId: postalCode ? matchRegionId(postalCode, regions) : null,
+      referredByRepId: (userSnap.get("referredByRepId") as string | undefined) ?? null,
+      referralSignal: (userSnap.get("referralSignal") as string | undefined) ?? null,
+    };
+  } catch (err) {
+    logger.error("resolveSalesAttribution failed", { uid, err });
+    return { regionId: null, referredByRepId: null, referralSignal: null };
+  }
+}
 
 export const submitForVetting = onCall(CALLABLE_OPTS, async (req) => {
   const uid = requireRole(req, "tradesperson");
@@ -55,9 +89,27 @@ export const submitForVetting = onCall(CALLABLE_OPTS, async (req) => {
     }
   }
 
+  // Stamp the sales attribution (region by FSA + referral mirror) at submit, so
+  // the right rep can vet this application and own its commission.
+  const attribution = await resolveSalesAttribution(uid);
+
   await tradieRef.update({
     vettingStatus: "pending",
     submittedAt: FieldValue.serverTimestamp(),
+    regionId: attribution.regionId,
+    referredByRepId: attribution.referredByRepId,
+    referralSignal: attribution.referralSignal,
+  });
+
+  await logAdminAction({
+    actorUid: uid,
+    action: "submitForVetting",
+    targetType: "tradesperson",
+    targetId: uid,
+    metadata: {
+      regionId: attribution.regionId,
+      referredByRepId: attribution.referredByRepId,
+    },
   });
 
   // Alert the admin team there's a fresh application to vet. Best-effort:

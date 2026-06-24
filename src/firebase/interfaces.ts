@@ -461,6 +461,15 @@ export interface TradespersonDoc {
   vettingStatus: VettingStatus;
   vettingNotes: string;
   isVisible: boolean;
+  // Sales attribution, all SERVER-MANAGED (stamped by submitForVetting from the
+  // tradesperson's postal-code FSA + the locked users/{uid} referral fields) and
+  // locked in firestore.rules — the owner can never write them. Denormalized
+  // here (off the private user doc) so rep-scoped vetting + commission can read
+  // them. `regionId`: the sales territory matched by FSA (null if unmatched).
+  // `referredByRepId`: mirror of the referring rep (null if not referred).
+  regionId?: string | null;
+  referredByRepId?: string | null;
+  referralSignal?: "link" | "code" | "name" | null;
   // OWNER-CONTROLLED listing toggle, distinct from the SERVER-MANAGED
   // `isVisible` above. `isVisible` is the eligibility gate (true only once the
   // tradesperson is vetting-approved + ID + cert verified; flipped solely by
@@ -575,6 +584,11 @@ export interface TradespersonDoc {
 export interface TradespersonContact {
   location: GeoPoint;
   primaryAddressText: string;
+  // Postal code captured from the service-area pin's reverse-geocode. Private
+  // (this subdoc is owner+admin only). Its FSA (first 3 chars) assigns the
+  // tradesperson to a sales region at submitForVetting. Absent for rural pins
+  // the geocoder couldn't resolve to a postal code.
+  postalCode?: string | null;
   businessAddress?: string | null;
   businessPhone?: string | null;
   gstNumber?: string | null;

@@ -195,7 +195,13 @@ service cloud.firestore {
         && request.resource.data.idVerified == false
         && request.resource.data.ratingAvg == 0
         && request.resource.data.ratingCount == 0
-        && request.resource.data.nextInvoiceNumber == 1;
+        && request.resource.data.nextInvoiceNumber == 1
+        // Sales attribution is stamped server-side at submitForVetting, never by
+        // the owner at create — must be absent/null on a fresh draft so nobody
+        // self-assigns a region or referral before review.
+        && request.resource.data.get('regionId', null) == null
+        && request.resource.data.get('referredByRepId', null) == null
+        && request.resource.data.get('referralSignal', null) == null;
       // Owner update: positive equality checks on server-managed fields,
       // and approved tradies can't yank themselves back into vetting.
       // The insurance/WSIB flags are set by Cloud Function triggers in
@@ -275,6 +281,17 @@ service cloud.firestore {
         // set it directly. `.get(field, null)` for docs predating the field.
         && request.resource.data.get('slug', null)
              == resource.data.get('slug', null)
+        // Sales attribution (region + referral mirror) is server-managed
+        // (submitForVetting stamps it from the FSA + the locked user doc). The
+        // owner can never write it — that would let them pick their own region
+        // or self-attribute a referral to capture commission. `.get(field, null)`
+        // so docs predating these fields stay editable.
+        && request.resource.data.get('regionId', null)
+             == resource.data.get('regionId', null)
+        && request.resource.data.get('referredByRepId', null)
+             == resource.data.get('referredByRepId', null)
+        && request.resource.data.get('referralSignal', null)
+             == resource.data.get('referralSignal', null)
         && (resource.data.vettingStatus == 'approved'
             ? request.resource.data.vettingStatus == 'approved'
             : request.resource.data.vettingStatus in ['draft','pending','info_requested']);

@@ -561,7 +561,13 @@ async function saveDraft(opts: { silent?: boolean } = {}): Promise<void> {
     if (locLat != null && locLng != null) {
       // Exact pin + address label go to the private contact subdoc; setLocation
       // also derives the coarse locationApprox + geohashPublic on the public doc.
-      await setLocation(auth.fbUser.uid, locLat, locLng, location.value.label ?? "");
+      await setLocation(
+        auth.fbUser.uid,
+        locLat,
+        locLng,
+        location.value.label ?? "",
+        location.value.postalCode,
+      );
     }
     lastSavedAt.value = new Date();
     dirty.value = false;

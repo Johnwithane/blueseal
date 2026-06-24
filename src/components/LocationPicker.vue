@@ -15,6 +15,10 @@ export interface LocationValue {
   lng: number | null;
   radiusKm: number;
   label?: string;
+  // Postal code from the pin's reverse-geocode. Its FSA (first 3 chars) maps a
+  // tradesperson to a sales region (see matchRegionId). May be absent for rural
+  // points the geocoder can't resolve to a postal code.
+  postalCode?: string;
 }
 
 const props = withDefaults(
@@ -54,6 +58,7 @@ const searchEl = ref<HTMLInputElement | null>(null);
 const status = ref<string | null>(null);
 const loading = ref(true);
 const label = ref(props.modelValue.label ?? "");
+const postalCode = ref(props.modelValue.postalCode ?? "");
 const radiusKm = ref(props.modelValue.radiusKm || 50);
 
 let map: google.maps.Map | null = null;
@@ -94,10 +99,19 @@ async function resolveCityLabel(lat: number, lng: number): Promise<void> {
       }
       if (city) break;
     }
-    if (city) {
-      label.value = city;
-      emitChange(lat, lng, city);
+    // Postal code for region assignment (its FSA = the first 3 chars). Cleared
+    // when the new point has none, so a stale code never lingers on the value.
+    let postal: string | null = null;
+    for (const r of results) {
+      const comp = r.address_components?.find((c) => c.types.includes("postal_code"));
+      if (comp) {
+        postal = comp.long_name;
+        break;
+      }
     }
+    postalCode.value = postal ?? "";
+    if (city) label.value = city;
+    emitChange(lat, lng, label.value);
   } catch {
     /* geocoding failed (quota / network) — keep whatever label we have */
   }
@@ -109,6 +123,7 @@ function emitChange(lat: number | null, lng: number | null, newLabel?: string) {
     lng,
     radiusKm: radiusKm.value,
     label: (newLabel ?? label.value) || undefined,
+    postalCode: postalCode.value || undefined,
   });
 }
 

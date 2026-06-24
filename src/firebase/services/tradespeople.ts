@@ -191,6 +191,7 @@ export async function setLocation(
   lat: number,
   lng: number,
   label?: string,
+  postalCode?: string,
 ): Promise<void> {
   const geohashPublic = geohashForLocation([lat, lng]).slice(0, 6);
   const batch = writeBatch(db);
@@ -199,6 +200,9 @@ export async function setLocation(
     {
       location: new GeoPoint(lat, lng),
       ...(label !== undefined ? { primaryAddressText: label } : {}),
+      // Postal code (private). Its FSA assigns the tradesperson to a sales
+      // region at submitForVetting. Only written when the geocoder resolved one.
+      ...(postalCode ? { postalCode } : {}),
     },
     { merge: true },
   );
