@@ -21,6 +21,10 @@ service cloud.firestore {
     // QA toolkit capability: lets a tester file bug reports. Additive claim,
     // granted only by an admin — never implies admin power.
     function isQa() { return hasRole('qa'); }
+    // Regional sales rep: a view-mode role (own /sales dashboard) granted by an
+    // admin. Vets their region's applications + earns commission on it. Never
+    // implies admin power.
+    function isSales() { return hasRole('sales'); }
     function isOwner(ownerId) { return isSignedIn() && uid() == ownerId; }
 
     function jobDoc(jobId) { return get(/databases/$(database)/documents/jobs/$(jobId)); }
@@ -398,6 +402,19 @@ service cloud.firestore {
     match /platformStats/{docId} {
       allow read: if true;
       allow write: if false;
+    }
+
+    // ---------- regions (sales territories; server-only writes) ----------
+    // A region maps postal FSA prefixes to the sales rep who owns it. Written
+    // exclusively by the adminUpsertRegion / adminDeleteRegion callables (admin
+    // SDK, which bypasses these rules), so all client writes are denied. Read is
+    // admin OR the region's own rep — a rep needs to see their territory + its
+    // health, never another rep's region. A rep lists their regions with
+    // where('repId','==',uid()); the per-doc predicate authorizes that query
+    // (its filter matches the rule, so it isn't a "rules are not filters" trap).
+    match /regions/{regionId} {
+      allow read: if isAdmin() || (resource != null && resource.data.repId == uid());
+      allow create, update, delete: if false;
     }
 
     // ---------- clients (tradesperson client book / CRM — Blue Seal Pro) ----------

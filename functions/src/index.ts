@@ -78,6 +78,12 @@ export {
   adminRestoreUser,
 } from "./admin/userSupport";
 
+// Regions & sales reps — regional sales managers own a territory (a set of
+// postal FSA prefixes), vet their region's tradespeople, and earn residual
+// commission. Region writes are admin-only callables (validated + audited).
+export { adminUpsertRegion } from "./sales/upsertRegion";
+export { adminDeleteRegion } from "./sales/deleteRegion";
+
 // Chat
 export { onMessageCreated } from "./chat/onMessageCreated";
 

@@ -21,7 +21,7 @@ const emit = defineEmits<{ rolesUpdated: [roles: Role[], activeRole: Role] }>();
 const auth = useAuthStore();
 const toast = useToast();
 
-const ALL_ROLES: Role[] = ["client", "tradesperson", "admin", "qa"];
+const ALL_ROLES: Role[] = ["client", "tradesperson", "admin", "qa", "sales"];
 const isSelf = computed(() => auth.fbUser?.uid === props.user.id);
 
 const savedRoles = ref<Role[]>([...(props.user.roles ?? [])]);
@@ -30,6 +30,7 @@ const working = reactive<Record<Role, boolean>>({
   tradesperson: savedRoles.value.includes("tradesperson"),
   admin: savedRoles.value.includes("admin"),
   qa: savedRoles.value.includes("qa"),
+  sales: savedRoles.value.includes("sales"),
 });
 const saving = ref(false);
 const error = ref<string | null>(null);
@@ -40,15 +41,17 @@ const key = (r: Role[]) => [...r].sort().join(",");
 const changed = computed(() => key(nextRoles.value) !== key(savedRoles.value));
 const valid = computed(() => nextRoles.value.length > 0);
 
-// Granting/removing admin or qa, or removing tradesperson, are consequential
-// enough to confirm explicitly.
+// Granting/removing admin, qa or sales, or removing tradesperson, are
+// consequential enough to confirm explicitly (sales unlocks a region's
+// commission + vetting access).
 const needsConfirm = computed(() => {
   const before = new Set(savedRoles.value);
   const after = new Set(nextRoles.value);
   return (
     before.has("admin") !== after.has("admin") ||
     (before.has("tradesperson") && !after.has("tradesperson")) ||
-    before.has("qa") !== after.has("qa")
+    before.has("qa") !== after.has("qa") ||
+    before.has("sales") !== after.has("sales")
   );
 });
 const confirmSummary = computed(() => {

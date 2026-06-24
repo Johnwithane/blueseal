@@ -86,6 +86,7 @@ const manageTiles = [
   { to: "/admin/site-content", label: "Site content", icon: "pi-file-edit", desc: "Help & legal pages" },
   { to: "/admin/business-cards", label: "Business cards", icon: "pi-id-card", desc: "Generate cards" },
   { to: "/admin/rebate-programs", label: "Rebates", icon: "pi-gift", desc: "Rebate programs" },
+  { to: "/admin/regions", label: "Regions", icon: "pi-map-marker", desc: "Sales territories" },
 ];
 
 const platformStats = computed(() => [

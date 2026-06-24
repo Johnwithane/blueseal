@@ -10,7 +10,7 @@ import { newTradieDocDefaults } from "../lib/tradieProfile";
 const Input = z.object({
   targetUid: z.string().min(1).max(128),
   roles: z
-    .array(z.enum(["client", "tradesperson", "admin", "qa"]))
+    .array(z.enum(["client", "tradesperson", "admin", "qa", "sales"]))
     .min(1)
     .refine((r) => new Set(r).size === r.length, "Roles must be unique"),
 });

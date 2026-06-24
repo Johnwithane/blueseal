@@ -22,12 +22,14 @@ const ROLE_LABEL: Record<Role, string> = {
   tradesperson: "Tradesperson",
   admin: "Admin",
   qa: "QA",
+  sales: "Sales",
 };
 const ROLE_ICON: Record<Role, string> = {
   client: "pi-user",
   tradesperson: "pi-wrench",
   admin: "pi-shield",
   qa: "pi-bug",
+  sales: "pi-map-marker",
 };
 
 // Only roles that map to an actual view (everything except qa).

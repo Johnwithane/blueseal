@@ -12,6 +12,7 @@ const ROLE_LABEL: Record<Role, string> = {
   tradesperson: "Tradesperson",
   admin: "Admin",
   qa: "QA",
+  sales: "Sales",
 };
 
 const ROLE_ICON: Record<Role, string> = {
@@ -19,6 +20,7 @@ const ROLE_ICON: Record<Role, string> = {
   tradesperson: "pi pi-wrench",
   admin: "pi pi-shield",
   qa: "pi pi-bug",
+  sales: "pi pi-map-marker",
 };
 
 const visible = computed(() => store.targetRole !== null);

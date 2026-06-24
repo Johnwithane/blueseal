@@ -4,9 +4,59 @@ import type { GeoPoint, Timestamp } from "firebase/firestore";
 // (and the mirrored custom claim) so `hasRole('qa')` gates the self-serve QA
 // toolkit, but it is NEVER an `activeRole` (there is no qa dashboard) and is
 // only ever granted by an admin via adminSetUserRoles — never self-assigned.
-export type Role = "client" | "tradesperson" | "admin" | "qa";
+// "sales" is a regional sales rep. Unlike "qa" it IS a view-mode with its own
+// /sales dashboard: granted by an admin, it lets the rep vet their region's
+// applications and track their commission earnings.
+export type Role = "client" | "tradesperson" | "admin" | "qa" | "sales";
 
 export type WithId<T> = T & { id: string };
+
+// ---------------------------------------------------------------------------
+// regions/{regionId} — sales territories.
+//
+// A named region (e.g. "Northern BC") is a set of postal FSA prefixes. A
+// tradesperson auto-assigns to a region by their address (matchRegionId), and
+// the region's `repId` is the sales rep who owns it: the support contact for
+// that territory who earns the 10% residual commission on its Blue Seal
+// revenue. One rep per region; a rep may hold several regions. Written
+// server-side only (adminUpsertRegion / adminDeleteRegion callables); never
+// from the client.
+// ---------------------------------------------------------------------------
+export type RegionStatus = "active" | "paused";
+
+export interface RegionMarketing {
+  /** Active-tradie count that unlocks a regional marketing budget. */
+  thresholdActive: number;
+  /** Set when activeTradieCount first reaches thresholdActive (else null). */
+  unlockedAt: Timestamp | null;
+  /** Admin-recorded marketing spend allocated to the region, in cents. */
+  allocatedCents: number;
+  /** Free-form admin notes about the budget / campaigns. */
+  notes: string;
+}
+
+export interface RegionDoc {
+  name: string;
+  /** CA province code (see src/data/provinces.ts), e.g. "BC". */
+  province: string;
+  /**
+   * Postal FSA prefixes that map a tradesperson to this region. Uppercase, no
+   * spaces; 1-3 chars (e.g. "V" / "V8" / "V8W"). Longest prefix wins when two
+   * regions could both claim a postal code (see matchRegionId).
+   */
+  fsaPrefixes: string[];
+  /** The sales rep who owns this region (users/{uid}); null = unassigned. */
+  repId: string | null;
+  status: RegionStatus;
+  /** Denormalized region-health counts, recomputed by scheduledRegionHealth. */
+  activeTradieCount: number;
+  totalTradieCount: number;
+  marketing: RegionMarketing;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+  /** Admin uid who last edited, or "seed". */
+  updatedBy: string;
+}
 
 // ---------------------------------------------------------------------------
 // platformStats/current — public marketing counts shown on the /pitch deck.
