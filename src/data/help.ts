@@ -668,6 +668,13 @@ const faqs: FaqItem[] = [
     audience: "all",
   },
   {
+    question: "Can I sign up or sign in with Google?",
+    answer:
+      "Yes. Tap **Continue with Google** on the sign-in or sign-up page (or the quick **Continue as you** popup if it appears), and you're in. Your email is verified automatically, so there's no password to set and no verification email to wait for. The first time, we'll ask one quick question, whether you're here to **hire** a tradesperson or **work** as one, so we set your account up the right way. You can switch or add the other role anytime from your account.",
+    categoryId: "getting-started",
+    audience: "all",
+  },
+  {
     question: "My tradesperson sent me a Blue Seal invite link, what is it?",
     answer:
       "Your tradesperson set up your job on Blue Seal so you can both track it in one place: the quote, schedule, messages, and invoice. The link signs you in with just your email (**no password, nothing to install**), and it only works for the email address they invited. Once you're in, you can chat, accept the quote, and review and pay the invoice. If you weren't expecting it, check with your tradesperson before tapping, and nothing is linked to you until you confirm it's your job.",

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
@@ -9,11 +9,18 @@ import Message from "primevue/message";
 import Divider from "primevue/divider";
 import { useAuthStore } from "@/stores/auth";
 import { signUpSchema } from "@/validation/schemas";
+import { useGoogleOneTap } from "@/composables/useGoogleOneTap";
 import { humanizeError } from "@/utils/errors";
 import { normalizeReferralCode } from "@/utils/referralCode";
 import { useSeo } from "@/composables/useSeo";
 
 useSeo({ title: "Create your account", noindex: true });
+
+// Google One Tap ("Continue as <name>"). No-op unless VITE_GOOGLE_OAUTH_CLIENT_ID
+// is set. One Tap doesn't see the role toggle, so a brand-new One Tap account
+// defaults to client and is sent to the forced /welcome role choice.
+const oneTap = useGoogleOneTap({ context: "signup" });
+onMounted(() => void oneTap.start());
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -216,6 +223,12 @@ async function google() {
 
       <Divider align="center"><span class="text-xs text-[color:var(--bs-muted)]">or</span></Divider>
       <Button label="Continue with Google" icon="pi pi-google" outlined class="w-full" @click="google" />
+      <p class="text-xs text-center text-[color:var(--bs-muted)] -mt-2">
+        By continuing with Google you agree to our
+        <router-link to="/terms" target="_blank" class="underline">Terms</router-link>
+        and
+        <router-link to="/privacy" target="_blank" class="underline">Privacy Policy</router-link>.
+      </p>
 
       <p class="text-sm text-center">
         Already have an account?

@@ -236,6 +236,16 @@ const routes: RouteRecordRaw[] = [
   // Legacy path — tradie signup is now a toggle inside /sign-up.
   { path: "/sign-up/tradie", redirect: { name: "SignUp", query: { as: "tradesperson" } } },
   {
+    // Forced role choice for a brand-new account created without an up-front
+    // role pick (Google "Continue with Google" on /sign-in, and One Tap). The
+    // /sign-up button already knows the role from its toggle and skips this.
+    // Chromeless + requiresAuth: you only ever land here right after signing in.
+    path: "/welcome",
+    name: "Welcome",
+    component: () => import("@/views/auth/WelcomeRoleView.vue"),
+    meta: { requiresAuth: true, layout: "chromeless", title: "Welcome" },
+  },
+  {
     path: "/forgot-password",
     name: "ForgotPassword",
     component: () => import("@/views/auth/ForgotPasswordView.vue"),

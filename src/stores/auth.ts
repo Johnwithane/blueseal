@@ -4,6 +4,7 @@ import {
   createUserWithEmailAndPassword,
   isSignInWithEmailLink,
   onAuthStateChanged,
+  signInWithCredential,
   signInWithEmailAndPassword,
   signInWithEmailLink,
   signInWithPopup,
@@ -406,6 +407,48 @@ export const useAuthStore = defineStore("auth", {
         isNew = created;
         // Refresh so the token carries the claims the callable just
         // set/reconciled before the router guard reads them on redirect.
+        await cred.user.getIdToken(true);
+        if (created) {
+          this.roles = roles;
+          this.activeRole = activeRole;
+        }
+      } catch (e) {
+        this.error = (e as Error).message;
+        throw e;
+      } finally {
+        if (provisioningUid) provisioningUids.delete(provisioningUid);
+        this.pending = false;
+      }
+      return { isNew };
+    },
+
+    /**
+     * Signs in from a Google One Tap credential (the ID-token JWT the GIS
+     * "Continue as <name>" card hands back). Same provisioning path as
+     * signInWithGoogle — server-side, idempotent, returns `isNew` so the One Tap
+     * composable can route a brand-new account to the forced /welcome role
+     * choice. One Tap has no up-front role, so brand-new accounts default to
+     * `client` (then pick at /welcome); a returning user just gets signed in.
+     */
+    async signInWithGoogleCredential(idToken: string): Promise<{ isNew: boolean }> {
+      this.pending = true;
+      this.error = null;
+      let provisioningUid: string | null = null;
+      let isNew = false;
+      try {
+        const cred = await signInWithCredential(
+          auth,
+          GoogleAuthProvider.credential(idToken),
+        );
+        provisioningUid = cred.user.uid;
+        provisioningUids.add(provisioningUid);
+        const { roles, activeRole, isNew: created } = await callProvisionAccount({
+          role: "client",
+          displayName: cred.user.displayName ?? "Anonymous",
+          termsAcceptedVersion: LEGAL_VERSION,
+          photoURL: cred.user.photoURL,
+        });
+        isNew = created;
         await cred.user.getIdToken(true);
         if (created) {
           this.roles = roles;

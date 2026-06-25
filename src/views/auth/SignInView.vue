@@ -1,20 +1,25 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import Password from "primevue/password";
 import Message from "primevue/message";
 import Divider from "primevue/divider";
-import Dialog from "primevue/dialog";
 import { useAuthStore } from "@/stores/auth";
 import { signInSchema } from "@/validation/schemas";
 import { useToast } from "@/composables/useToast";
+import { useGoogleOneTap } from "@/composables/useGoogleOneTap";
 import { humanizeError } from "@/utils/errors";
 import { safeRedirect } from "@/utils/redirect";
 import { useSeo } from "@/composables/useSeo";
 
 useSeo({ title: "Sign in", noindex: true });
+
+// Google One Tap ("Continue as <name>"). No-op unless VITE_GOOGLE_OAUTH_CLIENT_ID
+// is set; routes new accounts to /welcome and returning users to their redirect.
+const oneTap = useGoogleOneTap({ context: "signin" });
+onMounted(() => void oneTap.start());
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -70,54 +75,26 @@ async function submit() {
   }
 }
 
-// Google on the SIGN-IN page can belong to someone with no account yet. They
-// get provisioned as a client (the safe default), then asked which side of
-// the marketplace they're on — a new tradesperson would otherwise be stranded
-// in the client view with no hint that onboarding exists.
-const showRoleChoice = ref(false);
-const addingTradieRole = ref(false);
-// Set once either button resolves the choice, so the dialog's @hide (X / Esc)
-// can fall back to the client default without clobbering an explicit pick.
-const roleResolved = ref(false);
-
+// Google on the SIGN-IN page can belong to someone with no account yet. A
+// brand-new account is provisioned as a client (the safe default), then sent
+// to the forced /welcome role choice — a new tradesperson would otherwise be
+// stranded in the client view with no hint that onboarding exists. The choice
+// lives on its own route (not a dismissible dialog) so it can't be skipped and
+// is shared with the One Tap flow.
 async function googleSignIn() {
   try {
     const { isNew } = await auth.signInWithGoogle("client");
     if (isNew) {
-      roleResolved.value = false;
-      showRoleChoice.value = true;
+      router.replace({
+        name: "Welcome",
+        query: typeof route.query.redirect === "string" ? { redirect: route.query.redirect } : {},
+      });
       return;
     }
-    const redirect = safeRedirect(route.query.redirect);
-    router.replace(redirect);
+    router.replace(safeRedirect(route.query.redirect));
   } catch (e) {
     formError.value = humanizeError(e);
   }
-}
-
-function continueAsClient() {
-  roleResolved.value = true;
-  showRoleChoice.value = false;
-  const redirect = (route.query.redirect as string) || "/dashboard";
-  router.replace(redirect);
-}
-
-async function continueAsTradesperson() {
-  addingTradieRole.value = true;
-  try {
-    await auth.addRole("tradesperson");
-    roleResolved.value = true;
-    showRoleChoice.value = false;
-    router.replace("/onboarding");
-  } catch (e) {
-    toast.error("Couldn't set up your tradesperson profile", humanizeError(e));
-  } finally {
-    addingTradieRole.value = false;
-  }
-}
-
-function onRoleDialogHide() {
-  if (!roleResolved.value) continueAsClient();
 }
 </script>
 
@@ -166,6 +143,12 @@ function onRoleDialogHide() {
         class="w-full"
         @click="googleSignIn"
       />
+      <p class="text-xs text-center text-[color:var(--bs-muted)] -mt-2">
+        By continuing with Google you agree to our
+        <router-link to="/terms" target="_blank" class="underline">Terms</router-link>
+        and
+        <router-link to="/privacy" target="_blank" class="underline">Privacy Policy</router-link>.
+      </p>
 
       <Message v-if="linkSent" severity="success" :closable="false">
         Check your email for a sign-in link. No password needed.
@@ -188,38 +171,5 @@ function onRoleDialogHide() {
         <router-link to="/sign-up" class="font-medium">Sign up</router-link>
       </p>
     </form>
-
-    <!-- New-account role choice: closing the dialog (X / mask) keeps the safe
-         client default, same as "I'm hiring". -->
-    <Dialog
-      v-model:visible="showRoleChoice"
-      modal
-      header="Welcome to Blue Seal!"
-      class="w-[95vw] max-w-sm"
-      :dismissable-mask="false"
-      :closable="true"
-      @hide="onRoleDialogHide"
-    >
-      <p class="text-sm text-[color:var(--bs-muted)]">
-        Your account is ready. How will you use Blue Seal?
-      </p>
-      <div class="mt-4 space-y-2">
-        <Button
-          label="I'm hiring a tradesperson"
-          icon="pi pi-search"
-          class="w-full"
-          :disabled="addingTradieRole"
-          @click="continueAsClient"
-        />
-        <Button
-          label="I'm a tradesperson"
-          icon="pi pi-wrench"
-          outlined
-          class="w-full"
-          :loading="addingTradieRole"
-          @click="continueAsTradesperson"
-        />
-      </div>
-    </Dialog>
   </section>
 </template>

@@ -6,6 +6,36 @@ Tasks are grouped by the phase that introduced them so you can see why each one 
 
 ---
 
+## Google One Tap — "Continue as <name>" popup (added 2026-06-25)
+
+One Tap is built and wired into `/sign-in` and `/sign-up`, but stays **OFF** until
+you set the OAuth client ID below. With it blank, nothing changes (the "Continue
+with Google" button still works); set it and the One Tap card starts appearing for
+logged-out Google users. New accounts route to the forced `/welcome` role choice.
+
+### [ ] Provision the OAuth Web Client ID and authorize the site origin
+
+- **Why:** One Tap needs the OAuth 2.0 **Web Client ID** to render the card, and
+  it must be the *same* client ID that backs Firebase Auth's Google provider so
+  `signInWithCredential` accepts the token (audience match). The site's origin
+  must be on that client's **Authorized JavaScript origins** or the prompt is
+  silently suppressed by Google.
+- **What:**
+  1. GCP Console → **APIs & Services → Credentials** (project `blueseal-762af`) →
+     open **"Web client (auto created by Google Service)"** (the one Firebase made).
+  2. Under **Authorized JavaScript origins** add `https://blueseal.app` (and any
+     preview/staging origins, plus `http://localhost:5173` for local dev).
+  3. Copy the **Client ID** and set `VITE_GOOGLE_OAUTH_CLIENT_ID=<that id>` in the
+     hosting env (and your local `.env`). Rebuild/redeploy hosting.
+- **Verify:** Open `/sign-in` logged out in a browser signed into a Google account
+  → the "Continue as <name>" One Tap card appears top-right. Picking it signs you
+  in; a brand-new account lands on `/welcome`.
+- **Note (FedCM):** One Tap uses FedCM (`use_fedcm_for_prompt: true`), so it keeps
+  working as Chrome removes third-party cookies. No extra setup, just don't block
+  the prompt in browser settings when testing.
+
+---
+
 ## Business card generator — print & mail-out (added 2026-06-17)
 
 The admin tool at `/admin/business-cards` generates print-ready two-sided card

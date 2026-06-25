@@ -119,10 +119,23 @@ Tradesperson verification has three independent documents — **ID**, **certific
 3. Repeat with **Tradesperson** selected before clicking Continue with Google.
 4. **Expected:** no error; lands in the **onboarding wizard** with the
    **tradesperson** role already granted (resume works on return — see 1.2).
-5. From `/sign-in` (not sign-up), a **brand-new** Google account → the
-   **"How will you use Blue Seal?"** dialog appears; choosing *tradesperson* routes
-   to `/onboarding`, choosing *client* (or dismissing) lands on the dashboard.
-6. **Mobile (375px):** popup + dialog usable; no horizontal scroll.
+5. From `/sign-in` (not sign-up), a **brand-new** Google account → you're redirected
+   to the **`/welcome`** step ("How will you use Blue Seal?"). It **cannot be
+   skipped** (no silent client default). Choose *tradesperson* → `/onboarding`;
+   choose *client* → dashboard. A **returning** Google account skips `/welcome` and
+   lands on the dashboard (or its redirect target).
+6. **Mobile (375px):** popup + `/welcome` cards usable; no horizontal scroll.
+
+### 1.7 Google One Tap — "Continue as <name>" (only when configured)
+> One Tap is **OFF until `VITE_GOOGLE_OAUTH_CLIENT_ID` is set** (see HUMANTASKS).
+> With it unset, skip this path — the button flow (1.6) is the coverage.
+1. Logged out, open `/sign-in` (or `/sign-up`). **Expected:** the **"Continue as
+   <name>"** One Tap card appears (top-right on desktop).
+2. Tap it. **Expected:** signs in with no password. A **brand-new** account lands on
+   **`/welcome`** (forced role choice, as 1.6 step 5); a **returning** account lands
+   on the dashboard.
+3. **Regression:** the plain **Continue with Google** button still works whether or
+   not One Tap shows, and One Tap **never** appears once you're already signed in.
 
 ---
 
