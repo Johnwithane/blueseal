@@ -32,11 +32,14 @@ async function submit() {
   saving.value = true;
   try {
     await signSalesAgreement(dataUrl);
+    // Close immediately on success so the rep isn't left staring at the
+    // signature pad. reloadUserDoc then clears the gate (App.vue's
+    // needsRepAgreement) so the dialog doesn't remount.
+    visible.value = false;
     await auth.reloadUserDoc();
     toast.success("Signed", "You're all set. Welcome to the Blue Seal sales team.");
   } catch (e) {
     toast.error("Couldn't sign", humanizeError(e));
-  } finally {
     saving.value = false;
   }
 }
@@ -63,7 +66,13 @@ async function submit() {
     <SignatureCanvas ref="sig" @update:empty="(v) => (empty = v)" />
     <div class="flex justify-end gap-2 mt-3">
       <Button label="Clear" text :disabled="saving || empty" @click="sig?.clear()" />
-      <Button label="Agree & sign" icon="pi pi-check" :loading="saving" :disabled="empty" @click="submit" />
+      <Button
+        :label="saving ? 'Signing…' : 'Agree & sign'"
+        icon="pi pi-check"
+        :loading="saving"
+        :disabled="empty"
+        @click="submit"
+      />
     </div>
   </Dialog>
 </template>

@@ -24,7 +24,10 @@ function fmtMoney(cents: number): string {
 const auth = useAuthStore();
 const toast = useToast();
 
-const code = computed(() => auth.user?.salesRep?.referralCode ?? "");
+// Prefer a just-claimed code so the link renders instantly, before the user-doc
+// reload round-trips. Falls back to the stored code on the doc.
+const justClaimed = ref<string | null>(null);
+const code = computed(() => justClaimed.value ?? auth.user?.salesRep?.referralCode ?? "");
 const editing = ref(false);
 const draft = ref("");
 const saving = ref(false);
@@ -47,10 +50,12 @@ async function save() {
   }
   saving.value = true;
   try {
-    await claimReferralCode(normalizedDraft.value);
-    await auth.reloadUserDoc();
+    const { code: savedCode } = await claimReferralCode(normalizedDraft.value);
+    // Show the code + shareable link immediately, then sync the store.
+    justClaimed.value = savedCode;
     editing.value = false;
     toast.success("Saved", "Your referral code is set.");
+    await auth.reloadUserDoc();
   } catch (e) {
     toast.error("Couldn't save", humanizeError(e));
   } finally {
