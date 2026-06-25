@@ -88,6 +88,8 @@ export {
 // commission. Region writes are admin-only callables (validated + audited).
 export { adminUpsertRegion } from "./sales/upsertRegion";
 export { adminDeleteRegion } from "./sales/deleteRegion";
+// Daily per-region active-tradie recount + marketing-budget unlock.
+export { scheduledRegionHealth } from "./sales/scheduledRegionHealth";
 // Sales rep self-service: e-sign the liability agreement (inert until signed),
 // then claim a unique vanity referral code.
 export { signSalesAgreement } from "./sales/signAgreement";
