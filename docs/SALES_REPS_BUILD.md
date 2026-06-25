@@ -48,11 +48,14 @@ referral rep falls back to the region's rep.
 | `0bd2aad` | **M4b** server-side scoped vetting (ownership-gated decision callables + rep read callables) |
 | `61c0011` | **M4c** rep vetting UI under `/sales` (queue + review with signed doc links + decisions) |
 | `1c0333d` | **M5a** commission ledger model + 10% math + rules (no accrual yet) |
+| `836c4d1` | **M5b** commission accrual + reversal wired into the live Stripe webhooks |
 
-Test suite: **441 unit + 482 rules, all green.** Live functions include `adminUpsertRegion`,
+Test suite: **441 unit + 482 rules + 139 functions, all green.** Live functions include `adminUpsertRegion`,
 `adminDeleteRegion`, `signSalesAgreement`, `claimReferralCode`, `submitForVetting` (region stamp),
 `provisionAccount` (referral capture), `maybeMarkVisible` path (free month), the vetting decision
-callables (rep-scoped), `listRepApplications`, `getApplicationDetails`.
+callables (rep-scoped), `listRepApplications`, `getApplicationDetails`. `stripeWebhook` now accrues
++ reverses commissions (M5b: `resolveCommissionOwner` + `accrueCommission`/`reverseCommission` in
+`functions/src/lib/`).
 
 Key data already in place: `users/{uid}.salesRep` (code + liability + active), `users/{uid}.referredByRepId`,
 `regions/{id}` (fsaPrefixes + repId), `referralCodes/{codeLower}`, `tradespeople/{uid}.{regionId,referredByRepId,referralSignal}`,
@@ -60,11 +63,18 @@ Key data already in place: `users/{uid}.salesRep` (code + liability + active), `
 
 ---
 
-## NEXT TASK — M5b: commission accrual on the live Stripe webhooks
+## M5b (SHIPPED — `836c4d1`): commission accrual on the live Stripe webhooks
 
-**This is the most correctness-critical code in the feature.** It edits live payment webhook
-handlers. A thrown error there can break payment processing, not just commissions. Build carefully,
-make it idempotent, and verify on real Firestore before trusting it.
+Shipped + deployed (`functions:stripeWebhook` verified ACTIVE via gcloud before commit). The
+blueprint below is kept as the reference for how accrual works. What landed:
+`functions/src/lib/commissionOwner.ts` (`resolveCommissionOwner`) + `commissionAccrual.ts`
+(`accrueCommission` / `reverseCommission`, deterministic ids so a webhook replay never doubles),
+wired into `payment_intent.succeeded` (service fee), the new `invoice.payment_succeeded` handler
+(subscription), and reversals on `charge.refunded` (full refund) + `charge.dispute.closed` (lost).
+Partial-refund + subscription-chargeback proportional clawback are deliberately deferred (no
+finalized policy — `PROFESSIONAL_TASKS.md`). 15 new unit tests; QA happy paths 11.9/11.10.
+**Real-Firestore end-to-end verify (test-mode Stripe drive) is still pending** — run the
+11.9/11.10 paths (or a `verify-commission` script) once a `sk_test_` key + ADC are on hand.
 
 ### Helpers to add
 1. `functions/src/lib/commissionOwner.ts` → `resolveCommissionOwner(tradieUid)`:
@@ -104,12 +114,18 @@ confirm NO duplicate, then refund and confirm a `reversed` entry. Add functions/
 
 ---
 
-## After M5b
+## NEXT TASK — M6: rep Stripe Connect + monthly payouts
 
-- **M6 — rep Stripe Connect + monthly payouts:** rep Connect onboarding callables (mirror the tradie
-  Connect flow); `salesRep.payouts` mirror via `account.updated`; a monthly `scheduledRepCommissionPayouts`
-  that sums each rep's `accrued` (minus `reversed`) ≥ a $50 min, does `stripe.transfers.create({ destination })`,
-  writes a `commissionPayouts` batch, flips those commissions to `paid`. Below-min rolls over.
+Now that commissions accrue, pay them out. Mirror the existing tradie Connect flow
+(`functions/src/payments/createConnectAccount.ts` etc.): rep Connect onboarding callables; a
+`salesRep.payouts` mirror updated via the existing `account.updated` handler; a monthly
+`scheduledRepCommissionPayouts` that, per rep, sums `accrued` minus `reversed` commissions, and once
+the net clears a **$50 min** does `stripe.transfers.create({ destination })`, writes a
+`commissionPayouts` batch, and flips those commissions to `paid` (stamping `payoutBatchId`).
+Below-min rolls over to next month. New scheduled function → deploy targeted + verify ACTIVE.
+
+## After M6
+
 - **M7 — sales dashboard + region health + reps console:** flesh out `/sales` (earnings, owned tradies,
   next payout, Connect onboarding); `scheduledRegionHealth` daily active-tradie recount + marketing-budget
   unlock; admin reps console; admin region-override control for a missed FSA.
