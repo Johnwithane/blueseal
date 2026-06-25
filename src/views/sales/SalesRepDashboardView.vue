@@ -9,6 +9,13 @@ import { claimReferralCode } from "@/firebase/services/salesReps";
 import { isValidReferralCode, normalizeReferralCode } from "@/utils/referralCode";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
+import { useRepEarnings } from "@/composables/useRepEarnings";
+
+const { summary, loading: earningsLoading } = useRepEarnings();
+
+function fmtMoney(cents: number): string {
+  return new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD" }).format(cents / 100);
+}
 
 // Minimal sales-rep landing (M2): claim/share your vanity referral code. The
 // liability gate (RepAgreementDialog, mounted in App.vue) blocks this view until
@@ -71,6 +78,38 @@ async function copyLink() {
       </p>
     </header>
 
+    <!-- Earnings at a glance → opens the full payouts page. -->
+    <RouterLink
+      to="/sales/payouts"
+      class="bs-card p-4 mb-4 block no-underline text-inherit hover:shadow-md transition-shadow"
+    >
+      <div class="flex items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <span
+            class="inline-flex h-9 w-9 items-center justify-center rounded-full shrink-0"
+            style="background-color: var(--bs-surface-alt); color: var(--bs-blue)"
+          >
+            <i class="pi pi-wallet"></i>
+          </span>
+          <div>
+            <div class="text-sm font-medium">Earnings &amp; payouts</div>
+            <div class="text-xs text-[color:var(--bs-muted)]">Connect your bank, see what you're owed</div>
+          </div>
+        </div>
+        <i class="pi pi-chevron-right text-[color:var(--bs-muted)]"></i>
+      </div>
+      <div v-if="!earningsLoading" class="mt-3 flex gap-6 text-sm">
+        <div>
+          <span class="text-[color:var(--bs-muted)] text-xs block">Unpaid balance</span>
+          <span class="font-semibold tabular-nums">{{ fmtMoney(summary.unpaidCents) }}</span>
+        </div>
+        <div>
+          <span class="text-[color:var(--bs-muted)] text-xs block">Paid to date</span>
+          <span class="font-semibold tabular-nums">{{ fmtMoney(summary.lifetimePaidCents) }}</span>
+        </div>
+      </div>
+    </RouterLink>
+
     <RouterLink
       to="/sales/applications"
       class="bs-card p-4 mb-4 flex items-center justify-between gap-3 no-underline text-inherit hover:shadow-md transition-shadow"
@@ -125,7 +164,8 @@ async function copyLink() {
     </div>
 
     <p class="text-xs text-[color:var(--bs-muted)] mt-4">
-      Your earnings, referred tradespeople, and region tools are coming soon.
+      Anyone who signs up through your link is yours for life. You earn 10% of everything they bill
+      through Blue Seal, paid out monthly.
     </p>
   </section>
 </template>

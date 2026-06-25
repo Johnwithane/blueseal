@@ -121,7 +121,7 @@ async function pay() {
   console.log(`✔ PaymentIntent ${pi.id} → ${pi.status}; charge ${chargeId}`);
 }
 
-async function waitForDoc(path, predicate, label) {
+async function waitForDoc(path, predicate, _label) {
   for (let i = 0; i < 30; i++) {
     const snap = await db.doc(path).get();
     if (snap.exists && predicate(snap.data())) return snap.data();

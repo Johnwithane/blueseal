@@ -324,6 +324,27 @@ const routes: RouteRecordRaw[] = [
     component: () => import("@/views/sales/SalesApplicationReviewView.vue"),
     meta: { requiresAuth: true, role: "sales", layout: "app", title: "Review application" },
   },
+  // Rep earnings + Stripe Connect onboarding. /return + /refresh mirror Stripe's
+  // hosted-form redirect targets (same view, toast, URL rewrite) — like the
+  // tradesperson /payouts trio.
+  {
+    path: "/sales/payouts",
+    name: "SalesPayouts",
+    component: () => import("@/views/sales/SalesRepPayoutsView.vue"),
+    meta: { requiresAuth: true, role: "sales", layout: "app", title: "Earnings & payouts" },
+  },
+  {
+    path: "/sales/payouts/return",
+    name: "SalesPayoutsReturn",
+    component: () => import("@/views/sales/SalesRepPayoutsView.vue"),
+    meta: { requiresAuth: true, role: "sales", layout: "app", title: "Earnings & payouts" },
+  },
+  {
+    path: "/sales/payouts/refresh",
+    name: "SalesPayoutsRefresh",
+    component: () => import("@/views/sales/SalesRepPayoutsView.vue"),
+    meta: { requiresAuth: true, role: "sales", layout: "app", title: "Earnings & payouts" },
+  },
 
   // Tradesperson onboarding wizard
   {

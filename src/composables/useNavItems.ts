@@ -272,6 +272,56 @@ export function useNavItems(): {
       ];
     }
 
+    if (auth.activeRole === "sales") {
+      // Sales rep: home (referral code + earnings glance), Notifications, then
+      // the two daily destinations — Applications to vet, Earnings & payouts.
+      return [
+        {
+          key: "dashboard",
+          label: "Sales",
+          icon: "pi-home",
+          to: "/sales",
+          mobile: true,
+          matches: exact("/sales"),
+        },
+        {
+          key: "notifications",
+          label: "Notifications",
+          mobileLabel: "Alerts",
+          icon: "pi-bell",
+          to: "",
+          mobile: true,
+          matches: () => false,
+        },
+        {
+          key: "applications",
+          label: "Applications",
+          mobileLabel: "Vetting",
+          icon: "pi-shield",
+          to: "/sales/applications",
+          mobile: true,
+          matches: prefix("/sales/applications"),
+        },
+        {
+          key: "payouts",
+          label: "Earnings & payouts",
+          mobileLabel: "Earnings",
+          icon: "pi-wallet",
+          to: "/sales/payouts",
+          mobile: true,
+          matches: prefix("/sales/payouts"),
+        },
+        {
+          key: "resources",
+          label: "Resources",
+          icon: "pi-book",
+          to: "/sales/resources",
+          mobile: false,
+          matches: prefix("/sales/resources"),
+        },
+      ];
+    }
+
     // Default = client view (also covers null activeRole during auth init).
     return [
       {
