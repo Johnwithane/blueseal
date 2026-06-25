@@ -522,6 +522,26 @@ function fmt(n: number): string {
         </div>
       </section>
 
+      <!-- SALES REP ENGINE -->
+      <section class="band band--navy">
+        <div class="container reveal">
+          <div class="kicker">The supply engine</div>
+          <h2 class="h-lg">A commissioned rep force that signs verified pros at ~$0 CAC.</h2>
+          <div class="grid split grid-top">
+            <div>
+              <div class="step"><span class="si">1</span><p class="m0"><strong>Reps own a territory or a referral code.</strong> Every tradesperson belongs to the rep who signed them, else their region's rep.</p></div>
+              <div class="step"><span class="si">2</span><p class="m0"><strong>They earn 10% for the life of the pro.</strong> A flat cut of every dollar their pros bill through Blue Seal, for as long as the pro is active. Reps are paid to recruit and to retain.</p></div>
+              <div class="step"><span class="si">3</span><p class="m0"><strong>Reps vet their own pros.</strong> The person who signs a tradesperson also checks their ID and certs, so growth never outruns quality.</p></div>
+            </div>
+            <div class="grid loops">
+              <div class="card"><h4>Aligned, not salaried</h4><p class="m0">Reps earn only when their pros earn. Acquisition cost scales with revenue, never ahead of it.</p></div>
+              <div class="card"><h4>A better offer to pitch</h4><p class="m0">A rep's link gives a pro their first month of Pro free, no card. The referral sells itself.</p></div>
+              <div class="card"><h4>Copy-paste into each city</h4><p class="m0">Drop a rep into a new region, hand them the playbook, and verified supply builds itself before we spend on demand.</p></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- WHERE IT GROWS -->
       <section class="band band--paper">
         <div class="container reveal">

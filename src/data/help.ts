@@ -598,6 +598,13 @@ const faqs: FaqItem[] = [
     audience: "tradesperson",
   },
   {
+    question: "Who is the Blue Seal rep on my account?",
+    answer:
+      "If a sales rep signed you up, or one covers your area, they appear on your account as **your Blue Seal rep**. They are your point of contact: they help review your application, answer questions, and earn a commission when you do well, so they are on your side. You can reach them from **Account → Payouts**. Not everyone has a rep, and that is fine. The app works exactly the same either way.",
+    categoryId: "for-tradespeople",
+    audience: "tradesperson",
+  },
+  {
     question: "I got an email saying Blue Seal set up a free profile for me. Is it real?",
     answer:
       "Yes, that's us. We build draft profiles for local tradespeople from publicly listed business information, then reach out to invite you to claim yours. The profile stays **private** until you claim it, so it isn't shown publicly in the meantime. Claiming is free: the link in the email signs you in without a password, shows you the profile we drafted, and lets you edit anything or add your trade ticket and ID to earn the verified badge. If you'd rather not be on Blue Seal at all, the same link lets you remove the listing for good. We never charge to be listed. Blue Seal makes money from payment service fees and optional Pro tools, not from directory fees.",

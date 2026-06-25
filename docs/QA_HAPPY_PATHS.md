@@ -370,8 +370,9 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    **/admin/vetting**.
 9. **Commission accrues on a referred tradie's revenue (money seam).** This is
    server-side: commissions are written by the Stripe webhook and there is no
-   rep-facing earnings screen yet (it arrives with the sales dashboard), so verify
-   in the **Firebase console** `commissions` collection. Take a tradesperson who
+   the rep now sees their running balance at **/sales/payouts** (path 11.11), but
+   to confirm the exact ledger entry verify in the **Firebase console**
+   `commissions` collection. Take a tradesperson who
    signed up via your code (step 5) to **live**, then run them to a **card-paid
    invoice** (6.2) while they are **not** Pro (so the platform service fee
    applies). **Expected:** one `commissions` doc with id `service_fee_<invoiceId>`,
@@ -392,6 +393,33 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
     reversal. **Negative checks:** a **partial** refund writes **no** reversal (not
     clawed back yet), and a dispute that closes **won** (or without loss) leaves
     the commission intact. Only a **lost** chargeback reverses it.
+11. **Rep dashboard + payout onboarding.** As a signed-in rep, open **/sales**.
+    **Expected:** an "Earnings & payouts" card shows your **unpaid balance** and
+    **paid to date**, plus cards for Applications and your referral code. Open it
+    (or the **Earnings** nav item) to reach **/sales/payouts**. **Expected:** the
+    unpaid balance matches your accrued commission (net of any reversals), and a
+    Stripe Connect onboarding panel invites you to connect a bank. Click **Start
+    Stripe setup** → you land on Stripe's hosted form (test mode). Complete it →
+    you return to /sales/payouts and, once Stripe confirms, the panel flips to
+    **Payouts are live**. Mobile (375px): cards stack, no horizontal scroll.
+12. **Rep resources hub.** From /sales, open **Resources** (nav) or visit
+    **/sales/resources**. **Expected:** a collapsible playbook (how the program
+    works, signing people up, vetting, getting paid, pitching, FAQ). Each section
+    expands/collapses; content renders as formatted text. Mobile-friendly.
+13. **Admin reps console + payout reconciliation.** As **admin**, open
+    **Admin → Sales reps** (`/admin/sales-reps`). **Expected:** every rep is
+    listed with their code, regions, payout status, and earnings (unpaid + paid),
+    plus an **Activate/Deactivate** toggle. Deactivate a rep → their referred
+    tradespeople fall back to the region rep for new commission (re-run 11.9 to
+    confirm `ownerKind` becomes "region"). If a payout batch is ever **pending**,
+    a **Retry transfer** button appears; clicking it reconciles the transfer
+    (safe to click twice — it never double-pays). Assigning a rep to a territory
+    still happens in **Admin → Regions**.
+14. **Tradesperson sees their rep contact.** As a tradesperson who signed up via
+    a rep's code (or whose area has a rep), open **Account → Payouts**.
+    **Expected:** a **"Your Blue Seal rep"** card shows the rep's name and a
+    contact email link. A tradesperson with **no** rep (direct, unregioned
+    signup) sees **no** such card.
 
 ---
 
@@ -463,4 +491,8 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 - [ ] 11.6 Rep can't see/act on applications outside their territory
 - [ ] 11.7 Commission accrues 10% on a referred tradie (card service fee + Pro sub; none on waived fee / comp month)
 - [ ] 11.8 Commission reverses on full refund / lost chargeback (not on partial / won)
+- [ ] 11.11 Rep dashboard earnings + Stripe Connect payout onboarding (/sales/payouts)
+- [ ] 11.12 Rep resources hub (/sales/resources)
+- [ ] 11.13 Admin reps console: roster, activate/deactivate, retry pending payout (/admin/sales-reps)
+- [ ] 11.14 Tradesperson sees their Blue Seal rep contact (Account → Payouts)
 - [ ] 12 Admin jobs & postings browse (province + territory + status + search, all regions)
