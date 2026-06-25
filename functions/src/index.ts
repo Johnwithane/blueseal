@@ -42,6 +42,11 @@ export {
   requestApplicationInfo,
   rejectApplication,
 } from "./vetting/decisions";
+// Scoped vetting: a sales rep reviews the applications they own (referral or
+// region). The decision callables above now accept an owning rep; these two
+// give reps a server-filtered read path (rules can't scope their list reads).
+export { listRepApplications } from "./vetting/listRepApplications";
+export { getApplicationDetails } from "./vetting/getApplicationDetails";
 export { scheduledIdRetention } from "./vetting/scheduledIdRetention";
 
 // Insurance

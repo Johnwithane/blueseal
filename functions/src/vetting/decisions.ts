@@ -3,10 +3,10 @@ import { CALLABLE_OPTS } from "../lib/callable";
 import { z } from "zod";
 import { FieldValue } from "firebase-admin/firestore";
 import { db } from "../lib/admin";
-import { requireAdmin } from "../lib/auth";
 import { logAdminAction } from "../lib/audit";
 import { notify } from "../lib/notify";
 import { maybeMarkVisible } from "./visibility";
+import { requireVettingActor, assertRepOwnsTradie } from "../lib/vettingActor";
 
 const ApproveInput = z.object({ tradieUid: z.string().min(1).max(128) });
 const InfoInput = z.object({
@@ -28,10 +28,12 @@ async function getTradieVetting(
 }
 
 export const approveApplication = onCall(CALLABLE_OPTS, async (req) => {
-  const actor = requireAdmin(req);
+  const { uid: actor, role: actorRole } = await requireVettingActor(req);
   const parsed = ApproveInput.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);
   const { tradieUid } = parsed.data;
+  // A rep may only act on tradies they own (referral or region); admin: any.
+  if (actorRole === "sales") await assertRepOwnsTradie(actor, tradieUid);
   // Single-click "approve everything": flips every PENDING cert + the pending
   // ID to approved, marks the application approved, and writes the
   // denormalized idVerified/verifiedTrades on the tradie doc so isVisible
@@ -129,15 +131,17 @@ export const approveApplication = onCall(CALLABLE_OPTS, async (req) => {
     action: "approveApplication",
     targetType: "tradesperson",
     targetId: tradieUid,
+    metadata: { actorRole },
   });
   return { ok: true };
 });
 
 export const requestApplicationInfo = onCall(CALLABLE_OPTS, async (req) => {
-  const actor = requireAdmin(req);
+  const { uid: actor, role: actorRole } = await requireVettingActor(req);
   const parsed = InfoInput.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);
   const { tradieUid, notes } = parsed.data;
+  if (actorRole === "sales") await assertRepOwnsTradie(actor, tradieUid);
   const current = await getTradieVetting(tradieUid);
 
   // Idempotent: re-issuing the SAME request (already info_requested with these
@@ -168,15 +172,17 @@ export const requestApplicationInfo = onCall(CALLABLE_OPTS, async (req) => {
     targetType: "tradesperson",
     targetId: tradieUid,
     reason: notes,
+    metadata: { actorRole },
   });
   return { ok: true };
 });
 
 export const rejectApplication = onCall(CALLABLE_OPTS, async (req) => {
-  const actor = requireAdmin(req);
+  const { uid: actor, role: actorRole } = await requireVettingActor(req);
   const parsed = RejectInput.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);
   const { tradieUid, reason } = parsed.data;
+  if (actorRole === "sales") await assertRepOwnsTradie(actor, tradieUid);
   const current = await getTradieVetting(tradieUid);
 
   // Idempotent: re-rejecting with the SAME reason is a no-op so a double-tap
@@ -209,6 +215,7 @@ export const rejectApplication = onCall(CALLABLE_OPTS, async (req) => {
     targetType: "tradesperson",
     targetId: tradieUid,
     reason,
+    metadata: { actorRole },
   });
   return { ok: true };
 });
