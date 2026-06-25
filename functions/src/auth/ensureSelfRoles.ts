@@ -84,6 +84,14 @@ export const ensureSelfRoles = onCall(CALLABLE_OPTS, async (req) => {
   const existing = (authUser.customClaims ?? {}) as Record<string, unknown>;
   const existingClaimRoles = rolesFromUnknown(existing.roles, existing.role);
   const claimRoles = [...targetRoles];
+  // Sales is admin-granted (adminSetUserRoles), never self-serviceable
+  // (addRoleToSelf is client/tradesperson only), and the /users rules lock the
+  // `roles` field — so the doc is a trustworthy source. Mirror it from the doc,
+  // or this reconciler (which runs on most page loads) strips `sales` off the
+  // token within one load and every rep callable rejects "Role sales required".
+  if (nextRoles.includes("sales") && !claimRoles.includes("sales")) {
+    claimRoles.push("sales");
+  }
   if (existingClaimRoles.includes("admin") && !claimRoles.includes("admin")) {
     claimRoles.push("admin");
   }

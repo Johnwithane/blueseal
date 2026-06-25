@@ -235,7 +235,10 @@ export const useAuthStore = defineStore("auth", {
                 r === "client" ||
                 r === "tradesperson" ||
                 r === "admin" ||
-                r === "qa",
+                r === "qa" ||
+                // `sales` must be here too, or a missing sales claim is never
+                // detected and the ensureSelfRoles repair below never fires.
+                r === "sales",
             )
           : [];
         const claimMissing = docRoles.some((r) => !claimRoles.includes(r));
