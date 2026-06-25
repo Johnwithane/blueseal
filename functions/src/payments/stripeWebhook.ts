@@ -42,6 +42,7 @@ import {
   handleCheckoutSessionCompleted,
   handleSubscriptionChanged,
   handleSubscriptionInvoicePaymentFailed,
+  handleSubscriptionInvoicePaymentSucceeded,
 } from "./handlers/subscription";
 import {
   handleChargeDisputeClosed,
@@ -214,6 +215,11 @@ export const stripeWebhook = onRequest(
         case "customer.subscription.updated":
         case "customer.subscription.deleted":
           await handleSubscriptionChanged(event.data.object as StripeSubscription);
+          break;
+        case "invoice.payment_succeeded":
+          await handleSubscriptionInvoicePaymentSucceeded(
+            event.data.object as StripeInvoice,
+          );
           break;
         case "invoice.payment_failed":
           await handleSubscriptionInvoicePaymentFailed(

@@ -27,6 +27,7 @@ import { db } from "../../lib/admin";
 import { notify } from "../../lib/notify";
 import { postSystemMessage } from "../../lib/chatSystemMessage";
 import { seedReviewPairAndNotify } from "../../lib/reviewPair";
+import { accrueCommission } from "../../lib/commissionAccrual";
 import type { StripePaymentIntent } from "./shared";
 
 interface InvoiceLookup {
@@ -219,6 +220,28 @@ export async function handlePaymentIntentSucceeded(
     { paidAt: FieldValue.serverTimestamp() },
     { merge: true },
   );
+
+  // Sales-rep commission accrual (M5b). 10% of the platform portion of the
+  // service fee the client paid, to the tradesperson's owning rep. Best-effort
+  // + fully guarded: a failure here must NEVER roll back the committed payment.
+  // Idempotent on the invoiceId, so a webhook replay can't double-accrue. Pro
+  // tradies have the platform fee waived (platformPortionCents 0) → no entry,
+  // which is correct.
+  try {
+    const platformPortionCents =
+      inv.data.payment?.serviceFee?.platformPortionCents ?? 0;
+    await accrueCommission({
+      tradespersonId: result.tradespersonId,
+      source: "service_fee",
+      sourceRef: inv.ref.id,
+      grossCents: platformPortionCents,
+    });
+  } catch (err) {
+    logger.error("paymentIntent succeeded: commission accrual failed", {
+      invoiceId: inv.ref.id,
+      err: err instanceof Error ? err.message : String(err),
+    });
+  }
 
   // Verified-earnings stats on the tradesperson public profile. Atomic
   // increments (the social-proof badge counts dollars, not just job count).

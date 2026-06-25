@@ -23,6 +23,7 @@ import { logger } from "firebase-functions/v2";
 import { db } from "../../lib/admin";
 import { logAdminAction } from "../../lib/audit";
 import { notify, notifyMany } from "../../lib/notify";
+import { reverseCommission } from "../../lib/commissionAccrual";
 import type { StripeDispute } from "./shared";
 
 function chargeId(d: StripeDispute): string {
@@ -228,6 +229,22 @@ export async function handleChargeDisputeClosed(
       },
       { merge: true },
     );
+
+    // A LOST dispute means the bank clawed back the funds — including the
+    // application fee Blue Seal kept — so reverse the rep's commission on that
+    // service-fee revenue. won / warning_closed leave the money with us → no
+    // reversal. Shares the deterministic reversal id with the refund path, so a
+    // refund-then-dispute (or replay) can only ever produce one reversal entry.
+    if (dispute.status === "lost") {
+      try {
+        await reverseCommission({ source: "service_fee", sourceRef: inv.ref.id });
+      } catch (err) {
+        logger.error("disputeClosed: commission reversal failed", {
+          invoiceId: inv.ref.id,
+          err: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
   }
 
   await logAdminAction({

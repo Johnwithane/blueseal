@@ -11,7 +11,20 @@ import { logger } from "firebase-functions/v2";
 
 import { db } from "../../lib/admin";
 import { notify } from "../../lib/notify";
+import { reverseCommission } from "../../lib/commissionAccrual";
 import type { StripeCharge, StripeRefund } from "./shared";
+
+/** The Stripe invoice id a charge settled (subscription charges only), or null. */
+function chargeInvoiceId(charge: StripeCharge): string | null {
+  const inv = charge.invoice;
+  if (!inv) return null;
+  return typeof inv === "string" ? inv : inv.id;
+}
+
+/** True once Stripe has refunded the charge in full. */
+function isFullyRefunded(charge: StripeCharge): boolean {
+  return charge.amount_refunded >= charge.amount;
+}
 
 interface RefundEntry {
   refundId: string;
@@ -131,6 +144,22 @@ export async function handleChargeRefunded(
   if (!ref) {
     // Not an invoice payment — it may be a job's upfront fee paid by card.
     if (await handleUpfrontRefund(charge, eventId)) return;
+    // …or a Blue Seal Pro subscription charge (those settle a Stripe invoice,
+    // not a Blue Seal invoice doc). A full refund returns the subscription
+    // revenue, so reverse the rep's commission for that Stripe invoice. Rare
+    // (Pro refunds are manual goodwill); idempotent + guarded.
+    const stripeInvoiceId = chargeInvoiceId(charge);
+    if (stripeInvoiceId && isFullyRefunded(charge)) {
+      try {
+        await reverseCommission({ source: "subscription", sourceRef: stripeInvoiceId });
+      } catch (err) {
+        logger.error("chargeRefunded: subscription commission reversal failed", {
+          stripeInvoiceId,
+          err: err instanceof Error ? err.message : String(err),
+        });
+      }
+      return;
+    }
     logger.warn("chargeRefunded: no invoice or upfront fee for charge", {
       chargeId: charge.id,
       paymentIntentId: charge.payment_intent,
@@ -191,6 +220,22 @@ export async function handleChargeRefunded(
       { merge: true },
     );
   });
+
+  // Reverse the sales-rep commission when the invoice is FULLY refunded: Stripe
+  // auto-refunds the application fee Blue Seal kept, so the platform revenue the
+  // rep earned 10% on is gone. Partial refunds aren't clawed back (the fee is
+  // retained on partial refunds and there's no finalized proportional policy —
+  // see PROFESSIONAL_TASKS.md). Idempotent on the invoiceId + fully guarded.
+  if (isFullyRefunded(charge)) {
+    try {
+      await reverseCommission({ source: "service_fee", sourceRef: ref.id });
+    } catch (err) {
+      logger.error("chargeRefunded: service-fee commission reversal failed", {
+        invoiceId: ref.id,
+        err: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
 
   // Notify both parties after the transaction commits. Best-effort —
   // a notify failure shouldn't roll back the refund record.

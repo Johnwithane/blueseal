@@ -48,6 +48,10 @@ export interface StripeCharge {
   refunded: boolean;
   payment_intent?: string | null;
   transfer?: string | null;
+  // The Stripe invoice this charge settled, when it's a subscription charge
+  // (null for the one-off PaymentIntent charges behind client invoices). Used
+  // to reverse a subscription commission when a Pro charge is refunded.
+  invoice?: string | { id: string } | null;
   // For `charge.refunded` events the refund object is on `refunds.data`.
   refunds?: { data: StripeRefund[] } | null;
   metadata?: Record<string, string> | null;
@@ -112,6 +116,9 @@ export interface StripeInvoice {
   customer?: string | { id: string } | null;
   subscription?: string | { id: string } | null;
   billing_reason?: string | null;
+  // Cents Stripe actually collected for this invoice — the commission base for
+  // a subscription accrual. 0 for a comped / 100%-coupon invoice (→ no accrual).
+  amount_paid?: number | null;
 }
 
 export interface StripeEvent {

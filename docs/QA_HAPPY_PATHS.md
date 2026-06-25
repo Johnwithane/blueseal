@@ -355,6 +355,30 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    DIFFERENT region (and not your referral) does NOT appear in your list, and the
    server denies a decision call on them. Admin still sees + vets everyone from
    **/admin/vetting**.
+9. **Commission accrues on a referred tradie's revenue (money seam).** This is
+   server-side: commissions are written by the Stripe webhook and there is no
+   rep-facing earnings screen yet (it arrives with the sales dashboard), so verify
+   in the **Firebase console** `commissions` collection. Take a tradesperson who
+   signed up via your code (step 5) to **live**, then run them to a **card-paid
+   invoice** (6.2) while they are **not** Pro (so the platform service fee
+   applies). **Expected:** one `commissions` doc with id `service_fee_<invoiceId>`,
+   `repId` = the owning rep, `ownerKind` "referral", `source` "service_fee",
+   `status` "accrued", and `commissionCents` = **10%** of the fee's platform
+   portion. Exactly one doc, and a webhook retry never adds a second. Then make
+   them **Pro** and pay another card invoice. **Expected:** the fee is waived to
+   $0, so **no** new commission is written (nothing for the platform to share). A
+   real **Pro subscription** payment (8.1) writes a `subscription_<stripeInvoiceId>`
+   doc at 10% of the amount charged; the referral **free comp month** writes
+   nothing (there is no Stripe charge behind it).
+10. **Commission reverses on a refund / lost chargeback (money seam).** From step
+    9, **fully refund** the card-paid invoice (admin / Stripe test mode).
+    **Expected:** a second doc with id `service_fee_<invoiceId>_reversal`,
+    `status` "reversed", `reversalOf` the original id, mirroring the original
+    amount; the original accrual is left untouched (the ledger is append-only and
+    payouts net accrued minus reversed). A refund retry never adds a second
+    reversal. **Negative checks:** a **partial** refund writes **no** reversal (not
+    clawed back yet), and a dispute that closes **won** (or without loss) leaves
+    the commission intact. Only a **lost** chargeback reverses it.
 
 ---
 
@@ -424,4 +448,6 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 - [ ] 11.4 Direct signup unchanged (no comp, card trial)
 - [ ] 11.5 Rep reviews + approves an owned application (docs visible, goes live)
 - [ ] 11.6 Rep can't see/act on applications outside their territory
+- [ ] 11.7 Commission accrues 10% on a referred tradie (card service fee + Pro sub; none on waived fee / comp month)
+- [ ] 11.8 Commission reverses on full refund / lost chargeback (not on partial / won)
 - [ ] 12 Admin jobs & postings browse (province + territory + status + search, all regions)

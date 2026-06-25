@@ -9,6 +9,7 @@ import { logger } from "firebase-functions/v2";
 
 import { db } from "../../lib/admin";
 import { notify } from "../../lib/notify";
+import { accrueCommission } from "../../lib/commissionAccrual";
 import {
   syncSubscriptionMirror,
   type SubscriptionState,
@@ -125,6 +126,51 @@ export async function handleCheckoutSessionCompleted(
     { subscription: { ...(existing ?? {}), stripeCustomerId: cust, updatedAt: Timestamp.now() } },
     { merge: true },
   );
+}
+
+export async function handleSubscriptionInvoicePaymentSucceeded(
+  invoice: StripeInvoice,
+): Promise<void> {
+  // Only subscription invoices — client service-fee payments are PaymentIntents
+  // (not Stripe Invoices) so they never reach here, but guard explicitly.
+  const isSubscriptionInvoice =
+    !!invoice.subscription || (invoice.billing_reason ?? "").startsWith("subscription");
+  if (!isSubscriptionInvoice) return;
+
+  // Comped first month / 100%-coupon invoice → nothing collected → no Blue Seal
+  // revenue → no commission. (The free-month comp has no Stripe invoice at all.)
+  const amountPaid = invoice.amount_paid ?? 0;
+  if (amountPaid <= 0) return;
+
+  const cust = customerId(invoice.customer);
+  const uid = await resolveUid(undefined, cust);
+  if (!uid) {
+    logger.warn("subscription invoice paid: no user for customer", {
+      invoiceId: invoice.id,
+      customer: cust,
+    });
+    return;
+  }
+
+  // The Pro subscriber IS the tradesperson — accrue 10% of what Stripe collected
+  // to their owning rep. Idempotent on the Stripe invoice id, so each monthly
+  // renewal accrues once (the residual is life-of-the-tradesperson). Best-effort
+  // + guarded: a commission failure must not fail the webhook (Stripe would
+  // retry an event whose real work — the subscription sync — already ran).
+  try {
+    await accrueCommission({
+      tradespersonId: uid,
+      source: "subscription",
+      sourceRef: invoice.id,
+      grossCents: amountPaid,
+    });
+  } catch (err) {
+    logger.error("subscription invoice paid: commission accrual failed", {
+      invoiceId: invoice.id,
+      uid,
+      err: err instanceof Error ? err.message : String(err),
+    });
+  }
 }
 
 export async function handleSubscriptionInvoicePaymentFailed(
