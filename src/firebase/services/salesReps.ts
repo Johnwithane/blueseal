@@ -36,3 +36,17 @@ export async function isReferralCodeAvailable(
   if (!snap.exists()) return true;
   return currentUid != null && snap.data()?.uid === currentUid;
 }
+
+export interface RepContact {
+  hasRep: boolean;
+  name?: string;
+  email?: string | null;
+  ownerKind?: "referral" | "region";
+}
+
+/** Tradesperson-facing: who is my Blue Seal rep (support contact), if any. */
+export async function getMyRepContact(): Promise<RepContact> {
+  const fn = httpsCallable<undefined, RepContact>(functions, "getMyRepContact");
+  const { data } = await fn();
+  return data;
+}

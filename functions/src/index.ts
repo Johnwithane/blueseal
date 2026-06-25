@@ -95,6 +95,8 @@ export { scheduledRegionHealth } from "./sales/scheduledRegionHealth";
 export { adminListSalesReps } from "./sales/adminListSalesReps";
 export { adminSetRepActive } from "./sales/adminSetRepActive";
 export { adminRetryPayoutBatch } from "./sales/adminRetryPayoutBatch";
+// Tradesperson-facing: who is my Blue Seal rep (support contact).
+export { getMyRepContact } from "./sales/getMyRepContact";
 // Sales rep self-service: e-sign the liability agreement (inert until signed),
 // then claim a unique vanity referral code.
 export { signSalesAgreement } from "./sales/signAgreement";

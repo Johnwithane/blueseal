@@ -58,6 +58,7 @@ import TradieDocsManager from "@/components/TradieDocsManager.vue";
 import VouchesPanel from "@/components/VouchesPanel.vue";
 import PayoutsPanel from "@/components/PayoutsPanel.vue";
 import SubscriptionPanel from "@/components/SubscriptionPanel.vue";
+import RepContactCard from "@/components/tradie/RepContactCard.vue";
 import BrandingPanel from "@/components/BrandingPanel.vue";
 import GoogleBusinessPanel from "@/components/GoogleBusinessPanel.vue";
 import LocationPicker, { type LocationValue } from "@/components/LocationPicker.vue";
@@ -1461,6 +1462,7 @@ async function grantAllTrades() {
     <!-- PAYOUTS TAB ----------------------------------------------------- -->
     <div v-if="auth.hasTradieRole" v-show="activeTab === 'payouts'">
       <PayoutsPanel />
+      <RepContactCard class="mt-4" />
     </div>
 
     <!-- BLUE SEAL PRO TAB ------------------------------------------------ -->

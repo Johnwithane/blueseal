@@ -345,6 +345,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import("@/views/sales/SalesRepPayoutsView.vue"),
     meta: { requiresAuth: true, role: "sales", layout: "app", title: "Earnings & payouts" },
   },
+  {
+    path: "/sales/resources",
+    name: "SalesResources",
+    component: () => import("@/views/sales/SalesResourcesView.vue"),
+    meta: { requiresAuth: true, role: "sales", layout: "app", title: "Rep resources" },
+  },
 
   // Tradesperson onboarding wizard
   {
