@@ -93,6 +93,53 @@ export interface ReferralCodeDoc {
 }
 
 // ---------------------------------------------------------------------------
+// commissions/{commissionId} — the sales-rep commission ledger. One entry per
+// revenue event (a Pro subscription payment, or a job's service fee) attributed
+// to the owning rep (referral beats region). SERVER-ONLY writes (the accrual
+// hooks); read by admin + the owning rep. A refund/chargeback records a separate
+// `reversed` entry referencing the original, never a negative accrual.
+// ---------------------------------------------------------------------------
+export type CommissionSource = "subscription" | "service_fee";
+export type CommissionOwnerKind = "referral" | "region";
+export type CommissionStatus = "accrued" | "reversed" | "paid";
+
+export interface CommissionDoc {
+  repId: string;
+  /** Region the tradesperson belongs to (null for a referral with no region). */
+  regionId: string | null;
+  tradespersonId: string;
+  ownerKind: CommissionOwnerKind;
+  source: CommissionSource;
+  /** Stripe invoice id (subscription) or Blue Seal invoiceId (service fee) — the dedupe key. */
+  sourceRef: string;
+  grossRevenueCents: number;
+  rateBps: number;
+  commissionCents: number;
+  status: CommissionStatus;
+  /** Set when the entry is rolled into a payout batch (M6). */
+  payoutBatchId: string | null;
+  /** For a reversal entry: the id of the commission it offsets. */
+  reversalOf: string | null;
+  createdAt: Timestamp;
+}
+
+// commissionPayouts/{batchId} — a monthly Stripe transfer of a rep's accrued
+// commissions to their Connect account (M6). SERVER-ONLY writes; admin + owning
+// rep read.
+export type CommissionPayoutStatus = "pending" | "paid" | "failed";
+
+export interface CommissionPayoutDoc {
+  repId: string;
+  stripeTransferId: string | null;
+  amountCents: number;
+  commissionIds: string[];
+  periodStart: Timestamp;
+  periodEnd: Timestamp;
+  status: CommissionPayoutStatus;
+  createdAt: Timestamp;
+}
+
+// ---------------------------------------------------------------------------
 // platformStats/current — public marketing counts shown on the /pitch deck.
 // World-readable COUNTS ONLY (never any personal data). Written exclusively by
 // the recomputePlatformStats scheduled Cloud Function (Admin SDK).

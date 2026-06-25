@@ -458,6 +458,21 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    // ---------- commissions + commissionPayouts (sales-rep ledger) ----------
+    // The commission ledger + monthly payout batches. Read is admin OR the
+    // owning rep (a rep sees their own earnings, never another rep's). Writes
+    // are SERVER-ONLY (accrual hooks + the payout scheduler, Admin SDK) — a rep
+    // can never mint or edit their own commission. A rep lists their own with
+    // where('repId','==',uid()); the per-doc predicate authorizes that query.
+    match /commissions/{commissionId} {
+      allow read: if isAdmin() || (resource != null && resource.data.repId == uid());
+      allow create, update, delete: if false;
+    }
+    match /commissionPayouts/{batchId} {
+      allow read: if isAdmin() || (resource != null && resource.data.repId == uid());
+      allow create, update, delete: if false;
+    }
+
     // ---------- clients (tradesperson client book / CRM — Blue Seal Pro) ----------
     // A tradesperson-owned contact record (see ClientDoc). Read is
     // ownership-only — a lapsed Pro tradesperson never loses access to their own
