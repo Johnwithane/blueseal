@@ -49,13 +49,15 @@ referral rep falls back to the region's rep.
 | `61c0011` | **M4c** rep vetting UI under `/sales` (queue + review with signed doc links + decisions) |
 | `1c0333d` | **M5a** commission ledger model + 10% math + rules (no accrual yet) |
 | `836c4d1` | **M5b** commission accrual + reversal wired into the live Stripe webhooks |
+| _(pending)_ | **M6** rep Stripe Connect onboarding + monthly commission payout scheduler |
 
-Test suite: **441 unit + 482 rules + 139 functions, all green.** Live functions include `adminUpsertRegion`,
+Test suite: **441 unit + 482 rules + 151 functions, all green.** Live functions include `adminUpsertRegion`,
 `adminDeleteRegion`, `signSalesAgreement`, `claimReferralCode`, `submitForVetting` (region stamp),
 `provisionAccount` (referral capture), `maybeMarkVisible` path (free month), the vetting decision
 callables (rep-scoped), `listRepApplications`, `getApplicationDetails`. `stripeWebhook` now accrues
 + reverses commissions (M5b: `resolveCommissionOwner` + `accrueCommission`/`reverseCommission` in
-`functions/src/lib/`).
+`functions/src/lib/`). M6 adds `createRepConnect{Account,OnboardingLink,LoginLink}`, the
+`account.updated` rep-payouts mirror, and the monthly `scheduledRepCommissionPayouts`.
 
 Key data already in place: `users/{uid}.salesRep` (code + liability + active), `users/{uid}.referredByRepId`,
 `regions/{id}` (fsaPrefixes + repId), `referralCodes/{codeLower}`, `tradespeople/{uid}.{regionId,referredByRepId,referralSignal}`,
@@ -114,21 +116,29 @@ confirm NO duplicate, then refund and confirm a `reversed` entry. Add functions/
 
 ---
 
-## NEXT TASK — M6: rep Stripe Connect + monthly payouts
+## M6 (SHIPPED): rep Stripe Connect + monthly payouts
 
-Now that commissions accrue, pay them out. Mirror the existing tradie Connect flow
-(`functions/src/payments/createConnectAccount.ts` etc.): rep Connect onboarding callables; a
-`salesRep.payouts` mirror updated via the existing `account.updated` handler; a monthly
-`scheduledRepCommissionPayouts` that, per rep, sums `accrued` minus `reversed` commissions, and once
-the net clears a **$50 min** does `stripe.transfers.create({ destination })`, writes a
-`commissionPayouts` batch, and flips those commissions to `paid` (stamping `payoutBatchId`).
-Below-min rolls over to next month. New scheduled function → deploy targeted + verify ACTIVE.
+Shipped + deployed (5 functions verified ACTIVE via gcloud). Rep Connect onboarding mirrors the
+tradie flow — `createRepConnect{Account,OnboardingLink,LoginLink}` write `users/{uid}.salesRep.payouts`
+(transfers-only capability; `metadata.repId` round-trip), and `account.updated` mirrors that slice
+with a payouts-only status derivation (a transfers-only rep reads "enabled", not "restricted"). The
+monthly `scheduledRepCommissionPayouts` (1st @ 03:30 PT) nets each rep's `accrued` minus not-yet-netted
+`reversed`, and when the net clears the **$50 min** transfers it to their Connect account, writing a
+`commissionPayouts` batch and flipping the entries to `paid`. Money-safety: **claim-before-pay** (flip
+to paid + write a `pending` batch BEFORE the transfer, idempotency-keyed transfer, then confirm), so a
+retry/replay can never double-pay; transfer rejection unwinds the claim; below-min rolls over. Netting
+math is a pure helper (`functions/src/lib/commissionPayout.ts`, 8 unit tests). Deferred: partial-refund
+proportional clawback, post-final-payout clawback, and pending-batch reconciliation (M7 admin console).
+**Real-Firestore end-to-end payout verify (test-mode transfer) still pending** — needs a rep onboarded
+in test mode + a `sk_test_` key + ADC.
 
-## After M6
+## NEXT TASK — M7: sales dashboard + region health + reps console
 
 - **M7 — sales dashboard + region health + reps console:** flesh out `/sales` (earnings, owned tradies,
-  next payout, Connect onboarding); `scheduledRegionHealth` daily active-tradie recount + marketing-budget
-  unlock; admin reps console; admin region-override control for a missed FSA.
+  next payout, Connect onboarding — the UI that calls the M6 rep-Connect callables; add the
+  `/sales/payouts/return` + `/sales/payouts/refresh` routes the onboarding link points at);
+  `scheduledRegionHealth` daily active-tradie recount + marketing-budget unlock; admin reps console
+  (incl. pending-batch payout reconciliation); admin region-override control for a missed FSA.
 - **M8 — resource hub + tradie support-contact + pitch slide + Help/FAQ + QA:** `/sales/resources`
   (clone the Help Center pattern); show tradies their rep contact; a go-to-market slide in the
   password-gated `PitchView.vue`; final Help/FAQ + QA happy-paths sweep.

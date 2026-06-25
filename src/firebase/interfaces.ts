@@ -79,7 +79,12 @@ export interface SalesRepState {
   /** Null until the rep signs; re-signed when the agreement version bumps. */
   liability: SalesRepLiability | null;
   createdAt: Timestamp;
-  // M6 adds Stripe Connect payout fields (stripeAccountId, payouts, balances).
+  /**
+   * Stripe Connect Express payout state (M6) — same shape as the tradesperson
+   * mirror. Seeded by `createRepConnectAccount`, kept in sync by the
+   * `account.updated` webhook. Absent until the rep starts payout onboarding.
+   */
+  payouts?: PayoutsState;
 }
 
 // referralCodes/{codeLower} — uniqueness registry (mirrors profileSlugs). Maps a

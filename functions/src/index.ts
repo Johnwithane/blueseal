@@ -173,6 +173,11 @@ export { sendSupportTicketReply } from "./support/sendSupportTicketReply";
 export { createConnectAccount } from "./payments/createConnectAccount";
 export { createConnectOnboardingLink } from "./payments/createConnectOnboardingLink";
 export { createConnectLoginLink } from "./payments/createConnectLoginLink";
+// Sales reps onboard their own Connect account the same way (metadata.repId →
+// the account.updated mirror writes users/{uid}.salesRep.payouts).
+export { createRepConnectAccount } from "./payments/createRepConnectAccount";
+export { createRepConnectOnboardingLink } from "./payments/createRepConnectOnboardingLink";
+export { createRepConnectLoginLink } from "./payments/createRepConnectLoginLink";
 export { stripeWebhook } from "./payments/stripeWebhook";
 export { createInvoicePaymentIntent } from "./payments/createInvoicePaymentIntent";
 export { createUpfrontFeePaymentIntent } from "./payments/createUpfrontFeePaymentIntent";
@@ -184,6 +189,9 @@ export { backfillPayoutsField } from "./payments/backfillPayoutsField";
 // comp (subscription.proCompUntil) lapses. No Stripe binding; safe to deploy
 // before the Stripe secrets are set.
 export { scheduledProCompExpiry } from "./payments/scheduledProCompExpiry";
+// Sales reps — monthly commission payout (net accrued minus reversed, $50 min,
+// Stripe transfer to the rep's Connect account, ledger flipped to paid).
+export { scheduledRepCommissionPayouts } from "./payments/scheduledRepCommissionPayouts";
 
 // Seed + ops
 // NOTE: `ping` is intentionally NOT exported — it was an unauthenticated,
