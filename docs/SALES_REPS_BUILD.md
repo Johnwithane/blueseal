@@ -49,15 +49,25 @@ referral rep falls back to the region's rep.
 | `61c0011` | **M4c** rep vetting UI under `/sales` (queue + review with signed doc links + decisions) |
 | `1c0333d` | **M5a** commission ledger model + 10% math + rules (no accrual yet) |
 | `836c4d1` | **M5b** commission accrual + reversal wired into the live Stripe webhooks |
-| _(pending)_ | **M6** rep Stripe Connect onboarding + monthly commission payout scheduler |
+| `c6cc3c8` | **M6** rep Stripe Connect onboarding + monthly commission payout scheduler |
+| `ef211e6` | **M7a** rep dashboard: earnings, payouts, Connect onboarding UI |
+| `972407e` | **M7b** scheduledRegionHealth: daily active-tradie recount + budget unlock |
+| `e12c411` | **M7c** admin reps console + pending-payout reconciliation |
+| `261096b` | **M8a/b** rep resource hub + tradesperson's rep-contact card |
+| `aecaca6` | **M8c/d** pitch slide + Help/FAQ + QA happy-paths sweep |
 
-Test suite: **441 unit + 482 rules + 151 functions, all green.** Live functions include `adminUpsertRegion`,
-`adminDeleteRegion`, `signSalesAgreement`, `claimReferralCode`, `submitForVetting` (region stamp),
-`provisionAccount` (referral capture), `maybeMarkVisible` path (free month), the vetting decision
-callables (rep-scoped), `listRepApplications`, `getApplicationDetails`. `stripeWebhook` now accrues
-+ reverses commissions (M5b: `resolveCommissionOwner` + `accrueCommission`/`reverseCommission` in
-`functions/src/lib/`). M6 adds `createRepConnect{Account,OnboardingLink,LoginLink}`, the
-`account.updated` rep-payouts mirror, and the monthly `scheduledRepCommissionPayouts`.
+**Feature complete.** Test suite: **447 unit + 482 rules + 151 functions, all green.** Live functions
+include `adminUpsertRegion`, `adminDeleteRegion`, `signSalesAgreement`, `claimReferralCode`,
+`submitForVetting` (region stamp), `provisionAccount` (referral capture), `maybeMarkVisible` path
+(free month), the vetting decision callables (rep-scoped), `listRepApplications`,
+`getApplicationDetails`. `stripeWebhook` accrues + reverses commissions (M5b). M6 added
+`createRepConnect{Account,OnboardingLink,LoginLink}`, the `account.updated` rep-payouts mirror, and
+the monthly `scheduledRepCommissionPayouts`. M7 added `scheduledRegionHealth`, `adminListSalesReps`,
+`adminSetRepActive`, `adminRetryPayoutBatch`, and the rep dashboard / admin console UI. M8 added
+`getMyRepContact`, the `/sales/resources` playbook, and the tradesperson rep-contact card.
+
+**Not yet live to users:** the M7/M8 client (Vue) is committed but the hosting bundle hasn't been
+deployed (`npm run deploy:prod`) or pushed. All Cloud Functions ARE deployed + verified ACTIVE.
 
 Key data already in place: `users/{uid}.salesRep` (code + liability + active), `users/{uid}.referredByRepId`,
 `regions/{id}` (fsaPrefixes + repId), `referralCodes/{codeLower}`, `tradespeople/{uid}.{regionId,referredByRepId,referralSignal}`,
@@ -134,16 +144,23 @@ proportional clawback, post-final-payout clawback, and pending-batch reconciliat
 seeded a payout-enabled rep + $60 accrued, triggered the deployed scheduler, confirmed a real transfer,
 a `paid` batch, and the ledger flipped to `paid`, then cleaned up.
 
-## NEXT TASK — M7: sales dashboard + region health + reps console
+## M7 + M8 (SHIPPED) — the feature is complete
 
-- **M7 — sales dashboard + region health + reps console:** flesh out `/sales` (earnings, owned tradies,
-  next payout, Connect onboarding — the UI that calls the M6 rep-Connect callables; add the
-  `/sales/payouts/return` + `/sales/payouts/refresh` routes the onboarding link points at);
-  `scheduledRegionHealth` daily active-tradie recount + marketing-budget unlock; admin reps console
-  (incl. pending-batch payout reconciliation); admin region-override control for a missed FSA.
-- **M8 — resource hub + tradie support-contact + pitch slide + Help/FAQ + QA:** `/sales/resources`
-  (clone the Help Center pattern); show tradies their rep contact; a go-to-market slide in the
-  password-gated `PitchView.vue`; final Help/FAQ + QA happy-paths sweep.
+- **M7a** `/sales` dashboard: earnings-at-a-glance + `/sales/payouts` (Stripe Connect onboarding,
+  unpaid balance, payout history) + the missing `sales` nav branch.
+- **M7b** `scheduledRegionHealth`: daily per-region active/total recount + marketing-budget unlock.
+- **M7c** `/admin/sales-reps`: rep roster + earnings, activate/deactivate, pending-payout retry
+  (idempotency-safe). Region rep assignment stays in `/admin/regions`.
+- **M8a/b** `/sales/resources` playbook + the tradesperson "Your Blue Seal rep" contact card.
+- **M8c/d** a "supply engine" pitch slide + a tradesperson FAQ + QA happy paths 11.11–11.14.
+
+**Verified on real Firestore:** accrual + reversal (`verify-commission.mjs`) and the monthly payout
+(`verify-payout.mjs`). The rep-facing UI is committed but not yet deployed to hosting.
+
+### Open follow-ups (next session)
+- **Deploy hosting + push** (`npm run deploy:prod`) to make the M7/M8 UI live — needs Johnny's go-ahead.
+- Optional: a real-browser QA pass of the rep dashboard / admin console (qa-runner), and the deferred
+  edges noted in M5b/M6 (partial-refund proportional clawback; post-final-payout clawback).
 
 ---
 
