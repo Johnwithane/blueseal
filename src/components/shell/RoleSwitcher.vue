@@ -23,6 +23,7 @@ const ROLE_LABEL: Record<Role, string> = {
   admin: "Admin",
   qa: "QA",
   sales: "Sales",
+  projectManager: "Project manager",
 };
 const ROLE_ICON: Record<Role, string> = {
   client: "pi-user",
@@ -30,6 +31,7 @@ const ROLE_ICON: Record<Role, string> = {
   admin: "pi-shield",
   qa: "pi-bug",
   sales: "pi-map-marker",
+  projectManager: "pi-briefcase",
 };
 
 // Only roles that map to an actual view (everything except qa).

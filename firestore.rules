@@ -116,6 +116,11 @@ service cloud.firestore {
         // gate (requireRepActive) trusts this field. `.get(field, null)` so
         // non-rep docs (no field) stay editable.
         && request.resource.data.get('salesRep', null) == resource.data.get('salesRep', null)
+        // Project-manager identity (recruiting code + liability + active flag) is
+        // server-managed (signPm / claimPmCode callables + admin). The owner can
+        // never write it — the payout gate (requirePmActive) trusts this field.
+        // `.get(field, null)` so non-PM docs stay editable.
+        && request.resource.data.get('projectManager', null) == resource.data.get('projectManager', null)
         // Referral attribution is server-managed (provisionAccount resolves the
         // code to an active+signed rep). The owner can never set or change it —
         // that would let someone self-attribute to a rep (or steal/transfer a

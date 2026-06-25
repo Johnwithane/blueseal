@@ -352,6 +352,15 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, role: "sales", layout: "app", title: "Rep resources" },
   },
 
+  // Project manager cockpit (real estate agents, property managers, landlords).
+  // Self-serve role; the public profile + earning gate live in later phases.
+  {
+    path: "/manage",
+    name: "ProjectManagerDashboard",
+    component: () => import("@/views/manage/ProjectManagerDashboardView.vue"),
+    meta: { requiresAuth: true, role: "projectManager", layout: "app", title: "Manage" },
+  },
+
   // Tradesperson onboarding wizard
   {
     path: "/onboarding",

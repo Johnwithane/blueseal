@@ -121,6 +121,13 @@ const ROLE_BADGES: Record<Role, RoleBadge> = {
     tint: "var(--bs-info-tint)",
     text: "var(--bs-info-text)",
   },
+  projectManager: {
+    label: "Project manager",
+    icon: "pi pi-briefcase",
+    accent: "var(--bs-info)",
+    tint: "var(--bs-info-tint)",
+    text: "var(--bs-info-text)",
+  },
   tradesperson: {
     label: "Tradesperson",
     icon: "pi pi-wrench",

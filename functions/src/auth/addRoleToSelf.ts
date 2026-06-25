@@ -5,8 +5,9 @@ import { z } from "zod";
 import { FieldValue } from "firebase-admin/firestore";
 import { adminAuth, db } from "../lib/admin";
 import { requireAuth } from "../lib/auth";
+import { initialProjectManagerState } from "../lib/projectManager";
 
-const Input = z.object({ role: z.enum(["client", "tradesperson"]) });
+const Input = z.object({ role: z.enum(["client", "tradesperson", "projectManager"]) });
 
 /**
  * Lets a signed-in user grant themselves the other public role
@@ -103,12 +104,17 @@ export const addRoleToSelf = onCall(CALLABLE_OPTS, async (req) => {
     }
   }
 
+  // Enabling "projectManager" stamps the PM state (active immediately, no
+  // vetting; agreement signed later at payout setup). Same idea as the
+  // tradesperson draft-doc init above, but it lives on the user doc.
+  const roleExtras = role === "projectManager" ? { projectManager: initialProjectManagerState() } : {};
+
   // User doc first (rules check writes `roles == resource.data.roles` and
   // `activeRole in resource.data.roles` for client writes — we're going
   // through the Admin SDK here so that gate doesn't apply, but we still
   // honor the shape). Set activeRole to the newly-added role so the user
   // lands in the new view after the call.
-  await userRef.set({ roles: nextRoles, activeRole: role }, { merge: true });
+  await userRef.set({ roles: nextRoles, activeRole: role, ...roleExtras }, { merge: true });
 
   // Claims next — merge with existing so admin/tenant claims survive.
   const authUser = await adminAuth.getUser(uid);

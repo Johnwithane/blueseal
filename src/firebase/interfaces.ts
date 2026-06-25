@@ -7,7 +7,11 @@ import type { GeoPoint, Timestamp } from "firebase/firestore";
 // "sales" is a regional sales rep. Unlike "qa" it IS a view-mode with its own
 // /sales dashboard: granted by an admin, it lets the rep vet their region's
 // applications and track their commission earnings.
-export type Role = "client" | "tradesperson" | "admin" | "qa" | "sales";
+// "projectManager" is a SELF-SERVE view-mode (real estate agents, property
+// managers, landlords) with its own /manage cockpit: they recommend trades, set
+// up projects for clients across properties, and earn a commission on jobs their
+// preferred contractors do for clients they brought in.
+export type Role = "client" | "tradesperson" | "admin" | "qa" | "sales" | "projectManager";
 
 export type WithId<T> = T & { id: string };
 
@@ -83,6 +87,38 @@ export interface SalesRepState {
    * Stripe Connect Express payout state (M6) — same shape as the tradesperson
    * mirror. Seeded by `createRepConnectAccount`, kept in sync by the
    * `account.updated` webhook. Absent until the rep starts payout onboarding.
+   */
+  payouts?: PayoutsState;
+}
+
+// ---------------------------------------------------------------------------
+// Project managers (real estate agents, property managers, landlords) — identity
+// lives on users/{uid}.projectManager. Self-serve (no admin grant, no vetting):
+// the role is enabled at signup or by an existing client, and the public profile
+// goes live immediately. The agreement is signed at payout setup (it gates
+// commission payout, not the cockpit). The recruiting vanity code is unique via
+// the pmReferralCodes registry.
+// ---------------------------------------------------------------------------
+export interface ProjectManagerLiability {
+  /** Agreement version signed (see src/projectManager/agreement.ts PM_AGREEMENT_VERSION). */
+  version: string;
+  signedAt: Timestamp;
+  /** Storage path of the drawn signature (server-written audit artifact). */
+  signatureStoragePath: string;
+}
+
+export interface ProjectManagerState {
+  /** Vanity recruiting code, uppercase display form; "" until claimed. */
+  referralCode: string;
+  /** Admin can deactivate a PM; defaults true (self-serve, no approval needed). */
+  active: boolean;
+  /** Null until signed at payout setup; gates commission payout, not the cockpit. */
+  liability: ProjectManagerLiability | null;
+  createdAt: Timestamp;
+  /**
+   * Stripe Connect Express payout state — same shape + machinery as the sales-rep
+   * mirror. Seeded by PM Connect onboarding, kept in sync by `account.updated`.
+   * Absent until the PM starts payout onboarding.
    */
   payouts?: PayoutsState;
 }
@@ -221,6 +257,11 @@ export interface UserDoc {
   // claimReferralCode callables + admin) and locked in firestore.rules — the
   // owner can never write it. Absent on every non-rep account.
   salesRep?: SalesRepState | null;
+  // Project-manager identity + recruiting code + liability + payouts. Present only
+  // on accounts that enabled the `projectManager` role. SERVER-MANAGED (signPm /
+  // claimPmCode callables + admin) and locked in firestore.rules — the owner can
+  // never write it. Absent on every non-PM account.
+  projectManager?: ProjectManagerState | null;
   // Referral attribution captured at signup: the sales rep whose code/link/name
   // this user joined through (the CANONICAL attribution; the tradesperson doc
   // gets a mirror at submitForVetting for rep-scoped reads). SERVER-MANAGED

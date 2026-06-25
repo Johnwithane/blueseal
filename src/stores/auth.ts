@@ -82,7 +82,8 @@ function rolesFromClaims(claims: Record<string, unknown>): Role[] {
         r === "tradesperson" ||
         r === "admin" ||
         r === "qa" ||
-        r === "sales",
+        r === "sales" ||
+        r === "projectManager",
     );
   }
   const legacy = claims.role;
@@ -91,7 +92,8 @@ function rolesFromClaims(claims: Record<string, unknown>): Role[] {
     legacy === "tradesperson" ||
     legacy === "admin" ||
     legacy === "qa" ||
-    legacy === "sales"
+    legacy === "sales" ||
+    legacy === "projectManager"
   ) {
     return [legacy];
   }
@@ -126,12 +128,16 @@ export const useAuthStore = defineStore("auth", {
     // "Currently viewing as a sales rep." Sales IS a view-mode (unlike qa), with
     // its own /sales dashboard.
     isSales: (s) => s.activeRole === "sales",
+    // "Currently viewing as a project manager." A self-serve view-mode with its
+    // own /manage cockpit.
+    isProjectManager: (s) => s.activeRole === "projectManager",
     // "Has the X role at all" — for offering switchers, CTAs, or admin-only
     // affordances that should stay visible regardless of the active view.
     hasClientRole: (s) => s.roles.includes("client"),
     hasTradieRole: (s) => s.roles.includes("tradesperson"),
     hasAdminRole: (s) => s.roles.includes("admin"),
     hasSalesRole: (s) => s.roles.includes("sales"),
+    hasProjectManagerRole: (s) => s.roles.includes("projectManager"),
     // "Holds the qa capability" — unlocks the /qa toolkit and the global
     // Report-a-bug button. There is no qa activeRole, so there's no `isQa`
     // view-mode getter to match isClient/isTradie/isAdmin.

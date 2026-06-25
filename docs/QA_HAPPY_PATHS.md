@@ -463,6 +463,37 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 
 ---
 
+## 13. Project managers  → (real estate agents, property managers, landlords; help article pending)
+
+> A **project manager** (PM) recommends trades, sets up jobs for their clients, and
+> earns a referral commission. Self-serve, **no vetting**: the role enables instantly
+> and the cockpit lives at `/manage`. The agreement is signed later (at payout setup),
+> not before using the cockpit. P1 ships the role + cockpit shell; later phases add
+> trusted trades, projects + dispatch, commission, and the public profile (extend this
+> section as each lands).
+
+1. **Sign up as a project manager (password).** On `/sign-up` pick **A project
+   manager**, fill name/email/password, agree to terms, create the account.
+   **Expected:** account created; you land on the **/manage** cockpit (the
+   "Project manager" pill + the trusted-trades / projects / earnings section cards).
+   No referral-code field and no agreement dialog (the agreement comes at payout).
+2. **Become a PM from an existing client.** Sign up with Google (or as a client), and
+   on the **/welcome** screen choose **I manage projects or properties** (or, as an
+   existing client, use the same path). **Expected:** the project-manager role is
+   added and you land on `/manage`. Your account now holds both **client** and
+   **project manager**.
+3. **Switch views.** Open the role switcher (side panel / avatar menu).
+   **Expected:** a **Project manager** pill appears alongside **Client**; switching
+   flips the view with the role-switch animation, and `/dashboard` routes a PM to
+   `/manage`.
+4. **Cannot forge PM identity (rules).** The `projectManager` object on the user doc
+   is server-managed; the client cannot write it (covered by
+   `tests/rules/projectManager.test.ts`).
+5. **Mobile (375px).** Re-run the signup cards + cockpit at 375px.
+   **Expected:** the three role cards stack and stay tappable; the cockpit cards read cleanly.
+
+---
+
 ## Coverage checklist (tick as you complete a full pass)
 
 - [ ] 1.1 Client sign-up
@@ -504,3 +535,6 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 - [ ] 11.13 Admin reps console: roster, activate/deactivate, retry pending payout (/admin/sales-reps)
 - [ ] 11.14 Tradesperson sees their Blue Seal rep contact (Account → Payouts)
 - [ ] 12 Admin jobs & postings browse (province + territory + status + search, all regions)
+- [ ] 13.1 Sign up as a project manager (card) → lands on /manage
+- [ ] 13.2 Become a PM from /welcome → /manage, holds client + project manager
+- [ ] 13.3 Role switcher shows Project manager; /dashboard routes PM to /manage

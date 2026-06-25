@@ -30,9 +30,18 @@ const route = useRoute();
 // the soft-ask for every role the moment the new session lands — including
 // right after this signup completes.
 
-// Preselect tradesperson when arriving via /sign-up?as=tradesperson (or the
-// old /sign-up/tradie route, which now redirects here).
-const isTradie = ref(route.query.as === "tradesperson");
+// Preselect the role from /sign-up?as=tradesperson | projectManager (the old
+// /sign-up/tradie route redirects here). Default client.
+type SignupRole = "client" | "tradesperson" | "projectManager";
+const selectedRole = ref<SignupRole>(
+  route.query.as === "tradesperson"
+    ? "tradesperson"
+    : route.query.as === "projectManager"
+      ? "projectManager"
+      : "client",
+);
+const isTradie = computed(() => selectedRole.value === "tradesperson");
+const isPm = computed(() => selectedRole.value === "projectManager");
 
 // Referral capture: a rep's vanity code arrives via ?ref=CODE (the /join link)
 // or is typed by hand. We thread it to provisionAccount, which resolves it to
@@ -56,21 +65,27 @@ const termsAccepted = ref(false);
 const fieldErrors = ref<Record<string, string>>({});
 const formError = ref<string | null>(null);
 
-const role = computed<"client" | "tradesperson">(() =>
-  isTradie.value ? "tradesperson" : "client",
-);
+const role = computed<SignupRole>(() => selectedRole.value);
 const heading = computed(() =>
-  isTradie.value ? "Build your verified profile" : "Create your account",
+  isTradie.value
+    ? "Build your verified profile"
+    : isPm.value
+      ? "Set up your project manager account"
+      : "Create your account",
 );
 const subtitle = computed(() =>
   isTradie.value
     ? "We'll vet your cert + ID, then put you in front of nearby clients."
-    : "Find verified tradespeople near you.",
+    : isPm.value
+      ? "Recommend your trusted trades, set up jobs for your clients, and earn a referral cut."
+      : "Find verified tradespeople near you.",
 );
 const submitLabel = computed(() =>
   isTradie.value ? "Start onboarding" : "Create account",
 );
-const redirectTo = computed(() => (isTradie.value ? "/onboarding" : "/dashboard"));
+const redirectTo = computed(() =>
+  isTradie.value ? "/onboarding" : isPm.value ? "/manage" : "/dashboard",
+);
 
 async function submit() {
   fieldErrors.value = {};
@@ -138,14 +153,14 @@ async function google() {
     <form class="bs-form bs-card p-6 space-y-4" @submit.prevent="submit">
       <fieldset class="space-y-2">
         <legend class="text-sm font-medium mb-2">I'm signing up as a…</legend>
-        <div role="radiogroup" class="grid grid-cols-2 gap-2">
+        <div role="radiogroup" class="grid grid-cols-1 gap-2">
           <button
             type="button"
             role="radio"
-            :aria-checked="!isTradie"
+            :aria-checked="selectedRole === 'client'"
             class="role-option"
-            :class="{ 'role-option-active': !isTradie }"
-            @click="isTradie = false"
+            :class="{ 'role-option-active': selectedRole === 'client' }"
+            @click="selectedRole = 'client'"
           >
             <i class="pi pi-search text-lg"></i>
             <span class="role-option-title">A client</span>
@@ -154,14 +169,26 @@ async function google() {
           <button
             type="button"
             role="radio"
-            :aria-checked="isTradie"
+            :aria-checked="selectedRole === 'tradesperson'"
             class="role-option"
-            :class="{ 'role-option-active': isTradie }"
-            @click="isTradie = true"
+            :class="{ 'role-option-active': selectedRole === 'tradesperson' }"
+            @click="selectedRole = 'tradesperson'"
           >
             <i class="pi pi-wrench text-lg"></i>
             <span class="role-option-title">A tradesperson</span>
             <span class="role-option-sub">Offering services</span>
+          </button>
+          <button
+            type="button"
+            role="radio"
+            :aria-checked="selectedRole === 'projectManager'"
+            class="role-option"
+            :class="{ 'role-option-active': selectedRole === 'projectManager' }"
+            @click="selectedRole = 'projectManager'"
+          >
+            <i class="pi pi-briefcase text-lg"></i>
+            <span class="role-option-title">A project manager</span>
+            <span class="role-option-sub">Managing properties &amp; referring trades</span>
           </button>
         </div>
       </fieldset>

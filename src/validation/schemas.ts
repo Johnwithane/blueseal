@@ -27,7 +27,7 @@ export const signUpSchema = z.object({
   email: z.string().trim().toLowerCase().email("Enter a valid email").max(200),
   password: z.string().min(8, "At least 8 characters").max(128),
   displayName: safeName,
-  role: z.enum(["client", "tradesperson"]),
+  role: z.enum(["client", "tradesperson", "projectManager"]),
   termsAccepted: z.literal(true, {
     errorMap: () => ({
       message: "You must agree to the Terms of Service and Privacy Policy",

@@ -20,7 +20,7 @@ const route = useRoute();
 // "client" needs no write; picking "tradesperson" adds the role + draft profile
 // and drops into onboarding. There is deliberately no skip/dismiss — closing the
 // silent dialog used to strand intended tradespeople as clients.
-const busy = ref<null | "client" | "tradesperson">(null);
+const busy = ref<null | "client" | "tradesperson" | "projectManager">(null);
 const error = ref<string | null>(null);
 
 const firstName = computed(() => {
@@ -44,6 +44,21 @@ async function chooseTradesperson() {
     // flips the active view. The onboarding wizard resumes from there.
     await auth.addRole("tradesperson");
     router.replace("/onboarding");
+  } catch (e) {
+    error.value = humanizeError(e);
+    busy.value = null;
+  }
+}
+
+async function chooseProjectManager() {
+  if (busy.value) return;
+  busy.value = "projectManager";
+  error.value = null;
+  try {
+    // Idempotent: addRole enables the project-manager role (active immediately,
+    // no vetting) and flips the active view into the /manage cockpit.
+    await auth.addRole("projectManager");
+    router.replace("/manage");
   } catch (e) {
     error.value = humanizeError(e);
     busy.value = null;
@@ -89,6 +104,20 @@ async function chooseTradesperson() {
           <span class="role-option-sub">
             Build a verified profile and get hired
             <template v-if="busy === 'tradesperson'"> &middot; setting up&hellip;</template>
+          </span>
+        </button>
+        <button
+          type="button"
+          class="role-option"
+          :disabled="!!busy"
+          :aria-busy="busy === 'projectManager'"
+          @click="chooseProjectManager"
+        >
+          <i class="pi pi-briefcase text-xl"></i>
+          <span class="role-option-title">I manage projects or properties</span>
+          <span class="role-option-sub">
+            Recommend trades and set up jobs for your clients
+            <template v-if="busy === 'projectManager'"> &middot; setting up&hellip;</template>
           </span>
         </button>
       </div>

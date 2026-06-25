@@ -6,9 +6,10 @@ import { FieldValue } from "firebase-admin/firestore";
 import { adminAuth, db } from "../lib/admin";
 import { requireAuth } from "../lib/auth";
 import { resolveReferralRepId } from "../lib/referralResolve";
+import { initialProjectManagerState } from "../lib/projectManager";
 
 const Input = z.object({
-  role: z.enum(["client", "tradesperson"]),
+  role: z.enum(["client", "tradesperson", "projectManager"]),
   displayName: z.string().trim().min(1).max(120),
   termsAcceptedVersion: z.string().min(1).max(40),
   photoURL: z.string().url().max(2048).nullable().optional(),
@@ -69,7 +70,12 @@ export const provisionAccount = onCall(CALLABLE_OPTS, async (req) => {
         : [role];
     activeRole = typeof data.activeRole === "string" ? data.activeRole : (roles[0] ?? role);
   } else {
-    roles = role === "tradesperson" ? ["tradesperson", "client"] : ["client"];
+    roles =
+      role === "tradesperson"
+        ? ["tradesperson", "client"]
+        : role === "projectManager"
+          ? ["projectManager", "client"]
+          : ["client"];
     activeRole = role;
     // Resolve the referral code to its rep (only an active, signed rep counts).
     // Frozen on the user doc here — the canonical attribution. The free month is
@@ -98,6 +104,9 @@ export const provisionAccount = onCall(CALLABLE_OPTS, async (req) => {
       notificationPrefs: { emailEnabled: true, whatsappEnabled: true },
       referredByRepId,
       referralSignal,
+      // A PM is active the instant the role is enabled (self-serve, no vetting);
+      // the liability agreement is signed later at payout setup.
+      ...(role === "projectManager" ? { projectManager: initialProjectManagerState() } : {}),
     });
     logger.info("Provisioned account", { uid, roles, referredByRepId });
   }
