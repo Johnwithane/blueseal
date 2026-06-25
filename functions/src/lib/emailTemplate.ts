@@ -17,6 +17,20 @@ const MUTED = "#6B6862";
 const BORDER = "#EAE7DF";
 const BG = "#FAF9F6";
 
+// Per-role dot colour + label for the optional recipient-role marker. Kept
+// deliberately understated for email (a small coloured dot + muted label, no
+// filled pill). Accents mirror the in-app NotificationsPanel badge
+// (src/utils/notifications.ts → ROLE_BADGES) — the same semantic colour family
+// per role (info/success/danger/warning). Raw hexes (not CSS vars) because
+// email clients can't resolve custom properties — keep the accents in sync
+// with --bs-info/success/danger/warning in src/assets/main.css.
+const ROLE_PILL: Record<string, { label: string; accent: string }> = {
+  client: { label: "Client", accent: "#374C76" },
+  tradesperson: { label: "Tradesperson", accent: "#3F7D5C" },
+  admin: { label: "Admin", accent: "#B2373D" },
+  sales: { label: "Sales", accent: "#C28A33" },
+};
+
 function esc(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -69,6 +83,15 @@ export interface BrandedEmailOpts {
    * injected verbatim, NOT escaped here.
    */
   footerHtml?: string;
+  /**
+   * Optional recipient role ("client" | "tradesperson" | "admin" | "sales").
+   * When set to a known role, a small coloured "● ROLE view" pill is shown at
+   * the top of the card so multi-role recipients can tell which view the mail
+   * is for at a glance — the email mirror of the in-app notification badge.
+   * Unknown/empty → no pill. The caller decides whether to pass it (notify.ts
+   * only does so for accounts that span more than one view).
+   */
+  recipientRole?: string;
 }
 
 /**
@@ -128,6 +151,18 @@ export function brandedEmailHtml(opts: BrandedEmailOpts): string {
     : `margin:0;font-size:20px;line-height:1.3;color:${NAVY};font-weight:700;`;
   const titleH1 = namePrefix + `<h1 style="${titleStyle}">${titleInner}</h1>`;
 
+  // Optional recipient-role marker — a quiet "• Role view" line above the
+  // heading (small coloured dot + muted label), so a multi-role recipient sees
+  // which view this mail is for without it competing with the heading.
+  const role = opts.recipientRole ? ROLE_PILL[opts.recipientRole] : undefined;
+  const rolePill = role
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 10px;"><tr>` +
+      `<td style="padding:0;">` +
+      `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${role.accent};vertical-align:middle;margin-right:7px;"></span>` +
+      `<span style="font-size:11px;font-weight:600;color:${MUTED};letter-spacing:0.02em;vertical-align:middle;">${esc(role.label)} view</span>` +
+      `</td></tr></table>`
+    : "";
+
   // Avatar to the left of the heading when we have one, so the reader sees who
   // messaged/acted at a glance.
   const heading = opts.actorPhotoUrl
@@ -153,6 +188,7 @@ export function brandedEmailHtml(opts: BrandedEmailOpts): string {
     `</td></tr>` +
     // card
     `<tr><td style="background:#ffffff;border:1px solid ${BORDER};border-radius:14px;padding:28px 28px 24px;">` +
+    rolePill +
     heading +
     paras +
     (opts.contentHtml ?? "") +

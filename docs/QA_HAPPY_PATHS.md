@@ -302,6 +302,14 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 2. **Account & profile** — edit profile, notification prefs. → `notifications`
 3. **Email notifications** — key events (new request, quote, message, invoice)
    send a branded email.
+4. **Per-view notification badges (multi-role accounts).** As an account that
+   holds more than one view (e.g. admin + tradesperson + sales), open the
+   notifications bell. **Expected:** each row carries a coloured left edge + a
+   small icon-and-label chip naming the view it's for (Client / Tradesperson /
+   Admin / Sales), and the matching branded email shows a "● ROLE view" pill at
+   the top of the card. A **single-role** user sees **no** badge (one context,
+   so it'd be noise). Check at 375px — the chip wraps under the body, never
+   clipping the title.
 4. **PWA install** — install to home screen (iPhone/Android/desktop). → `install-the-app`
 5. **Help Center** — browse `/help`, search, open an article and a FAQ. →
    `report-a-problem`

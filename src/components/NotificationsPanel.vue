@@ -3,6 +3,8 @@ import { computed } from "vue";
 import Avatar from "primevue/avatar";
 import type { NotificationDoc, NotificationType, WithId } from "@/firebase/interfaces";
 import { useFormatters } from "@/composables/useFormatters";
+import { roleBadge } from "@/utils/notifications";
+import { useAuthStore } from "@/stores/auth";
 
 const props = defineProps<{
   items: WithId<NotificationDoc>[];
@@ -15,8 +17,24 @@ const emit = defineEmits<{
 }>();
 
 const { relativeTime } = useFormatters();
+const auth = useAuthStore();
 
 const unreadCount = computed(() => props.items.filter((n) => !n.read).length);
+
+// Only stamp rows with a per-role badge when the account actually spans more
+// than one view (e.g. admin + tradesperson + sales). A single-role user has
+// just one context, so the badge would be redundant noise. "qa" is a
+// capability, not a view-mode, so it doesn't count toward "multi-role".
+const showRoleBadge = computed(() => auth.roles.filter((r) => r !== "qa").length > 1);
+
+// Resolve each row's role badge once (gated by showRoleBadge) so the template
+// doesn't recompute it for both the left accent and the chip.
+const rows = computed(() =>
+  props.items.map((n) => ({
+    n,
+    badge: showRoleBadge.value ? roleBadge(n.recipientRole) : null,
+  })),
+);
 
 // Icon lookup mirrors the types in `NotificationType`; keeping it inline so a
 // future contributor adding a type sees the visual mapping in one place.
@@ -112,10 +130,11 @@ function initialFor(name: string | null): string {
 
     <ul v-else class="max-h-96 overflow-y-auto">
       <li
-        v-for="n in items"
+        v-for="{ n, badge } in rows"
         :key="n.id"
-        class="flex cursor-pointer items-start gap-2 border-b border-[color:var(--bs-border)] px-3 py-2 last:border-b-0 hover:bg-[color:var(--bs-surface-alt)]"
+        class="flex cursor-pointer items-start gap-2 border-b border-l-[3px] border-[color:var(--bs-border)] px-3 py-2 last:border-b-0 hover:bg-[color:var(--bs-surface-alt)]"
         :class="{ 'bg-[color:var(--bs-surface-alt)]/40': !n.read }"
+        :style="{ borderLeftColor: badge ? badge.accent : 'transparent' }"
         @click="emit('open', n)"
       >
         <!--
@@ -165,6 +184,19 @@ function initialFor(name: string | null): string {
             </span>
           </div>
           <p class="line-clamp-2 text-xs text-[color:var(--bs-text-muted)]">{{ n.body }}</p>
+          <!--
+            Role chip: which VIEW this notification is for. Only present for
+            multi-role accounts (see showRoleBadge) so single-role users aren't
+            shown a redundant tag on every row.
+          -->
+          <span
+            v-if="badge"
+            class="mt-1 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none"
+            :style="{ backgroundColor: badge.tint, color: badge.text }"
+          >
+            <i :class="badge.icon" class="text-[10px]" aria-hidden="true"></i>
+            {{ badge.label }}
+          </span>
         </div>
         <span
           v-if="!n.read"

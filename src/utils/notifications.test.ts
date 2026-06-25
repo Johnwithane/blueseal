@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   resolveNotificationLink,
+  roleBadge,
   shouldSwitchRoleForNotification,
 } from "./notifications";
 import type { NotificationDoc, Role } from "@/firebase/interfaces";
@@ -134,5 +135,41 @@ describe("shouldSwitchRoleForNotification", () => {
 
   it("handles a null activeRole (mid-init) by allowing the switch", () => {
     expect(shouldSwitchRoleForNotification(sw("client"), null, both)).toBe(true);
+  });
+});
+
+describe("roleBadge", () => {
+  it("returns null for a legacy notification with no recipientRole", () => {
+    expect(roleBadge(null)).toBeNull();
+  });
+
+  it("maps every view-role to a distinct label, icon and colour", () => {
+    const roles: Role[] = ["client", "tradesperson", "admin", "sales"];
+    const badges = roles.map((r) => roleBadge(r));
+
+    // Every view-role resolves.
+    expect(badges.every((b) => b !== null)).toBe(true);
+
+    // Labels mirror the RoleSwitcher pills.
+    expect(roleBadge("client")?.label).toBe("Client");
+    expect(roleBadge("tradesperson")?.label).toBe("Tradesperson");
+    expect(roleBadge("admin")?.label).toBe("Admin");
+    expect(roleBadge("sales")?.label).toBe("Sales");
+
+    // Icons mirror the RoleSwitcher icons.
+    expect(roleBadge("client")?.icon).toBe("pi pi-user");
+    expect(roleBadge("tradesperson")?.icon).toBe("pi pi-wrench");
+    expect(roleBadge("admin")?.icon).toBe("pi pi-shield");
+    expect(roleBadge("sales")?.icon).toBe("pi pi-map-marker");
+
+    // Accents are all distinct so roles are unmistakable at a glance.
+    const accents = badges.map((b) => b?.accent);
+    expect(new Set(accents).size).toBe(roles.length);
+  });
+
+  it("still resolves qa (exhaustive over Role) even though it never renders", () => {
+    // qa is a capability, never a notification recipient view-mode — but the
+    // map is exhaustive over Role, so the lookup must not return null.
+    expect(roleBadge("qa")).not.toBeNull();
   });
 });

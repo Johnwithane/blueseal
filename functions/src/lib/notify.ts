@@ -9,8 +9,10 @@ import { enqueueWhatsApp } from "./whatsapp";
 // let users pick SMS over WhatsApp once we have one), but every notify
 // call routes "high" through WhatsApp by default to keep cost near zero.
 
-// Keep in sync with src/firebase/interfaces.ts → Role.
-export type Role = "client" | "tradesperson" | "admin";
+// Recipient view-modes for a notification. Mirrors src/firebase/interfaces.ts
+// → Role, MINUS "qa": qa is a capability claim, never a notification target
+// (it has no view/dashboard to land in), so it can never be a recipientRole.
+export type Role = "client" | "tradesperson" | "admin" | "sales";
 
 // Keep in sync with src/firebase/interfaces.ts → NotificationType.
 // Cross-package boundary means we can't share the type literally; the
@@ -134,6 +136,10 @@ export interface NotifyInput {
 interface UserContact {
   email: string | null;
   phone: string | null;
+  // Raw roles array off the user doc (may include "qa", which is not a
+  // view-mode) — used only to decide whether to stamp the email with a
+  // recipient-role pill. Typed string[] because it can carry "qa".
+  roles: string[];
   emailEnabled: boolean;
   whatsappEnabled: boolean;
   newJobPostingEnabled: boolean;
@@ -169,6 +175,7 @@ async function getUserContact(uid: string): Promise<UserContact> {
       | {
           email?: string;
           phone?: string;
+          roles?: string[];
           notificationPrefs?: {
             emailEnabled?: boolean;
             whatsappEnabled?: boolean;
@@ -183,6 +190,7 @@ async function getUserContact(uid: string): Promise<UserContact> {
     return {
       email: data?.email ?? null,
       phone: data?.phone ?? null,
+      roles: data?.roles ?? [],
       emailEnabled: prefs.emailEnabled !== false,
       whatsappEnabled: prefs.whatsappEnabled !== false,
       newJobPostingEnabled: prefs.newJobPostingEnabled !== false,
@@ -192,6 +200,7 @@ async function getUserContact(uid: string): Promise<UserContact> {
     return {
       email: null,
       phone: null,
+      roles: [],
       emailEnabled: true,
       whatsappEnabled: true,
       newJobPostingEnabled: true,
@@ -402,6 +411,11 @@ export async function notify(input: NotifyInput): Promise<void> {
   // shell (logo header, CTA button, signature + CASL footer) plus the plain
   // text fallback for clients that don't render HTML.
   if (contact.email && contact.emailEnabled) {
+    // Only stamp the email with a recipient-role pill when the account spans
+    // more than one view (e.g. admin who is also a tradesperson + sales rep) —
+    // a single-role user has one context, so the tag would be noise. "qa" is a
+    // capability, not a view, so it doesn't count. Mirrors NotificationsPanel.
+    const multiRole = contact.roles.filter((r) => r !== "qa").length > 1;
     try {
       await enqueueMail({
         to: contact.email,
@@ -422,6 +436,8 @@ export async function notify(input: NotifyInput): Promise<void> {
           // who accepted, etc) — already fetched above for the in-app row.
           actorPhotoUrl: actorSnapshot.photoURL ?? undefined,
           actorName: actorSnapshot.displayName ?? undefined,
+          // Which view this mail is for — only for multi-role recipients.
+          recipientRole: multiRole ? (input.recipientRole ?? undefined) : undefined,
         }),
       });
     } catch (err) {
