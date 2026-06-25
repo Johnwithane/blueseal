@@ -75,8 +75,9 @@ wired into `payment_intent.succeeded` (service fee), the new `invoice.payment_su
 (subscription), and reversals on `charge.refunded` (full refund) + `charge.dispute.closed` (lost).
 Partial-refund + subscription-chargeback proportional clawback are deliberately deferred (no
 finalized policy — `PROFESSIONAL_TASKS.md`). 15 new unit tests; QA happy paths 11.9/11.10.
-**Real-Firestore end-to-end verify (test-mode Stripe drive) is still pending** — run the
-11.9/11.10 paths (or a `verify-commission` script) once a `sk_test_` key + ADC are on hand.
+**Verified end-to-end on real Firestore** (test-mode Stripe, live webhook) via
+`functions/scripts/verify-commission.mjs`: accrual (right rep, 10%, exactly one entry) + reversal
+on a full refund, then cleaned up.
 
 ### Helpers to add
 1. `functions/src/lib/commissionOwner.ts` → `resolveCommissionOwner(tradieUid)`:
@@ -129,8 +130,9 @@ to paid + write a `pending` batch BEFORE the transfer, idempotency-keyed transfe
 retry/replay can never double-pay; transfer rejection unwinds the claim; below-min rolls over. Netting
 math is a pure helper (`functions/src/lib/commissionPayout.ts`, 8 unit tests). Deferred: partial-refund
 proportional clawback, post-final-payout clawback, and pending-batch reconciliation (M7 admin console).
-**Real-Firestore end-to-end payout verify (test-mode transfer) still pending** — needs a rep onboarded
-in test mode + a `sk_test_` key + ADC.
+**Verified end-to-end on real Firestore** (test-mode Stripe) via `functions/scripts/verify-payout.mjs`:
+seeded a payout-enabled rep + $60 accrued, triggered the deployed scheduler, confirmed a real transfer,
+a `paid` batch, and the ledger flipped to `paid`, then cleaned up.
 
 ## NEXT TASK — M7: sales dashboard + region health + reps console
 
