@@ -17,6 +17,7 @@
 - **Closest tool competitor: Jobber** (Canadian-founded, Edmonton) — the pro SaaS most tradies already know, with free AI Copilot. But **no client marketplace and no verification.**
 - **Blue Seal's pricing is structurally sound and, if anything, *underpriced* on the subscription.** $29 CAD/mo Pro is the cheapest serious trades tool in the market, and the 5%/$99-capped client fee is far below every lead-gen and on-demand model. The capped fee is directly supported by marketplace-leakage research (Hagiu & Wright, *Management Science* 2023).
 - **The real risks are not price — they're (a) AI becoming free table-stakes** (Jobber Copilot, Housecall Pro AI both bundled free), **(b) the "verified" claim being legally radioactive if overstated** (Angi's Oct-2025 settlement + the 2023 FTC HomeAdvisor case), and **(c) feature depth** vs. incumbents with 10-year head starts.
+- **New (2026): a direct local competitor — bibidi (Kelowna) — has launched.** A broad local-services marketplace (~100 categories), an 8% fee on *both* sides, an *optional paid* identity badge (not cert/ID vetting), a *booking* flow (not the whole job), no AI, and no property-manager channel. It **validates** the market and sharpens our contrast (deep + verified vs broad + light) rather than threatening the niche. Full deep dive + strategy playbook: [`COMPETITOR_BIBIDI.md`](./COMPETITOR_BIBIDI.md).
 
 ---
 

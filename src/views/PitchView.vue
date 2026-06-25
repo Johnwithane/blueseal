@@ -451,11 +451,50 @@ function fmt(n: number): string {
                 <tr><td><strong>Angi / Thumbtack</strong></td><td>Sells leads, $15–150 each</td><td>Sells leads, not trust</td></tr>
                 <tr><td><strong>Jiffy</strong></td><td>12–18% commission</td><td>Low-ticket only; leaks on big jobs</td></tr>
                 <tr><td><strong>HomeStars</strong></td><td>Reviews directory</td><td>No real cert/ID check; no job tools</td></tr>
+                <tr><td><strong>bibidi</strong> (Kelowna)</td><td>Local "book any help" app, 8% both sides</td><td>Optional ID badge, not cert/ID; a booking, not the job</td></tr>
                 <tr class="tstrong"><td>Blue Seal</td><td>Capped fee + Pro</td><td>Verified · AI · high-ticket-friendly · both sides rated</td></tr>
               </tbody>
             </table>
           </div>
-          <p class="note">Locally, a cluster of scrape-and-list “Okanagan trades directory” sites has appeared, proof homeowners search for this, but none verify the pro or run the job. They compete on listings; we compete on the whole transaction.</p>
+          <p class="note">A funded local competitor, <strong>bibidi</strong> (also Kelowna-built, launched 2026), now sells “trusted local help” across 100+ categories. We read that as validation, not a threat: it proves the demand and draws the line we win on. They went broad and light (an optional ID badge, an 8% fee on both sides, a booking). We go deep and verified (hand-checked cert + ID, a capped fee, the whole job). A separate cluster of scrape-and-list directory sites competes on listings; we compete on the whole transaction.</p>
+        </div>
+      </section>
+
+      <!-- UNFAIR ADVANTAGE -->
+      <section class="band band--navy">
+        <div class="container reveal">
+          <div class="kicker">Why we win</div>
+          <h2 class="h-lg">A funded rival just validated the market. We're built to take the part they can't.</h2>
+          <p class="lead">bibidi proves Okanagan homeowners want a trusted local app. It also shows the trap: broad and light. We picked the hard, defensible half, and we run leaner than anyone can match.</p>
+          <div class="grid g2 eqh grid-top">
+            <div class="card">
+              <h3>bibidi: broad &amp; light</h3>
+              <ul class="clean">
+                <li>100+ categories, tutoring to pet care</li>
+                <li>Optional paid ID badge, no cert check</li>
+                <li>8% fee on both sides (~16% blended)</li>
+                <li>A booking, then funds released</li>
+                <li>Native-app team, racing a launch clock</li>
+              </ul>
+            </div>
+            <div class="card card--red">
+              <h3>Blue Seal: deep &amp; verified</h3>
+              <ul class="clean">
+                <li>Trades only, built for the trust bar</li>
+                <li>Hand-checked certification + government ID</li>
+                <li>5% capped at $99, one side, $0 on Pro</li>
+                <li>The whole job: quote to paid, with AI</li>
+                <li>2 people, ~$0 burn, product already shipped</li>
+              </ul>
+            </div>
+          </div>
+          <div class="tiles grid-top">
+            <div class="tile"><div class="n">2</div><div class="l">people, both founders</div></div>
+            <div class="tile"><div class="n">~$0</div><div class="l">monthly cash burn</div></div>
+            <div class="tile"><div class="n">$0</div><div class="l">outside capital raised</div></div>
+            <div class="tile"><div class="n">100%</div><div class="l">of the product, live</div></div>
+          </div>
+          <p class="note">Agility and zero burn are the edge funding can't buy. They must convert demand fast or raise again. We carry no burn clock, so the same investment buys demand, not survival, and we can out-iterate a bigger team on the seams that matter: verification, the whole job, AI, and property managers.</p>
         </div>
       </section>
 
@@ -476,6 +515,7 @@ function fmt(n: number): string {
             <div class="grid loops">
               <div class="card"><h4>Free loop 1: bring your own client</h4><p class="m0">A pro invites their existing customer by link. A real client, acquired at $0.</p></div>
               <div class="card"><h4>Free loop 2: Pro waives the fee</h4><p class="m0">A Pro pro is cheaper to hire. That's a built-in referral engine.</p></div>
+              <div class="card"><h4>Free loop 3: property managers <span class="pill pill--test">IN BUILD</span></h4><p class="m0">A property manager recruits the trades they trust (supply) and emails jobs to their tenants and buyers (demand). Both sides, no ad spend.</p></div>
             </div>
           </div>
         </div>
@@ -485,14 +525,20 @@ function fmt(n: number): string {
       <section class="band band--paper">
         <div class="container reveal">
           <div class="kicker">Where it grows</div>
-          <h2 class="h-lg">Three more revenue lines on a base we already own.</h2>
-          <p class="lead">Each turns the verified audience we've earned into new revenue, with a real benchmark behind it. We're building the first (insurance) right now.</p>
-          <div class="grid g3 eqh grid-top">
+          <h2 class="h-lg">Four more revenue lines on a base we already own.</h2>
+          <p class="lead">Each turns the verified audience we've earned into new revenue and reach. Two of them, insurance and property managers, are in build right now.</p>
+          <div class="grid g2 eqh grid-top">
             <div class="card">
               <div class="bignum">~$135 / pro / yr</div>
               <h3 class="mt-s">Insurance <span class="pill pill--test">IN BUILD NOW</span></h3>
               <p>Solo trades pay ~$900/yr for liability cover. We already verify it, and we're setting up placement right now, earning ~15% commission (or a ~$45 flat affiliate fee). 10% of 15,000 Okanagan pros ≈ a six-figure line locally; BC is ~12× larger.</p>
               <p class="src">Live this year. Run in Canada today by Zensurance, Foxquilt, APOLLO.</p>
+            </div>
+            <div class="card">
+              <div class="bignum">B2B channel</div>
+              <h3 class="mt-s">Property managers <span class="pill pill--test">IN BUILD</span></h3>
+              <p>Agents, landlords and property managers recruit the trades they trust and dispatch jobs to their clients, earning a residual. It grows supply and demand at $0 CAC, then managing multiple properties becomes the paid tier.</p>
+              <p class="src">A B2B lane no local competitor serves. In build now.</p>
             </div>
             <div class="card">
               <div class="bignum">$40 / seat / mo</div>
@@ -507,7 +553,7 @@ function fmt(n: number): string {
               <p class="src">SkilledTradesBC: ~47,000 apprentices registered.</p>
             </div>
           </div>
-          <p class="note"><strong>Insurance is in build now</strong> (live this year) and is modelled into the projection below alongside enterprise; apprenticeship is a supply/mission play (revenue later). Sources: BC Construction Association / SkilledTradesBC 2024; ServiceTitan FY26 filing; Canadian insurtech affiliate benchmarks.</p>
+          <p class="note"><strong>Insurance is in build now</strong> (live this year) and is modelled into the projection below alongside enterprise; apprenticeship is a supply/mission play (revenue later). <strong>Property Manager mode</strong> is in build as a two-sided growth channel and B2B moat; its multi-property paid tier is not yet priced, so it is excluded from the projection. Sources: BC Construction Association / SkilledTradesBC 2024; ServiceTitan FY26 filing; Canadian insurtech affiliate benchmarks.</p>
         </div>
       </section>
 
