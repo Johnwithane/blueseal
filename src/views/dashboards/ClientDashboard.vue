@@ -5,6 +5,7 @@ import Button from "primevue/button";
 import SelectButton from "primevue/selectbutton";
 import Tag from "primevue/tag";
 import JobList from "@/components/JobList.vue";
+import TrustedTradesPanel from "@/components/TrustedTradesPanel.vue";
 import { useAuthStore } from "@/stores/auth";
 import { subscribeClientJobs } from "@/firebase/services/jobs";
 import { subscribeMyJobPosts, subscribeJobPostMeta } from "@/firebase/services/jobPosts";
@@ -16,10 +17,11 @@ const auth = useAuthStore();
 const { relativeTime } = useFormatters();
 const jobs = ref<WithId<JobDoc>[]>([]);
 const posts = ref<WithId<JobPostDoc>[]>([]);
-const view = ref<"jobs" | "posts">("jobs");
+const view = ref<"jobs" | "posts" | "trades">("jobs");
 const viewOptions = [
   { label: "My jobs", value: "jobs" },
   { label: "Posted jobs", value: "posts" },
+  { label: "Saved trades", value: "trades" },
 ];
 
 // Completed view for "My jobs": flips JobList to the terminal-status
@@ -139,6 +141,9 @@ function formatBudget(min: number, max: number): string {
         </template>
       </SelectButton>
     </div>
+
+    <!-- SAVED TRADES (universal: re-hire trades you trust) -->
+    <TrustedTradesPanel v-if="view === 'trades'" />
 
     <!-- MY JOBS -->
     <template v-if="view === 'jobs'">

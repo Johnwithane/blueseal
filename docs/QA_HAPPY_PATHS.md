@@ -489,8 +489,12 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 4. **Cannot forge PM identity (rules).** The `projectManager` object on the user doc
    is server-managed; the client cannot write it (covered by
    `tests/rules/projectManager.test.ts`).
-5. **Mobile (375px).** Re-run the signup cards + cockpit at 375px.
-   **Expected:** the three role cards stack and stay tappable; the cockpit cards read cleanly.
+5. **Saved trades, re-hire fast.** Save a tradesperson from their profile (the save
+   toggle). **Expected:** they appear under **Saved trades** on the client dashboard
+   and in the PM cockpit's "Your saved trades" panel; **Request** opens a fresh quote
+   to them; the **x** removes them. (Reuses the existing `savedTradies` shortlist.)
+6. **Mobile (375px).** Re-run the signup cards + cockpit + saved-trades list at 375px.
+   **Expected:** the role cards stack and stay tappable; the cockpit + saved cards read cleanly.
 
 ---
 
@@ -538,3 +542,4 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 - [ ] 13.1 Sign up as a project manager (card) → lands on /manage
 - [ ] 13.2 Become a PM from /welcome → /manage, holds client + project manager
 - [ ] 13.3 Role switcher shows Project manager; /dashboard routes PM to /manage
+- [ ] 13.4 Save a trade → Saved trades tab + PM cockpit; Request re-hires; remove works

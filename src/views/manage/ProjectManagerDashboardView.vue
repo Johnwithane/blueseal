@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import { useAuthStore } from "@/stores/auth";
 import { useSeo } from "@/composables/useSeo";
+import TrustedTradesPanel from "@/components/TrustedTradesPanel.vue";
 
 useSeo({ title: "Manage", noindex: true });
 
@@ -29,13 +30,15 @@ const firstName = computed(() => (auth.user?.displayName ?? "").trim().split(/\s
          recruit), Projects (set up + dispatch), Earnings (commission + payouts), and your
          public profile. They render here once each phase ships. -->
     <div class="grid grid-cols-1 gap-3">
-      <div class="bs-card p-5">
-        <h2 class="font-semibold flex items-center gap-2">
-          <i class="pi pi-users text-[color:var(--bs-blue)]"></i> Your trusted trades
+      <div>
+        <h2 class="font-semibold flex items-center gap-2 mb-1">
+          <i class="pi pi-users text-[color:var(--bs-blue)]"></i> Your saved trades
         </h2>
-        <p class="text-sm text-[color:var(--bs-muted)] mt-1">
-          Save the tradespeople you recommend and invite new ones to join Blue Seal.
+        <p class="text-sm text-[color:var(--bs-muted)] mb-3">
+          The tradespeople you recommend. Save them from their profile, then re-hire for a
+          client in one tap. Inviting new ones to join is coming next.
         </p>
+        <TrustedTradesPanel />
       </div>
       <div class="bs-card p-5">
         <h2 class="font-semibold flex items-center gap-2">
