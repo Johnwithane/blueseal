@@ -110,6 +110,20 @@ Tradesperson verification has three independent documents — **ID**, **certific
 3. **Expected:** after admin confirms insurance, the **Insured** badge shows on
    your public profile.
 
+### 1.6 Google sign-up — client AND tradesperson (no spurious error)
+1. `/sign-up`, choose **Client**, accept terms, click **Continue with Google**,
+   pick a Google account.
+2. **Expected:** **no error toast/message** (regression guard — this used to flash
+   "You don't have permission to do that." while still creating the account). Lands
+   straight on the **client dashboard**, signed in, email already verified.
+3. Repeat with **Tradesperson** selected before clicking Continue with Google.
+4. **Expected:** no error; lands in the **onboarding wizard** with the
+   **tradesperson** role already granted (resume works on return — see 1.2).
+5. From `/sign-in` (not sign-up), a **brand-new** Google account → the
+   **"How will you use Blue Seal?"** dialog appears; choosing *tradesperson* routes
+   to `/onboarding`, choosing *client* (or dismissing) lands on the dashboard.
+6. **Mobile (375px):** popup + dialog usable; no horizontal scroll.
+
 ---
 
 ## 2. Job creation  → help: `post-a-job`, `request-a-quote`, `find-a-tradesperson`, `bring-your-own-client`

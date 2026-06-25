@@ -58,11 +58,11 @@ describe("provisionAccount (server-side account provisioning)", () => {
   });
 
   it("creates a client user doc and mirrors the role to claims", async () => {
-    const res = await callFn<{ roles: string[]; activeRole: string }>(
+    const res = await callFn<{ roles: string[]; activeRole: string; isNew: boolean }>(
       provisionAccount,
       req({ data: { role: "client" } }),
     );
-    expect(res).toEqual({ roles: ["client"], activeRole: "client" });
+    expect(res).toEqual({ roles: ["client"], activeRole: "client", isNew: true });
 
     const doc = fakeDb.peek(`users/${UID}`);
     expect(doc).toMatchObject({
@@ -80,11 +80,15 @@ describe("provisionAccount (server-side account provisioning)", () => {
   });
 
   it("gives a tradesperson the implied client role", async () => {
-    const res = await callFn<{ roles: string[]; activeRole: string }>(
+    const res = await callFn<{ roles: string[]; activeRole: string; isNew: boolean }>(
       provisionAccount,
       req({ data: { role: "tradesperson" } }),
     );
-    expect(res).toEqual({ roles: ["tradesperson", "client"], activeRole: "tradesperson" });
+    expect(res).toEqual({
+      roles: ["tradesperson", "client"],
+      activeRole: "tradesperson",
+      isNew: true,
+    });
     expect(fakeDb.peek(`users/${UID}`)).toMatchObject({
       roles: ["tradesperson", "client"],
       activeRole: "tradesperson",
@@ -106,11 +110,12 @@ describe("provisionAccount (server-side account provisioning)", () => {
     });
     // Even though the caller asks for tradesperson, the existing doc wins —
     // role changes go through addRoleToSelf, not here.
-    const res = await callFn<{ roles: string[]; activeRole: string }>(
+    const res = await callFn<{ roles: string[]; activeRole: string; isNew: boolean }>(
       provisionAccount,
       req({ data: { role: "tradesperson", displayName: "New Name" } }),
     );
-    expect(res).toEqual({ roles: ["client"], activeRole: "client" });
+    // isNew false: the doc already existed, so this was an idempotent reconcile.
+    expect(res).toEqual({ roles: ["client"], activeRole: "client", isNew: false });
 
     const doc = fakeDb.peek(`users/${UID}`);
     expect(doc).toMatchObject({
@@ -138,12 +143,12 @@ describe("provisionAccount (server-side account provisioning)", () => {
 
   it("does not fail the call if the claim write transiently errors (trigger backstops)", async () => {
     setCustomUserClaims.mockRejectedValueOnce(new Error("auth/user-not-found"));
-    const res = await callFn<{ roles: string[]; activeRole: string }>(
+    const res = await callFn<{ roles: string[]; activeRole: string; isNew: boolean }>(
       provisionAccount,
       req({ data: { role: "client" } }),
     );
     // Doc still created; call resolves — setRoleOnSignup mirrors claims after.
-    expect(res).toEqual({ roles: ["client"], activeRole: "client" });
+    expect(res).toEqual({ roles: ["client"], activeRole: "client", isNew: true });
     expect(fakeDb.peek(`users/${UID}`)).toMatchObject({ roles: ["client"] });
   });
 });

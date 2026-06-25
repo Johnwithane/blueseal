@@ -387,19 +387,27 @@ export const useAuthStore = defineStore("auth", {
         const cred = await signInWithPopup(auth, new GoogleAuthProvider());
         provisioningUid = cred.user.uid;
         provisioningUids.add(provisioningUid);
-        const existing = await getUser(cred.user.uid);
-        if (!existing) {
-          isNew = true;
-          // Server-side provision (Admin SDK, bypasses rules) — see signUp.
-          const { roles, activeRole } = await callProvisionAccount({
-            role: intendedRole,
-            displayName: cred.user.displayName ?? "Anonymous",
-            termsAcceptedVersion: LEGAL_VERSION,
-            photoURL: cred.user.photoURL,
-            referralCode: referral?.referralCode,
-            referralSignal: referral?.referralSignal,
-          });
-          await cred.user.getIdToken(true);
+        // Provision/reconcile SERVER-SIDE (Admin SDK, bypasses rules). We do NOT
+        // pre-read users/{uid} from the client here: that read raced the
+        // Auth→Firestore token handshake right after the popup and lost on a
+        // brand-new account, throwing permission-denied AFTER the Auth account
+        // was already created — the spurious "You don't have permission to do
+        // that." users hit on Google sign-up (the account existed but they saw
+        // an error). provisionAccount is idempotent and reports `isNew`, so the
+        // server is the source of truth for new-vs-returning. Mirrors signUp.
+        const { roles, activeRole, isNew: created } = await callProvisionAccount({
+          role: intendedRole,
+          displayName: cred.user.displayName ?? "Anonymous",
+          termsAcceptedVersion: LEGAL_VERSION,
+          photoURL: cred.user.photoURL,
+          referralCode: referral?.referralCode,
+          referralSignal: referral?.referralSignal,
+        });
+        isNew = created;
+        // Refresh so the token carries the claims the callable just
+        // set/reconciled before the router guard reads them on redirect.
+        await cred.user.getIdToken(true);
+        if (created) {
           this.roles = roles;
           this.activeRole = activeRole;
         }
@@ -439,17 +447,16 @@ export const useAuthStore = defineStore("auth", {
         const cred = await signInWithEmailLink(auth, email, href);
         provisioningUid = cred.user.uid;
         provisioningUids.add(provisioningUid);
-        const existing = await getUser(cred.user.uid);
-        let isNew = false;
-        if (!existing) {
-          isNew = true;
-          // Server-side provision (Admin SDK, bypasses rules) — see signUp.
-          const { roles, activeRole } = await callProvisionAccount({
-            role,
-            displayName: cred.user.displayName ?? "",
-            termsAcceptedVersion: LEGAL_VERSION,
-            photoURL: cred.user.photoURL,
-          });
+        // Provision/reconcile server-side; no racy client users/{uid} read here
+        // (same Auth→Firestore handshake race as the Google path — see
+        // signInWithGoogle). The callable is idempotent and reports `isNew`.
+        const { roles, activeRole, isNew } = await callProvisionAccount({
+          role,
+          displayName: cred.user.displayName ?? "",
+          termsAcceptedVersion: LEGAL_VERSION,
+          photoURL: cred.user.photoURL,
+        });
+        if (isNew) {
           this.roles = roles;
           this.activeRole = activeRole;
         }

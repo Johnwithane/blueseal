@@ -121,5 +121,9 @@ export const provisionAccount = onCall(CALLABLE_OPTS, async (req) => {
     logger.warn("provisionAccount: claim set deferred to setRoleOnSignup trigger", { uid, e });
   }
 
-  return { roles, activeRole };
+  // `isNew` lets the client tell a fresh provision from an idempotent reconcile
+  // WITHOUT a racy client-side users/{uid} read right after sign-in (which loses
+  // the Auth→Firestore token handshake and surfaces a spurious permission-denied
+  // on the Google/magic-link paths). The server already knows from snap.exists.
+  return { roles, activeRole, isNew };
 });

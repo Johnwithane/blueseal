@@ -79,7 +79,10 @@ export async function getUser(uid: string): Promise<WithId<UserDoc> | null> {
  * "You don't have permission to do that." users hit on signup). The callable
  * writes via the Admin SDK, which bypasses rules entirely, so there's no token
  * to race. Idempotent; returns the resulting roles so the caller can seed
- * local state without waiting for the claim trigger.
+ * local state without waiting for the claim trigger. `isNew` reports whether
+ * this call actually created the doc (vs. reconciled an existing one), so OAuth
+ * /magic-link callers can detect a brand-new account WITHOUT a racy client-side
+ * users/{uid} read right after sign-in.
  */
 export async function provisionAccount(input: {
   role: Role;
@@ -88,8 +91,8 @@ export async function provisionAccount(input: {
   photoURL?: string | null;
   referralCode?: string;
   referralSignal?: "link" | "code" | "name";
-}): Promise<{ roles: Role[]; activeRole: Role }> {
-  const callable = httpsCallable<typeof input, { roles: Role[]; activeRole: Role }>(
+}): Promise<{ roles: Role[]; activeRole: Role; isNew: boolean }> {
+  const callable = httpsCallable<typeof input, { roles: Role[]; activeRole: Role; isNew: boolean }>(
     functions,
     "provisionAccount",
   );

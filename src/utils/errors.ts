@@ -14,8 +14,11 @@ const FIREBASE_AUTH_MAP: Record<string, string> = {
   "auth/too-many-requests":
     "Too many attempts. Try again in a few minutes, or reset your password.",
   "auth/popup-closed-by-user": "Sign-in window was closed. Please try again.",
+  "auth/cancelled-popup-request": "Sign-in window was closed. Please try again.",
   "auth/popup-blocked":
     "Your browser blocked the sign-in popup. Allow popups and retry.",
+  "auth/account-exists-with-different-credential":
+    "You already have an account with this email. Sign in with your password instead.",
   "auth/network-request-failed":
     "Network problem. Check your connection and try again.",
   "auth/user-disabled":
