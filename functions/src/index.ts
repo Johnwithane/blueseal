@@ -90,6 +90,11 @@ export { adminUpsertRegion } from "./sales/upsertRegion";
 export { adminDeleteRegion } from "./sales/deleteRegion";
 // Daily per-region active-tradie recount + marketing-budget unlock.
 export { scheduledRegionHealth } from "./sales/scheduledRegionHealth";
+// Admin sales-reps console: list reps + earnings, toggle active, reconcile a
+// pending payout batch.
+export { adminListSalesReps } from "./sales/adminListSalesReps";
+export { adminSetRepActive } from "./sales/adminSetRepActive";
+export { adminRetryPayoutBatch } from "./sales/adminRetryPayoutBatch";
 // Sales rep self-service: e-sign the liability agreement (inert until signed),
 // then claim a unique vanity referral code.
 export { signSalesAgreement } from "./sales/signAgreement";
