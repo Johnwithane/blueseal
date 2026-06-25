@@ -331,6 +331,16 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 6. **Direct signup unchanged.** Sign up as a tradesperson WITHOUT a code.
    **Expected:** no free-month banner, and the normal 30-day card trial path
    applies (no auto-comp).
+7. **Rep reviews + approves an owned application.** As a signed-in rep (with a
+   region or a referral), open **/sales → Applications to review**.
+   **Expected:** you see the pending tradespeople in your region, or who used
+   your code. Open one → **Expected:** their certifications + ID render with
+   "View document" links that open the file. Tap **Approve** → **Expected:** the
+   tradesperson goes live and the application leaves your queue.
+8. **Rep can't touch others' applications.** A pending tradesperson in a
+   DIFFERENT region (and not your referral) does NOT appear in your list, and the
+   server denies a decision call on them. Admin still sees + vets everyone from
+   **/admin/vetting**.
 
 ---
 
@@ -398,4 +408,6 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 - [ ] 11.2 Sales rep claims a vanity referral code (+ link)
 - [ ] 11.3 Referral signup via /join?ref= (banner + free month at go-live)
 - [ ] 11.4 Direct signup unchanged (no comp, card trial)
+- [ ] 11.5 Rep reviews + approves an owned application (docs visible, goes live)
+- [ ] 11.6 Rep can't see/act on applications outside their territory
 - [ ] 12 Admin jobs & postings browse (province + territory + status + search, all regions)

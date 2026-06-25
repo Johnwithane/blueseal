@@ -31,7 +31,18 @@ export const listRepApplications = onCall(CALLABLE_OPTS, async (req) => {
       // Referral beats region; either makes this rep the owner.
       return t.referredByRepId === uid || (t.regionId != null && regionIds.has(t.regionId));
     })
-    .map((d) => ({ id: d.id, ...d.data() }));
+    .map((d) => {
+      const t = d.data() as Record<string, unknown>;
+      const submittedAt = t.submittedAt as { toMillis?: () => number } | undefined;
+      return {
+        id: d.id,
+        displayName: (t.displayName as string) ?? "",
+        trades: (t.trades as string[]) ?? [],
+        regionId: (t.regionId as string | null) ?? null,
+        referredByRepId: (t.referredByRepId as string | null) ?? null,
+        submittedAtMs: typeof submittedAt?.toMillis === "function" ? submittedAt.toMillis() : null,
+      };
+    });
 
   return { applications };
 });

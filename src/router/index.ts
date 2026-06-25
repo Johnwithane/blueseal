@@ -302,6 +302,18 @@ const routes: RouteRecordRaw[] = [
     component: () => import("@/views/sales/SalesRepDashboardView.vue"),
     meta: { requiresAuth: true, role: "sales", layout: "app", title: "Sales" },
   },
+  {
+    path: "/sales/applications",
+    name: "SalesApplications",
+    component: () => import("@/views/sales/SalesApplicationsView.vue"),
+    meta: { requiresAuth: true, role: "sales", layout: "app", title: "Applications" },
+  },
+  {
+    path: "/sales/applications/:uid",
+    name: "SalesApplicationReview",
+    component: () => import("@/views/sales/SalesApplicationReviewView.vue"),
+    meta: { requiresAuth: true, role: "sales", layout: "app", title: "Review application" },
+  },
 
   // Tradesperson onboarding wizard
   {

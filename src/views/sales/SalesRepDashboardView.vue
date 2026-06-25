@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { RouterLink } from "vue-router";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import Message from "primevue/message";
@@ -69,6 +70,25 @@ async function copyLink() {
         yours: you review their application and earn commission on everything they do.
       </p>
     </header>
+
+    <RouterLink
+      to="/sales/applications"
+      class="bs-card p-4 mb-4 flex items-center justify-between gap-3 no-underline text-inherit hover:shadow-md transition-shadow"
+    >
+      <div class="flex items-center gap-3">
+        <span
+          class="inline-flex h-9 w-9 items-center justify-center rounded-full shrink-0"
+          style="background-color: var(--bs-surface-alt); color: var(--bs-blue)"
+        >
+          <i class="pi pi-shield"></i>
+        </span>
+        <div>
+          <div class="text-sm font-medium">Applications to review</div>
+          <div class="text-xs text-[color:var(--bs-muted)]">Vet the tradespeople in your territory</div>
+        </div>
+      </div>
+      <i class="pi pi-chevron-right text-[color:var(--bs-muted)]"></i>
+    </RouterLink>
 
     <div class="bs-card p-4 space-y-3">
       <h2 class="text-sm font-semibold">Your referral code</h2>
