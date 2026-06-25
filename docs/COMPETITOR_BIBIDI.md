@@ -47,6 +47,39 @@ Blue Seal is the inverse bet: **trades-deep, hand-verified (cert + government ID
 
 ---
 
+## 2A. Legal structure & monetization, in detail
+
+*(Adds detail from a second external due-diligence report the founder supplied 2026-06-25, merged with our primary research. Figures unique to that report, headcount, burn, net-take, breakeven, are reasoned estimates, flagged, and kept out of the investor deck.)*
+
+### Legal structure
+- **Operating entity:** **1561935 B.C. LTD.**, doing business as Bibidi (governs terms of use, privacy policy, liability waivers).
+- **HQ:** 167 Snowsell Street, Kelowna, BC.
+- **App Store seller of record:** "Frame and Furnish by Tif Inc." (the CEO's interiors business; a legacy developer account / holding-company artifact, not a separate product).
+- **Open flag:** our own research separately surfaced a "BIBIDI PTE. LTD." (Singapore-style) developer name on the Google Play listing; the DD report does not mention it. Unconfirmed, worth a registry check before relying on either entity claim.
+- **Compliance posture:** KYC outsourced to Veriff (bibidi states it does not itself store the government ID); marketing gated on CASL express consent; payments via Stripe Connect (escrow / delayed capture).
+
+### Monetization, in full (the fee story)
+Three stacked revenue lines:
+1. **Transactional commission: 8% + 8% = 16% gross, uncapped.** On a $100 booking the customer pays $108, the provider nets $92, bibidi takes $16. The split is deliberately psychological, neither side sees the full 16%. **No cap**, so bibidi takes ~$480 on a $3,000 job and ~$1,600 on a $10,000 job. This is exactly the high-ticket-leakage problem our capped fee is built around.
+2. **Classifieds subscription: $7.99/mo.** Basic profiles are free; this paid tier lets a provider list high-ticket/complex work with a direct "Contact Now" button (off-platform lead-gen). It is their **disintermediation hedge**, a recurring-revenue floor for the big jobs the 16% would otherwise push offline. (So "$8/mo just to list" is imprecise; it is the high-ticket lead tier.)
+3. **Identity verification: $4.99 one-time** (Veriff badge), optional. This is what "Verified" means on bibidi: a paid identity check, not certification / licence / insurance.
+
+**Net take is far below the 16% headline.** The DD report models, per $100 booking: Stripe processing + Connect payout friction ~$5.66, plus an Offline Team affiliate override ~2% (~$2.00), leaving **~$8.34 true net (~8.3%)**. Reasoned estimate, not disclosed, but directionally important: their real margin is thin even at 16% gross.
+
+### Go-to-market (the part they did well, worth respecting)
+- **Supply-first "Flintstone mode":** months of manual, in-person onboarding toward a target of **1,200 vetted providers** before opening to demand, so the shelf is stocked at launch. (We ran the same supply-first move with ~100 pros, but ours are credential-verified trades.)
+- **"Offline Team":** a decentralized, commission-based ambassador network that onboards providers and earns **recurring commission on their transaction volume**, tracked via a back-end dashboard. **This is structurally the same idea as our sales-rep + Property-Manager commission ledger.** They have validated commission-driven supply acquisition; our version ties it to verified trades and B2B dispatch.
+- **Demand activation:** "Yellow Man" morph-suit street campaign ($100 platform credit for interacting) and a launch festival ("the bibidi Bop," Kelowna Event Centre, June 14 2026) co-branded with local non-profits (Mamas for Mamas, Paws It Forward). Real local goodwill.
+- **Validation:** Accelerate Okanagan incubator (Kelowna Innovation Centre); won a Demo Day pitch award.
+
+### The burn-vs-market trap (the pressure point)
+The DD report estimates an **11-person team** burning **~$35k/mo (lean) to $55-75k/mo (full-time)**, with breakeven at **~4,200-6,600 completed bookings/month** (roughly 140-220/day), i.e. **~6.5% of all Kelowna households booking a $100 service every month**. Near-impossible inside the Okanagan alone, so the model **requires continuous VC and fast geographic expansion** (Vancouver / Calgary / Toronto) to amortize payroll over a larger market. Read: the burn is a clock, and Kelowna is an expensive proof-of-concept for the next raise. *(Headcount and burn are that report's estimates; not independently confirmed; kept out of the deck.)*
+
+### Wider fee context (fuel for our "fair fee" story)
+Against the category, bibidi's 16% sits mid-pack and our capped 5% sits at the floor: TaskRabbit ~22.5% (15% service + 7.5% trust, customer-side), Jiffy ~15-20% provider commission plus a $75/mo "Jiffy+" consumer subscription, Taskal 0% (a zero-commission P2P entrant that pressures everyone's take). Blue Seal's 5% capped at $99 (waived on Pro) is the cheapest, the fairest, and the only one that stops scaling with job size.
+
+---
+
 ## 3. Why bibidi's arrival is good news (read this before reacting)
 
 1. **It validates the thesis with money behind it.** Someone else looked at the Okanagan and bet a real team + a native-app build that residents want a trusted local-services marketplace. That de-risks the *market* question every investor asks. Our deck can now say "the market is validated" and point at a live, funded, award-winning local example instead of arguing from first principles.
@@ -120,4 +153,4 @@ The deck change (this session) names bibidi as the validating local competitor, 
 
 ## 9. Sources & method
 
-Live `bibidi.ca` (home, `/categories`, `/login`, logged-in `/dashboard`), `bibidi.ca/api/profiles`, FAQ, support/terms, Apple App Store (id6755289614) and Google Play (com.bibidilocal.app) listings, Accelerate Okanagan, local press, and founder traces. Gathered by a 25-agent research fan-out (55 raw findings, 18 adversarially verified) plus a first-hand logged-in walk on 2026-06-25. Dollar/headcount/burn figures for bibidi are estimates or unverified and are flagged as such; structural and pricing facts are primary-source confirmed.
+Live `bibidi.ca` (home, `/categories`, `/login`, logged-in `/dashboard`), `bibidi.ca/api/profiles`, FAQ, support/terms, Apple App Store (id6755289614) and Google Play (com.bibidilocal.app) listings, Accelerate Okanagan, local press, and founder traces. Gathered by a 25-agent research fan-out (55 raw findings, 18 adversarially verified) plus a first-hand logged-in walk on 2026-06-25. A second external due-diligence report (founder-supplied, 2026-06-25) contributed the legal entity (1561935 B.C. LTD.), the Classifieds-tier mechanics, the net-take and breakeven analysis, and the Offline Team detail; its quantitative estimates (headcount, burn, net margin) are flagged inline and excluded from the deck. Dollar/headcount/burn figures for bibidi are estimates or unverified and are flagged as such; structural and pricing facts are primary-source confirmed.

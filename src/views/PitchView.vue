@@ -451,12 +451,12 @@ function fmt(n: number): string {
                 <tr><td><strong>Angi / Thumbtack</strong></td><td>Sells leads, $15–150 each</td><td>Sells leads, not trust</td></tr>
                 <tr><td><strong>Jiffy</strong></td><td>12–18% commission</td><td>Low-ticket only; leaks on big jobs</td></tr>
                 <tr><td><strong>HomeStars</strong></td><td>Reviews directory</td><td>No real cert/ID check; no job tools</td></tr>
-                <tr><td><strong>bibidi</strong> (Kelowna)</td><td>Local "book any help" app, 8% both sides</td><td>Optional ID badge, not cert/ID; a booking, not the job</td></tr>
-                <tr class="tstrong"><td>Blue Seal</td><td>Capped fee + Pro</td><td>Verified · AI · high-ticket-friendly · both sides rated</td></tr>
+                <tr><td><strong>bibidi</strong> (Kelowna)</td><td>16% per job (8% client + 8% pro), uncapped, + $7.99/mo to list</td><td>No cap; taxes both sides; ID badge, not cert/ID; a booking, no business tools</td></tr>
+                <tr class="tstrong"><td>Blue Seal</td><td>5% capped at $99, waived on $29/mo Pro</td><td>Verified · AI · runs the whole business · high-ticket-friendly</td></tr>
               </tbody>
             </table>
           </div>
-          <p class="note">A funded local competitor, <strong>bibidi</strong> (also Kelowna-built, launched 2026), now sells “trusted local help” across 100+ categories. We read that as validation, not a threat: it proves the demand and draws the line we win on. They went broad and light (an optional ID badge, an 8% fee on both sides, a booking). We go deep and verified (hand-checked cert + ID, a capped fee, the whole job). A separate cluster of scrape-and-list directory sites competes on listings; we compete on the whole transaction.</p>
+          <p class="note">A funded local competitor, <strong>bibidi</strong> (also Kelowna-built, launched 2026), now sells “trusted local help” across 100+ categories. We read that as validation, not a threat: it proves the demand and draws the line we win on. They went broad and light: 16% taken on every job (8% off the pro and 8% onto the client, uncapped), plus $7.99/mo to list and $4.99 for an ID badge, and it ends at a booking. We go deep and verified: hand-checked cert and ID, a 5% fee capped at $99 (waived on Pro), and the whole business run in one place. A separate cluster of scrape-and-list directory sites competes on listings; we compete on the whole transaction.</p>
         </div>
       </section>
 
@@ -470,24 +470,25 @@ function fmt(n: number): string {
             <div class="card">
               <h3>bibidi: broad &amp; light</h3>
               <ul class="clean">
-                <li>100+ categories, tutoring to pet care</li>
-                <li>Optional paid ID badge, no cert check</li>
-                <li>8% fee on both sides (~16% blended)</li>
-                <li>A booking, then funds released</li>
-                <li>Native-app team, racing a launch clock</li>
+                <li><strong>16% per job:</strong> 8% off the pro AND 8% onto the client</li>
+                <li><strong>No cap,</strong> so the bite grows with the job</li>
+                <li>$7.99/mo to list high-ticket work, $4.99 for an ID badge</li>
+                <li>100+ categories; an optional ID check, not a cert check</li>
+                <li>A booking, then funds released. No quotes, scheduling, invoicing or AI</li>
               </ul>
             </div>
             <div class="card card--red">
               <h3>Blue Seal: deep &amp; verified</h3>
               <ul class="clean">
-                <li>Trades only, built for the trust bar</li>
+                <li><strong>5% on the client only,</strong> capped at $99 a job</li>
+                <li><strong>$29/mo Pro waives it entirely:</strong> clients pay $0</li>
                 <li>Hand-checked certification + government ID</li>
-                <li>5% capped at $99, one side, $0 on Pro</li>
-                <li>The whole job: quote to paid, with AI</li>
+                <li>Runs the whole business: quotes, kanban, scheduling, invoicing, AI</li>
                 <li>2 people, ~$0 burn, product already shipped</li>
               </ul>
             </div>
           </div>
+          <p class="fee-math grid-top">On a <strong>$3,000 job</strong>, bibidi takes about <strong>$480</strong> (the client pays $3,240, the pro keeps $2,760). Blue Seal takes <strong>$99</strong>, or <strong>$0</strong> on Pro. On a $10,000 reno theirs is <strong>$1,600</strong>; ours is still <strong>$99</strong>.</p>
           <div class="tiles grid-top">
             <div class="tile"><div class="n">2</div><div class="l">people, both founders</div></div>
             <div class="tile"><div class="n">~$0</div><div class="l">monthly cash burn</div></div>
@@ -1290,6 +1291,22 @@ tbody tr:last-child td {
   margin-top: auto;
   padding-top: 0.9rem;
   font-size: 0.9rem;
+}
+
+/* Fee-math callout in the navy "Why we win" band: explicit, self-contained
+   light-on-dark styling so the number contrast pops regardless of band. */
+.fee-math {
+  font-size: 1.05rem;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-left: 4px solid var(--bs-red);
+  border-radius: var(--r);
+  padding: 0.9rem 1.1rem;
+  margin: 1.4rem 0 0;
+}
+.fee-math strong {
+  color: var(--bs-light-blue);
 }
 
 ul.clean {
