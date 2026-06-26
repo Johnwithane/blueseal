@@ -86,6 +86,11 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // When useAppUpdate() skip-waits the new worker, claim the open page so
+        // `controllerchange` fires and we reload onto the fresh build promptly.
+        // Without this the apply leans entirely on its hardReset failsafe — the
+        // update still lands, just a couple seconds slower and via a cache wipe.
+        clientsClaim: true,
         // The FCM service worker registers itself (separate scope) — keep it
         // out of the precache so Workbox never serves a stale copy of it.
         // version.json MUST always hit the network (it's the freshness probe),

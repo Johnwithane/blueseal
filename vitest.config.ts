@@ -1,9 +1,25 @@
-import { defineConfig } from "vitest/config";
+import { defineConfig, type Plugin } from "vitest/config";
 import vue from "@vitejs/plugin-vue";
 import { fileURLToPath, URL } from "node:url";
 
+// vite-plugin-pwa supplies `virtual:pwa-register/vue` at build time; it isn't in
+// the test build, so stub it here (a no-op register) for any module that imports
+// it — e.g. useAppUpdate. Without this, Vite fails to resolve the import before
+// vi.mock can run.
+function pwaRegisterStub(): Plugin {
+  const id = "virtual:pwa-register/vue";
+  return {
+    name: "stub-pwa-register",
+    resolveId: (source) => (source === id ? "\0" + id : undefined),
+    load: (resolved) =>
+      resolved === "\0" + id
+        ? "export const useRegisterSW = () => ({ updateServiceWorker: () => {} });"
+        : undefined,
+  };
+}
+
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [vue(), pwaRegisterStub()],
   resolve: {
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
   },

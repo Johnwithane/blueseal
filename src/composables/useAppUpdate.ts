@@ -97,15 +97,23 @@ async function applyUpdate(): Promise<void> {
   applying.value = true;
 
   // Failsafe: no matter which path below stalls (a worker that never takes
-  // control, a slow cache wipe), we still reload within a few seconds. This is
-  // what kills the "spinner hangs forever" bug.
-  window.setTimeout(() => window.location.reload(), RELOAD_FAILSAFE_MS);
+  // control, a slow cache wipe), we still move within a few seconds. It MUST be
+  // hardReset, not a plain reload: while the old worker is still in control, a
+  // plain reload is re-served the *stale* precached shell (navigateFallback →
+  // precached index.html → old JS), so version.json still reads "behind" and the
+  // banner comes straight back — the update loop. hardReset unregisters the
+  // worker and drops its caches first, forcing the reload onto the network,
+  // where index.html is no-cache → always the newest build.
+  window.setTimeout(() => void hardReset(), RELOAD_FAILSAFE_MS);
 
   try {
     const reg = await navigator.serviceWorker?.getRegistration();
     if (reg?.waiting) {
       // A new worker is ready: ask it to take over, reload when it does. The
-      // vite-plugin-pwa service worker handles this SKIP_WAITING message.
+      // vite-plugin-pwa service worker handles this SKIP_WAITING message;
+      // clientsClaim (vite.config) makes it claim this page so controllerchange
+      // fires promptly. The hardReset failsafe above backstops any browser that
+      // doesn't honour either (notably installed iOS PWAs).
       navigator.serviceWorker.addEventListener(
         "controllerchange",
         () => window.location.reload(),
@@ -119,7 +127,7 @@ async function applyUpdate(): Promise<void> {
     // no-cache index.html (and fresh hashed assets) from the network.
     await hardReset();
   } catch {
-    window.location.reload();
+    await hardReset();
   }
 }
 

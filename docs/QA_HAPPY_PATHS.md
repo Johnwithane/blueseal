@@ -320,7 +320,15 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    so it'd be noise). Check at 375px — the chip wraps under the body, never
    clipping the title.
 4. **PWA install** — install to home screen (iPhone/Android/desktop). → `install-the-app`
-5. **Help Center** — browse `/help`, search, open an article and a FAQ. →
+5. **In-app update (the banner must not loop).** With the app already open on an
+   older build, ship a new build. **Expected:** within ~30s (or on tab refocus) a
+   "A new version of Blue Seal is available" banner appears; tap **Update** → the
+   app reloads **once** to the newest build and the banner **does not come back**.
+   Test the worst case too: an **installed iOS PWA** from the home screen — tap
+   Update, confirm a single reload lands the new build (no repeating popup). A
+   `critical` release shows the blocking "Update required" overlay instead; same
+   one-tap, single-reload result.
+6. **Help Center** — browse `/help`, search, open an article and a FAQ. →
    `report-a-problem`
 
 ---
@@ -649,7 +657,7 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 - [ ] 8.1 Pro trial (Stripe)
 - [ ] 8.2 AI paywall + receipt OCR free
 - [ ] 8.3 Recurring billing drafts (never auto-sends)
-- [ ] 9 Role switch / notifications / PWA install / Help Center
+- [ ] 9 Role switch / notifications / PWA install / in-app update banner (no loop, incl. installed iOS PWA) / Help Center
 - [ ] 10 QA toolkit: provision / Pro toggle / reset / bug / error log / browse-area override
 - [ ] 11.1 Sales rep first-login agreement gate (blocks until signed)
 - [ ] 11.2 Sales rep claims a vanity referral code (+ link)
