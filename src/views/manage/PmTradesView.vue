@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { RouterLink } from "vue-router";
 import InputText from "primevue/inputtext";
 import Button from "primevue/button";
 import { useAuthStore } from "@/stores/auth";
@@ -70,6 +71,24 @@ async function copyRecruitLink() {
       The tradespeople you recommend. Your projects send each job to the matching saved trades for
       quotes.
     </p>
+
+    <!-- Find + save trades from the directory (reuses the main search). -->
+    <RouterLink
+      to="/search"
+      class="block bs-card p-4 mb-6 no-underline text-inherit border border-[color:var(--bs-blue)] hover:shadow-md transition-shadow"
+    >
+      <div class="flex items-center gap-3">
+        <i class="pi pi-search text-xl text-[color:var(--bs-blue)]"></i>
+        <div class="flex-1 min-w-0">
+          <p class="font-medium">Find a tradesperson</p>
+          <p class="text-sm text-[color:var(--bs-muted)]">
+            Search the Blue Seal directory by trade and area, then save the ones you trust. Saved
+            trades are who your projects go to for quotes.
+          </p>
+        </div>
+        <i class="pi pi-chevron-right text-xs text-[color:var(--bs-muted)]"></i>
+      </div>
+    </RouterLink>
 
     <h2 class="font-semibold flex items-center gap-2 mb-1">
       <i class="pi pi-users text-[color:var(--bs-blue)]"></i> Your saved trades
