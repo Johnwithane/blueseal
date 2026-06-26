@@ -69,6 +69,29 @@ describe("jobs — PM read-only visibility (drivenByProjectManagerId)", () => {
     const other = env.authenticatedContext(OTHER_CLIENT_UID, CLIENT_CLAIMS).firestore();
     await assertFails(getDoc(doc(other, "jobs", JOB_ID)));
   });
+
+  it("a client CANNOT forge PM linkage at create (commission-fraud + read leak)", async () => {
+    const client = env.authenticatedContext(CLIENT_UID, CLIENT_CLAIMS).firestore();
+    const base = {
+      clientId: CLIENT_UID,
+      tradespersonId: TRADIE_UID,
+      status: "requested",
+      trade: "plumbing",
+      createdAt: serverTimestamp(),
+    };
+    // A plain direct-request job is fine...
+    await assertSucceeds(setDoc(doc(client, "jobs", "job_clean"), base));
+    // ...but forging the server-minted PM linkage is denied on each field.
+    await assertFails(
+      setDoc(doc(client, "jobs", "job_forge_pm"), { ...base, drivenByProjectManagerId: PM_UID }),
+    );
+    await assertFails(
+      setDoc(doc(client, "jobs", "job_forge_proj"), { ...base, projectId: "proj-x" }),
+    );
+    await assertFails(
+      setDoc(doc(client, "jobs", "job_forge_prop"), { ...base, propertyId: "prop-x" }),
+    );
+  });
 });
 
 describe("jobs archive — per-party gate", () => {

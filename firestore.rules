@@ -610,6 +610,11 @@ service cloud.firestore {
         || isOwner(pmId) || isAdmin();
       allow create: if isOwner(pmId) && hasRole('projectManager')
         && request.resource.data.get('slug', null) == null
+        // featuredContractors is server-managed (admin SDK). Pin it absent on
+        // CREATE too — else a PM could setDoc isVisible:true + a forged
+        // featuredContractors[] in one shot, publishing arbitrary tradie
+        // identities on a world-readable doc and bypassing the consent/opt-out flow.
+        && request.resource.data.get('featuredContractors', null) == null
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time;
       allow update: if (isOwner(pmId) && hasRole('projectManager')
@@ -640,7 +645,14 @@ service cloud.firestore {
       allow create: if isClient()
         && request.resource.data.clientId == uid()
         && request.resource.data.status == 'requested'
-        && request.resource.data.tradespersonId is string;
+        && request.resource.data.tradespersonId is string
+        // PM linkage is server-minted by acceptApplicationQuote (admin SDK) only.
+        // A direct client-created job must NOT carry it: a forged
+        // drivenByProjectManagerId would mint a PM commission AND grant that PM
+        // read access to this job (full address + clientName). Pin all three null.
+        && request.resource.data.get('drivenByProjectManagerId', null) == null
+        && request.resource.data.get('projectId', null) == null
+        && request.resource.data.get('propertyId', null) == null;
       // Updates: identity + creation fields immutable. Status transitions are
       // permitted but the doc cannot be reassigned to a different client/tradie/chat.
       // Counterparty display fields (denormalized at create) are also immutable

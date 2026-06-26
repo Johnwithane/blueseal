@@ -133,6 +133,18 @@ describe("projectManagers — write access", () => {
       }),
     );
   });
+
+  it("the owner cannot forge featuredContractors at CREATE (consent bypass)", async () => {
+    const fs = env.authenticatedContext(PM_UID, PM_CLAIMS).firestore();
+    await assertFails(
+      setDoc(doc(fs, "projectManagers", PM_UID), {
+        ...profileDoc({ isVisible: true }),
+        featuredContractors: [{ tradieId: "victim", displayName: "Victim", photoURL: null, trades: [] }],
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
 });
 
 // P5b contractor-owned subcollections: read by the contractor only; server-only writes.
