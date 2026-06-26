@@ -43,10 +43,14 @@ const applicantCounts = ref<Record<string, number>>({});
 const metaUnsubs = new Map<string, () => void>();
 
 function syncMetaSubs(current: WithId<JobPostDoc>[]): void {
-  const openIds = new Set(current.filter((p) => p.status === "open").map((p) => p.id));
+  // "invited" (PM-dispatched, awaiting quotes) is an ACTIVE post — count its
+  // applicants too, so a client sees quotes land on a PM-set-up job.
+  const activeIds = new Set(
+    current.filter((p) => p.status === "open" || p.status === "invited").map((p) => p.id),
+  );
   // Drop subs for posts that closed or disappeared.
   for (const [id, unsub] of metaUnsubs) {
-    if (!openIds.has(id)) {
+    if (!activeIds.has(id)) {
       unsub();
       metaUnsubs.delete(id);
       const next = { ...applicantCounts.value };
@@ -54,8 +58,8 @@ function syncMetaSubs(current: WithId<JobPostDoc>[]): void {
       applicantCounts.value = next;
     }
   }
-  // Add subs for newly-open posts.
-  for (const id of openIds) {
+  // Add subs for newly-active posts.
+  for (const id of activeIds) {
     if (!metaUnsubs.has(id)) {
       metaUnsubs.set(
         id,
@@ -67,8 +71,12 @@ function syncMetaSubs(current: WithId<JobPostDoc>[]): void {
   }
 }
 
-const openPosts = computed(() => posts.value.filter((p) => p.status === "open"));
-const inactivePosts = computed(() => posts.value.filter((p) => p.status !== "open"));
+const openPosts = computed(() =>
+  posts.value.filter((p) => p.status === "open" || p.status === "invited"),
+);
+const inactivePosts = computed(() =>
+  posts.value.filter((p) => p.status !== "open" && p.status !== "invited"),
+);
 const totalApplicants = computed(() =>
   openPosts.value.reduce((sum, p) => sum + (applicantCounts.value[p.id] ?? 0), 0),
 );
@@ -95,9 +103,17 @@ onUnmounted(() => {
 
 const postStatusSeverity: Record<string, "info" | "success" | "warn" | "danger" | "secondary"> = {
   open: "info",
+  invited: "warn",
   closed: "success",
   cancelled: "secondary",
   expired: "danger",
+};
+const postStatusLabel: Record<string, string> = {
+  open: "Open",
+  invited: "Awaiting quotes",
+  closed: "Filled",
+  cancelled: "Cancelled",
+  expired: "Expired",
 };
 
 // Does the client have any finished jobs? Used to hide the "View
@@ -225,7 +241,7 @@ function formatBudget(min: number, max: number): string {
                   {{ tradeLabel(post.trade) }} • {{ relativeTime(post.createdAt) }}
                 </div>
               </div>
-              <Tag :value="post.status" :severity="postStatusSeverity[post.status] ?? 'info'" />
+              <Tag :value="postStatusLabel[post.status] ?? post.status" :severity="postStatusSeverity[post.status] ?? 'info'" />
             </div>
             <p class="text-sm mt-2 text-[color:var(--bs-muted)] line-clamp-2">{{ post.description }}</p>
             <div class="text-xs text-[color:var(--bs-muted)] mt-2">
@@ -281,7 +297,7 @@ function formatBudget(min: number, max: number): string {
                     {{ tradeLabel(post.trade) }} • {{ relativeTime(post.createdAt) }}
                   </div>
                 </div>
-                <Tag :value="post.status" :severity="postStatusSeverity[post.status] ?? 'info'" />
+                <Tag :value="postStatusLabel[post.status] ?? post.status" :severity="postStatusSeverity[post.status] ?? 'info'" />
               </div>
               <p class="text-sm mt-2 text-[color:var(--bs-muted)] line-clamp-2">{{ post.description }}</p>
               <div class="text-xs text-[color:var(--bs-muted)] mt-2">
