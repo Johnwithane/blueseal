@@ -9,6 +9,7 @@ export const CARD_TYPES = [
   "tradesperson_signup",
   "client_search",
   "tradesperson_profile",
+  "pm_profile",
 ] as const;
 
 export const CARD_THEMES = ["cream", "navy"] as const;

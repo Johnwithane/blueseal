@@ -73,6 +73,14 @@ const DEFAULTS: Record<
     qrCaption: "Scan to hire me",
     ctaLabel: "",
   },
+  // PMs generate their own card from the cockpit (/manage/card); this entry only
+  // satisfies the Record<CardType> type — the admin tool doesn't offer it.
+  pm_profile: {
+    headline: "",
+    subcopy: "",
+    qrCaption: "Scan to see my profile",
+    ctaLabel: "",
+  },
 };
 
 const form = reactive({

@@ -188,6 +188,17 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
             steps: ["As that contractor, open /featured-by-pms → Remove me."],
             expected: "They drop off the PM's profile and can't be re-featured until they opt back in.",
           },
+          {
+            id: "pm-business-card",
+            title: "Business card (QR to public profile)",
+            steps: [
+              "Dashboard → My business card (or Public profile → Business card / /manage/card).",
+              "Pick a theme, tweak the scan caption, download the 2-sided PDF + a PNG.",
+              "Scan the QR with a phone.",
+            ],
+            expected:
+              "The card shows your name/brand + recommended trades; the QR opens your public profile (/pm/<slug>, or /project-managers/<uid> if no slug). A warning shows if your profile isn't published yet.",
+          },
         ],
       },
       {

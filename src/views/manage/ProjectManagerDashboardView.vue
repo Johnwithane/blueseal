@@ -107,6 +107,7 @@ const projectStatusLabel: Record<string, string> = {
     <div class="flex flex-wrap gap-2 mt-5">
       <RouterLink to="/manage/properties?new=1"><Button label="New project" icon="pi pi-plus" size="small" /></RouterLink>
       <RouterLink to="/manage/trades"><Button label="Find a trade to refer" icon="pi pi-search" size="small" outlined /></RouterLink>
+      <RouterLink to="/manage/card"><Button label="My business card" icon="pi pi-id-card" size="small" severity="secondary" outlined /></RouterLink>
       <RouterLink to="/manage/profile"><Button label="Share my profile" icon="pi pi-link" size="small" severity="secondary" outlined /></RouterLink>
     </div>
 

@@ -20,7 +20,11 @@
 import QRCode from "qrcode";
 import { SITE_URL, SITE_TAGLINE } from "@/seo/site";
 
-export type CardType = "tradesperson_signup" | "client_search" | "tradesperson_profile";
+export type CardType =
+  | "tradesperson_signup"
+  | "client_search"
+  | "tradesperson_profile"
+  | "pm_profile";
 export type CardTheme = "cream" | "navy";
 export type CardFace = "front" | "back";
 
@@ -179,26 +183,33 @@ export async function ensureCardFonts(): Promise<void> {
 function defaultCampaign(type: CardType): string {
   if (type === "tradesperson_signup") return "tradesperson_signup";
   if (type === "client_search") return "client_search";
+  if (type === "pm_profile") return "pm_profile";
   return "tradesperson_profile";
 }
 
+const isProfileType = (type: CardType): boolean =>
+  type === "tradesperson_profile" || type === "pm_profile";
+
 export function cardTargetUrl(
   type: CardType,
-  opts: { uid?: string; campaign?: string } = {},
+  opts: { uid?: string; slug?: string; campaign?: string } = {},
 ): { url: string; label: string } {
   let path: string;
   if (type === "tradesperson_signup") path = "/sign-up?as=tradesperson";
   else if (type === "client_search") path = "/search";
+  // PM profile: prefer the vanity /pm/<slug>, fall back to canonical /project-managers/<uid>.
+  else if (type === "pm_profile")
+    path = opts.slug ? `/pm/${opts.slug}` : `/project-managers/${opts.uid ?? ""}`;
   else path = `/tradies/${opts.uid ?? ""}`;
 
   const u = new URL(SITE_URL + path);
   u.searchParams.set("utm_source", "business_card");
   u.searchParams.set("utm_medium", "print");
   u.searchParams.set("utm_campaign", opts.campaign?.trim() || defaultCampaign(type));
-  if (type === "tradesperson_profile" && opts.uid) u.searchParams.set("utm_content", opts.uid);
+  if (isProfileType(type) && opts.uid) u.searchParams.set("utm_content", opts.uid);
 
   const bare = SITE_URL.replace(/^https?:\/\//, "");
-  const label = type === "tradesperson_profile" ? bare : bare + path.split("?")[0];
+  const label = isProfileType(type) ? bare : bare + path.split("?")[0];
   return { url: u.toString(), label };
 }
 
@@ -468,6 +479,8 @@ export interface CardProfile {
   email?: string;
   phone?: string;
   isPro?: boolean;
+  /** Overrides the verified pill label (e.g. "Project manager on Blue Seal"). */
+  badgeLabel?: string;
 }
 
 export interface CardContent {
@@ -602,7 +615,7 @@ export function drawCardFace(
   const groupTop = (contentH: number): number =>
     cy + Math.max(0, (chH - (contentH + logoGap + logoH)) / 2);
 
-  if (content.type === "tradesperson_profile" && content.profile) {
+  if (isProfileType(content.type) && content.profile) {
     const p = content.profile;
     const pr = 54; // photo radius
     const nameMaxW = lw - (pr * 2 + 28);
@@ -658,7 +671,7 @@ export function drawCardFace(
       th,
       lx,
       y + 20,
-      p.isPro ? "Blue Seal Pro · Verified" : "Verified on Blue Seal",
+      p.badgeLabel ?? (p.isPro ? "Blue Seal Pro · Verified" : "Verified on Blue Seal"),
     );
     y += 40;
     drawImageContain(ctx, assets.logo, lx, y + logoGap, Math.min(cw * 0.6, 340), logoH, "left");

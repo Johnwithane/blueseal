@@ -37,9 +37,14 @@ onUnmounted(() => unsub?.());
           recommend.
         </p>
       </div>
-      <RouterLink v-if="profile" :to="publicPath" target="_blank">
-        <span class="text-sm text-[color:var(--bs-blue)] no-underline whitespace-nowrap">View page ↗</span>
-      </RouterLink>
+      <div class="flex items-center gap-3 whitespace-nowrap">
+        <RouterLink to="/manage/card" class="text-sm text-[color:var(--bs-blue)] no-underline">
+          <i class="pi pi-id-card text-xs"></i> Business card
+        </RouterLink>
+        <RouterLink v-if="profile" :to="publicPath" target="_blank">
+          <span class="text-sm text-[color:var(--bs-blue)] no-underline">View page ↗</span>
+        </RouterLink>
+      </div>
     </div>
 
     <div class="mt-5">

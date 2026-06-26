@@ -668,6 +668,13 @@ const faqs: FaqItem[] = [
     audience: "client",
   },
   {
+    question: "I'm a project manager. Can I get a business card to give my clients?",
+    answer:
+      "Yes. In your cockpit, tap **My business card** (on the dashboard, or from the **Public profile** section). Pick a theme, add an optional phone number, and download a print-ready, two-sided PDF (or PNGs). The card shows your name, brand, and the trades you recommend, with a QR code that opens your public profile, where clients see your featured trades and can request a quote. Publish your public profile first so the QR works for anyone who scans it; claiming a **blueseal.app/pm/your-name** handle gives the card a cleaner link. It's free.",
+    categoryId: "for-clients",
+    audience: "client",
+  },
+  {
     question: "Why am I asked if Blue Seal is an additional insured on my policy?",
     answer:
       "When you upload your own liability policy, we ask whether Blue Seal is named as an **additional insured**. That's what actually extends your coverage to Blue Seal (being a \"certificate holder\" doesn't). It's automatic on a Blue Seal partner policy. If Blue Seal **is** named, an admin confirms it against your certificate. If it **isn't**, you sign a short liability release so everyone's clear that your policy doesn't cover Blue Seal and you're accepting responsibility for your work. You can skip the release any time by adding Blue Seal as an additional insured and uploading the updated certificate.",

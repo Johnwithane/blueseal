@@ -606,6 +606,14 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    `pm_featured` notification. As that contractor, open **/featured-by-pms** and tap
    **Remove me**. **Expected:** they drop off the PM's profile and can't be re-featured
    until they opt back in (covered by `featuredContractors.test.ts` + rules tests).
+10i. **Business card (QR to public profile).** From the **dashboard** tap **My business
+   card** (or **Public profile -> Business card**, route `/manage/card`). Pick a theme
+   (Cream/Navy), tweak the scan caption + optional phone, then **download the 2-sided
+   PDF** and a **PNG**. Scan the QR with a phone. **Expected:** the card shows your
+   name/brand + the trades you recommend (from your featured contractors); the QR opens
+   your public profile (`/pm/<handle>`, or `/project-managers/<uid>` if you haven't
+   claimed a handle). If your profile isn't published yet, a warning tells you to publish
+   it first (so the scan resolves for clients).
 11. **Mobile (375px).** Re-run the signup cards + cockpit + saved-trades + properties +
    projects (incl. the client accept + address form), the tradesperson "Invited to
    quote" section, the cockpit Earnings + Public-profile editors, and the public
@@ -672,5 +680,6 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 - [ ] 13.10f Property → Projects → Jobs drill-down; New-project scoped to a property; Jobs board reflects PM-driven jobs
 - [ ] 13.10g Photos: attach a photo to a property + a project; hero on detail, thumbnail on lists, visible to the invited client
 - [ ] 13.10h Find/feature trades: search → save; feature on profile → public card + pm_featured notif; contractor /featured-by-pms → Remove me (opt-out)
+- [ ] 13.10i Business card: /manage/card → theme + caption → download 2-sided PDF + PNG; QR opens /pm/<handle> (or /project-managers/<uid>); warns if profile unpublished
 - [ ] 13.10 Public fallback: client opens a no-bid scoped posting to the board (geocoded, leaves the invited lists, enters the radius feed)
 - [ ] 13.11 PM visibility: project detail shows quote amounts + won-job status/schedule; never the chat/invoice; another PM is denied
