@@ -32,7 +32,12 @@ function requireUid(): string {
 }
 
 function draftFields(draft: PropertyDraft) {
-  return { label: draft.label, addressText: draft.addressText, notes: draft.notes };
+  return {
+    label: draft.label,
+    addressText: draft.addressText,
+    notes: draft.notes,
+    photoUrl: draft.photoUrl,
+  };
 }
 
 export async function createProperty(draft: PropertyDraft): Promise<string> {

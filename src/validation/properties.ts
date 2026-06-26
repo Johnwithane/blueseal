@@ -13,6 +13,13 @@ export const propertySchema = z.object({
     .nullable()
     .transform((v) => (v ? v : null))
     .default(null),
+  photoUrl: z
+    .string()
+    .trim()
+    .max(1000)
+    .nullable()
+    .transform((v) => (v ? v : null))
+    .default(null),
 });
 
 export type PropertyDraft = z.infer<typeof propertySchema>;

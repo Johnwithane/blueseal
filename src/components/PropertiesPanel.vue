@@ -12,6 +12,7 @@ import {
   setPropertyArchived,
 } from "@/firebase/services/properties";
 import { propertySchema } from "@/validation/properties";
+import { uploadPmPhoto } from "@/firebase/services/pmImages";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 import type { PropertyDoc, WithId } from "@/firebase/interfaces";
@@ -28,8 +29,9 @@ let unsub: (() => void) | null = null;
 const formOpen = ref(false);
 const editingId = ref<string | null>(null); // null = adding
 const saving = ref(false);
-const form = reactive({ label: "", addressText: "", notes: "" });
+const form = reactive({ label: "", addressText: "", notes: "", photoUrl: "" });
 const fieldErrors = ref<Record<string, string>>({});
+const uploading = ref(false);
 
 onMounted(() => {
   const uid = auth.fbUser?.uid;
@@ -49,6 +51,7 @@ function openAdd() {
   form.label = "";
   form.addressText = "";
   form.notes = "";
+  form.photoUrl = "";
   fieldErrors.value = {};
   formOpen.value = true;
 }
@@ -58,8 +61,24 @@ function openEdit(p: WithId<PropertyDoc>) {
   form.label = p.label;
   form.addressText = p.addressText;
   form.notes = p.notes ?? "";
+  form.photoUrl = p.photoUrl ?? "";
   fieldErrors.value = {};
   formOpen.value = true;
+}
+
+async function onPickPhoto(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0];
+  const uid = auth.fbUser?.uid;
+  if (!file || !uid) return;
+  uploading.value = true;
+  try {
+    form.photoUrl = await uploadPmPhoto(uid, file);
+  } catch (err) {
+    toast.error("Upload failed", humanizeError(err));
+  } finally {
+    uploading.value = false;
+    (e.target as HTMLInputElement).value = "";
+  }
 }
 
 async function save() {
@@ -68,6 +87,7 @@ async function save() {
     label: form.label,
     addressText: form.addressText,
     notes: form.notes,
+    photoUrl: form.photoUrl,
   });
   if (!parsed.success) {
     for (const issue of parsed.error.issues) {
@@ -121,8 +141,18 @@ async function archive(p: WithId<PropertyDoc>) {
         </label>
         <Textarea v-model="form.notes" class="mt-1 w-full" rows="2" />
       </div>
+      <div>
+        <label class="text-sm font-medium">
+          Photo <span class="text-[color:var(--bs-muted)] font-normal">(optional)</span>
+        </label>
+        <div class="flex items-center gap-3 mt-1">
+          <img v-if="form.photoUrl" :src="form.photoUrl" alt="Property photo" class="h-14 w-14 rounded object-cover" />
+          <input type="file" accept="image/*" :disabled="uploading" @change="onPickPhoto" />
+          <button v-if="form.photoUrl" type="button" class="text-xs text-[color:var(--bs-muted)] underline" @click="form.photoUrl = ''">Remove</button>
+        </div>
+      </div>
       <div class="flex gap-2">
-        <Button label="Save" :loading="saving" size="small" @click="save" />
+        <Button label="Save" :loading="saving || uploading" size="small" @click="save" />
         <Button label="Cancel" text size="small" @click="formOpen = false" />
       </div>
     </div>
@@ -141,7 +171,13 @@ async function archive(p: WithId<PropertyDoc>) {
           :to="{ name: 'PmPropertyDetail', params: { propertyId: p.id } }"
           class="flex items-start gap-3 flex-1 min-w-0 no-underline text-inherit"
         >
-          <i class="pi pi-home text-[color:var(--bs-blue)] mt-1"></i>
+          <img
+            v-if="p.photoUrl"
+            :src="p.photoUrl"
+            alt=""
+            class="h-10 w-10 rounded object-cover shrink-0"
+          />
+          <i v-else class="pi pi-home text-[color:var(--bs-blue)] mt-1"></i>
           <div class="min-w-0 flex-1">
             <p class="font-medium truncate">{{ p.label }}</p>
             <p v-if="p.addressText" class="text-xs text-[color:var(--bs-muted)] truncate">{{ p.addressText }}</p>

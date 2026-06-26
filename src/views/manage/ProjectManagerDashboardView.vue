@@ -147,7 +147,8 @@ const projectStatusLabel: Record<string, string> = {
           :to="{ name: 'ProjectDetail', params: { projectId: p.id } }"
           class="bs-card p-3 flex items-center gap-3 no-underline text-inherit hover:shadow-md transition-shadow"
         >
-          <i class="pi pi-folder-open text-[color:var(--bs-blue)]"></i>
+          <img v-if="p.photoUrl" :src="p.photoUrl" alt="" class="h-10 w-10 rounded object-cover shrink-0" />
+          <i v-else class="pi pi-folder-open text-[color:var(--bs-blue)]"></i>
           <div class="min-w-0 flex-1">
             <p class="font-medium truncate">{{ p.label }}</p>
             <p class="text-xs text-[color:var(--bs-muted)] truncate">

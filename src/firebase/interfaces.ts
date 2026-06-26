@@ -135,6 +135,8 @@ export interface PropertyDoc {
   /** Free-text address line(s); structured address/geo arrives with dispatch (P3b). */
   addressText: string;
   notes: string | null;
+  /** Optional photo of the property (PM-uploaded, world-read storage). */
+  photoUrl?: string | null;
   linkedClientId: string | null;
   archivedAt: Timestamp | null;
   createdAt: Timestamp;
@@ -193,6 +195,8 @@ export interface ProjectDoc {
   label: string;
   /** What the PM entered for the client; denormalized for display. */
   clientName: string;
+  /** Optional photo of the project (PM-uploaded at creation, world-read storage). */
+  photoUrl?: string | null;
   jobSpecs: ProjectJobSpec[];
   status: ProjectStatus;
   projectInvite: ProjectInvite | null;

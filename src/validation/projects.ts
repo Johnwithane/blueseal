@@ -23,6 +23,13 @@ export const projectSchema = z.object({
     .nullable()
     .transform((v) => (v ? v : null))
     .default(null),
+  photoUrl: z
+    .string()
+    .trim()
+    .max(1000)
+    .nullable()
+    .transform((v) => (v ? v : null))
+    .default(null),
   jobs: z.array(projectJobSpecSchema).min(1, "Add at least one job").max(20),
 });
 

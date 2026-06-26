@@ -42,6 +42,7 @@ export function makeStoragePath(opts: {
     | "logo"
     | "banner"
     | "cover"
+    | "photos"
     | "certs"
     | "id"
     | "intake"

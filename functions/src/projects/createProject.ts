@@ -30,6 +30,7 @@ const Input = z.object({
   clientName: z.string().trim().min(1).max(80),
   clientEmail: z.string().trim().toLowerCase().email().max(200),
   propertyId: z.string().trim().min(1).max(200).nullable().default(null),
+  photoUrl: z.string().trim().max(1000).nullable().default(null),
   jobs: z
     .array(
       z.object({
@@ -104,6 +105,7 @@ export const createProject = onCall(CALLABLE_OPTS, async (req) => {
       propertyId: input.propertyId,
       label: input.label,
       clientName: input.clientName,
+      photoUrl: input.photoUrl,
       jobSpecs: input.jobs,
       status: "invited",
       claimedAt: null,

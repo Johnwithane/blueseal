@@ -124,6 +124,12 @@ function liveQuotes(postId: string): WithId<ApplicationDoc>[] {
     <div v-if="!project" class="text-sm text-[color:var(--bs-muted)] py-8 text-center">Loading…</div>
 
     <template v-else>
+      <img
+        v-if="project.photoUrl"
+        :src="project.photoUrl"
+        :alt="project.label"
+        class="w-full h-40 sm:h-52 rounded-xl object-cover mt-3 mb-3"
+      />
       <h1 class="text-2xl font-bold mt-3">{{ project.label }}</h1>
       <p class="text-sm text-[color:var(--bs-muted)] mt-1">
         For {{ project.clientName }} ·

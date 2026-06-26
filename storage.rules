@@ -120,6 +120,13 @@ service firebase.storage {
       allow write: if isOwner(pmId) && smallSizeOk() && isCompressedImage();
     }
 
+    // Project + property photos a PM attaches (world-read so the client sees them
+    // on the project they were invited to). Owner-write by the PM; same pipeline.
+    match /projectManagers/{pmId}/photos/{file=**} {
+      allow read: if true;
+      allow write: if isOwner(pmId) && smallSizeOk() && isCompressedImage();
+    }
+
     // Seeded prospect images (profile photo / logo / portfolio / banner) —
     // ADMIN write (the prospect has no account yet, so there's no owner), world
     // read so the drafted profile + the outreach email can show them. These

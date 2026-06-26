@@ -10,6 +10,7 @@ import {
   type CreateProjectResult,
 } from "@/firebase/services/projects";
 import { subscribeProperties } from "@/firebase/services/properties";
+import { uploadPmPhoto } from "@/firebase/services/pmImages";
 import { projectSchema } from "@/validation/projects";
 import { TRADES } from "@/data/trades";
 import { useToast } from "@/composables/useToast";
@@ -37,11 +38,13 @@ const propertyOptions = computed(() => [
 const scoped = computed(() => props.propertyId != null);
 
 const saving = ref(false);
+const uploading = ref(false);
 const form = reactive({
   label: "",
   clientName: "",
   clientEmail: "",
   propertyId: null as string | null,
+  photoUrl: "" as string,
   jobs: [{ trade: "", title: "", description: "" }],
 });
 const fieldErrors = ref<Record<string, string>>({});
@@ -58,8 +61,24 @@ function reset() {
   form.clientName = "";
   form.clientEmail = "";
   form.propertyId = null;
+  form.photoUrl = "";
   form.jobs = [{ trade: "", title: "", description: "" }];
   fieldErrors.value = {};
+}
+
+async function onPickPhoto(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0];
+  const uid = auth.fbUser?.uid;
+  if (!file || !uid) return;
+  uploading.value = true;
+  try {
+    form.photoUrl = await uploadPmPhoto(uid, file);
+  } catch (err) {
+    toast.error("Upload failed", humanizeError(err));
+  } finally {
+    uploading.value = false;
+    (e.target as HTMLInputElement).value = "";
+  }
 }
 
 function addJob() {
@@ -155,6 +174,17 @@ async function copyInvite() {
         />
       </div>
 
+      <div>
+        <label class="text-sm font-medium">
+          Photo <span class="text-[color:var(--bs-muted)] font-normal">(optional)</span>
+        </label>
+        <div class="flex items-center gap-3 mt-1">
+          <img v-if="form.photoUrl" :src="form.photoUrl" alt="Project photo" class="h-14 w-14 rounded object-cover" />
+          <input type="file" accept="image/*" :disabled="uploading" @change="onPickPhoto" />
+          <button v-if="form.photoUrl" type="button" class="text-xs text-[color:var(--bs-muted)] underline" @click="form.photoUrl = ''">Remove</button>
+        </div>
+      </div>
+
       <div class="space-y-2">
         <label class="text-sm font-medium">Jobs</label>
         <div v-for="(job, i) in form.jobs" :key="i" class="bs-card p-3 space-y-2">
@@ -190,7 +220,7 @@ async function copyInvite() {
       </div>
 
       <div class="flex gap-2">
-        <Button label="Create & invite client" :loading="saving" size="small" @click="save" />
+        <Button label="Create & invite client" :loading="saving || uploading" size="small" @click="save" />
         <Button label="Cancel" text size="small" @click="$emit('cancel')" />
       </div>
     </div>
