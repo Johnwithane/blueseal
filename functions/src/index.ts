@@ -102,8 +102,14 @@ export { getMyRepContact } from "./sales/getMyRepContact";
 export { signSalesAgreement } from "./sales/signAgreement";
 export { claimReferralCode } from "./sales/claimReferralCode";
 
-// Project manager self-service: claim a unique vanity recruiting code (/join?pm=).
+// Project manager self-service: claim a unique vanity recruiting code (/join?pm=),
+// e-sign the liability agreement (gates payout, not the cockpit), and Stripe
+// Connect onboarding for the monthly commission payout (P4).
 export { claimPmCode } from "./projectManager/claimPmCode";
+export { signPmAgreement } from "./projectManager/signAgreement";
+export { createPmConnectAccount } from "./payments/createPmConnectAccount";
+export { createPmConnectOnboardingLink } from "./payments/createPmConnectOnboardingLink";
+export { createPmConnectLoginLink } from "./payments/createPmConnectLoginLink";
 
 // Chat
 export { onMessageCreated } from "./chat/onMessageCreated";

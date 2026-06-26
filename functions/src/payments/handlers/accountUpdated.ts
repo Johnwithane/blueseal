@@ -98,14 +98,44 @@ async function handleRepAccountUpdated(
   });
 }
 
+// A PM's Connect account carries `metadata.pmId` (set by createPmConnectAccount).
+// Transfers-only like a rep, so it shares deriveRepStatus (payout-readiness alone).
+// Mirrors onto `users/{uid}.projectManager.payouts`.
+async function handlePmAccountUpdated(
+  account: StripeAccount,
+  pmId: string,
+): Promise<void> {
+  const ref = db.doc(`users/${pmId}`);
+  const snap = await ref.get();
+  if (!snap.exists || !snap.data()?.projectManager) {
+    logger.warn("stripeWebhook account.updated: pm metadata uid missing projectManager", {
+      accountId: account.id,
+      pmId,
+    });
+    return;
+  }
+  const payouts = { ...mirror(account), onboardingStatus: deriveRepStatus(account) };
+  await ref.set({ projectManager: { payouts } }, { merge: true });
+  logger.info("stripeWebhook account.updated: pm payouts mirrored", {
+    accountId: account.id,
+    pmId,
+    onboardingStatus: payouts.onboardingStatus,
+  });
+}
+
 export async function handleAccountUpdated(
   account: StripeAccount,
 ): Promise<void> {
-  // A rep Connect account (metadata.repId) mirrors to the user's salesRep doc;
-  // everything else is a tradesperson account.
+  // A rep Connect account (metadata.repId) mirrors to salesRep; a PM account
+  // (metadata.pmId) to projectManager; everything else is a tradesperson account.
   const repId = account.metadata?.repId;
   if (repId) {
     await handleRepAccountUpdated(account, repId);
+    return;
+  }
+  const pmId = account.metadata?.pmId;
+  if (pmId) {
+    await handlePmAccountUpdated(account, pmId);
     return;
   }
 

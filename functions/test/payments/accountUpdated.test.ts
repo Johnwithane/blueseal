@@ -19,6 +19,7 @@ import { db } from "../../src/lib/admin";
 const fakeDb = db as unknown as FakeFirestore;
 
 const REP = "rep-1";
+const PM = "pm-1";
 const TRADIE = "tradie-1";
 
 // A fully-onboarded transfers-only rep account: payouts on, charges OFF.
@@ -76,6 +77,29 @@ describe("account.updated — rep routing", () => {
     fakeDb.seed(`users/${REP}`, { roles: ["client", "sales"] }); // no salesRep
     await handleAccountUpdated(repAccount() as never);
     expect(fakeDb.peek(`users/${REP}`)?.salesRep).toBeUndefined();
+  });
+});
+
+describe("account.updated — PM routing (P4)", () => {
+  it("mirrors a PM account onto users/{uid}.projectManager.payouts, enabled on payouts alone", async () => {
+    fakeDb.seed(`users/${PM}`, { projectManager: { referralCode: "ACME", active: true } });
+    await handleAccountUpdated(
+      repAccount({ id: "acct_pm", metadata: { pmId: PM } }) as never,
+    );
+    const payouts = fakeDb.peek(`users/${PM}`)?.projectManager?.payouts;
+    expect(payouts).toMatchObject({
+      stripeAccountId: "acct_pm",
+      onboardingStatus: "enabled",
+      payoutsEnabled: true,
+      chargesEnabled: false,
+      detailsSubmitted: true,
+    });
+  });
+
+  it("no-ops when the PM user has no projectManager state", async () => {
+    fakeDb.seed(`users/${PM}`, { roles: ["client", "projectManager"] });
+    await handleAccountUpdated(repAccount({ metadata: { pmId: PM } }) as never);
+    expect(fakeDb.peek(`users/${PM}`)?.projectManager).toBeUndefined();
   });
 });
 
