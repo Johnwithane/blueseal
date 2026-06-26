@@ -4,6 +4,7 @@ import { RouterLink } from "vue-router";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import Textarea from "primevue/textarea";
+import { useConfirm } from "primevue/useconfirm";
 import { useAuthStore } from "@/stores/auth";
 import {
   subscribeProperties,
@@ -21,6 +22,7 @@ import type { PropertyDoc, WithId } from "@/firebase/interfaces";
 // organized by property. Mirrors the Clients CRM panel, simplified.
 const auth = useAuthStore();
 const toast = useToast();
+const confirm = useConfirm();
 
 const loading = ref(true);
 const rows = ref<WithId<PropertyDoc>[]>([]);
@@ -108,12 +110,24 @@ async function save() {
   }
 }
 
-async function archive(p: WithId<PropertyDoc>) {
-  try {
-    await setPropertyArchived(p.id, true);
-  } catch (e) {
-    toast.error("Couldn't archive", humanizeError(e));
-  }
+function archive(p: WithId<PropertyDoc>) {
+  // One-tap archive used to be silent + irreversible (archived rows drop off the
+  // list). Confirm first and toast the result.
+  confirm.require({
+    header: "Archive property?",
+    message: `Archive "${p.label}"? It'll be hidden from your list. Its projects stay intact.`,
+    icon: "pi pi-inbox",
+    acceptLabel: "Archive",
+    rejectLabel: "Cancel",
+    accept: async () => {
+      try {
+        await setPropertyArchived(p.id, true);
+        toast.success("Archived", `"${p.label}" was archived.`);
+      } catch (e) {
+        toast.error("Couldn't archive", humanizeError(e));
+      }
+    },
+  });
 }
 </script>
 

@@ -25,7 +25,12 @@ const AddressInput = z.object({
   line1: z.string().trim().min(2).max(200),
   city: z.string().trim().min(2).max(100),
   region: z.string().trim().min(2).max(100),
-  postalCode: z.string().trim().min(3).max(12),
+  // Canadian postal code (A1A 1A1, optional space) — target market is Canada and
+  // dispatch derives the public FSA from the first 3 chars.
+  postalCode: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z]\d[A-Za-z]\s?\d[A-Za-z]\d$/, "Enter a valid Canadian postal code"),
 });
 
 const Input = z.object({
