@@ -43,52 +43,85 @@ which hold **Jobs** (individual trade tasks).
 | `fe260df` | **P2b** recruiting link `/join?pm=` + `pmReferralCodes` + `claimPmCode` + provisionAccount auto-add + free month at go-live (`maybeMarkVisible`) + rules/tests |
 | `83f7a8d` | **P3a** properties book: `properties/{id}` + rules (mirror `clients/`) + service + Zod + `PropertiesPanel` cockpit section + rules tests |
 | `37db6cc` | **P3a** QA happy paths (section 13) |
+| `10400d8` | **P3b-1** `projects/{id}` + magic-link invite/claim/accept (`createProject`, `sendProjectInviteSignInLink`, `claimProjectInvite`, `respondToProject`, `unsubscribeProjectInvite`) + `ProjectsPanel` + `ClientProjectsPanel` + claim views + rules/tests |
+| `73416f4` | **P3b-2a** scoped dispatch: `"invited"` JobPostStatus + `invitedContractorIds` + `dispatchScopedPostings` on accept; `submitApplication`/`acceptApplicationQuote` accept invited posts + stamp `drivenByProjectManagerId`/`projectId`/`propertyId`; "Invited to quote" surface + composite index |
+| `f9721e6` | **P3b-2b** public-board fallback (`openPostingToPublic`: geocode + flip `invited`→`open`, clear scope) |
+| `57734e9` | **P3b-3** PM read-only visibility: `ProjectDetailView` (posting status + quote amounts + won-job status/schedule); jobPosts/applications/jobs read rules widened to the PM; no chat/invoice |
 
 Note: the role switcher is now driven by `src/data/roleViews.ts` (commit `cf1f711`, another session) — the single source of truth for role label/icon; it already includes `projectManager`. Don't reintroduce inline role maps.
 
-Test counts after P3a: 450 app unit + 499 rules + 151 functions, all green.
+Test counts after P3b: 450 app unit + 515 rules + 160 functions, all green.
+
+Key data added in P3b: `projects/{projectId}` (ProjectDoc + ProjectInvite + ProjectJobSpec, server-managed); `JobPostStatus += "invited"`; `JobPostDoc.invitedContractorIds`/`createdByProjectManagerId`/`projectId`/`propertyId`; `JobPostMetaDoc.preferredContractorIds`; `JobDoc.drivenByProjectManagerId`/`projectId`/`propertyId` + `originType "pm_project"`; `AddressPrivate.geo` nullable. The jobs-update rule's server-field pins were hoisted under one `isAdmin()` (distributive equivalence) to stay under Firestore's 1000-expression-per-request limit — keep that shape if you add more pins.
 
 Key data already in place: `Role` += `projectManager`; `users/{uid}.projectManager` (ProjectManagerState: active, referralCode, liability, payouts); `users/{uid}.referredByPmId`; `pmReferralCodes/{codeLower}`; `properties/{propertyId}` (PropertyDoc). Functions: `claimPmCode`, `provisionAccount` (pmCode), `maybeMarkVisible` (PM free month). Lib: `functions/src/lib/projectManager.ts` (`requirePmActive`, `assertPmAgreementSigned`, `initialProjectManagerState`, `resolvePmId`), `src/projectManager/agreement.ts`. Cockpit: `src/views/manage/ProjectManagerDashboardView.vue` (recruit + saved trades + properties sections).
 
 ---
 
-## NEXT TASK — P3b: Projects + compare-and-choose dispatch
+## P3b — Projects + compare-and-choose dispatch — SHIPPED ✅ (commits above)
 
-**The biggest, most sensitive phase. It edits the LIVE, payment-adjacent job-board engine. Build carefully, add composite indexes, test the rules, and verify on real Firestore against the Stripe test path before trusting it.**
+The full flow is live: a PM creates a **Project** (label, optional `propertyId`, job
+specs) for a client by email -> client claims via magic link (account auto-created,
+becomes `clientId`) and **accepts** (confirming a structured job address) -> each job
+fans out as a **scoped `"invited"` posting** to the PM's preferred contractors matching
+that trade -> they quote (`submitApplication`), the client picks
+(`acceptApplicationQuote`) -> the won `jobs/{id}` is stamped `projectId` + `propertyId`
++ `drivenByProjectManagerId` (only when the winner is a preferred contractor) -> public
+fallback (`openPostingToPublic`) when nobody bids -> the PM gets a read-only
+status/schedule + quote-amounts view (no chat, no invoice).
 
-### The flow
-1. PM creates a **Project** (label, optional `propertyId`, a list of job specs `{trade, title, description}`) for a client by email.
-2. Client gets a magic-link invite, account is auto-created, claims the project, becomes its `clientId`, and **accepts** it.
-3. On accept, each job becomes a quote request **scoped to the PM's preferred contractors** matching that trade.
-4. Preferred contractors quote (existing `submitApplication`); client picks via the existing `acceptApplicationQuote` -> a real `jobs/{id}` is created.
-5. **Public fallback:** if no preferred contractor bids, the client opens it to the public board.
-6. The won job is stamped `drivenByProjectManagerId` (only when the winner is a preferred contractor) + `projectId` + `propertyId`.
+The KEY decision held: a distinct `"invited"` JobPostStatus (not `"open"`) keeps the
+public geohash feed untouched (no backfill); invited contractors query
+`status == "invited" && invitedContractorIds array-contains me`; the public fallback
+flips `invited -> open` and clears the scope. `meta.preferredContractorIds` (never
+cleared) drives the PM-driven commission decision so a preferred contractor who wins
+even after a fallback still counts.
 
-### KEY technical decision (do NOT skip)
-Scoping a posting can't be a read-rule change alone — Firestore rules are not filters, so the public geohash feed query would break on posts it can't read (see memory `project_firestore_list_rule_pattern`). **Use a distinct `"invited"` JobPostStatus** (not `"open"`) plus an `invitedContractorIds: string[]` array:
-- Public feed already queries `status == "open"` -> untouched, **no backfill** needed.
-- Invited contractors get a dedicated query: `status == "invited" && invitedContractorIds array-contains me` (new composite index).
-- Public fallback = flip `invited -> open` + clear `invitedContractorIds`.
-- Read rule: owner/admin OR (`open` && visible tradie) OR (`invited` && uid in `invitedContractorIds`).
+**Address decision (Johnny):** the client confirms the structured address at accept
+(not the property, not the PM). No geocode until the public fallback, which geocodes
+client-side (Google Maps) — invited postings are found by array-contains, not proximity.
 
-### Suggested decomposition (each its own commit)
-- **P3b-1** `projects/{projectId}` collection + `createProject` callable + magic-link project invite + claim + accept. Mirror `createInviteJob`/`claimJobInvite`/`sendJobInviteSignInLink` (an invite that claims a BUNDLE under one email). PM cockpit "Projects" section + client accept UI. Touches no live job-board code.
-- **P3b-2** the `"invited"` status + `invitedContractorIds` on `JobPostDoc` + `createJobPost` support + the read rule + the invited-contractor query/surface + composite index. On project accept, create one scoped posting per job (tagged `projectId`, `createdByProjectManagerId`). Extend `acceptApplicationQuote` to stamp `drivenByProjectManagerId`/`projectId`/`propertyId`. Public fallback.
-- **P3b-3** PM read-only visibility: a projected status/schedule view of project jobs (no chat, no invoice) + aggregate counts for non-driven jobs.
-
-### Reuse map (file pointers, verify before editing)
-- Clients CRM (already mirrored as `properties/`): `clients/` rules `firestore.rules` ~503; `clientsService.ts`.
-- Job board: `JobPostDoc`/`ApplicationDoc` in `interfaces.ts` (~1544/~1642); `src/firebase/services/jobPosts.ts` (`subscribeJobPostFeed`), `applications.ts` (`submitApplication`, `acceptApplicationQuote`); `functions/src/jobPosts/acceptApplicationQuote.ts` (creates the job — add the stamps here); jobPost rules `firestore.rules` ~861-934.
-- Magic-link invite: `functions/src/jobs/createInviteJob.ts`, `claimJobInvite.ts`, `sendJobInviteSignInLink.ts`; `ClientInvite` in `interfaces.ts` (~1087).
-- Job origin: `JobDoc` (~1145), `originType` (~1276), `JobStatus`/`JobPostStatus` enums.
-
-### Verify (real Firestore + Stripe test mode)
-Seed disposable `verify-*-claude` data: a PM with preferred contractors, a project, a client. Invite -> claim -> accept -> contractors quote -> client picks -> confirm the job carries `projectId` + `drivenByProjectManagerId` and the public feed is unaffected. Card-pay the invoice and confirm commission accrues to BOTH the rep (if any) and the PM (P4 territory). Clean up after.
+### Still NOT verified on real Firestore
+P3b shipped gates-green but **has not been exercised end-to-end on real Firestore + the
+Stripe test path** (per `feedback_verify_real_firestore` — the site has no live users).
+Before trusting it: seed disposable `verify-*-claude` data (a PM with preferred
+contractors, a project, a client), run invite -> claim -> accept -> quote -> pick, and
+confirm the won job carries `projectId` + `drivenByProjectManagerId`, the public feed is
+unaffected, and the PM never reads the chat/invoice. Then card-pay to confirm commission
+(P4). Clean up after.
 
 ---
 
-## After P3b
-- **P4 — commission:** generalize the shipped engine (`functions/src/lib/commissionAccrual.ts`, `commissionOwner.ts`, `scheduledRepCommissionPayouts.ts`, `CommissionDoc`) with an `ownerType` discriminator; ADD a PM accrual on `drivenByProjectManagerId` service-fee events (owner-scoped deterministic id so rep + PM entries coexist); generalize the payout scheduler + Connect onboarding for PMs. See plan file P4.
+## NEXT TASK — P4: Commission for PM-driven jobs
+
+Generalize the shipped sales-rep commission engine so a **PM-driven** job (a job carrying
+`drivenByProjectManagerId`) accrues a SECOND 10% service-fee commission to the PM,
+**additive** to the rep accrual (both can ride the same fee). Job fees only; platform-funded.
+
+- Extend `CommissionDoc`/`CommissionPayoutDoc` with an `ownerType: "rep" | "pm"` discriminator
+  (default `"rep"`, rep entries unchanged) + a PM owner field.
+- At the service-fee accrual site (`functions/src/payments/handlers/paymentIntent.ts`), after
+  the existing rep accrual, if `job.drivenByProjectManagerId` is set, accrue a PM entry —
+  **owner-scoped deterministic id** (e.g. `service_fee_<invoiceId>_pm_<pmId>`) so the rep + PM
+  entries coexist instead of overwriting. Reuse `commissionCents`. Add the matching PM reversal
+  in `chargeRefunded.ts` / `chargeDispute.ts`. Subscription accrual untouched.
+- Generalize `scheduledRepCommissionPayouts` to group by `(ownerType, ownerId)` and pay PMs too
+  (reuse `planRepPayout`); read PM Connect payouts from `users/{pmId}.projectManager.payouts`.
+- Generalize the rep Connect onboarding callables for PMs (or a `pm` variant) + reuse
+  `RepPayoutsPanel`/`useRepEarnings` on the PM cockpit (the `Earnings` section stub).
+- Widen the `commissions` read rule so the owning PM reads their entries.
+- Tests: additive accrual (rep + PM both on one PM-driven fee, distinct ids), idempotent replay,
+  PM reversal, payout grouping, rep-flow regression unchanged. Re-verify the rep path byte-for-byte.
+
+### Reuse map for P4 (verify before editing)
+- Commission: `functions/src/lib/commission.ts` (`commissionCents`/`COMMISSION_RATE_BPS`),
+  `commissionAccrual.ts` (`accrueCommission`/`reverseCommission`), `commissionOwner.ts`,
+  `commissionPayout.ts` (`planRepPayout`), `scheduledRepCommissionPayouts.ts`, `CommissionDoc`.
+- Accrual call sites: `functions/src/payments/handlers/paymentIntent.ts`, `chargeRefunded.ts`,
+  `chargeDispute.ts`.
+- PM stamp on the job: `JobDoc.drivenByProjectManagerId` (set in `acceptApplicationQuote.ts`).
+
+## After P4
 - **P5 — public PM profile:** mirror `TradieProfileView` + slug (`/pm/:slug`), instant/no vetting, featured trades + contractor opt-out.
 - **P6 — multi-property paywall meter:** `requireMultiplePropertiesEntitlement` via the entitlements seam, open at launch.
 
