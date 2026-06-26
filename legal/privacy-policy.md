@@ -15,10 +15,12 @@ If you do not agree with this Privacy Policy, do not use the Service.
 
 ## 1. Who this policy covers
 
-Blue Seal serves three types of users:
+Blue Seal serves these types of users:
 
 - **Clients** — people who hire tradespeople through the Service.
 - **Tradespeople (or "Tradies")** — verified service providers offering trade work through the Service.
+- **Project managers** — people (such as property managers, real-estate agents or landlords) who recommend tradespeople and set up projects on behalf of a Client.
+- **Sales representatives** — people who help tradespeople join and get verified.
 - **Visitors** — anyone who accesses the Service without an account.
 
 Different sections of this policy apply to each, and we note where this matters.
@@ -53,6 +55,16 @@ We collect only the information we need to operate the Service, verify users, fa
 - Payment instructions / banking information you publish on invoices
 - Stripe customer and connected-account identifiers when you subscribe to Blue Seal Pro or set up payouts (see § 4)
 - Private reviews of clients you have worked with
+
+**Project managers — additional**
+- The properties you manage (an address or label, optional notes, and an optional photo)
+- The projects you set up, including the **name and email address of the Client you are inviting** (so we can send them a sign-in link), and the jobs you describe
+- Optional public-profile information you publish (business name, bio, brand colour, logo and cover image, and a chosen profile handle)
+- The tradespeople you save and choose to feature on your public profile
+- Stripe connected-account identifiers when you set up commission payouts (see § 4)
+
+**Sales representatives — additional**
+- A referral / vanity code you choose, and Stripe connected-account identifiers when you set up commission payouts (see § 4)
 
 ### 2.2 Information we collect automatically
 
@@ -110,7 +122,9 @@ We disclose personal information only in the circumstances described below.
 The whole point of the Service is to connect clients and tradespeople, so some information is necessarily shared between users:
 
 - **Public tradesperson profiles** are visible to all Service users and (where indexed) to the public. They include the tradesperson's display name, photo, trades, service area on a map, portfolio photos, ratings and reviews. Government ID images are **never** included in a public profile.
+- **Public project-manager profiles** are visible to anyone with the link once the project manager chooses to publish them. They include the project manager's business name, bio, brand image, and the tradespeople they choose to **feature**. A featured tradesperson's existing public details (display name, photo and trades) appear on that profile; we notify the tradesperson when they are featured, and they can remove themselves at any time. Publishing is the project manager's choice and there is no review step.
 - **Within a job:** the matched client and tradesperson can see each other's display name, photo, the client's service address for that job, intake form details, and the full chat thread for that job.
+- **Within a project-manager project:** the project manager who set up a project can see its status and schedule and the quote amounts submitted for it (so they can help the Client choose). They do **not** see the job's private chat or the invoice. A Client a project manager invites receives the project details the project manager set up for them.
 - **Reviews:**
   - **Public reviews** by clients about tradespeople are visible to all users and are attributed to the client's display name.
   - **Private reviews** by tradespeople about clients are visible only to other verified tradespeople and to Blue Seal administrators. They are not shown to the client they describe.
@@ -125,7 +139,7 @@ We use third-party service providers ("processors") who handle personal informat
 |---|---|---|
 | **Google LLC (Firebase / Google Cloud)** — Authentication, Firestore database, Cloud Storage, Cloud Functions, Hosting, App Check, Vertex AI (Gemini) | Core backend, identity, file storage, AI assistant | United States and other Google regions |
 | **Google LLC (Maps Platform)** | Map display and place search | United States |
-| **Stripe, Inc.** | Blue Seal Pro subscription billing; in-app card payments; tradesperson payouts via Stripe Connect. Connect onboarding collects a tradesperson's identity, business and banking information **directly from the tradesperson** under Stripe's own terms — Blue Seal does not receive or store it. For card payments, Stripe shares payment status and the last four digits / brand of the card; Blue Seal never receives full card numbers. | United States, Canada |
+| **Stripe, Inc.** | Blue Seal Pro subscription billing; in-app card payments; and payouts via Stripe Connect to tradespeople, sales representatives and project managers. Connect onboarding collects the recipient's identity, business and banking information **directly from them** under Stripe's own terms — Blue Seal does not receive or store it. For card payments, Stripe shares payment status and the last four digits / brand of the card; Blue Seal never receives full card numbers. | United States, Canada |
 | **Resend** | Transactional and (where you've consented) marketing email | United States |
 | **Sentry** | Error and performance monitoring | United States |
 | **Cloudflare** *(if used for DNS / CDN)* | Edge delivery, DDoS protection | Global edge |

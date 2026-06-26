@@ -26,6 +26,13 @@ Blue Seal is a two-sided marketplace that **introduces** clients ("**Clients**")
 
 We verify each Tradesperson's identity and at least one trade certification before their profile becomes visible, but verification has limits — see § 4.
 
+**Other participants.** Two further roles may take part in the Service, each as an **independent participant — not an employee, agent, partner or representative of Blue Seal** — and each governed by a separate agreement they accept in-app:
+
+- **Sales representatives** help Tradespeople join and get verified and earn a referral commission on activity they introduce.
+- **Project managers** (for example, property managers, real-estate agents or landlords) recommend Tradespeople, set up projects on behalf of a Client, and earn a referral commission when one of their recommended Tradespeople performs work the Project manager originated. A Project manager may organize and coordinate work for a Client, but **the Client still chooses the Tradesperson and accepts the quote**; the contract for the work is between the Client and the Tradesperson, and the Project manager is **not a party** to it and does **not** collect or handle payment for the work.
+
+Referral commissions are paid by Blue Seal out of its own revenue and are **never** an added charge to a Client or a Tradesperson (see § 9.10).
+
 ---
 
 ## 2. Eligibility and accounts
@@ -67,6 +74,17 @@ If you sign up as a Tradesperson, you must additionally:
 Your profile remains hidden from Clients until our team has reviewed and approved your certification(s) and ID. We may request additional information, reject an application, or revoke approval at any time if we have reason to doubt its accuracy.
 
 You must not list yourself as a Tradesperson if you, or any business through which you offer your services, are subject to a suspension, revocation, or restriction by a licensing body or government authority relating to the trade work you would perform.
+
+### 2.5 Sales representatives and project managers
+
+If you take part as a sales representative or a project manager, you must additionally:
+
+- accept the separate agreement we present for that role before you can receive any commission payout;
+- recommend Tradespeople honestly and in good faith, and not misrepresent a Tradesperson's qualifications, licensing, or insurance;
+- keep confidential any Client or Tradesperson information you access through the Service, and use it only to coordinate the work you set up; and
+- where you provide a person's contact details to set up a project or send an invitation on their behalf, confirm you are entitled to share those details with us for that purpose.
+
+These roles are self-serve; the project-manager role is enabled without a separate vetting step, and a public project-manager profile is published instantly at your choice without review. We may suspend or remove either role, or any profile, at any time.
 
 ---
 
@@ -278,6 +296,12 @@ We may publish a separate **Fee Schedule** setting out the service fee, subscrip
 ### 9.9 Taxes
 
 The Tradesperson is solely responsible for charging, collecting, reporting, and remitting any GST, HST, PST, QST, or other tax that applies to the **work they perform**, including configuring the correct tax amount on each invoice they send through the Service. **Blue Seal does not calculate, collect, or remit tax on the underlying work performed by a Tradesperson.** Blue Seal is responsible for any tax it itself owes on its own service fee and subscription revenue, and any such tax that must be added to the service fee or the subscription price will be shown at the point of payment where required. **You should consult a tax professional if you are unsure how tax should be set up on your invoices.**
+
+A sales representative or project manager who earns commission is an independent contractor responsible for their own taxes on that commission, as set out in their separate agreement.
+
+### 9.10 Referral commissions (sales representatives and project managers)
+
+A sales representative or project manager may earn a referral commission on qualifying activity, as described in the separate agreement for their role. Any such commission is **paid by Blue Seal out of its own revenue** and is **not an additional charge** to any Client or Tradesperson — it does not change the price of any job, any invoice, or the Blue Seal service fee. Commissions are paid through **Stripe Connect** to a connected account the partner sets up (see § 7.2 for how Connect onboarding works), on the schedule and minimum-balance rules described in their agreement, and a commission is reversed if the underlying payment is later refunded or charged back. We may change or end a referral-commission program prospectively at any time.
 
 ---
 
