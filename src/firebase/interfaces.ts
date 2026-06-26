@@ -123,6 +123,24 @@ export interface ProjectManagerState {
   payouts?: PayoutsState;
 }
 
+// properties/{propertyId} — a project manager's owned property (an address/unit)
+// holding the projects + jobs at that location. Mirrors the Clients CRM: PM-owned,
+// soft-deleted via archivedAt (hard delete is admin-only). `linkedClientId` is
+// SERVER-MANAGED — set when a client account is connected to the property via the
+// magic-link connect flow (P3b).
+export interface PropertyDoc {
+  projectManagerId: string;
+  /** Nickname, e.g. "Unit 4B - 123 Main St". */
+  label: string;
+  /** Free-text address line(s); structured address/geo arrives with dispatch (P3b). */
+  addressText: string;
+  notes: string | null;
+  linkedClientId: string | null;
+  archivedAt: Timestamp | null;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
 // referralCodes/{codeLower} — uniqueness registry (mirrors profileSlugs). Maps a
 // lowercased code to the rep who owns it; resolved at signup to attribute a new
 // tradesperson + grant the free month. World-readable, server-only writes.

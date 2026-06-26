@@ -529,6 +529,39 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ---------- properties (Project Manager) ----------
+    // A project manager's owned property (an address/unit). Read is ownership-only
+    // (the owning PM) plus the connected client; create/update require the
+    // projectManager role and pin projectManagerId. linkedClientId is server-managed
+    // (set when a client account is connected via the magic-link flow). Delete is
+    // admin-only; PMs soft-delete via archivedAt. Mirrors clients/{clientId}.
+    match /properties/{propertyId} {
+      function ownsExistingProperty() {
+        return isSignedIn() && resource.data.projectManagerId == uid();
+      }
+      allow read: if ownsExistingProperty()
+        || (isSignedIn() && resource.data.get('linkedClientId', null) == uid())
+        || isAdmin();
+      allow create: if hasRole('projectManager')
+        && request.resource.data.projectManagerId == uid()
+        && request.resource.data.label is string
+        && request.resource.data.label.size() >= 1
+        && request.resource.data.label.size() <= 120
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.get('linkedClientId', null) == null;
+      allow update: if (isAdmin() || (ownsExistingProperty() && hasRole('projectManager')))
+        && request.resource.data.projectManagerId == resource.data.projectManagerId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.label is string
+        && request.resource.data.label.size() >= 1
+        && request.resource.data.label.size() <= 120
+        && (isAdmin()
+            || request.resource.data.get('linkedClientId', null)
+                == resource.data.get('linkedClientId', null));
+      allow delete: if isAdmin();
+    }
+
     // ---------- jobs ----------
     match /jobs/{jobId} {
       allow read: if isSignedIn() && (

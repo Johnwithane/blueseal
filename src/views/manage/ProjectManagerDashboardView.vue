@@ -9,6 +9,7 @@ import { humanizeError } from "@/utils/errors";
 import { claimPmCode } from "@/firebase/services/projectManagers";
 import { isValidReferralCode, normalizeReferralCode } from "@/utils/referralCode";
 import TrustedTradesPanel from "@/components/TrustedTradesPanel.vue";
+import PropertiesPanel from "@/components/PropertiesPanel.vue";
 
 useSeo({ title: "Manage", noindex: true });
 
@@ -119,6 +120,16 @@ async function copyRecruitLink() {
         </p>
         <TrustedTradesPanel />
       </div>
+      <div>
+        <h2 class="font-semibold flex items-center gap-2 mb-1">
+          <i class="pi pi-home text-[color:var(--bs-blue)]"></i> Properties
+        </h2>
+        <p class="text-sm text-[color:var(--bs-muted)] mb-3">
+          The addresses you manage. Projects and jobs are organized by property.
+        </p>
+        <PropertiesPanel />
+      </div>
+
       <div class="bs-card p-5">
         <h2 class="font-semibold flex items-center gap-2">
           <i class="pi pi-folder-open text-[color:var(--bs-blue)]"></i> Projects
