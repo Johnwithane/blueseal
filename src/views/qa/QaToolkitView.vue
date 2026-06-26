@@ -5,7 +5,7 @@
 // data, grab Stripe sandbox cards, jump to key flows, and review their bug
 // reports + the shared error-log queue. May use Pinia (unlike admin views).
 import { computed, onMounted, ref } from "vue";
-import { RouterLink } from "vue-router";
+import { RouterLink, useRouter } from "vue-router";
 import Button from "primevue/button";
 import MultiSelect from "primevue/multiselect";
 import Tag from "primevue/tag";
@@ -19,6 +19,8 @@ import { useFormatters } from "@/composables/useFormatters";
 import { humanizeError } from "@/utils/errors";
 import {
   qaProvisionSelfTradesperson,
+  qaProvisionSelfProjectManager,
+  qaProvisionSelfSalesRep,
   qaSetSelfPro,
   qaResetSelfData,
 } from "@/firebase/services/qa";
@@ -28,6 +30,7 @@ import type { BugReportDoc, ErrorLogDoc, WithId } from "@/firebase/interfaces";
 
 const auth = useAuthStore();
 const toast = useToast();
+const router = useRouter();
 const { relativeTime } = useFormatters();
 
 // --- Happy-paths runbook → one accordion panel per "## " section ----------
@@ -96,6 +99,41 @@ async function provision() {
     toast.error("Couldn't provision", humanizeError(e));
   } finally {
     provisioning.value = false;
+  }
+}
+
+// --- Become a project manager / sales rep --------------------------------
+const provisioningRole = ref<null | "pm" | "sales">(null);
+
+async function becomeProjectManager() {
+  provisioningRole.value = "pm";
+  try {
+    const res = await qaProvisionSelfProjectManager({});
+    await auth.fbUser?.getIdToken(true);
+    auth.roles = res.data.roles;
+    await auth.switchActiveRole("projectManager").catch(() => {});
+    toast.success("You're a project manager", "Opening your cockpit…");
+    router.push("/manage");
+  } catch (e) {
+    toast.error("Couldn't provision", humanizeError(e));
+  } finally {
+    provisioningRole.value = null;
+  }
+}
+
+async function becomeSalesRep() {
+  provisioningRole.value = "sales";
+  try {
+    const res = await qaProvisionSelfSalesRep({});
+    await auth.fbUser?.getIdToken(true);
+    auth.roles = res.data.roles;
+    await auth.switchActiveRole("sales").catch(() => {});
+    toast.success("You're a sales rep", "Sign the agreement to start, then open /sales.");
+    router.push("/sales");
+  } catch (e) {
+    toast.error("Couldn't provision", humanizeError(e));
+  } finally {
+    provisioningRole.value = null;
   }
 }
 
@@ -261,6 +299,37 @@ onMounted(() => {
         </div>
       </div>
 
+      <!-- Become a project manager / sales rep -->
+      <div class="qa-card">
+        <div class="qa-head"><i class="pi pi-briefcase" aria-hidden="true"></i>Become a PM or sales rep</div>
+        <div class="qa-body">
+          <p class="qa-hint">
+            Grant yourself the new roles to test them. The PM role is active instantly (opens
+            <code>/manage</code>); the sales-rep role needs the in-app agreement signed first.
+          </p>
+          <div class="flex flex-wrap gap-2">
+            <Button
+              label="Become a project manager"
+              icon="pi pi-briefcase"
+              size="small"
+              :loading="provisioningRole === 'pm'"
+              :disabled="provisioningRole !== null"
+              @click="becomeProjectManager"
+            />
+            <Button
+              label="Become a sales rep"
+              icon="pi pi-map-marker"
+              severity="secondary"
+              outlined
+              size="small"
+              :loading="provisioningRole === 'sales'"
+              :disabled="provisioningRole !== null"
+              @click="becomeSalesRep"
+            />
+          </div>
+        </div>
+      </div>
+
       <!-- Stripe sandbox -->
       <div class="qa-card">
         <div class="qa-head"><i class="pi pi-credit-card" aria-hidden="true"></i>Stripe sandbox (test mode)</div>
@@ -332,6 +401,8 @@ onMounted(() => {
           <div class="flex flex-wrap gap-2">
             <RouterLink to="/dashboard/client"><Button label="Client dashboard" icon="pi pi-home" outlined size="small" /></RouterLink>
             <RouterLink to="/dashboard/tradie"><Button label="Tradesperson" icon="pi pi-wrench" outlined size="small" /></RouterLink>
+            <RouterLink to="/manage"><Button label="PM cockpit" icon="pi pi-briefcase" outlined size="small" /></RouterLink>
+            <RouterLink to="/sales"><Button label="Sales" icon="pi pi-map-marker" outlined size="small" /></RouterLink>
             <RouterLink to="/jobs/browse"><Button label="Browse jobs" icon="pi pi-search" outlined size="small" /></RouterLink>
             <RouterLink to="/jobs/post"><Button label="Post a job" icon="pi pi-plus" outlined size="small" /></RouterLink>
             <RouterLink to="/search"><Button label="Search" icon="pi pi-users" outlined size="small" /></RouterLink>

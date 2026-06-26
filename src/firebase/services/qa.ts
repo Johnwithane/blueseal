@@ -17,6 +17,18 @@ export const qaProvisionSelfTradesperson = httpsCallable<
   { ok: boolean; roles: Role[]; trades: string[] }
 >(functions, "qaProvisionSelfTradesperson");
 
+/** Grant the caller the project-manager role (active immediately) so they can test /manage. */
+export const qaProvisionSelfProjectManager = httpsCallable<
+  Record<string, never>,
+  { ok: boolean; roles: Role[] }
+>(functions, "qaProvisionSelfProjectManager");
+
+/** Grant the caller the sales-rep role (inert until they sign the agreement in-app). */
+export const qaProvisionSelfSalesRep = httpsCallable<
+  Record<string, never>,
+  { ok: boolean; roles: Role[] }
+>(functions, "qaProvisionSelfSalesRep");
+
 /** Toggle the caller's own Blue Seal Pro entitlement (comp window) on/off. */
 export const qaSetSelfPro = httpsCallable<
   { pro: boolean },

@@ -25,6 +25,8 @@ export {
 // by an admin). The two fabrication callables are additionally env-gated by
 // QA_TOOLKIT_ENABLED (see qa/guard.ts + HUMANTASKS.md).
 export { qaProvisionSelfTradesperson } from "./qa/provisionSelfTradesperson";
+export { qaProvisionSelfProjectManager } from "./qa/provisionSelfProjectManager";
+export { qaProvisionSelfSalesRep } from "./qa/provisionSelfSalesRep";
 export { qaSetSelfPro } from "./qa/setSelfPro";
 export { qaResetSelfData } from "./qa/resetSelfData";
 export { requestAccountDeletion } from "./auth/requestAccountDeletion";
