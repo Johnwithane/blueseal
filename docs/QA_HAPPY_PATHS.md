@@ -509,8 +509,13 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    (vetted), they appear in the PM's saved trades and get a free first month of Pro
    (granted at go-live, like a rep code). Sanity: the rep `?ref=` link still works
    unchanged. (Server attribution: `users/{tradieUid}.referredByPmId`.)
-7. **Mobile (375px).** Re-run the signup cards + cockpit + saved-trades list at 375px.
-   **Expected:** the role cards stack and stay tappable; the cockpit + saved + recruit cards read cleanly.
+7. **Properties book.** In the cockpit "Properties" section, add a property
+   (label + optional address + notes), edit it, then archive it. **Expected:** it
+   appears in the list and persists; archive drops it from the default list.
+   Properties are private to you (the PM); a connected client account can read its
+   own property once linked (P3b).
+8. **Mobile (375px).** Re-run the signup cards + cockpit + saved-trades + properties at 375px.
+   **Expected:** the role cards stack and stay tappable; the cockpit cards read cleanly.
 
 ---
 
@@ -560,3 +565,4 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 - [ ] 13.3 Role switcher shows Project manager; /dashboard routes PM to /manage
 - [ ] 13.4 Save a trade → Saved trades tab + PM cockpit; Request re-hires; remove works
 - [ ] 13.5 Claim recruiting code; /join?pm= signup → tradesperson; free month at go-live + appears in PM saved trades; rep ?ref= unaffected
+- [ ] 13.6 Properties: add / edit / archive a property in the cockpit
