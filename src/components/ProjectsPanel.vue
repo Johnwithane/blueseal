@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
+import { RouterLink } from "vue-router";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import Textarea from "primevue/textarea";
@@ -233,19 +234,25 @@ async function copyInvite() {
       </p>
     </div>
     <ul v-else-if="rows.length" class="grid grid-cols-1 gap-2">
-      <li v-for="p in rows" :key="p.id" class="bs-card p-3 flex items-start gap-3">
-        <i class="pi pi-folder-open text-[color:var(--bs-blue)] mt-1"></i>
-        <div class="min-w-0 flex-1">
-          <p class="font-medium truncate">{{ p.label }}</p>
-          <p class="text-xs text-[color:var(--bs-muted)] truncate">
-            {{ p.clientName }} ·
-            {{ p.jobSpecs.length }} {{ p.jobSpecs.length === 1 ? "job" : "jobs" }}
-            <template v-if="p.jobSpecs.length">
-              ({{ p.jobSpecs.map((j) => tradeLabel(j.trade)).join(", ") }})
-            </template>
-          </p>
-        </div>
-        <Tag :value="statusLabel[p.status]" :severity="statusSeverity[p.status]" />
+      <li v-for="p in rows" :key="p.id">
+        <RouterLink
+          :to="{ name: 'ProjectDetail', params: { projectId: p.id } }"
+          class="bs-card p-3 flex items-start gap-3 no-underline text-inherit hover:shadow-md transition-shadow"
+        >
+          <i class="pi pi-folder-open text-[color:var(--bs-blue)] mt-1"></i>
+          <div class="min-w-0 flex-1">
+            <p class="font-medium truncate">{{ p.label }}</p>
+            <p class="text-xs text-[color:var(--bs-muted)] truncate">
+              {{ p.clientName }} ·
+              {{ p.jobSpecs.length }} {{ p.jobSpecs.length === 1 ? "job" : "jobs" }}
+              <template v-if="p.jobSpecs.length">
+                ({{ p.jobSpecs.map((j) => tradeLabel(j.trade)).join(", ") }})
+              </template>
+            </p>
+          </div>
+          <Tag :value="statusLabel[p.status]" :severity="statusSeverity[p.status]" />
+          <i class="pi pi-chevron-right text-xs text-[color:var(--bs-muted)] mt-1"></i>
+        </RouterLink>
       </li>
     </ul>
   </div>

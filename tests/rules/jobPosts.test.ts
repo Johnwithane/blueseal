@@ -112,3 +112,54 @@ describe("jobPosts — invited (scoped) postings read access", () => {
     await assertSucceeds(getDoc(doc(fsAs(CLIENT_UID, CLIENT_CLAIMS), "jobPosts", INVITED_POST_ID)));
   });
 });
+
+// PM read-only visibility (P3b-3): the dispatching PM reads their project's
+// postings + the incoming quotes (applications) to broker compare-and-choose.
+const PM_UID = "pm-vis-uid";
+const PM_CLAIMS = { roles: ["client", "projectManager"], role: "client" };
+const OTHER_PM_UID = "other-pm-uid";
+const PM_POST_ID = "post_pm_1";
+
+async function seedPmPostingWithQuote() {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const fs = ctx.firestore();
+    await setDoc(doc(fs, "jobPosts", PM_POST_ID), {
+      clientId: CLIENT_UID,
+      status: "invited",
+      invitedContractorIds: [TRADIE_UID],
+      createdByProjectManagerId: PM_UID,
+      projectId: "proj-x",
+    });
+    await setDoc(doc(fs, "jobPosts", PM_POST_ID, "applications", TRADIE_UID), {
+      tradespersonId: TRADIE_UID,
+      clientId: CLIENT_UID,
+      status: "pending",
+    });
+  });
+}
+
+describe("jobPosts — PM read-only project visibility", () => {
+  it("the dispatching PM can read their scoped posting", async () => {
+    await seedPmPostingWithQuote();
+    await assertSucceeds(getDoc(doc(fsAs(PM_UID, PM_CLAIMS), "jobPosts", PM_POST_ID)));
+  });
+
+  it("a different PM cannot read someone else's posting", async () => {
+    await seedPmPostingWithQuote();
+    await assertFails(getDoc(doc(fsAs(OTHER_PM_UID, PM_CLAIMS), "jobPosts", PM_POST_ID)));
+  });
+
+  it("the dispatching PM can read the incoming quotes (applications)", async () => {
+    await seedPmPostingWithQuote();
+    await assertSucceeds(
+      getDoc(doc(fsAs(PM_UID, PM_CLAIMS), "jobPosts", PM_POST_ID, "applications", TRADIE_UID)),
+    );
+  });
+
+  it("a different PM cannot read the quotes", async () => {
+    await seedPmPostingWithQuote();
+    await assertFails(
+      getDoc(doc(fsAs(OTHER_PM_UID, PM_CLAIMS), "jobPosts", PM_POST_ID, "applications", TRADIE_UID)),
+    );
+  });
+});

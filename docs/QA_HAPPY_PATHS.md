@@ -545,6 +545,14 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    for any verified tradesperson in the area (its address is geocoded at this step).
    A preferred contractor who still wins after the fallback keeps the
    `drivenByProjectManagerId` stamp (commission); an off-list public winner does not.
+9c. **PM read-only visibility (P3b-3).** In the cockpit, tap a project to open its
+   detail (`/manage/projects/:id`). **Expected:** each job shows its posting status;
+   while quotes arrive you see the **amounts** (to broker the pick); once the client
+   picks a contractor, that job shows the **winner + job status + scheduled dates**.
+   You never see the job **chat** or the **invoice** (financial firewall: rules
+   expose only the job doc to the driving PM, never `chats/` or `invoices/`). A PM
+   cannot open another PM's project or postings. (Covered by the PM-read tests in
+   `tests/rules/jobPosts.test.ts` + `tests/rules/jobs.test.ts`.)
 10. **Project money / permission seam (rules).** The project doc is server-managed:
    the client cannot forge `status` (no direct write) and only the project's own
    client can accept/decline; only the owning PM or linked client reads it. A scoped
@@ -610,3 +618,5 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 - [ ] 13.7 Projects: create + invite a client → claim via magic link → accept (address form) / decline on the dashboard
 - [ ] 13.8 Dispatch: accepted project fans each job to matching preferred contractors ("Invited to quote"); client compares + accepts; won job carries projectId + drivenByProjectManagerId
 - [ ] 13.9 Project seam: client can't forge status; invited posting readable/appliable only by an invited contractor; job PM fields pinned (rules + unit tests)
+- [ ] 13.10 Public fallback: client opens a no-bid scoped posting to the board (geocoded, leaves the invited lists, enters the radius feed)
+- [ ] 13.11 PM visibility: project detail shows quote amounts + won-job status/schedule; never the chat/invoice; another PM is denied

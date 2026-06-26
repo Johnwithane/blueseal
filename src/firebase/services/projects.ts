@@ -2,7 +2,7 @@
 // magic-link project-invite flow + live reads over the top-level `projects/{id}`
 // collection (see ProjectDoc). The whole doc is server-managed — every WRITE goes
 // through a callable; clients only READ (the PM their own, the client theirs).
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/firebase/config";
 import { typedConverter } from "@/firebase/converters";
@@ -11,6 +11,8 @@ import type { ProjectDraft } from "@/validation/projects";
 
 const projectsCol = () =>
   collection(db, "projects").withConverter(typedConverter<ProjectDoc>());
+const projectDocRef = (id: string) =>
+  doc(db, "projects", id).withConverter(typedConverter<ProjectDoc>());
 
 // ── Callables ──────────────────────────────────────────────────────────────
 
@@ -107,6 +109,17 @@ export function subscribeProjectsForPm(
       .sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0));
     cb(rows);
   });
+}
+
+// A single project (live), for the PM's read-only detail view. The owning PM or
+// linked client may read it (rules); null while loading / if denied.
+export function subscribeProject(
+  projectId: string,
+  cb: (project: WithId<ProjectDoc> | null) => void,
+): () => void {
+  return onSnapshot(projectDocRef(projectId), (snap) =>
+    cb(snap.exists() ? { id: snap.id, ...snap.data() } : null),
+  );
 }
 
 // A client's claimed/accepted projects, for the client dashboard panel. Only

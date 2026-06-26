@@ -379,6 +379,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import("@/views/manage/ProjectManagerDashboardView.vue"),
     meta: { requiresAuth: true, role: "projectManager", layout: "app", title: "Manage" },
   },
+  {
+    path: "/manage/projects/:projectId",
+    name: "ProjectDetail",
+    component: () => import("@/views/manage/ProjectDetailView.vue"),
+    meta: { requiresAuth: true, role: "projectManager", layout: "app", title: "Project" },
+  },
 
   // Tradesperson onboarding wizard
   {

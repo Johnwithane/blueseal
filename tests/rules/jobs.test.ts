@@ -10,7 +10,7 @@ import {
   assertSucceeds,
   type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
-import { Timestamp, doc, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
+import { Timestamp, doc, getDoc, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 
 import {
   ADMIN_CLAIMS,
@@ -53,6 +53,23 @@ async function seedJob(extras: Record<string, unknown> = {}) {
     });
   });
 }
+
+describe("jobs — PM read-only visibility (drivenByProjectManagerId)", () => {
+  const PM_UID = "pm-job-vis";
+  const PM_CLAIMS = { roles: ["client", "projectManager"], role: "client" };
+
+  it("the driving PM can read a job they drove (status/schedule window)", async () => {
+    await seedJob({ drivenByProjectManagerId: PM_UID, projectId: "proj-x" });
+    const pm = env.authenticatedContext(PM_UID, PM_CLAIMS).firestore();
+    await assertSucceeds(getDoc(doc(pm, "jobs", JOB_ID)));
+  });
+
+  it("a non-party who didn't drive the job cannot read it", async () => {
+    await seedJob({ drivenByProjectManagerId: PM_UID });
+    const other = env.authenticatedContext(OTHER_CLIENT_UID, CLIENT_CLAIMS).firestore();
+    await assertFails(getDoc(doc(other, "jobs", JOB_ID)));
+  });
+});
 
 describe("jobs archive — per-party gate", () => {
   it("client can set their own archivedAt", async () => {

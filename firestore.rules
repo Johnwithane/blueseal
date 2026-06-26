@@ -580,6 +580,12 @@ service cloud.firestore {
         resource.data.clientId == uid()
         || resource.data.tradespersonId == uid()
         || isAdmin()
+        // The PM who DROVE this job (one of their preferred contractors won a job
+        // they originated) gets a read-only window onto its status/schedule for
+        // project visibility (P3b-3). This is the JOB doc only — chats/{chatId}
+        // and invoices/{jobId} keep their party-only rules, so the financial +
+        // messaging firewall holds (the PM never reads the live invoice or chat).
+        || resource.data.get('drivenByProjectManagerId', null) == uid()
       );
       allow create: if isClient()
         && request.resource.data.clientId == uid()
@@ -913,8 +919,18 @@ service cloud.firestore {
           && exists(/databases/$(database)/documents/tradespeople/$(uid()))
           && get(/databases/$(database)/documents/tradespeople/$(uid())).data.isVisible == true;
       }
+      // The PM who dispatched a scoped posting reads it (read-only project
+      // visibility, P3b-3) — to broker the compare-and-choose. Off the post doc
+      // directly; the by-lookup variant authorizes the applications subcollection.
+      function isPmOfPost() {
+        return isSignedIn() && resource.data.get('createdByProjectManagerId', null) == uid();
+      }
+      function isPmOfPostByLookup() {
+        return isSignedIn()
+          && get(/databases/$(database)/documents/jobPosts/$(postId)).data.get('createdByProjectManagerId', null) == uid();
+      }
 
-      allow read:   if isPostOwner() || isAdmin()
+      allow read:   if isPostOwner() || isAdmin() || isPmOfPost()
         || (isVisibleTradie() && (postOpen() || isInvitedToPost()));
       allow create: if false;  // createJobPost / project dispatch (admin SDK) only
       allow update: if false;  // marketplace + project callables only
@@ -947,7 +963,10 @@ service cloud.firestore {
           // `resource.data.clientId == uid()` only covers single-doc gets, not
           // the list ("rules are not filters"), which broke the client's
           // Applicants view for every non-admin client.
-          || isPostOwnerByLookup();
+          || isPostOwnerByLookup()
+          // The dispatching PM reads the quotes (amounts) to broker the
+          // compare-and-choose (read-only project visibility, P3b-3).
+          || isPmOfPostByLookup();
         allow create, update, delete: if false;  // marketplace callables only
 
         // Pre-acceptance Q&A thread between the post-owning client and this one

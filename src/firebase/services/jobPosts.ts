@@ -116,6 +116,21 @@ export function subscribeJobPostMeta(
   );
 }
 
+// The scoped postings a project manager dispatched (read-only project visibility,
+// P3b-3). Across all their projects; the cockpit filters by projectId client-side.
+// The PM-read rule authorizes each doc (createdByProjectManagerId == uid).
+export function subscribeProjectPostingsForPm(
+  pmUid: string,
+  cb: (posts: WithId<JobPostDoc>[]) => void,
+): () => void {
+  const q = query(
+    postsCol(),
+    where("createdByProjectManagerId", "==", pmUid),
+    limit(200),
+  );
+  return onSnapshot(q, (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
+}
+
 // The scoped ("invited") postings a tradesperson has been invited to quote on
 // (Project Manager dispatch). Found by array-contains on invitedContractorIds, NOT
 // by proximity — an invite is direct, so it shows regardless of service area. The
