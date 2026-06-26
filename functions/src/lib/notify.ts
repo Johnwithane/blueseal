@@ -86,7 +86,10 @@ export type NotificationType =
   // before their verified insurance expires (scheduledInsuranceExpiry).
   | "insurance_expiry_reminder"
   // A project manager featured this tradesperson on their public profile (P5b).
-  | "pm_featured";
+  | "pm_featured"
+  // A project manager dispatched a scoped job to this hand-picked contractor
+  // (project accept → dispatchScopedPostings). Links to /jobs/browse.
+  | "invited_to_quote";
 
 /**
  * Channel routing per notification.

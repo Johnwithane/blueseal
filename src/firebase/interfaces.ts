@@ -204,6 +204,10 @@ export interface ProjectDoc {
   // jobSpec; lets the owning PM enumerate the project's postings for read-only
   // visibility (P3b-3). Absent until accept.
   jobPostIds?: string[];
+  /** Client-confirmed work address, captured at accept (used by dispatch + recovery). */
+  address?: { line1: string; city: string; region: string; postalCode: string } | null;
+  /** Set when the scoped postings were created (accept → dispatch). */
+  dispatchedAt?: Timestamp | null;
   claimedAt: Timestamp | null;
   acceptedAt: Timestamp | null;
   declinedAt: Timestamp | null;
@@ -2822,7 +2826,11 @@ export type NotificationType =
   | "insurance_expiry_reminder"
   // A project manager featured this tradesperson on their public profile (P5b).
   // Links to /featured-by-pms, where the contractor can opt out.
-  | "pm_featured";
+  | "pm_featured"
+  // A project manager dispatched a scoped job to this hand-picked contractor
+  // (project accept → dispatchScopedPostings). Links to /jobs/browse, the
+  // "Invited to quote" section.
+  | "invited_to_quote";
 
 export interface NotificationDoc {
   userId: string;

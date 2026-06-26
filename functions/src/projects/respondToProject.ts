@@ -87,17 +87,24 @@ export const respondToProject = onCall(CALLABLE_OPTS, async (req) => {
       }
       tx.update(ref, {
         status: "accepted",
+        // Persist the client-confirmed address so a failed dispatch can be
+        // re-run (redispatchProject) without re-prompting for it.
+        address,
         acceptedAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       });
     });
 
     // Dispatch one scoped posting per jobSpec to the PM's matching preferred
-    // contractors. Best-effort: a dispatch failure leaves the project accepted but
-    // un-posted (logged) rather than rolling back the client's accept.
+    // contractors. The dispatch writes jobPostIds onto the project atomically.
+    // Best-effort: a dispatch failure leaves the project accepted with an empty
+    // jobPostIds (recoverable via redispatchProject) rather than rolling back the
+    // client's accept.
     let jobPostIds: string[] = [];
+    let unmatchedTrades: string[] = [];
+    let dispatched = true;
     try {
-      jobPostIds = await dispatchScopedPostings({
+      const res = await dispatchScopedPostings({
         projectId,
         projectManagerId: project.projectManagerId,
         propertyId: project.propertyId ?? null,
@@ -105,8 +112,10 @@ export const respondToProject = onCall(CALLABLE_OPTS, async (req) => {
         jobSpecs: Array.isArray(project.jobSpecs) ? project.jobSpecs : [],
         address,
       });
-      await ref.update({ jobPostIds, updatedAt: FieldValue.serverTimestamp() });
+      jobPostIds = res.postIds;
+      unmatchedTrades = res.unmatchedTrades;
     } catch (err) {
+      dispatched = false;
       logger.error("respondToProject: dispatch failed after accept", { uid, projectId, err });
     }
 
@@ -124,8 +133,13 @@ export const respondToProject = onCall(CALLABLE_OPTS, async (req) => {
     } catch (err) {
       logger.error("respondToProject: notify failed", { uid, projectId, err });
     }
-    logger.info("respondToProject: accepted", { uid, projectId, postCount: jobPostIds.length });
-    return { status: "accepted" as const, jobPostIds };
+    logger.info("respondToProject: accepted", {
+      uid,
+      projectId,
+      postCount: jobPostIds.length,
+      dispatched,
+    });
+    return { status: "accepted" as const, jobPostIds, dispatched, unmatchedTrades };
   }
 
   await ref.update({

@@ -4,7 +4,11 @@ import { makeRequest, callFn, expectHttpsError } from "../helpers/invoke";
 
 const { notify, dispatchScopedPostings } = vi.hoisted(() => ({
   notify: vi.fn(async () => {}),
-  dispatchScopedPostings: vi.fn(async () => ["post1", "post2"]),
+  dispatchScopedPostings: vi.fn(async () => ({
+    postIds: ["post1", "post2"],
+    invitedUids: ["t1"],
+    unmatchedTrades: [] as string[],
+  })),
 }));
 
 vi.mock("firebase-admin/firestore", () => ({
@@ -86,15 +90,23 @@ describe("respondToProject (client accepts / declines)", () => {
     await expectHttpsError(callFn(respondToProject, reqAs(CLIENT)), "failed-precondition");
   });
 
-  it("accepts: flips status, dispatches postings, stores jobPostIds, notifies the PM", async () => {
+  it("accepts: flips status, stores the address, dispatches, notifies the PM", async () => {
     seedProject();
     const res = await callFn(respondToProject, reqAs(CLIENT, { response: "accept" }));
 
-    expect(res).toEqual({ status: "accepted", jobPostIds: ["post1", "post2"] });
+    expect(res).toEqual({
+      status: "accepted",
+      jobPostIds: ["post1", "post2"],
+      dispatched: true,
+      unmatchedTrades: [],
+    });
     const project = fakeDb.peek(`projects/${PROJECT}`);
     expect(project?.status).toBe("accepted");
     expect(project?.acceptedAt).toBe("__serverTimestamp__");
-    expect(project?.jobPostIds).toEqual(["post1", "post2"]);
+    // The client-confirmed address is persisted at accept so a failed dispatch
+    // can be re-run without re-prompting. (jobPostIds is written by dispatch,
+    // which is mocked here.)
+    expect(project?.address).toEqual(ADDRESS);
     expect(dispatchScopedPostings).toHaveBeenCalledOnce();
     expect(dispatchScopedPostings).toHaveBeenCalledWith(
       expect.objectContaining({ projectId: PROJECT, projectManagerId: PM, clientId: CLIENT }),
@@ -102,6 +114,24 @@ describe("respondToProject (client accepts / declines)", () => {
     expect(notify).toHaveBeenCalledWith(
       expect.objectContaining({ userId: PM, recipientRole: "projectManager" }),
     );
+  });
+
+  it("accepts but reports dispatched:false when dispatch throws (recoverable)", async () => {
+    seedProject();
+    dispatchScopedPostings.mockRejectedValueOnce(new Error("transient"));
+    const res = await callFn(respondToProject, reqAs(CLIENT, { response: "accept" }));
+
+    expect(res).toEqual({
+      status: "accepted",
+      jobPostIds: [],
+      dispatched: false,
+      unmatchedTrades: [],
+    });
+    const project = fakeDb.peek(`projects/${PROJECT}`);
+    // Project is accepted with the address stored but no postings — redispatchProject
+    // can recover it.
+    expect(project?.status).toBe("accepted");
+    expect(project?.address).toEqual(ADDRESS);
   });
 
   it("declines: flips status to declined and notifies the PM", async () => {

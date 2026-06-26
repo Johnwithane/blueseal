@@ -81,16 +81,41 @@ export async function respondToProject(
   projectId: string,
   response: "accept" | "decline",
   address: ProjectAcceptAddress | null = null,
-): Promise<{ status: "accepted" | "declined"; jobPostIds?: string[] }> {
+): Promise<{
+  status: "accepted" | "declined";
+  jobPostIds?: string[];
+  dispatched?: boolean;
+  unmatchedTrades?: string[];
+}> {
   const fn = httpsCallable<
     {
       projectId: string;
       response: "accept" | "decline";
       address: ProjectAcceptAddress | null;
     },
-    { status: "accepted" | "declined"; jobPostIds?: string[] }
+    {
+      status: "accepted" | "declined";
+      jobPostIds?: string[];
+      dispatched?: boolean;
+      unmatchedTrades?: string[];
+    }
   >(functions, "respondToProject");
   const res = await fn({ projectId, response, address });
+  return res.data;
+}
+
+/**
+ * Recover a project whose dispatch failed (accepted, but no postings). Either the
+ * client or the owning PM can re-run it; refuses once the project already has postings.
+ */
+export async function redispatchProject(
+  projectId: string,
+): Promise<{ ok: true; jobPostIds: string[]; unmatchedTrades: string[] }> {
+  const fn = httpsCallable<
+    { projectId: string },
+    { ok: true; jobPostIds: string[]; unmatchedTrades: string[] }
+  >(functions, "redispatchProject");
+  const res = await fn({ projectId });
   return res.data;
 }
 
