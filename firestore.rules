@@ -1591,6 +1591,18 @@ service cloud.firestore {
       allow create, delete: if false;
     }
 
+    // ---------- qaChecklist (shared QA test-progress board) ----------
+    // Doc id == a checklist item id (src/data/qaChecklist.ts). Any QA tester (or
+    // admin) can read the whole board and mark an item pass/fail; the writer is
+    // pinned to themselves so attribution is honest. qa-only surface.
+    match /qaChecklist/{itemId} {
+      allow read: if isAdmin() || isQa();
+      allow create, update: if (isAdmin() || isQa())
+        && request.resource.data.byUid == uid()
+        && request.resource.data.status in ['pass', 'fail'];
+      allow delete: if isAdmin() || isQa();
+    }
+
     // ---------- mail (Firebase Trigger Email extension; server-only) ----------
     match /mail/{mailId} {
       allow read, write: if false;

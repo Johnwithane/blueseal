@@ -11,6 +11,7 @@ import MultiSelect from "primevue/multiselect";
 import Tag from "primevue/tag";
 import Message from "primevue/message";
 import MarkdownProse from "@/components/help/MarkdownProse.vue";
+import QaChecklistPanel from "@/components/qa/QaChecklistPanel.vue";
 import { TRADES } from "@/data/trades";
 import qaHappyPathsMd from "../../../docs/QA_HAPPY_PATHS.md?raw";
 import { useAuthStore } from "@/stores/auth";
@@ -54,6 +55,7 @@ const pathSections = computed<PathSection[]>(() =>
 );
 // The whole runbook collapses; inside it, only one path is open at a time.
 const showPaths = ref(false);
+const showChecklist = ref(true);
 const openPath = ref<number | null>(null);
 function togglePath(i: number) {
   openPath.value = openPath.value === i ? null : i;
@@ -259,6 +261,31 @@ onMounted(() => {
             </div>
           </li>
         </ul>
+      </div>
+    </div>
+
+    <!-- Shared test checklist — per role, with team-wide pass/fail progress. -->
+    <div class="qa-card mt-4">
+      <button
+        type="button"
+        class="qa-head"
+        :aria-expanded="showChecklist"
+        style="cursor: pointer; border: 0"
+        @click="showChecklist = !showChecklist"
+      >
+        <i class="pi pi-check-square" aria-hidden="true"></i>
+        <span>Test checklist (shared progress)</span>
+        <i
+          :class="['pi', showChecklist ? 'pi-chevron-up' : 'pi-chevron-down', 'qa-head__chev']"
+          aria-hidden="true"
+        ></i>
+      </button>
+      <div v-if="showChecklist" class="qa-body">
+        <p class="qa-hint">
+          Pick a role, work through its paths, and mark each Pass / Fail. Progress is shared across
+          the whole QA team. Tap a path to see its steps + expected result.
+        </p>
+        <QaChecklistPanel />
       </div>
     </div>
 
