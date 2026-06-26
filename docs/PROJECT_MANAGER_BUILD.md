@@ -47,10 +47,14 @@ which hold **Jobs** (individual trade tasks).
 | `73416f4` | **P3b-2a** scoped dispatch: `"invited"` JobPostStatus + `invitedContractorIds` + `dispatchScopedPostings` on accept; `submitApplication`/`acceptApplicationQuote` accept invited posts + stamp `drivenByProjectManagerId`/`projectId`/`propertyId`; "Invited to quote" surface + composite index |
 | `f9721e6` | **P3b-2b** public-board fallback (`openPostingToPublic`: geocode + flip `invited`→`open`, clear scope) |
 | `57734e9` | **P3b-3** PM read-only visibility: `ProjectDetailView` (posting status + quote amounts + won-job status/schedule); jobPosts/applications/jobs read rules widened to the PM; no chat/invoice |
+| `3b233d5` | **P4a** additive PM commission accrual + reversal (owner-scoped id `..._pm_<pmId>`; rep path byte-for-byte unchanged); `accruePmServiceFee`/`reversePmServiceFee` at the paymentIntent + chargeRefunded/chargeDispute sites; commissions read rule widened to the PM |
+| `fba98db` | **P4b-1** monthly payout scheduler generalized to pay PMs (group by `(ownerType, ownerId)`, read `projectManager.payouts`) |
+| `2fd2bb0` | **P4b-2** `signPmAgreement` + PM Stripe Connect onboarding callables + `account.updated` PM routing |
+| `87636fb` | **P4b-3** cockpit Earnings UI: `PmEarningsPanel` + `PmAgreementDialog` + `usePmEarnings` + `pmPayoutsService` |
 
 Note: the role switcher is now driven by `src/data/roleViews.ts` (commit `cf1f711`, another session) — the single source of truth for role label/icon; it already includes `projectManager`. Don't reintroduce inline role maps.
 
-Test counts after P3b: 450 app unit + 515 rules + 160 functions, all green.
+Test counts after P4: 450 app unit + 518 rules + 171 functions, all green.
 
 Key data added in P3b: `projects/{projectId}` (ProjectDoc + ProjectInvite + ProjectJobSpec, server-managed); `JobPostStatus += "invited"`; `JobPostDoc.invitedContractorIds`/`createdByProjectManagerId`/`projectId`/`propertyId`; `JobPostMetaDoc.preferredContractorIds`; `JobDoc.drivenByProjectManagerId`/`projectId`/`propertyId` + `originType "pm_project"`; `AddressPrivate.geo` nullable. The jobs-update rule's server-field pins were hoisted under one `isAdmin()` (distributive equivalence) to stay under Firestore's 1000-expression-per-request limit — keep that shape if you add more pins.
 
@@ -81,48 +85,57 @@ even after a fallback still counts.
 (not the property, not the PM). No geocode until the public fallback, which geocodes
 client-side (Google Maps) — invited postings are found by array-contains, not proximity.
 
-### Still NOT verified on real Firestore
-P3b shipped gates-green but **has not been exercised end-to-end on real Firestore + the
-Stripe test path** (per `feedback_verify_real_firestore` — the site has no live users).
-Before trusting it: seed disposable `verify-*-claude` data (a PM with preferred
-contractors, a project, a client), run invite -> claim -> accept -> quote -> pick, and
-confirm the won job carries `projectId` + `drivenByProjectManagerId`, the public feed is
-unaffected, and the PM never reads the chat/invoice. Then card-pay to confirm commission
-(P4). Clean up after.
+---
+
+## P4 — Commission + payouts for PM-driven jobs — SHIPPED ✅ (commits above)
+
+A **PM-driven** job (carrying `drivenByProjectManagerId`) now accrues a SECOND 10%
+service-fee commission to the PM, **additive** to the rep accrual — both ride the same
+fee via an owner-scoped ledger id (`service_fee_<inv>_pm_<pmId>`); the rep path is
+byte-for-byte unchanged. PM entries: `ownerType "pm"`, `ownerId = pmId`, `repId null`,
+`ownerKind "pm_project"`. The monthly scheduler pays PMs the same way as reps (group
+by `(ownerType, ownerId)`, read `projectManager.payouts`, $50 min, claim-before-pay).
+The PM signs the agreement + onboards Stripe Connect from the cockpit **Earnings**
+section. Refund / lost dispute reverses both rep + PM entries. An off-list
+public-fallback win earns no PM commission (not PM-driven). Subscription fees: rep only.
+
+Reuse map (for P5+ or debugging): `commissionAccrual.ts` (`accruePmCommission`/
+`reversePmCommission`), `pmCommission.ts` (`accruePmServiceFee`/`reversePmServiceFee`,
+called at `paymentIntent`/`chargeRefunded`/`chargeDispute`), `scheduledRepCommissionPayouts.ts`
+(now owner-generic), `createPmConnect*` + `signPmAgreement`, `accountUpdated.ts` (pmId
+routing), `pmPayoutsService.ts` + `usePmEarnings` + `PmEarningsPanel`/`PmAgreementDialog`.
+
+### Still NOT verified on real Firestore (P3b + P4)
+Everything ships gates-green but **has not been exercised end-to-end on real Firestore +
+the Stripe test path** (per `feedback_verify_real_firestore` — the site has no live
+users). The right time is now that P4 is in (commission is only observable once a fee is
+paid). Seed disposable `verify-*-claude` data (a PM with preferred contractors + a signed
+agreement + Connect, a project, a client), run invite -> claim -> accept -> quote -> pick,
+confirm the won job carries `projectId` + `drivenByProjectManagerId` and the public feed
+is unaffected, then **card-pay the invoice** and confirm TWO commission entries (rep + PM,
+distinct ids, 10% each), a refund reverses both, and the PM never reads the chat/invoice.
+Clean up after. Requires the latest push to be CI-deployed first (new callables + rules).
 
 ---
 
-## NEXT TASK — P4: Commission for PM-driven jobs
+## NEXT TASK — P5: public Project Manager profile
 
-Generalize the shipped sales-rep commission engine so a **PM-driven** job (a job carrying
-`drivenByProjectManagerId`) accrues a SECOND 10% service-fee commission to the PM,
-**additive** to the rep accrual (both can ride the same fee). Job fees only; platform-funded.
+Mirror `TradieProfileView` for PMs: a world-readable profile (instant, no vetting) at a
+vanity slug, featuring the PM's preferred trades, with a per-contractor opt-out.
 
-- Extend `CommissionDoc`/`CommissionPayoutDoc` with an `ownerType: "rep" | "pm"` discriminator
-  (default `"rep"`, rep entries unchanged) + a PM owner field.
-- At the service-fee accrual site (`functions/src/payments/handlers/paymentIntent.ts`), after
-  the existing rep accrual, if `job.drivenByProjectManagerId` is set, accrue a PM entry —
-  **owner-scoped deterministic id** (e.g. `service_fee_<invoiceId>_pm_<pmId>`) so the rep + PM
-  entries coexist instead of overwriting. Reuse `commissionCents`. Add the matching PM reversal
-  in `chargeRefunded.ts` / `chargeDispute.ts`. Subscription accrual untouched.
-- Generalize `scheduledRepCommissionPayouts` to group by `(ownerType, ownerId)` and pay PMs too
-  (reuse `planRepPayout`); read PM Connect payouts from `users/{pmId}.projectManager.payouts`.
-- Generalize the rep Connect onboarding callables for PMs (or a `pm` variant) + reuse
-  `RepPayoutsPanel`/`useRepEarnings` on the PM cockpit (the `Earnings` section stub).
-- Widen the `commissions` read rule so the owning PM reads their entries.
-- Tests: additive accrual (rep + PM both on one PM-driven fee, distinct ids), idempotent replay,
-  PM reversal, payout grouping, rep-flow regression unchanged. Re-verify the rep path byte-for-byte.
+- `projectManagers/{uid}` public doc (mirror the `tradespeople` public doc: brand, logo,
+  bio, featured trades, `slug`, `isVisible`); world-read when visible, owner+admin else;
+  private contact subdoc. `claimProfileSlug` pattern + `slug.ts`.
+- `PropertyManagerProfileView.vue` mirroring `TradieProfileView.vue`: chromeless
+  `/project-managers/:uid` + vanity `/pm/:slug`. Brand + logo + featured Trusted Trades,
+  each linking to `/request/:tradieUid`. Reuse `BrandingPanel`.
+- Featured-contractor opt-out: notify a contractor when a PM features them; a
+  contractor-facing "PMs featuring you" view with a remove action (per-(PM, contractor)
+  opt-out so they drop off that PM's public profile).
+- A client requesting via the profile gets the job tagged so it appears in the PM's list.
+- Help/FAQ + QA + design.md.
 
-### Reuse map for P4 (verify before editing)
-- Commission: `functions/src/lib/commission.ts` (`commissionCents`/`COMMISSION_RATE_BPS`),
-  `commissionAccrual.ts` (`accrueCommission`/`reverseCommission`), `commissionOwner.ts`,
-  `commissionPayout.ts` (`planRepPayout`), `scheduledRepCommissionPayouts.ts`, `CommissionDoc`.
-- Accrual call sites: `functions/src/payments/handlers/paymentIntent.ts`, `chargeRefunded.ts`,
-  `chargeDispute.ts`.
-- PM stamp on the job: `JobDoc.drivenByProjectManagerId` (set in `acceptApplicationQuote.ts`).
-
-## After P4
-- **P5 — public PM profile:** mirror `TradieProfileView` + slug (`/pm/:slug`), instant/no vetting, featured trades + contractor opt-out.
+## After P5
 - **P6 — multi-property paywall meter:** `requireMultiplePropertiesEntitlement` via the entitlements seam, open at launch.
 
 ## Working agreements (follow these)
