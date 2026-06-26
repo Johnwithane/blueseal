@@ -11,6 +11,7 @@ import { isValidReferralCode, normalizeReferralCode } from "@/utils/referralCode
 import TrustedTradesPanel from "@/components/TrustedTradesPanel.vue";
 import PropertiesPanel from "@/components/PropertiesPanel.vue";
 import ProjectsPanel from "@/components/ProjectsPanel.vue";
+import PmEarningsPanel from "@/components/manage/PmEarningsPanel.vue";
 
 useSeo({ title: "Manage", noindex: true });
 
@@ -140,13 +141,14 @@ async function copyRecruitLink() {
         </p>
         <ProjectsPanel />
       </div>
-      <div class="bs-card p-5">
-        <h2 class="font-semibold flex items-center gap-2">
+      <div>
+        <h2 class="font-semibold flex items-center gap-2 mb-1">
           <i class="pi pi-dollar text-[color:var(--bs-blue)]"></i> Earnings
         </h2>
-        <p class="text-sm text-[color:var(--bs-muted)] mt-1">
+        <p class="text-sm text-[color:var(--bs-muted)] mb-3">
           Your referral commission accrues as your trades get paid. Set up payouts to get paid.
         </p>
+        <PmEarningsPanel />
       </div>
     </div>
   </section>

@@ -647,6 +647,13 @@ const faqs: FaqItem[] = [
     audience: "client",
   },
   {
+    question: "I'm a project manager. How and when do I get paid?",
+    answer:
+      "When one of your preferred contractors completes paid work on a job you set up, you earn a referral commission. It builds up as a balance in your cockpit's **Earnings** section. To receive it, sign the short project-manager agreement and connect a bank account through Stripe (about five minutes, one time). After that, your balance pays out automatically each month once it clears a $50 minimum; anything under that rolls to the next month. You can recommend trades and set up projects before doing any of this, the payout setup only gates getting paid, not using the cockpit.",
+    categoryId: "for-clients",
+    audience: "client",
+  },
+  {
     question: "Why am I asked if Blue Seal is an additional insured on my policy?",
     answer:
       "When you upload your own liability policy, we ask whether Blue Seal is named as an **additional insured**. That's what actually extends your coverage to Blue Seal (being a \"certificate holder\" doesn't). It's automatic on a Blue Seal partner policy. If Blue Seal **is** named, an admin confirms it against your certificate. If it **isn't**, you sign a short liability release so everyone's clear that your policy doesn't cover Blue Seal and you're accepting responsibility for your work. You can skip the release any time by adding Blue Seal as an additional insured and uploading the updated certificate.",

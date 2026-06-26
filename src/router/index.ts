@@ -385,6 +385,10 @@ const routes: RouteRecordRaw[] = [
     component: () => import("@/views/manage/ProjectDetailView.vue"),
     meta: { requiresAuth: true, role: "projectManager", layout: "app", title: "Project" },
   },
+  // Stripe Connect onboarding return/refresh land here; the cockpit's Earnings
+  // panel reflects the updated payout state live (via the account.updated webhook).
+  { path: "/manage/payouts/return", redirect: "/manage" },
+  { path: "/manage/payouts/refresh", redirect: "/manage" },
 
   // Tradesperson onboarding wizard
   {

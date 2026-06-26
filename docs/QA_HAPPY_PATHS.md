@@ -477,9 +477,10 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 > A **project manager** (PM) recommends trades, sets up jobs for their clients, and
 > earns a referral commission. Self-serve, **no vetting**: the role enables instantly
 > and the cockpit lives at `/manage`. The agreement is signed later (at payout setup),
-> not before using the cockpit. P1 ships the role + cockpit shell; later phases add
-> trusted trades, projects + dispatch, commission, and the public profile (extend this
-> section as each lands).
+> not before using the cockpit. Shipped: role + cockpit (P1), trusted trades +
+> recruiting (P2), properties (P3a), projects + compare-and-choose dispatch + PM
+> visibility (P3b), and the additive PM commission + payouts (P4). The public PM
+> profile (P5) is the remaining phase.
 
 1. **Sign up as a project manager (password).** On `/sign-up` pick **A project
    manager**, fill name/email/password, agree to terms, create the account.
@@ -561,6 +562,21 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    party writes (covered by `tests/rules/projects.test.ts`, the invited-post tests
    in `tests/rules/jobPosts.test.ts`, the jobs-update pins, and `respondToProject`
    unit tests).
+10b. **PM commission accrues on payment (P4).** Take a PM-driven job (path 9, won by
+   a preferred contractor) through to a **card-paid** invoice. **Expected:** TWO
+   commission ledger entries accrue on the same fee — the tradesperson's rep (if any)
+   AND the PM, each 10% of Blue Seal's platform portion, with distinct deterministic
+   ids (`service_fee_<inv>` and `service_fee_<inv>_pm_<pmId>`). A full refund / lost
+   dispute reverses BOTH. A public-fallback win by an off-list contractor accrues NO
+   PM entry (not PM-driven). Pro-waived fee = no entries. (Verify on real Firestore +
+   Stripe test mode; covered by `commissionAccrual` unit tests.)
+10c. **PM earnings + payouts (P4).** In the cockpit **Earnings** section: see the
+   unpaid balance + paid-to-date. Tap **Review & sign the agreement** (signature pad)
+   → then **Start Stripe setup** (Connect Express onboarding) → return to `/manage`.
+   **Expected:** once Stripe reports payouts enabled, the panel reads "Payouts are
+   live"; the monthly scheduler pays the PM the same way as a rep ($50 min,
+   claim-before-pay) once their balance clears. The agreement gates payout setup only,
+   never the cockpit. A PM reads only their own commission/payout entries (rules).
 11. **Mobile (375px).** Re-run the signup cards + cockpit + saved-trades + properties +
    projects (incl. the client accept + address form) and the tradesperson "Invited to
    quote" section at 375px. **Expected:** the role cards stack and stay tappable; the
@@ -618,5 +634,7 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 - [ ] 13.7 Projects: create + invite a client → claim via magic link → accept (address form) / decline on the dashboard
 - [ ] 13.8 Dispatch: accepted project fans each job to matching preferred contractors ("Invited to quote"); client compares + accepts; won job carries projectId + drivenByProjectManagerId
 - [ ] 13.9 Project seam: client can't forge status; invited posting readable/appliable only by an invited contractor; job PM fields pinned (rules + unit tests)
+- [ ] 13.10b PM commission: card-paid PM-driven fee accrues BOTH rep + PM 10% (distinct ids); refund reverses both; off-list public win accrues none
+- [ ] 13.10c PM earnings/payouts: sign agreement → Stripe Connect → monthly payout ($50 min); agreement gates payout only; PM reads only own ledger
 - [ ] 13.10 Public fallback: client opens a no-bid scoped posting to the board (geocoded, leaves the invited lists, enters the radius feed)
 - [ ] 13.11 PM visibility: project detail shows quote amounts + won-job status/schedule; never the chat/invoice; another PM is denied
