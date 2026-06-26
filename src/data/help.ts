@@ -647,6 +647,13 @@ const faqs: FaqItem[] = [
     audience: "client",
   },
   {
+    question: "I'm a project manager. How do I set up work for a client?",
+    answer:
+      "From your cockpit at **/manage**: add the **property** you manage (an address, with an optional photo), open it, and create a **project** there. A project is a bundle of jobs (each a trade, like \"repaint unit\" or \"fix the sink\"). Add the jobs, then invite your client by email. They get a one-tap sign-in link, review the project, and accept. On accept, each job is sent for quotes to the trades you've saved that match it, and your client compares the quotes and picks. You can watch status and quote amounts the whole way (you never see their private chat or invoice), and you earn a commission when one of your trades does the work.",
+    categoryId: "for-clients",
+    audience: "client",
+  },
+  {
     question: "Can I have my own public page as a project manager?",
     answer:
       "Yes. In your cockpit's **Public profile** section you can add a business name, a short about, a logo, a cover image, and a brand colour, then claim a shareable link like **blueseal.app/pm/your-name**. Flip **Publish** on and the page goes live instantly, there's no review. Turn it off any time and it's hidden again (only you can preview it while it's off). It's free.",
