@@ -61,6 +61,8 @@ const routes: RouteRecordRaw[] = [
         as: "tradesperson",
         utm_source: "referral",
         ...(typeof to.query.ref === "string" ? { ref: to.query.ref } : {}),
+        // A project manager's recruiting link: blueseal.app/join?pm=CODE.
+        ...(typeof to.query.pm === "string" ? { pm: to.query.pm } : {}),
       },
     }),
   },

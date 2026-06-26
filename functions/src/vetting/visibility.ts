@@ -38,17 +38,16 @@ export async function maybeMarkVisible(tradieUid: string): Promise<void> {
   });
   if (!justWentLive) return;
 
-  // Referral free month: if this tradesperson signed up through a rep's code,
-  // grant one month of Pro starting now. Read referredByRepId off the canonical
-  // user doc (set at provisionAccount). Best-effort + idempotent (grantProComp
-  // no-ops if they already have a longer comp or a paid sub), so it never rolls
-  // back the visibility flip.
+  // Referral free month: if this tradesperson signed up through a rep's code OR a
+  // project manager's recruiting link, grant one month of Pro starting now. Read
+  // the attribution off the canonical user doc (set at provisionAccount).
+  // Best-effort + idempotent (grantProComp no-ops if they already have a longer
+  // comp or a paid sub), so it never rolls back the visibility flip.
   try {
-    const referredByRepId = (await db.doc(`users/${tradieUid}`).get()).get("referredByRepId") as
-      | string
-      | null
-      | undefined;
-    if (referredByRepId) {
+    const userSnap = await db.doc(`users/${tradieUid}`).get();
+    const referredByRepId = userSnap.get("referredByRepId") as string | null | undefined;
+    const referredByPmId = userSnap.get("referredByPmId") as string | null | undefined;
+    if (referredByRepId || referredByPmId) {
       const until = Timestamp.fromMillis(
         Timestamp.now().toMillis() + REFERRAL_FREE_MONTH_DAYS * 24 * 60 * 60 * 1000,
       );

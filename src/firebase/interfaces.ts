@@ -270,6 +270,11 @@ export interface UserDoc {
   // referred. `referralSignal` records how it arrived.
   referredByRepId?: string | null;
   referralSignal?: "link" | "code" | "name" | null;
+  // The project manager whose recruiting link (/join?pm=CODE) this tradesperson
+  // signed up through. SERVER-MANAGED (provisionAccount resolves the code) and
+  // locked in firestore.rules. Drives the free Pro month at go-live + auto-adds
+  // the tradesperson to that PM's saved trades. null when not PM-recruited.
+  referredByPmId?: string | null;
 }
 
 // ---------------------------------------------------------------------------

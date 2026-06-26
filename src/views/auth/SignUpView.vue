@@ -49,6 +49,10 @@ const isPm = computed(() => selectedRole.value === "projectManager");
 // The signal records how it arrived ("link" when it came pre-filled, else "code").
 const refFromLink = typeof route.query.ref === "string" ? normalizeReferralCode(route.query.ref) : "";
 const referralCode = ref(refFromLink);
+// A project manager's recruiting code arrives via ?pm=CODE (the /join?pm= link).
+// Threaded to provisionAccount, which (for a tradesperson signup) attributes the
+// new tradesperson to that PM and grants the free month at go-live.
+const pmFromLink = typeof route.query.pm === "string" ? normalizeReferralCode(route.query.pm) : "";
 const referralSignal = computed<"link" | "code" | undefined>(() => {
   if (!referralCode.value) return undefined;
   return referralCode.value === refFromLink ? "link" : "code";
@@ -108,6 +112,7 @@ async function submit() {
       ...parsed.data,
       referralCode: referralCode.value || undefined,
       referralSignal: referralSignal.value,
+      pmCode: pmFromLink || undefined,
     });
     router.replace(redirectTo.value);
   } catch (e) {
@@ -129,6 +134,7 @@ async function google() {
     await auth.signInWithGoogle(role.value, {
       referralCode: referralCode.value || undefined,
       referralSignal: referralSignal.value,
+      pmCode: pmFromLink || undefined,
     });
     router.replace(redirectTo.value);
   } catch (e) {
@@ -146,7 +152,7 @@ async function google() {
     <h1 class="text-2xl font-bold">{{ heading }}</h1>
     <p class="text-[color:var(--bs-muted)] mb-6">{{ subtitle }}</p>
 
-    <Message v-if="isTradie && referralCode" severity="success" :closable="false" class="mb-6">
+    <Message v-if="isTradie && (referralCode || pmFromLink)" severity="success" :closable="false" class="mb-6">
       Your first month of Blue Seal Pro is free, no credit card needed.
     </Message>
 

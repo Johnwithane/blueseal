@@ -62,3 +62,22 @@ export function assertPmAgreementSigned(pm: ProjectManagerState): void {
     );
   }
 }
+
+/**
+ * Resolve a PM recruiting code to the project manager who owns it — only if that
+ * PM is ACTIVE. Mirrors resolveReferralRepId; case-insensitive (the registry is
+ * keyed by the lowercased code). The agreement is NOT required to recruit (it
+ * gates payout, not the cockpit). Returns the PM uid, or null if unknown/inactive.
+ */
+export async function resolvePmId(code: string): Promise<string | null> {
+  const codeLower = code.trim().toLowerCase();
+  if (!codeLower) return null;
+  const codeSnap = await db.doc(`pmReferralCodes/${codeLower}`).get();
+  if (!codeSnap.exists) return null;
+  const pmId = codeSnap.get("uid") as string | undefined;
+  if (!pmId) return null;
+  const pmSnap = await db.doc(`users/${pmId}`).get();
+  const pm = pmSnap.data()?.projectManager as { active?: boolean } | undefined;
+  if (!pm || pm.active === false) return null;
+  return pmId;
+}

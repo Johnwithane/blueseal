@@ -6,7 +6,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { adminAuth, db } from "../lib/admin";
 import { requireAuth } from "../lib/auth";
 import { resolveReferralRepId } from "../lib/referralResolve";
-import { initialProjectManagerState } from "../lib/projectManager";
+import { initialProjectManagerState, resolvePmId } from "../lib/projectManager";
 
 const Input = z.object({
   role: z.enum(["client", "tradesperson", "projectManager"]),
@@ -19,6 +19,9 @@ const Input = z.object({
   // it arrived, for attribution analytics.
   referralCode: z.string().trim().max(40).optional(),
   referralSignal: z.enum(["link", "code", "name"]).optional(),
+  // Optional PM recruiting code from /join?pm=CODE. Only honored for a
+  // tradesperson signup; resolved to an active project manager server-side.
+  pmCode: z.string().trim().max(40).optional(),
 });
 
 /**
@@ -85,6 +88,12 @@ export const provisionAccount = onCall(CALLABLE_OPTS, async (req) => {
       ? await resolveReferralRepId(parsed.data.referralCode)
       : null;
     const referralSignal = referredByRepId ? (parsed.data.referralSignal ?? "code") : null;
+    // PM recruiting attribution (only for tradesperson signups). Resolved to an
+    // active PM; drives the free month at go-live + the saved-trades auto-add below.
+    const referredByPmId =
+      role === "tradesperson" && parsed.data.pmCode
+        ? await resolvePmId(parsed.data.pmCode)
+        : null;
     await userRef.set({
       roles,
       activeRole,
@@ -104,11 +113,20 @@ export const provisionAccount = onCall(CALLABLE_OPTS, async (req) => {
       notificationPrefs: { emailEnabled: true, whatsappEnabled: true },
       referredByRepId,
       referralSignal,
+      referredByPmId,
       // A PM is active the instant the role is enabled (self-serve, no vetting);
       // the liability agreement is signed later at payout setup.
       ...(role === "projectManager" ? { projectManager: initialProjectManagerState() } : {}),
     });
     logger.info("Provisioned account", { uid, roles, referredByRepId });
+    // PM-recruited tradesperson: add them to the recruiting PM's saved trades so
+    // they appear as a preferred contractor once live (the free Pro month is
+    // granted at go-live; see maybeMarkVisible).
+    if (referredByPmId) {
+      await db
+        .doc(`users/${referredByPmId}/savedTradies/${uid}`)
+        .set({ createdAt: FieldValue.serverTimestamp() }, { merge: true });
+    }
   }
 
   // Mirror roles → claims immediately so the client's next getIdToken(true)

@@ -318,6 +318,7 @@ export const useAuthStore = defineStore("auth", {
       role: Role;
       referralCode?: string;
       referralSignal?: "link" | "code" | "name";
+      pmCode?: string;
     }) {
       this.pending = true;
       this.error = null;
@@ -344,6 +345,7 @@ export const useAuthStore = defineStore("auth", {
           termsAcceptedVersion: LEGAL_VERSION,
           referralCode: opts.referralCode,
           referralSignal: opts.referralSignal,
+          pmCode: opts.pmCode,
         });
         // Refresh so the token carries the claims the callable just set. If the
         // claim write lagged (handled server-side by the setRoleOnSignup
@@ -385,7 +387,7 @@ export const useAuthStore = defineStore("auth", {
      */
     async signInWithGoogle(
       intendedRole: Role = "client",
-      referral?: { referralCode?: string; referralSignal?: "link" | "code" | "name" },
+      referral?: { referralCode?: string; referralSignal?: "link" | "code" | "name"; pmCode?: string },
     ): Promise<{ isNew: boolean }> {
       this.pending = true;
       this.error = null;
@@ -412,6 +414,7 @@ export const useAuthStore = defineStore("auth", {
           photoURL: cred.user.photoURL,
           referralCode: referral?.referralCode,
           referralSignal: referral?.referralSignal,
+          pmCode: referral?.pmCode,
         });
         isNew = created;
         // Refresh so the token carries the claims the callable just

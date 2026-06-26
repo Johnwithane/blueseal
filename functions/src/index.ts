@@ -102,6 +102,9 @@ export { getMyRepContact } from "./sales/getMyRepContact";
 export { signSalesAgreement } from "./sales/signAgreement";
 export { claimReferralCode } from "./sales/claimReferralCode";
 
+// Project manager self-service: claim a unique vanity recruiting code (/join?pm=).
+export { claimPmCode } from "./projectManager/claimPmCode";
+
 // Chat
 export { onMessageCreated } from "./chat/onMessageCreated";
 

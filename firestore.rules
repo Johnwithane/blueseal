@@ -127,6 +127,9 @@ service cloud.firestore {
         // referral). `.get(field, null)` so non-referred docs stay editable.
         && request.resource.data.get('referredByRepId', null) == resource.data.get('referredByRepId', null)
         && request.resource.data.get('referralSignal', null) == resource.data.get('referralSignal', null)
+        // PM recruiting attribution is server-managed (provisionAccount resolves
+        // the /join?pm= code). The owner can never set or change it.
+        && request.resource.data.get('referredByPmId', null) == resource.data.get('referredByPmId', null)
         // Account suspension mirror is server-managed (adminSetUserDisabled, admin
         // SDK). The owner can never write it — that's the support-side lock, not a
         // self-serve toggle. `.get(field, null)` so docs predating it stay editable.
@@ -459,6 +462,17 @@ service cloud.firestore {
     // claimReferralCode callable (admin SDK) inside a uniqueness transaction, so
     // all client writes are denied. Mirrors profileSlugs.
     match /referralCodes/{codeLower} {
+      allow read: if true;
+      allow create, update, delete: if false;
+    }
+
+    // ---------- pmReferralCodes (PM recruiting code -> PM registry) ----------
+    // Maps a lowercased PM recruiting code (the doc id) to the project manager who
+    // owns it. World-readable so the signup flow can resolve "/join?pm=CODE" to a
+    // PM. Written only by the claimPmCode callable (admin SDK) inside a uniqueness
+    // transaction. Mirrors referralCodes; kept separate so the rep ?ref= path is
+    // untouched.
+    match /pmReferralCodes/{codeLower} {
       allow read: if true;
       allow create, update, delete: if false;
     }

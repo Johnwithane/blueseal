@@ -9,7 +9,7 @@ import {
   assertSucceeds,
   type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
-import { doc, setDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 
 import { ADMIN_CLAIMS, ADMIN_UID, setupTestEnv } from "./setup";
 
@@ -91,5 +91,42 @@ describe("users.projectManager — owner cannot write it", () => {
     await seedPmUser();
     const fs = env.authenticatedContext(ADMIN_UID, ADMIN_CLAIMS).firestore();
     await assertSucceeds(updateDoc(doc(fs, "users", PM_UID), { "projectManager.active": false }));
+  });
+
+  it("the owner cannot self-attribute to a project manager (referredByPmId)", async () => {
+    await seedPmUser();
+    const fs = env.authenticatedContext(PM_UID, PM_CLAIMS).firestore();
+    await assertFails(updateDoc(doc(fs, "users", PM_UID), { referredByPmId: "some-pm" }));
+  });
+});
+
+const PM_CODE_LOWER = "acme";
+
+async function seedPmCode() {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), "pmReferralCodes", PM_CODE_LOWER), {
+      uid: PM_UID,
+      code: "ACME",
+      claimedAt: new Date(),
+    });
+  });
+}
+
+describe("pmReferralCodes — read public, server-only writes", () => {
+  it("is world-readable to an anonymous visitor (resolve /join?pm= at signup)", async () => {
+    await seedPmCode();
+    const fs = env.unauthenticatedContext().firestore();
+    await assertSucceeds(getDoc(doc(fs, "pmReferralCodes", PM_CODE_LOWER)));
+  });
+
+  it("the PM cannot create their own recruiting code directly (server-only)", async () => {
+    const fs = env.authenticatedContext(PM_UID, PM_CLAIMS).firestore();
+    await assertFails(
+      setDoc(doc(fs, "pmReferralCodes", PM_CODE_LOWER), {
+        uid: PM_UID,
+        code: "ACME",
+        claimedAt: new Date(),
+      }),
+    );
   });
 });

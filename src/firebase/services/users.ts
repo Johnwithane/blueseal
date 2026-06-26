@@ -91,6 +91,7 @@ export async function provisionAccount(input: {
   photoURL?: string | null;
   referralCode?: string;
   referralSignal?: "link" | "code" | "name";
+  pmCode?: string;
 }): Promise<{ roles: Role[]; activeRole: Role; isNew: boolean }> {
   const callable = httpsCallable<typeof input, { roles: Role[]; activeRole: Role; isNew: boolean }>(
     functions,

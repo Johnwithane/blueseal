@@ -493,8 +493,15 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    toggle). **Expected:** they appear under **Saved trades** on the client dashboard
    and in the PM cockpit's "Your saved trades" panel; **Request** opens a fresh quote
    to them; the **x** removes them. (Reuses the existing `savedTradies` shortlist.)
-6. **Mobile (375px).** Re-run the signup cards + cockpit + saved-trades list at 375px.
-   **Expected:** the role cards stack and stay tappable; the cockpit + saved cards read cleanly.
+6. **Recruit trades (the acquisition link).** In the cockpit "Recruit trades" card,
+   claim a recruiting code and copy the `/join?pm=CODE` link. Open it in a fresh
+   session: signup preselects **tradesperson** with the free-month banner. Complete a
+   tradesperson signup through it. **Expected:** once that tradesperson goes live
+   (vetted), they appear in the PM's saved trades and get a free first month of Pro
+   (granted at go-live, like a rep code). Sanity: the rep `?ref=` link still works
+   unchanged. (Server attribution: `users/{tradieUid}.referredByPmId`.)
+7. **Mobile (375px).** Re-run the signup cards + cockpit + saved-trades list at 375px.
+   **Expected:** the role cards stack and stay tappable; the cockpit + saved + recruit cards read cleanly.
 
 ---
 
@@ -543,3 +550,4 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 - [ ] 13.2 Become a PM from /welcome → /manage, holds client + project manager
 - [ ] 13.3 Role switcher shows Project manager; /dashboard routes PM to /manage
 - [ ] 13.4 Save a trade → Saved trades tab + PM cockpit; Request re-hires; remove works
+- [ ] 13.5 Claim recruiting code; /join?pm= signup → tradesperson; free month at go-live + appears in PM saved trades; rep ?ref= unaffected
