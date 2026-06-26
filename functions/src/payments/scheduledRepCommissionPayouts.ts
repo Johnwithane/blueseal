@@ -1,8 +1,11 @@
-// Monthly sales-rep commission payout. On the 1st of each month, for every rep:
-// net their unpaid commissions (sum of "accrued" minus the not-yet-netted
-// "reversed" offsets), and if the net clears the $50 minimum, transfer it to the
-// rep's Stripe Connect account and mark those ledger entries settled. Below the
-// minimum rolls over to next month.
+// Monthly commission payout for BOTH sales reps and project managers (P4). On the
+// 1st of each month, for every commission OWNER — `(ownerType, ownerId)`: net their
+// unpaid commissions (sum of "accrued" minus the not-yet-netted "reversed" offsets),
+// and if the net clears the $50 minimum, transfer it to the owner's Stripe Connect
+// account and mark those ledger entries settled. Below the minimum rolls over to
+// next month. Rep payouts read `users/{id}.salesRep.payouts`; PM payouts read
+// `users/{id}.projectManager.payouts`. The export keeps its original name (it's a
+// deployed scheduled function) even though it now covers both owner types.
 //
 // MONEY-SAFETY ORDERING (claim-before-pay). The cardinal sin here is paying a
 // rep twice, so we CLAIM the commissions before moving money:
@@ -29,27 +32,43 @@ import { STRIPE_SECRET_KEY, getStripe } from "./stripeClient";
 
 const SCAN_LIMIT = 5000; // safety cap per run (logged if hit; remainder next run).
 
+type OwnerType = "rep" | "pm";
+
 interface LedgerRow {
   id: string;
-  repId: string;
+  ownerType: OwnerType;
+  ownerId: string;
   commissionCents: number;
   createdAt: Timestamp | null;
 }
 
+// A row's owner: PM entries carry ownerType "pm" + ownerId; rep entries (incl.
+// legacy rows with no ownerType) resolve to the rep via repId.
 function toRow(doc: QueryDocumentSnapshot): LedgerRow {
   const data = doc.data();
+  const ownerType: OwnerType = data.ownerType === "pm" ? "pm" : "rep";
+  const ownerId = String((ownerType === "pm" ? data.ownerId : data.repId) ?? "");
   return {
     id: doc.id,
-    repId: String(data.repId ?? ""),
+    ownerType,
+    ownerId,
     commissionCents: Number(data.commissionCents ?? 0),
     createdAt: (data.createdAt as Timestamp | undefined) ?? null,
   };
 }
 
+// Group key combines type + id so a rep and a PM with the same uid (shouldn't
+// happen, but is defended) never net together.
+function ownerKey(row: LedgerRow): string {
+  return `${row.ownerType}:${row.ownerId}`;
+}
+
 function pushGroup(map: Map<string, LedgerRow[]>, row: LedgerRow): void {
-  const arr = map.get(row.repId);
+  if (!row.ownerId) return;
+  const k = ownerKey(row);
+  const arr = map.get(k);
   if (arr) arr.push(row);
-  else map.set(row.repId, [row]);
+  else map.set(k, [row]);
 }
 
 export const scheduledRepCommissionPayouts = onSchedule(
@@ -73,17 +92,15 @@ export const scheduledRepCommissionPayouts = onSchedule(
       });
     }
 
-    // Group accrued by rep, and the not-yet-netted reversals (payoutBatchId null).
-    const accruedByRep = new Map<string, LedgerRow[]>();
+    // Group accrued by owner, and the not-yet-netted reversals (payoutBatchId null).
+    const accruedByOwner = new Map<string, LedgerRow[]>();
     for (const doc of accruedSnap.docs) {
-      const row = toRow(doc);
-      if (row.repId) pushGroup(accruedByRep, row);
+      pushGroup(accruedByOwner, toRow(doc));
     }
-    const reversedByRep = new Map<string, LedgerRow[]>();
+    const reversedByOwner = new Map<string, LedgerRow[]>();
     for (const doc of reversedSnap.docs) {
       if (doc.data().payoutBatchId != null) continue; // already netted in a prior batch
-      const row = toRow(doc);
-      if (row.repId) pushGroup(reversedByRep, row);
+      pushGroup(reversedByOwner, toRow(doc));
     }
 
     let paid = 0;
@@ -91,9 +108,10 @@ export const scheduledRepCommissionPayouts = onSchedule(
     let skipped = 0;
     let failed = 0;
 
-    for (const [repId, accrued] of accruedByRep) {
+    for (const [key, accrued] of accruedByOwner) {
+      const { ownerType, ownerId } = accrued[0];
       try {
-        const reversed = reversedByRep.get(repId) ?? [];
+        const reversed = reversedByOwner.get(key) ?? [];
         const plan = planRepPayout(
           accrued.map((r) => ({ id: r.id, commissionCents: r.commissionCents, createdAtMs: r.createdAt?.toMillis() ?? null })),
           reversed.map((r) => ({ id: r.id, commissionCents: r.commissionCents, createdAtMs: r.createdAt?.toMillis() ?? null })),
@@ -102,18 +120,23 @@ export const scheduledRepCommissionPayouts = onSchedule(
         const net = plan.netCents;
         if (!plan.shouldPay) {
           rolled += 1;
-          logger.info("scheduledRepCommissionPayouts: below minimum, rolling over", { repId, net });
+          logger.info("scheduledRepCommissionPayouts: below minimum, rolling over", { ownerType, ownerId, net });
           continue;
         }
 
-        const repSnap = await db.doc(`users/${repId}`).get();
-        const payouts = repSnap.data()?.salesRep?.payouts as
+        // Rep payouts live on salesRep.payouts; PM payouts on projectManager.payouts.
+        const ownerSnap = await db.doc(`users/${ownerId}`).get();
+        const ownerData = ownerSnap.data() ?? {};
+        const payouts = (ownerType === "pm"
+          ? ownerData.projectManager?.payouts
+          : ownerData.salesRep?.payouts) as
           | { stripeAccountId?: string; payoutsEnabled?: boolean }
           | undefined;
         if (!payouts?.stripeAccountId || !payouts.payoutsEnabled) {
           skipped += 1;
-          logger.warn("scheduledRepCommissionPayouts: rep payouts not enabled, rolling over", {
-            repId,
+          logger.warn("scheduledRepCommissionPayouts: owner payouts not enabled, rolling over", {
+            ownerType,
+            ownerId,
             net,
           });
           continue;
@@ -124,7 +147,10 @@ export const scheduledRepCommissionPayouts = onSchedule(
         const batchRef = db.collection("commissionPayouts").doc();
         const claim = db.batch();
         claim.set(batchRef, {
-          repId,
+          ownerType,
+          ownerId,
+          // Keep repId on rep batches (legacy readers/rules key on it); null for PMs.
+          repId: ownerType === "rep" ? ownerId : null,
           stripeTransferId: null,
           amountCents: net,
           commissionIds: plan.commissionIds,
@@ -143,6 +169,7 @@ export const scheduledRepCommissionPayouts = onSchedule(
         await claim.commit();
 
         // Step 2 — move the money. Idempotency key dedupes a same-period retry.
+        // (Rep key unchanged: `rep-payout-${id}-${period}`.)
         const stripe = getStripe();
         let transferId: string;
         try {
@@ -151,9 +178,9 @@ export const scheduledRepCommissionPayouts = onSchedule(
               amount: net,
               currency: "cad",
               destination: payouts.stripeAccountId,
-              metadata: { repId, period, batchId: batchRef.id },
+              metadata: { ownerType, ownerId, period, batchId: batchRef.id },
             },
-            { idempotencyKey: `rep-payout-${repId}-${period}` },
+            { idempotencyKey: `${ownerType}-payout-${ownerId}-${period}` },
           );
           transferId = transfer.id;
         } catch (transferErr) {
@@ -169,7 +196,8 @@ export const scheduledRepCommissionPayouts = onSchedule(
           await unwind.commit();
           failed += 1;
           logger.error("scheduledRepCommissionPayouts: transfer rejected, claim unwound", {
-            repId,
+            ownerType,
+            ownerId,
             net,
             batchId: batchRef.id,
             err: transferErr instanceof Error ? transferErr.message : String(transferErr),
@@ -177,12 +205,13 @@ export const scheduledRepCommissionPayouts = onSchedule(
           continue;
         }
 
-        // Step 3a — confirm. If this update fails the rep is still paid exactly
+        // Step 3a — confirm. If this update fails the owner is still paid exactly
         // once; the batch stays "pending" (recoverable) and we log loudly.
         await batchRef.update({ status: "paid", stripeTransferId: transferId });
         paid += 1;
         logger.info("scheduledRepCommissionPayouts: paid", {
-          repId,
+          ownerType,
+          ownerId,
           net,
           transferId,
           batchId: batchRef.id,
@@ -190,15 +219,16 @@ export const scheduledRepCommissionPayouts = onSchedule(
         });
       } catch (err) {
         failed += 1;
-        logger.error("scheduledRepCommissionPayouts: rep payout error", {
-          repId,
+        logger.error("scheduledRepCommissionPayouts: owner payout error", {
+          ownerType,
+          ownerId,
           err: err instanceof Error ? err.message : String(err),
         });
       }
     }
 
     logger.info("scheduledRepCommissionPayouts: done", {
-      reps: accruedByRep.size,
+      owners: accruedByOwner.size,
       paid,
       rolled,
       skipped,
