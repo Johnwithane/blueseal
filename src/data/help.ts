@@ -682,6 +682,13 @@ const faqs: FaqItem[] = [
     audience: "tradesperson",
   },
   {
+    question: "A project manager is featuring me on their profile. Can I opt out?",
+    answer:
+      "Yes, any time. A project manager who has saved you as one of their trusted trades can feature you on their public Blue Seal page (the trades they recommend to clients). We notify you when they do. To remove yourself, open the **Project managers featuring you** page (from the notification, at /featured-by-pms) and tap **Remove me**. You'll drop off their profile, and they can't feature you again unless you opt back in. Being featured is free and can only ever send you more quote requests, never charge you.",
+    categoryId: "for-tradespeople",
+    audience: "tradesperson",
+  },
+  {
     question: "What does \"Invited to quote\" mean on Browse jobs?",
     answer:
       "A project manager who has you in their trusted trades set up a job for their client and invited you to quote on it. It shows in a separate **Invited to quote** section on Browse jobs, and it appears even if your service area isn't set, because the invite is direct rather than based on distance. Open it and send a full quote like any other job post. The client compares the quotes from the trades the project manager invited and picks one. Only the invited trades can see and apply to it; if none of them bid, the client can open the job to the public board.",

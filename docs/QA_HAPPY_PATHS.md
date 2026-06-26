@@ -583,8 +583,29 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    rejected) and **toggle Publish on**. **Expected:** open `/pm/<handle>` (signed out
    / incognito) and see the published profile (cover, logo, name, about). With Publish
    **off**, the same link reads "Profile not found" to the public, but the owner sees
-   a preview banner. No vetting/review gate; publishing is instant. (Featured trades
-   on the profile + contractor opt-out are P5b.)
+   a preview banner. No vetting/review gate; publishing is instant.
+10e. **PM navigation + dashboard (UX redesign).** As a project manager, confirm the
+   **side nav is PM-specific** (Dashboard, Properties, Jobs, Trades, Earnings, Public
+   profile) — NOT the client nav. **Expected:** `/manage` is a Dashboard overview (stat
+   tiles for properties / active projects / jobs in progress / unpaid earnings, quick
+   actions, a payout-setup nudge, recent projects), and each nav item / tile routes to
+   its own section. Mobile bottom bar = Dashboard + Properties + Alerts.
+10f. **Property -> Projects -> Jobs drill-down.** From **Properties**, tap a property to
+   open it; tap **New project here** and create a project (it's scoped to that property,
+   no property picker). **Expected:** the project appears under that property and opens
+   to its read-only jobs/quotes; the Dashboard "recent projects" and the **Jobs** board
+   (every PM-driven job, read-only) also reflect it.
+10g. **Photos on properties + projects.** Add/edit a property and attach a **photo**;
+   create a project and attach a **photo**. **Expected:** the photo shows as a hero on
+   the property + project detail pages and as a thumbnail on the lists + dashboard; the
+   client invited to the project can see the project photo (world-read storage).
+10h. **Find / feature trades + contractor opt-out (P5b).** In **Trades**, tap **Find a
+   tradesperson** -> search -> Save one. In **Public profile -> Featured trades**, toggle
+   that saved trade **on**. **Expected:** they appear under "Trades I recommend" on your
+   public `/pm/<handle>` page (each card -> request a quote), and the contractor gets a
+   `pm_featured` notification. As that contractor, open **/featured-by-pms** and tap
+   **Remove me**. **Expected:** they drop off the PM's profile and can't be re-featured
+   until they opt back in (covered by `featuredContractors.test.ts` + rules tests).
 11. **Mobile (375px).** Re-run the signup cards + cockpit + saved-trades + properties +
    projects (incl. the client accept + address form), the tradesperson "Invited to
    quote" section, the cockpit Earnings + Public-profile editors, and the public
@@ -647,5 +668,9 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 - [ ] 13.10b PM commission: card-paid PM-driven fee accrues BOTH rep + PM 10% (distinct ids); refund reverses both; off-list public win accrues none
 - [ ] 13.10c PM earnings/payouts: sign agreement → Stripe Connect → monthly payout ($50 min); agreement gates payout only; PM reads only own ledger
 - [ ] 13.10d Public profile: edit brand/bio, upload logo+cover, claim /pm/<handle>, publish on → world-visible; off → not found to public, preview to owner
+- [ ] 13.10e PM nav + dashboard: PM-specific side nav (not client); /manage overview with stat tiles + quick actions routing into sections
+- [ ] 13.10f Property → Projects → Jobs drill-down; New-project scoped to a property; Jobs board reflects PM-driven jobs
+- [ ] 13.10g Photos: attach a photo to a property + a project; hero on detail, thumbnail on lists, visible to the invited client
+- [ ] 13.10h Find/feature trades: search → save; feature on profile → public card + pm_featured notif; contractor /featured-by-pms → Remove me (opt-out)
 - [ ] 13.10 Public fallback: client opens a no-bid scoped posting to the board (geocoded, leaves the invited lists, enters the radius feed)
 - [ ] 13.11 PM visibility: project detail shows quote amounts + won-job status/schedule; never the chat/invoice; another PM is denied
