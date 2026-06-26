@@ -395,6 +395,36 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, role: "projectManager", layout: "app", title: "Manage" },
   },
   {
+    path: "/manage/properties",
+    name: "PmProperties",
+    component: () => import("@/views/manage/PmPropertiesView.vue"),
+    meta: { requiresAuth: true, role: "projectManager", layout: "app", title: "Properties" },
+  },
+  {
+    path: "/manage/jobs",
+    name: "PmJobs",
+    component: () => import("@/views/manage/PmJobsView.vue"),
+    meta: { requiresAuth: true, role: "projectManager", layout: "app", title: "Jobs" },
+  },
+  {
+    path: "/manage/trades",
+    name: "PmTrades",
+    component: () => import("@/views/manage/PmTradesView.vue"),
+    meta: { requiresAuth: true, role: "projectManager", layout: "app", title: "Trades" },
+  },
+  {
+    path: "/manage/earnings",
+    name: "PmEarnings",
+    component: () => import("@/views/manage/PmEarningsView.vue"),
+    meta: { requiresAuth: true, role: "projectManager", layout: "app", title: "Earnings" },
+  },
+  {
+    path: "/manage/profile",
+    name: "PmProfile",
+    component: () => import("@/views/manage/PmProfileView.vue"),
+    meta: { requiresAuth: true, role: "projectManager", layout: "app", title: "Public profile" },
+  },
+  {
     path: "/manage/projects/:projectId",
     name: "ProjectDetail",
     component: () => import("@/views/manage/ProjectDetailView.vue"),

@@ -322,6 +322,76 @@ export function useNavItems(): {
       ];
     }
 
+    if (auth.activeRole === "projectManager") {
+      // Project manager cockpit: its own dedicated nav (previously fell through to
+      // the client nav). Home (Dashboard), Notifications, then the daily destinations
+      // — Properties (which hold projects + jobs), the flat Jobs board, the Trades
+      // hub (find/refer/recruit), Earnings, and the public Profile. Mobile bottom
+      // bar = Dashboard + Properties + Alerts (the rest are desktop-side / Profile menu).
+      return [
+        {
+          key: "dashboard",
+          label: "Dashboard",
+          icon: "pi-th-large",
+          to: "/manage",
+          mobile: true,
+          matches: exact("/manage"),
+        },
+        {
+          key: "notifications",
+          label: "Notifications",
+          mobileLabel: "Alerts",
+          icon: "pi-bell",
+          to: "",
+          mobile: true,
+          matches: () => false,
+        },
+        {
+          key: "properties",
+          label: "Properties",
+          icon: "pi-home",
+          to: "/manage/properties",
+          mobile: true,
+          // Property detail + its nested projects live under /manage/properties/:id
+          // and /manage/projects/:id (reached from a property).
+          matches: (r) =>
+            r.path.startsWith("/manage/properties") || r.path.startsWith("/manage/projects"),
+        },
+        {
+          key: "jobs",
+          label: "Jobs",
+          icon: "pi-briefcase",
+          to: "/manage/jobs",
+          mobile: false,
+          matches: prefix("/manage/jobs"),
+        },
+        {
+          key: "trades",
+          label: "Trades",
+          icon: "pi-users",
+          to: "/manage/trades",
+          mobile: false,
+          matches: prefix("/manage/trades"),
+        },
+        {
+          key: "earnings",
+          label: "Earnings",
+          icon: "pi-wallet",
+          to: "/manage/earnings",
+          mobile: false,
+          matches: prefix("/manage/earnings"),
+        },
+        {
+          key: "profile",
+          label: "Public profile",
+          icon: "pi-id-card",
+          to: "/manage/profile",
+          mobile: false,
+          matches: prefix("/manage/profile"),
+        },
+      ];
+    }
+
     // Default = client view (also covers null activeRole during auth init).
     return [
       {
