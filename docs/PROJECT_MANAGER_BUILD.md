@@ -52,6 +52,8 @@ which hold **Jobs** (individual trade tasks).
 | `2fd2bb0` | **P4b-2** `signPmAgreement` + PM Stripe Connect onboarding callables + `account.updated` PM routing |
 | `87636fb` | **P4b-3** cockpit Earnings UI: `PmEarningsPanel` + `PmAgreementDialog` + `usePmEarnings` + `pmPayoutsService` |
 | `9c009f3` | **P5a** public PM profile: `projectManagers/{uid}` doc + `claimPmProfileSlug` (+ `pmProfileSlugs` registry) + cockpit `PmProfilePanel` editor + public `ProjectManagerProfileView` (`/pm/:slug` + `/project-managers/:uid`) + rules/storage/tests |
+| `b41c512` | **P5b backend** featured-contractor consent: `featuredContractors[]` on the public doc + `setFeaturedContractor` / `setPmFeatureOptOut` callables + `featuredByPms` / `pmFeatureOptOuts` subcollections + `pm_featured` notification + rules/tests. **UI still pending** (see below). |
+| `1733382` | **UX A** real PM navigation (`useNavItems` projectManager case — was falling through to the CLIENT nav) + dedicated section routes under `/manage` + `/manage` rebuilt as a Dashboard overview + section views (Properties / Jobs / Trades / Earnings / Profile) reusing existing panels |
 
 Note: the role switcher is now driven by `src/data/roleViews.ts` (commit `cf1f711`, another session) — the single source of truth for role label/icon; it already includes `projectManager`. Don't reintroduce inline role maps.
 
@@ -128,40 +130,53 @@ CI-deployed first.
 
 ---
 
-## NEXT TASK — P5b: feature contractors on the public profile (+ consent)
+## NEXT TASK — PM experience redesign (UX B + C) + P5b UI
 
-Add the PM's preferred contractors to their public profile, WITH a contractor opt-out +
-notify so nobody is shown publicly without recourse. The key constraint: the public
-profile is world-readable but `users/{pmId}/savedTradies` is PRIVATE — so the featured
-set must be **denormalized onto the public `projectManagers/{uid}` doc** (it can't be
-read live from the private subcollection).
+Johnny's direction (2026-06-25): the PM needs a "feature-ready tool", not the client
+shell. **UX A shipped** (`1733382`): PM nav + dashboard + dedicated section routes.
+Approved IA + a faithful clickable mockup live at **`c:\tmp\pm-dashboard-preview.html`**
+(open it to see the target). Remaining:
 
-Suggested design (resolve before building):
-- `projectManagers/{uid}.featuredContractors: { tradieId, displayName, photoURL, trades }[]`
-  — denormalized, world-readable. Rendered as cards on the profile linking to
-  `/request/:tradieUid`.
-- `setFeaturedContractor({ tradieId, featured })` callable (PM): validates the tradie is
-  in the PM's savedTradies + visible + has NOT opted out; denormalizes their public info;
-  updates the array; writes a reverse index `users/{tradieId}/featuredByPms/{pmId}`;
-  notifies the contractor on add. (Server-side because it reads the tradie doc, enforces
-  the opt-out, and notifies.)
-- `setPmFeatureOptOut({ pmId, optedOut })` callable (contractor): writes
-  `users/{tradieId}/pmFeatureOptOuts/{pmId}` AND removes them from that PM's
-  featuredContractors + the reverse index. `setFeaturedContractor` refuses an opted-out
-  contractor.
-- Contractor "PMs featuring you" view: lists `users/{tradieId}/featuredByPms` with a
-  Remove (opt-out) action. New route + small view (or an Account section).
-- Featured-toggle UI in the cockpit (extend `TrustedTradesPanel` or `PmProfilePanel`).
-- **Request attribution:** add `JobDoc.requestedViaPmId` (server-stamped), have the
-  profile's featured links carry `?via=<pmId>`, and `createJob` stamp it so a request
-  off the PM's profile shows in their list (and could feed commission if it becomes a
-  PM-driven job). Pin it immutable in the jobs update rule.
-- Rules: `projectManagers` featuredContractors is owner/server-managed (pin against forging
-  someone else's identity); the opt-out + featuredByPms subcollections owner-scoped.
-  Allow + deny tests. Help/FAQ + QA section 13 + design.md.
+### UX B — Property -> Projects -> Jobs drill-down (the noun hierarchy)
+Right now `/manage/properties` shows PropertiesPanel + ProjectsPanel flat (interim).
+Make it a hierarchy, since "projects live within each property":
+- `PmPropertyDetailView` at `/manage/properties/:propertyId`: property header + the
+  projects AT that property (filter `subscribeProjectsForPm` by `propertyId`) + a
+  "New project here" that creates a project with `propertyId` prefilled. Each project
+  card -> `/manage/projects/:id` (the existing read-only `ProjectDetailView`).
+- Make PropertiesPanel cards link into the detail; move project creation out of the flat
+  `ProjectsPanel` into the property-scoped flow (then retire/repurpose `ProjectsPanel`).
+- Breadcrumbs: Properties / <address> / <project>.
 
-## After P5b
+### UX C — Trades hub directory search + P5b featuring UI
+- Trades hub (`/manage/trades`): add a tradesperson DIRECTORY SEARCH so the PM can find
+  + Save trades to refer (reuse the client `/search` save flow — but confirm the route
+  guard lets a projectManager activeRole reach it, or embed the search component
+  directly rather than routing to `/search`). The recruit link + saved list are already
+  there.
+- **P5b featuring UI (backend already shipped, `b41c512`):** a featured-toggle per saved
+  trade on the Public-profile section (calls `setFeaturedContractor`), render
+  `featuredContractors` on the public `ProjectManagerProfileView` as cards ->
+  `/request/:tradieId`, and a contractor-facing **`/featured-by-pms`** view listing
+  `users/{uid}/featuredByPms` with a Remove (opt-out -> `setPmFeatureOptOut`) action.
+  Client wrappers for `setFeaturedContractor` / `setPmFeatureOptOut` /
+  `subscribeFeaturedByPms` still need adding to a service. **IMPORTANT:** the
+  `pm_featured` notification already links to `/featured-by-pms` — that route/view MUST
+  exist before any featuring UI is exposed (today nothing can feature, so no notification
+  fires — safe — but don't ship the featuring toggle without the opt-out view).
+- **Request attribution (optional):** `JobDoc.requestedViaPmId` + `?via=<pmId>` on the
+  profile's request links + `createJob` stamp + jobs-rule pin.
+
+Each increment: Help/FAQ + QA section 13 + gates green.
+
+## After the redesign
 - **P6 — multi-property paywall meter:** `requireMultiplePropertiesEntitlement` via the entitlements seam, open at launch.
+
+## Still NOT verified on real Firestore
+P3b + P4 + P5 ship gates-green but the end-to-end money path (card-pay -> rep + PM
+commission -> refund reverses both) + the public profile publish/hide have NOT been
+exercised on real Firestore + Stripe test. See the verify script above; do it once the
+latest push is CI-deployed.
 
 ## Working agreements (follow these)
 - Read `CLAUDE.md` first. One increment at a time, fully shipped before the next.
