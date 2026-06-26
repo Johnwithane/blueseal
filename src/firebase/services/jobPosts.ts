@@ -92,6 +92,21 @@ export function subscribeMyJobPosts(
   );
 }
 
+// Public-board fallback for a scoped ("invited") PM posting: flips it to "open" and
+// clears the invited scope, geocoding the address so it enters the proximity feed.
+// The caller resolves lat/lng (geocoding is client-side) from the post's address.
+export async function openPostingToPublic(
+  postId: string,
+  coords: { lat: number; lng: number },
+): Promise<{ ok: true }> {
+  const fn = httpsCallable<
+    { postId: string; lat: number; lng: number },
+    { ok: true }
+  >(functions, "openPostingToPublic");
+  const res = await fn({ postId, lat: coords.lat, lng: coords.lng });
+  return res.data;
+}
+
 export function subscribeJobPostMeta(
   postId: string,
   cb: (meta: JobPostMetaDoc | null) => void,

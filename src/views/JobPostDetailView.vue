@@ -12,7 +12,9 @@ import {
   getJobPost,
   subscribeJobPostMeta,
   cancelJobPost,
+  openPostingToPublic,
 } from "@/firebase/services/jobPosts";
+import { useGoogleMaps } from "@/composables/useGoogleMaps";
 import {
   acceptApplication,
   acceptApplicationQuote,
@@ -531,6 +533,32 @@ async function onCancelPost() {
   });
 }
 
+// Public-board fallback for a scoped ("invited") PM posting: geocode the address
+// the client confirmed at accept, then flip it open to all verified trades nearby.
+const { geocodeAddress } = useGoogleMaps();
+const submittingPublic = ref(false);
+
+async function onOpenToPublic() {
+  if (!post.value || !meta.value) return;
+  submittingPublic.value = true;
+  try {
+    const a = meta.value.addressPrivate;
+    const query = `${a.line1}, ${post.value.addressPublic.city}, ${post.value.addressPublic.region} ${a.fullPostal}`;
+    const coords = await geocodeAddress(query);
+    if (!coords) {
+      toast.error("Couldn't open to the board", "We couldn't locate that address. Check it and try again.");
+      return;
+    }
+    await openPostingToPublic(postId.value, coords);
+    toast.success("Opened to all trades", "Verified trades in your area can now quote.");
+    post.value = await getJobPost(postId.value);
+  } catch (e) {
+    toast.error("Couldn't open to the board", humanizeError(e));
+  } finally {
+    submittingPublic.value = false;
+  }
+}
+
 async function onWithdraw() {
   submittingWithdraw.value = true;
   try {
@@ -697,6 +725,24 @@ const visibleApplications = computed(() => {
             outlined
             :loading="submittingCancel"
             @click="onCancelPost"
+          />
+        </div>
+
+        <!-- Scoped PM posting: only the project manager's trades can see it.
+             Let the client open it to the whole board if no one quotes. -->
+        <div v-if="post.status === 'invited'" class="mt-4">
+          <Message severity="info" :closable="false">
+            Your project manager sent this to their trusted trades. No quotes yet?
+            Open it to all verified trades in your area.
+          </Message>
+          <Button
+            label="Open to all trades nearby"
+            icon="pi pi-megaphone"
+            outlined
+            size="small"
+            class="mt-2"
+            :loading="submittingPublic"
+            @click="onOpenToPublic"
           />
         </div>
 

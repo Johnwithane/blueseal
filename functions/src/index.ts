@@ -157,6 +157,8 @@ export { sendProjectInviteSignInLink } from "./projects/sendProjectInviteSignInL
 export { claimProjectInvite } from "./projects/claimProjectInvite";
 export { respondToProject } from "./projects/respondToProject";
 export { unsubscribeProjectInvite } from "./projects/unsubscribeProjectInvite";
+// Public-board fallback for a scoped PM posting that got no preferred-contractor bids.
+export { openPostingToPublic } from "./jobPosts/openPostingToPublic";
 // Clients book recurring billing (Blue Seal Pro): a recurring charge is a
 // hidden backing solo-job + a recurring-flagged template invoice the existing
 // scheduledRecurringInvoices engine clones into review-and-send drafts.

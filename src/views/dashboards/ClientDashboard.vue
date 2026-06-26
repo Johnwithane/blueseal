@@ -229,7 +229,7 @@ function formatBudget(min: number, max: number): string {
             </div>
             <p class="text-sm mt-2 text-[color:var(--bs-muted)] line-clamp-2">{{ post.description }}</p>
             <div class="text-xs text-[color:var(--bs-muted)] mt-2">
-              Budget {{ formatBudget(post.budget.min, post.budget.max) }} ·
+              Budget {{ post.budget.max > 0 ? formatBudget(post.budget.min, post.budget.max) : "Quote requested" }} ·
               {{ post.addressPublic.city }}, {{ post.addressPublic.region }}
             </div>
             <!-- Live applicant count (UX-5) — highlighted when someone's waiting. -->
@@ -285,7 +285,7 @@ function formatBudget(min: number, max: number): string {
               </div>
               <p class="text-sm mt-2 text-[color:var(--bs-muted)] line-clamp-2">{{ post.description }}</p>
               <div class="text-xs text-[color:var(--bs-muted)] mt-2">
-                Budget {{ formatBudget(post.budget.min, post.budget.max) }} ·
+                Budget {{ post.budget.max > 0 ? formatBudget(post.budget.min, post.budget.max) : "Quote requested" }} ·
                 {{ post.addressPublic.city }}, {{ post.addressPublic.region }}
               </div>
             </RouterLink>

@@ -537,7 +537,14 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    **Expected:** a real job is created carrying `projectId`, `propertyId`, and
    `drivenByProjectManagerId` (the winner was a preferred contractor — the
    commission trigger, P4). A tradesperson NOT on the PM's list never sees the
-   posting. (Public-board fallback when no preferred contractor bids is P3b-2b.)
+   posting.
+9b. **Public-board fallback (P3b-2b).** On a scoped posting with no quotes, the
+   client opens the posting (from **Posted jobs**) and taps **Open to all trades
+   nearby**. **Expected:** the posting flips to **Open**, drops out of the invited
+   contractors' "Invited to quote" lists, and now appears in the normal radius feed
+   for any verified tradesperson in the area (its address is geocoded at this step).
+   A preferred contractor who still wins after the fallback keeps the
+   `drivenByProjectManagerId` stamp (commission); an off-list public winner does not.
 10. **Project money / permission seam (rules).** The project doc is server-managed:
    the client cannot forge `status` (no direct write) and only the project's own
    client can accept/decline; only the owning PM or linked client reads it. A scoped

@@ -351,7 +351,7 @@ function openRefer(post: WithId<JobPostDoc>) {
             </span>
             <span class="flex items-center gap-1">
               <span class="font-medium">
-                {{ formatBudget(post.budget.min, post.budget.max) }}
+                {{ post.budget.max > 0 ? formatBudget(post.budget.min, post.budget.max) : "Quote requested" }}
               </span>
               <Button
                 icon="pi pi-share-alt"
