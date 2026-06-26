@@ -401,6 +401,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, role: "projectManager", layout: "app", title: "Properties" },
   },
   {
+    path: "/manage/properties/:propertyId",
+    name: "PmPropertyDetail",
+    component: () => import("@/views/manage/PmPropertyDetailView.vue"),
+    meta: { requiresAuth: true, role: "projectManager", layout: "app", title: "Property" },
+  },
+  {
     path: "/manage/jobs",
     name: "PmJobs",
     component: () => import("@/views/manage/PmJobsView.vue"),

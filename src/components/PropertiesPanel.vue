@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, reactive, ref } from "vue";
+import { RouterLink } from "vue-router";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import Textarea from "primevue/textarea";
@@ -136,12 +137,17 @@ async function archive(p: WithId<PropertyDoc>) {
     </div>
     <ul v-else-if="rows.length" class="grid grid-cols-1 gap-2">
       <li v-for="p in rows" :key="p.id" class="bs-card p-3 flex items-start gap-3">
-        <i class="pi pi-home text-[color:var(--bs-blue)] mt-1"></i>
-        <div class="min-w-0 flex-1">
-          <p class="font-medium truncate">{{ p.label }}</p>
-          <p v-if="p.addressText" class="text-xs text-[color:var(--bs-muted)] truncate">{{ p.addressText }}</p>
-          <p v-if="p.notes" class="text-xs text-[color:var(--bs-muted)] mt-0.5 line-clamp-2">{{ p.notes }}</p>
-        </div>
+        <RouterLink
+          :to="{ name: 'PmPropertyDetail', params: { propertyId: p.id } }"
+          class="flex items-start gap-3 flex-1 min-w-0 no-underline text-inherit"
+        >
+          <i class="pi pi-home text-[color:var(--bs-blue)] mt-1"></i>
+          <div class="min-w-0 flex-1">
+            <p class="font-medium truncate">{{ p.label }}</p>
+            <p v-if="p.addressText" class="text-xs text-[color:var(--bs-muted)] truncate">{{ p.addressText }}</p>
+            <p v-if="p.notes" class="text-xs text-[color:var(--bs-muted)] mt-0.5 line-clamp-2">{{ p.notes }}</p>
+          </div>
+        </RouterLink>
         <Button
           icon="pi pi-pencil"
           text
@@ -159,6 +165,13 @@ async function archive(p: WithId<PropertyDoc>) {
           aria-label="Archive property"
           @click="archive(p)"
         />
+        <RouterLink
+          :to="{ name: 'PmPropertyDetail', params: { propertyId: p.id } }"
+          class="text-[color:var(--bs-muted)] mt-1 no-underline"
+          aria-label="Open property"
+        >
+          <i class="pi pi-chevron-right text-xs"></i>
+        </RouterLink>
       </li>
     </ul>
   </div>
