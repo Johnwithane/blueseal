@@ -579,6 +579,14 @@ const routes: RouteRecordRaw[] = [
       title: "My applications",
     },
   },
+  {
+    // Where a tradesperson manages which PMs feature them on a public profile
+    // (linked from the pm_featured notification). Opt-out lives here (P5b).
+    path: "/featured-by-pms",
+    name: "FeaturedByPms",
+    component: () => import("@/views/FeaturedByPmsView.vue"),
+    meta: { requiresAuth: true, role: "tradesperson", layout: "app", title: "Featured by" },
+  },
 
   // Admin sub-routes
   {

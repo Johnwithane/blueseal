@@ -5,11 +5,12 @@
 // contractors arrive in P5b. Mirrors TradieProfileView's resolve + owner-preview
 // pattern, much simplified.
 import { computed, onMounted, ref, watch } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, RouterLink } from "vue-router";
 import Message from "primevue/message";
 import { useAuthStore } from "@/stores/auth";
 import { useSeo } from "@/composables/useSeo";
 import { getPmProfile, resolvePmSlugToUid } from "@/firebase/services/pmProfile";
+import { tradeLabel } from "@/data/trades";
 import type { ProjectManagerProfileDoc, WithId } from "@/firebase/interfaces";
 
 const route = useRoute();
@@ -23,6 +24,7 @@ const name = computed(
   () => profile.value?.companyName?.trim() || profile.value?.displayName?.trim() || "Project manager",
 );
 const accent = computed(() => profile.value?.brandColor || "var(--bs-blue)");
+const featured = computed(() => profile.value?.featuredContractors ?? []);
 
 useSeo(
   computed(() => ({
@@ -115,6 +117,41 @@ watch(() => [route.params.slug, route.params.uid], load);
             This project manager coordinates trusted trades for clients on Blue Seal, verified
             tradespeople with the whole job (chat, quotes, invoices) in one place.
           </p>
+        </div>
+
+        <!-- Featured trades -->
+        <div v-if="featured.length" class="mt-6">
+          <h2 class="text-lg font-bold mb-1">Trades I recommend</h2>
+          <p class="text-sm text-[color:var(--bs-muted)] mb-3">
+            Verified tradespeople I trust. Tap one to request a quote.
+          </p>
+          <div class="grid sm:grid-cols-2 gap-3">
+            <RouterLink
+              v-for="c in featured"
+              :key="c.tradieId"
+              :to="`/request/${c.tradieId}`"
+              class="bs-card p-3 flex items-center gap-3 no-underline text-inherit hover:shadow-md transition-shadow"
+            >
+              <img
+                v-if="c.photoURL"
+                :src="c.photoURL"
+                alt=""
+                class="w-10 h-10 rounded-full object-cover shrink-0"
+              />
+              <span
+                v-else
+                class="w-10 h-10 rounded-full text-white grid place-items-center shrink-0"
+                :style="{ background: accent }"
+              >{{ (c.displayName ?? '?').charAt(0).toUpperCase() }}</span>
+              <div class="min-w-0 flex-1">
+                <p class="font-medium truncate">{{ c.displayName ?? "Tradesperson" }}</p>
+                <p class="text-xs text-[color:var(--bs-muted)] truncate">
+                  {{ c.trades.map((t) => tradeLabel(t)).slice(0, 2).join(", ") }}
+                </p>
+              </div>
+              <i class="pi pi-chevron-right text-xs text-[color:var(--bs-muted)]"></i>
+            </RouterLink>
+          </div>
         </div>
       </div>
     </template>

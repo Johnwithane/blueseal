@@ -3,12 +3,14 @@
 // claimed via the claimPmProfileSlug callable (server-managed). Mirrors the
 // tradesperson profile + slug services, simplified (no vetting / reviews / portfolio).
 import {
+  collection,
   doc,
   getDoc,
   onSnapshot,
   serverTimestamp,
   setDoc,
   updateDoc,
+  type Timestamp,
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/firebase/config";
@@ -86,4 +88,57 @@ export async function claimPmProfileSlug(slug: string): Promise<{ slug: string }
   );
   const { data } = await callable({ slug });
   return data;
+}
+
+// ── Featured contractors (P5b) ───────────────────────────────────────────────
+
+/** PM features/unfeatures a saved, visible contractor on their public profile. */
+export async function setFeaturedContractor(
+  tradieId: string,
+  featured: boolean,
+): Promise<{ ok: true }> {
+  const fn = httpsCallable<{ tradieId: string; featured: boolean }, { ok: true }>(
+    functions,
+    "setFeaturedContractor",
+  );
+  const { data } = await fn({ tradieId, featured });
+  return data;
+}
+
+/** Contractor opts out of (or back into) being featured on a given PM's profile. */
+export async function setPmFeatureOptOut(
+  pmId: string,
+  optedOut: boolean,
+): Promise<{ ok: true }> {
+  const fn = httpsCallable<{ pmId: string; optedOut: boolean }, { ok: true }>(
+    functions,
+    "setPmFeatureOptOut",
+  );
+  const { data } = await fn({ pmId, optedOut });
+  return data;
+}
+
+export interface FeaturedByPm {
+  id: string; // pmId
+  pmName: string | null;
+  featuredAt: Timestamp | null;
+}
+
+/** The PMs featuring this tradesperson (reverse index), for the contractor's view. */
+export function subscribeFeaturedByPms(
+  tradieUid: string,
+  cb: (rows: FeaturedByPm[]) => void,
+): () => void {
+  return onSnapshot(collection(db, "users", tradieUid, "featuredByPms"), (snap) =>
+    cb(
+      snap.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          pmName: (data.pmName as string | undefined) ?? null,
+          featuredAt: (data.featuredAt as Timestamp | undefined) ?? null,
+        };
+      }),
+    ),
+  );
 }
