@@ -226,8 +226,25 @@ export interface ProjectManagerProfileDoc {
   slug?: string;
   /** PM-controlled publish toggle (no vetting gate). */
   isVisible: boolean;
+  /**
+   * Preferred contractors the PM features on their public profile (P5b). DENORMALIZED
+   * (the source savedTradies subcollection is private, but this list is world-read),
+   * and SERVER-MANAGED: only setFeaturedContractor / setPmFeatureOptOut (admin SDK)
+   * write it, so a PM can't forge a contractor's identity or feature someone who
+   * opted out. Rules pin it against owner writes.
+   */
+  featuredContractors?: FeaturedContractor[];
   createdAt: Timestamp;
   updatedAt: Timestamp;
+}
+
+// One contractor featured on a PM's public profile. Public tradesperson fields only,
+// denormalized at feature time; the card links to /request/:tradieId.
+export interface FeaturedContractor {
+  tradieId: string;
+  displayName: string | null;
+  photoURL: string | null;
+  trades: string[];
 }
 
 // referralCodes/{codeLower} — uniqueness registry (mirrors profileSlugs). Maps a
@@ -2798,7 +2815,10 @@ export type NotificationType =
   | "referral_applied"
   // Daily insurance renewal nudge — fires to a tradesperson 30 and 7 days
   // before their verified insurance expires (scheduledInsuranceExpiry).
-  | "insurance_expiry_reminder";
+  | "insurance_expiry_reminder"
+  // A project manager featured this tradesperson on their public profile (P5b).
+  // Links to /featured-by-pms, where the contractor can opt out.
+  | "pm_featured";
 
 export interface NotificationDoc {
   userId: string;

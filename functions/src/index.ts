@@ -108,6 +108,8 @@ export { claimReferralCode } from "./sales/claimReferralCode";
 export { claimPmCode } from "./projectManager/claimPmCode";
 export { claimPmProfileSlug } from "./projectManager/claimProfileSlug";
 export { signPmAgreement } from "./projectManager/signAgreement";
+// Feature preferred contractors on the public profile (P5b), with a contractor opt-out.
+export { setFeaturedContractor, setPmFeatureOptOut } from "./projectManager/featuredContractors";
 export { createPmConnectAccount } from "./payments/createPmConnectAccount";
 export { createPmConnectOnboardingLink } from "./payments/createPmConnectOnboardingLink";
 export { createPmConnectLoginLink } from "./payments/createPmConnectLoginLink";

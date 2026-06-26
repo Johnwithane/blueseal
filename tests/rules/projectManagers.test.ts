@@ -11,7 +11,7 @@ import {
 } from "@firebase/rules-unit-testing";
 import { deleteDoc, doc, getDoc, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 
-import { CLIENT_CLAIMS, CLIENT_UID, setupTestEnv } from "./setup";
+import { CLIENT_CLAIMS, CLIENT_UID, TRADIE_CLAIMS, TRADIE_UID, setupTestEnv } from "./setup";
 
 let env: RulesTestEnvironment;
 
@@ -122,5 +122,53 @@ describe("projectManagers — write access", () => {
     await seedProfile();
     const fs = env.authenticatedContext(PM_UID, PM_CLAIMS).firestore();
     await assertFails(deleteDoc(doc(fs, "projectManagers", PM_UID)));
+  });
+
+  it("the owner cannot write featuredContractors directly (server-managed, P5b)", async () => {
+    await seedProfile({ featuredContractors: [] });
+    const fs = env.authenticatedContext(PM_UID, PM_CLAIMS).firestore();
+    await assertFails(
+      updateDoc(doc(fs, "projectManagers", PM_UID), {
+        featuredContractors: [{ tradieId: "x", displayName: "X", photoURL: null, trades: [] }],
+      }),
+    );
+  });
+});
+
+// P5b contractor-owned subcollections: read by the contractor only; server-only writes.
+describe("featuredByPms / pmFeatureOptOuts — contractor read, server-only write", () => {
+  async function seedFeaturedBy() {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "users", TRADIE_UID, "featuredByPms", PM_UID), {
+        pmName: "Elm Group",
+        featuredAt: new Date(),
+      });
+    });
+  }
+
+  it("the contractor can read who features them", async () => {
+    await seedFeaturedBy();
+    const fs = env.authenticatedContext(TRADIE_UID, TRADIE_CLAIMS).firestore();
+    await assertSucceeds(getDoc(doc(fs, "users", TRADIE_UID, "featuredByPms", PM_UID)));
+  });
+
+  it("a stranger cannot read someone else's featuredByPms", async () => {
+    await seedFeaturedBy();
+    const fs = env.authenticatedContext(OTHER_UID, CLIENT_CLAIMS).firestore();
+    await assertFails(getDoc(doc(fs, "users", TRADIE_UID, "featuredByPms", PM_UID)));
+  });
+
+  it("the contractor cannot write featuredByPms directly (server-only)", async () => {
+    const fs = env.authenticatedContext(TRADIE_UID, TRADIE_CLAIMS).firestore();
+    await assertFails(
+      setDoc(doc(fs, "users", TRADIE_UID, "featuredByPms", PM_UID), { pmName: "x", featuredAt: new Date() }),
+    );
+  });
+
+  it("the contractor cannot write pmFeatureOptOuts directly (opt-out is a callable)", async () => {
+    const fs = env.authenticatedContext(TRADIE_UID, TRADIE_CLAIMS).firestore();
+    await assertFails(
+      setDoc(doc(fs, "users", TRADIE_UID, "pmFeatureOptOuts", PM_UID), { optedOutAt: new Date() }),
+    );
   });
 });

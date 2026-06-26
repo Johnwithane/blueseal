@@ -52,6 +52,10 @@ export class FakeDocRef {
     if (prev === undefined) throw new Error(`update on missing doc ${this.path}`);
     this.fs._write(this.path, { ...prev, ...data });
   }
+
+  async delete(): Promise<void> {
+    this.fs._delete(this.path);
+  }
 }
 
 export class FakeTransaction {

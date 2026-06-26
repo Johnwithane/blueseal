@@ -84,7 +84,9 @@ export type NotificationType =
   | "referral_applied"
   // Daily insurance renewal nudge — fires to a tradesperson 30 and 7 days
   // before their verified insurance expires (scheduledInsuranceExpiry).
-  | "insurance_expiry_reminder";
+  | "insurance_expiry_reminder"
+  // A project manager featured this tradesperson on their public profile (P5b).
+  | "pm_featured";
 
 /**
  * Channel routing per notification.

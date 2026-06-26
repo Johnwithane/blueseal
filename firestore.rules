@@ -150,6 +150,23 @@ service cloud.firestore {
         allow delete: if isOwner(userId) || isAdmin();
       }
 
+      // ---------- users/{userId}/featuredByPms (P5b) ----------
+      // Reverse index of PMs featuring this tradesperson on their public profile.
+      // The contractor reads it ("PMs featuring you") and opts out via callable;
+      // writes are server-only (setFeaturedContractor / setPmFeatureOptOut, admin SDK).
+      match /featuredByPms/{pmId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow write: if false;
+      }
+
+      // ---------- users/{userId}/pmFeatureOptOuts (P5b) ----------
+      // Tombstone: this tradesperson opted out of a given PM's public profile.
+      // Server-managed (the opt-out callable); the PM's feature callable checks it.
+      match /pmFeatureOptOuts/{pmId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow write: if false;
+      }
+
       // ---------- users/{userId}/supportNotes (admin-only support log) ----------
       // Internal notes pinned to an account so the next support contact has
       // context. Admin-only end to end — the user can never read or write them.
@@ -597,7 +614,12 @@ service cloud.firestore {
         && request.resource.data.updatedAt == request.time;
       allow update: if (isOwner(pmId) && hasRole('projectManager')
           && request.resource.data.get('slug', null) == resource.data.get('slug', null)
-          && request.resource.data.createdAt == resource.data.createdAt)
+          && request.resource.data.createdAt == resource.data.createdAt
+          // featuredContractors is server-managed (setFeaturedContractor /
+          // setPmFeatureOptOut via the admin SDK): pinned so the owner can't forge
+          // a contractor's identity or feature someone who opted out.
+          && request.resource.data.get('featuredContractors', null)
+              == resource.data.get('featuredContractors', null))
         || isAdmin();
       allow delete: if isAdmin();
     }
