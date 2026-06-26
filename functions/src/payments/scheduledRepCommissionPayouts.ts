@@ -27,8 +27,13 @@ import type { QueryDocumentSnapshot } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 
 import { db } from "../lib/admin";
+import { notify } from "../lib/notify";
 import { planRepPayout } from "../lib/commissionPayout";
 import { STRIPE_SECRET_KEY, getStripe } from "./stripeClient";
+
+function dollars(cents: number): string {
+  return `$${(cents / 100).toFixed(2)}`;
+}
 
 const SCAN_LIMIT = 5000; // safety cap per run (logged if hit; remainder next run).
 
@@ -127,6 +132,18 @@ export const scheduledRepCommissionPayouts = onSchedule(
         // Rep payouts live on salesRep.payouts; PM payouts on projectManager.payouts.
         const ownerSnap = await db.doc(`users/${ownerId}`).get();
         const ownerData = ownerSnap.data() ?? {};
+        // A deactivated PM's accrued commission is HELD (rolls over) until they're
+        // reactivated, rather than paying a Connect account we've deliberately cut
+        // off (Johnny's decision). Reps have no equivalent gate — earned is earned.
+        if (ownerType === "pm" && ownerData.projectManager?.active === false) {
+          skipped += 1;
+          logger.warn("scheduledRepCommissionPayouts: PM deactivated, holding payout", {
+            ownerId,
+            net,
+          });
+          continue;
+        }
+
         const payouts = (ownerType === "pm"
           ? ownerData.projectManager?.payouts
           : ownerData.salesRep?.payouts) as
@@ -217,6 +234,21 @@ export const scheduledRepCommissionPayouts = onSchedule(
           batchId: batchRef.id,
           count: plan.commissionIds.length,
         });
+
+        // Tell the owner their money is on the way (their balance just dropped to 0).
+        try {
+          await notify({
+            userId: ownerId,
+            type: "commission_paid",
+            title: "Your commission was paid out",
+            body: `${dollars(net)} is on its way to your bank via Stripe.`,
+            link: ownerType === "pm" ? "/manage/earnings" : "/sales/payouts",
+            recipientRole: ownerType === "pm" ? "projectManager" : "sales",
+            priority: "normal",
+          });
+        } catch (notifyErr) {
+          logger.warn("scheduledRepCommissionPayouts: payout notify failed", { ownerId, notifyErr });
+        }
       } catch (err) {
         failed += 1;
         logger.error("scheduledRepCommissionPayouts: owner payout error", {

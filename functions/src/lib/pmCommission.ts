@@ -6,6 +6,7 @@
 // `drivenByProjectManagerId` exactly then, so this is null on every other job.
 
 import { db } from "./admin";
+import { notify } from "./notify";
 import {
   accruePmCommission,
   reversePmCommission,
@@ -56,5 +57,25 @@ export async function reversePmServiceFee(args: { invoiceId: string }): Promise<
   const jobId = (invSnap.data()?.jobId as string | undefined) ?? args.invoiceId;
   const pmId = await drivingPmId(jobId);
   if (!pmId) return;
-  await reversePmCommission({ pmId, source: "service_fee", sourceRef: args.invoiceId });
+  const reversedCents = await reversePmCommission({
+    pmId,
+    source: "service_fee",
+    sourceRef: args.invoiceId,
+  });
+  // Only notify on a real clawback (a waived/Pro fee accrued nothing → no reversal).
+  if (reversedCents && reversedCents > 0) {
+    try {
+      await notify({
+        userId: pmId,
+        type: "commission_reversed",
+        title: "A commission was reversed",
+        body: `A client refund reversed $${(reversedCents / 100).toFixed(2)} of your commission.`,
+        link: "/manage/earnings",
+        recipientRole: "projectManager",
+        priority: "normal",
+      });
+    } catch {
+      /* best-effort — the reversal itself already landed */
+    }
+  }
 }

@@ -89,7 +89,11 @@ export type NotificationType =
   | "pm_featured"
   // A project manager dispatched a scoped job to this hand-picked contractor
   // (project accept → dispatchScopedPostings). Links to /jobs/browse.
-  | "invited_to_quote";
+  | "invited_to_quote"
+  // A monthly commission payout settled to a rep/PM's Stripe Connect account.
+  | "commission_paid"
+  // A client refund/dispute clawed back a rep/PM's already-accrued commission.
+  | "commission_reversed";
 
 /**
  * Channel routing per notification.

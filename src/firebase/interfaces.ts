@@ -2830,7 +2830,12 @@ export type NotificationType =
   // A project manager dispatched a scoped job to this hand-picked contractor
   // (project accept → dispatchScopedPostings). Links to /jobs/browse, the
   // "Invited to quote" section.
-  | "invited_to_quote";
+  | "invited_to_quote"
+  // A monthly commission payout settled to a rep/PM's Stripe Connect account.
+  // Links to /manage/earnings (PM) or /sales/payouts (rep).
+  | "commission_paid"
+  // A client refund/dispute clawed back a rep/PM's already-accrued commission.
+  | "commission_reversed";
 
 export interface NotificationDoc {
   userId: string;

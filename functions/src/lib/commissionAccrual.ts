@@ -215,11 +215,15 @@ export interface ReversePmCommissionInput {
   sourceRef: string;
 }
 
-/** Reverse a PM accrual (full refund / lost dispute) with an offsetting entry. */
-export async function reversePmCommission(input: ReversePmCommissionInput): Promise<void> {
+/**
+ * Reverse a PM accrual (full refund / lost dispute) with an offsetting entry.
+ * Returns the reversed commission amount in cents, or null when there was nothing
+ * to reverse (so the caller can notify only on a real clawback).
+ */
+export async function reversePmCommission(input: ReversePmCommissionInput): Promise<number | null> {
   const originalId = pmAccrualId(input.source, input.sourceRef, input.pmId);
   const snap = await db.doc(`commissions/${originalId}`).get();
-  if (!snap.exists) return; // nothing accrued → nothing to reverse
+  if (!snap.exists) return null; // nothing accrued → nothing to reverse
 
   const orig = snap.data() ?? {};
   const id = pmReversalId(input.source, input.sourceRef, input.pmId);
@@ -250,4 +254,5 @@ export async function reversePmCommission(input: ReversePmCommissionInput): Prom
     pmId: input.pmId,
     commissionCents: orig.commissionCents ?? 0,
   });
+  return Number(orig.commissionCents ?? 0);
 }
