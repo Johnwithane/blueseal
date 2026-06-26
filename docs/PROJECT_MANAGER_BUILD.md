@@ -54,6 +54,11 @@ which hold **Jobs** (individual trade tasks).
 | `9c009f3` | **P5a** public PM profile: `projectManagers/{uid}` doc + `claimPmProfileSlug` (+ `pmProfileSlugs` registry) + cockpit `PmProfilePanel` editor + public `ProjectManagerProfileView` (`/pm/:slug` + `/project-managers/:uid`) + rules/storage/tests |
 | `b41c512` | **P5b backend** featured-contractor consent: `featuredContractors[]` on the public doc + `setFeaturedContractor` / `setPmFeatureOptOut` callables + `featuredByPms` / `pmFeatureOptOuts` subcollections + `pm_featured` notification + rules/tests. **UI still pending** (see below). |
 | `1733382` | **UX A** real PM navigation (`useNavItems` projectManager case — was falling through to the CLIENT nav) + dedicated section routes under `/manage` + `/manage` rebuilt as a Dashboard overview + section views (Properties / Jobs / Trades / Earnings / Profile) reusing existing panels |
+| `0894e05` | **UX B** Property -> Projects -> Jobs drill-down: `PmPropertyDetailView` (property's projects + property-scoped "New project here" via the extracted `NewProjectForm`), PropertiesPanel cards drill in, retired the flat `ProjectsPanel` |
+| `387031d` | **Photos** `PropertyDoc.photoUrl` + `ProjectDoc.photoUrl` + `projectManagers/{uid}/photos` storage bucket + `uploadPmPhoto` helper + upload UI + hero/thumbnail display |
+| `c5e53b1` | **UX C** Trades hub "Find a tradesperson" entry (-> `/search`, which has no role gate) |
+| `75bbfc9` | **UX C / P5b UI** featured-trades toggle (`PmFeaturedTradesPanel`) + public-profile render + contractor `/featured-by-pms` opt-out view + client wrappers — completes P5b |
+| `04be06a` | **Docs** QA section 13 (10e-10h) + help for the redesign |
 
 Note: the role switcher is now driven by `src/data/roleViews.ts` (commit `cf1f711`, another session) — the single source of truth for role label/icon; it already includes `projectManager`. Don't reintroduce inline role maps.
 
@@ -130,53 +135,38 @@ CI-deployed first.
 
 ---
 
-## NEXT TASK — PM experience redesign (UX B + C) + P5b UI
+## PM experience redesign — SHIPPED ✅ (UX A/B/C + photos, commits above)
 
-Johnny's direction (2026-06-25): the PM needs a "feature-ready tool", not the client
-shell. **UX A shipped** (`1733382`): PM nav + dashboard + dedicated section routes.
-Approved IA + a faithful clickable mockup live at **`c:\tmp\pm-dashboard-preview.html`**
-(open it to see the target). Remaining:
+The PM now has a "feature-ready tool": its own navigation (no more client shell), a
+Dashboard overview, the Property -> Projects -> Jobs drill-down, photos on properties
++ projects, a clear Trades hub (find/save + recruit), and the public profile with
+featured trades + the contractor opt-out (P5b complete). Approved mockup that drove it:
+`c:\tmp\pm-dashboard-preview.html`.
 
-### UX B — Property -> Projects -> Jobs drill-down (the noun hierarchy)
-Right now `/manage/properties` shows PropertiesPanel + ProjectsPanel flat (interim).
-Make it a hierarchy, since "projects live within each property":
-- `PmPropertyDetailView` at `/manage/properties/:propertyId`: property header + the
-  projects AT that property (filter `subscribeProjectsForPm` by `propertyId`) + a
-  "New project here" that creates a project with `propertyId` prefilled. Each project
-  card -> `/manage/projects/:id` (the existing read-only `ProjectDetailView`).
-- Make PropertiesPanel cards link into the detail; move project creation out of the flat
-  `ProjectsPanel` into the property-scoped flow (then retire/repurpose `ProjectsPanel`).
-- Breadcrumbs: Properties / <address> / <project>.
+### NEXT TASK — verify, then P6
 
-### UX C — Trades hub directory search + P5b featuring UI
-- Trades hub (`/manage/trades`): add a tradesperson DIRECTORY SEARCH so the PM can find
-  + Save trades to refer (reuse the client `/search` save flow — but confirm the route
-  guard lets a projectManager activeRole reach it, or embed the search component
-  directly rather than routing to `/search`). The recruit link + saved list are already
-  there.
-- **P5b featuring UI (backend already shipped, `b41c512`):** a featured-toggle per saved
-  trade on the Public-profile section (calls `setFeaturedContractor`), render
-  `featuredContractors` on the public `ProjectManagerProfileView` as cards ->
-  `/request/:tradieId`, and a contractor-facing **`/featured-by-pms`** view listing
-  `users/{uid}/featuredByPms` with a Remove (opt-out -> `setPmFeatureOptOut`) action.
-  Client wrappers for `setFeaturedContractor` / `setPmFeatureOptOut` /
-  `subscribeFeaturedByPms` still need adding to a service. **IMPORTANT:** the
-  `pm_featured` notification already links to `/featured-by-pms` — that route/view MUST
-  exist before any featuring UI is exposed (today nothing can feature, so no notification
-  fires — safe — but don't ship the featuring toggle without the opt-out view).
-- **Request attribution (optional):** `JobDoc.requestedViaPmId` + `?via=<pmId>` on the
-  profile's request links + `createJob` stamp + jobs-rule pin.
+1. **Real-Firestore + Stripe-test verify (highest priority, payment-adjacent).** Still
+   not exercised end-to-end (the site has no live users). Seed disposable
+   `verify-*-claude` data (a PM with preferred contractors + a signed agreement +
+   Connect, a property, a client), run invite -> claim -> accept -> quote -> pick, confirm
+   the won job carries `projectId` + `drivenByProjectManagerId` and the public feed is
+   unaffected, then **card-pay the invoice** and confirm TWO commission entries (rep + PM,
+   distinct ids, 10% each), a refund reverses both, and the PM never reads the
+   chat/invoice. Also sanity-check `/pm/<slug>` publish/hide + featuring/opt-out. Requires
+   the latest push CI-deployed first.
+2. **Request attribution (optional polish):** `JobDoc.requestedViaPmId` + `?via=<pmId>`
+   on the public profile's request links + `createJob` stamp + jobs-rule pin, so a quote
+   requested off a PM's public profile is attributed to them (and can feed commission if
+   it becomes PM-driven).
+3. **P6 — multi-property paywall meter:** `requireMultiplePropertiesEntitlement` via the
+   entitlements seam, open at launch.
 
-Each increment: Help/FAQ + QA section 13 + gates green.
-
-## After the redesign
-- **P6 — multi-property paywall meter:** `requireMultiplePropertiesEntitlement` via the entitlements seam, open at launch.
-
-## Still NOT verified on real Firestore
-P3b + P4 + P5 ship gates-green but the end-to-end money path (card-pay -> rep + PM
-commission -> refund reverses both) + the public profile publish/hide have NOT been
-exercised on real Firestore + Stripe test. See the verify script above; do it once the
-latest push is CI-deployed.
+### Redesign follow-ups / known interim bits
+- The Trades-hub "Find a tradesperson" routes to the shared `/search`; the "Request"
+  button on a saved trade routes to `/request/:uid` which switches the PM to the CLIENT
+  view (existing behaviour of the universal TrustedTradesPanel) — fine, but note it.
+- Property edit still happens in the PropertiesPanel list (the pencil), not yet inside
+  `PmPropertyDetailView`; could move the edit there for cohesion.
 
 ## Working agreements (follow these)
 - Read `CLAUDE.md` first. One increment at a time, fully shipped before the next.
