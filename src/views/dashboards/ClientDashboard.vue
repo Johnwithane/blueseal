@@ -6,6 +6,7 @@ import SelectButton from "primevue/selectbutton";
 import Tag from "primevue/tag";
 import JobList from "@/components/JobList.vue";
 import TrustedTradesPanel from "@/components/TrustedTradesPanel.vue";
+import ClientProjectsPanel from "@/components/ClientProjectsPanel.vue";
 import { useAuthStore } from "@/stores/auth";
 import { subscribeClientJobs } from "@/firebase/services/jobs";
 import { subscribeMyJobPosts, subscribeJobPostMeta } from "@/firebase/services/jobPosts";
@@ -122,6 +123,10 @@ function formatBudget(min: number, max: number): string {
         <Button label="Post a job" icon="pi pi-megaphone" size="small" />
       </RouterLink>
     </Teleport>
+
+    <!-- Projects a project manager set up for this client (claimed → needs an
+         accept/decision). Renders nothing when there are none. -->
+    <ClientProjectsPanel />
 
     <div class="mb-3">
       <SelectButton

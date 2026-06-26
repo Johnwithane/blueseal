@@ -222,6 +222,23 @@ const routes: RouteRecordRaw[] = [
     meta: { layout: "public", title: "Join your job" },
   },
 
+  // Project Manager dispatch invite flow. /project-invite/:token is the
+  // copied/texted link (confirm email → magic link sent); /claim-project is the
+  // magic-link landing (signs the CLIENT in and attaches them to the project
+  // bundle a PM set up for them — they accept/decline on their dashboard).
+  {
+    path: "/project-invite/:token",
+    name: "ProjectInviteLanding",
+    component: () => import("@/views/ProjectInviteLandingView.vue"),
+    meta: { layout: "public", title: "Your project on Blue Seal" },
+  },
+  {
+    path: "/claim-project",
+    name: "ProjectClaim",
+    component: () => import("@/views/ProjectClaimView.vue"),
+    meta: { layout: "public", title: "Your project" },
+  },
+
   // Auth
   {
     path: "/sign-in",

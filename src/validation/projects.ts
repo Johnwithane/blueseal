@@ -1,0 +1,30 @@
+import { z } from "zod";
+
+// A project manager's project: a bundle of trade jobs for one client, set up from
+// the cockpit and sent by email invite. Validated at the form boundary; the
+// createProject callable re-validates server-side and adds the server-managed
+// fields (projectManagerId, status, projectInvite, timestamps). Caps mirror the
+// invite-job + job-post schemas so the eventual postings fit those limits.
+export const projectJobSpecSchema = z.object({
+  trade: z.string().trim().min(1, "Pick a trade"),
+  title: z.string().trim().min(3, "Add a short title").max(140),
+  description: z.string().trim().min(1, "Describe the work").max(4000),
+});
+
+export const projectSchema = z.object({
+  label: z.string().trim().min(2, "Add a project name").max(120),
+  clientName: z.string().trim().min(1, "Add the client's name").max(80),
+  clientEmail: z.string().trim().toLowerCase().email("Enter a valid email").max(200),
+  propertyId: z
+    .string()
+    .trim()
+    .min(1)
+    .max(200)
+    .nullable()
+    .transform((v) => (v ? v : null))
+    .default(null),
+  jobs: z.array(projectJobSpecSchema).min(1, "Add at least one job").max(20),
+});
+
+export type ProjectDraft = z.infer<typeof projectSchema>;
+export type ProjectJobSpecDraft = z.infer<typeof projectJobSpecSchema>;

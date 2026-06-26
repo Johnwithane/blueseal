@@ -10,6 +10,7 @@ import { claimPmCode } from "@/firebase/services/projectManagers";
 import { isValidReferralCode, normalizeReferralCode } from "@/utils/referralCode";
 import TrustedTradesPanel from "@/components/TrustedTradesPanel.vue";
 import PropertiesPanel from "@/components/PropertiesPanel.vue";
+import ProjectsPanel from "@/components/ProjectsPanel.vue";
 
 useSeo({ title: "Manage", noindex: true });
 
@@ -130,13 +131,14 @@ async function copyRecruitLink() {
         <PropertiesPanel />
       </div>
 
-      <div class="bs-card p-5">
-        <h2 class="font-semibold flex items-center gap-2">
+      <div>
+        <h2 class="font-semibold flex items-center gap-2 mb-1">
           <i class="pi pi-folder-open text-[color:var(--bs-blue)]"></i> Projects
         </h2>
-        <p class="text-sm text-[color:var(--bs-muted)] mt-1">
+        <p class="text-sm text-[color:var(--bs-muted)] mb-3">
           Set up jobs for a client and send them to your preferred contractors for quotes.
         </p>
+        <ProjectsPanel />
       </div>
       <div class="bs-card p-5">
         <h2 class="font-semibold flex items-center gap-2">

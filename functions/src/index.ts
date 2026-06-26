@@ -148,6 +148,15 @@ export { revokeJobInvite } from "./jobs/revokeJobInvite";
 export { sendJobInviteSignInLink } from "./jobs/sendJobInviteSignInLink";
 export { claimJobInvite } from "./jobs/claimJobInvite";
 export { unsubscribeJobInvite } from "./jobs/unsubscribeJobInvite";
+// Projects (Project Manager dispatch): a PM bundles trade jobs for a client and
+// invites them by magic link; the client claims the bundle (account auto-created)
+// and accepts/declines. Accept is the dispatch trigger (P3b-2). Mirrors the
+// bring-your-own-client invite flow.
+export { createProject } from "./projects/createProject";
+export { sendProjectInviteSignInLink } from "./projects/sendProjectInviteSignInLink";
+export { claimProjectInvite } from "./projects/claimProjectInvite";
+export { respondToProject } from "./projects/respondToProject";
+export { unsubscribeProjectInvite } from "./projects/unsubscribeProjectInvite";
 // Clients book recurring billing (Blue Seal Pro): a recurring charge is a
 // hidden backing solo-job + a recurring-flagged template invoice the existing
 // scheduledRecurringInvoices engine clones into review-and-send drafts.

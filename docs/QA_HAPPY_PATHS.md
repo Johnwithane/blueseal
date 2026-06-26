@@ -514,8 +514,26 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    appears in the list and persists; archive drops it from the default list.
    Properties are private to you (the PM); a connected client account can read its
    own property once linked (P3b).
-8. **Mobile (375px).** Re-run the signup cards + cockpit + saved-trades + properties at 375px.
-   **Expected:** the role cards stack and stay tappable; the cockpit cards read cleanly.
+8. **Projects: set up, invite, claim, accept (P3b-1).** In the cockpit "Projects"
+   section, **New project**: name it, enter a client name + email, optionally pick
+   a property, add one or more jobs (each = trade + title + description), then
+   **Create & invite client**. **Expected:** the project lists with an **Invite
+   sent** tag; an invite link is shown to copy (the email also goes out when the
+   CASL mailing address is configured). Open the invite link (or the emailed
+   magic link) in a fresh session, confirm the client's email, sign in, and confirm
+   the claim. **Expected:** you land on the client dashboard with a **"Projects set
+   up for you"** card listing the jobs and **Accept / Decline**. Accept it.
+   **Expected:** the card flips to **Accepted**, and back in the PM cockpit the
+   project shows **Accepted** (the PM also gets a notification). Decline on a second
+   project instead and confirm it shows **Declined**. (Dispatch to contractors is
+   P3b-2.)
+9. **Project money / permission seam (rules).** The project doc is server-managed:
+   the client cannot forge `status` (no direct write) and only the project's own
+   client can accept/decline; only the owning PM or linked client can read it
+   (covered by `tests/rules/projects.test.ts` + `respondToProject` unit tests).
+10. **Mobile (375px).** Re-run the signup cards + cockpit + saved-trades + properties +
+   projects (incl. the client accept card) at 375px. **Expected:** the role cards stack
+   and stay tappable; the cockpit cards and the new-project form read cleanly.
 
 ---
 
@@ -566,3 +584,5 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 - [ ] 13.4 Save a trade → Saved trades tab + PM cockpit; Request re-hires; remove works
 - [ ] 13.5 Claim recruiting code; /join?pm= signup → tradesperson; free month at go-live + appears in PM saved trades; rep ?ref= unaffected
 - [ ] 13.6 Properties: add / edit / archive a property in the cockpit
+- [ ] 13.7 Projects: create + invite a client → claim via magic link → accept/decline on the dashboard (status reflects in the cockpit)
+- [ ] 13.8 Project seam: client can't forge status; only the linked client/PM read it (rules + respondToProject tests)

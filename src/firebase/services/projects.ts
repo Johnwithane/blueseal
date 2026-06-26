@@ -1,0 +1,109 @@
+// Projects service (Project Manager dispatch). Callable wrappers for the
+// magic-link project-invite flow + live reads over the top-level `projects/{id}`
+// collection (see ProjectDoc). The whole doc is server-managed — every WRITE goes
+// through a callable; clients only READ (the PM their own, the client theirs).
+import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
+import { db, functions } from "@/firebase/config";
+import { typedConverter } from "@/firebase/converters";
+import type { ProjectDoc, WithId } from "@/firebase/interfaces";
+import type { ProjectDraft } from "@/validation/projects";
+
+const projectsCol = () =>
+  collection(db, "projects").withConverter(typedConverter<ProjectDoc>());
+
+// ── Callables ──────────────────────────────────────────────────────────────
+
+export interface CreateProjectResult {
+  projectId: string;
+  inviteLink: string;
+  emailed: boolean;
+}
+
+/** PM creates a project + sends the client a magic-link invite. */
+export async function createProject(draft: ProjectDraft): Promise<CreateProjectResult> {
+  const fn = httpsCallable<ProjectDraft, CreateProjectResult>(functions, "createProject");
+  const res = await fn(draft);
+  return res.data;
+}
+
+/** Copy-link path: emails a fresh magic sign-in link to the invite's stored address. */
+export async function sendProjectInviteSignInLink(
+  token: string,
+  email: string,
+): Promise<{ ok: true }> {
+  const fn = httpsCallable<{ token: string; email: string }, { ok: true }>(
+    functions,
+    "sendProjectInviteSignInLink",
+  );
+  const res = await fn({ token, email });
+  return res.data;
+}
+
+export interface ProjectInvitePreview {
+  projectId: string;
+  label: string;
+  clientName: string;
+  jobCount: number;
+}
+
+export type ClaimProjectInviteResult =
+  | { status: "needs_verification" }
+  | { status: "none"; invites: [] }
+  | { status: "preview"; invites: ProjectInvitePreview[] }
+  | { status: "claimed"; claimed: number; projectIds: string[] };
+
+/** Magic-link-signed-in client claims every project invite for their verified email. */
+export async function claimProjectInvite(confirm: boolean): Promise<ClaimProjectInviteResult> {
+  const fn = httpsCallable<{ confirm: boolean }, ClaimProjectInviteResult>(
+    functions,
+    "claimProjectInvite",
+  );
+  const res = await fn({ confirm });
+  return res.data;
+}
+
+/** Client accepts or declines a claimed project bundle. Accept triggers dispatch (P3b-2). */
+export async function respondToProject(
+  projectId: string,
+  response: "accept" | "decline",
+): Promise<{ status: "accepted" | "declined" }> {
+  const fn = httpsCallable<
+    { projectId: string; response: "accept" | "decline" },
+    { status: "accepted" | "declined" }
+  >(functions, "respondToProject");
+  const res = await fn({ projectId, response });
+  return res.data;
+}
+
+// ── Live reads ───────────────────────────────────────────────────────────────
+
+// The PM's projects for the cockpit. Newest first, sorted client-side (a PM's
+// project list is small — no composite index needed).
+export function subscribeProjectsForPm(
+  pmUid: string,
+  cb: (rows: WithId<ProjectDoc>[]) => void,
+): () => void {
+  const q = query(projectsCol(), where("projectManagerId", "==", pmUid));
+  return onSnapshot(q, (snap) => {
+    const rows = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }) as WithId<ProjectDoc>)
+      .sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0));
+    cb(rows);
+  });
+}
+
+// A client's claimed/accepted projects, for the client dashboard panel. Only
+// projects whose invite they've claimed (clientId == uid) are readable.
+export function subscribeClientProjects(
+  clientId: string,
+  cb: (rows: WithId<ProjectDoc>[]) => void,
+): () => void {
+  const q = query(projectsCol(), where("clientId", "==", clientId));
+  return onSnapshot(q, (snap) => {
+    const rows = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }) as WithId<ProjectDoc>)
+      .sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0));
+    cb(rows);
+  });
+}

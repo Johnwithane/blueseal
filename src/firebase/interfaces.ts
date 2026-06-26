@@ -141,6 +141,69 @@ export interface PropertyDoc {
   updatedAt: Timestamp;
 }
 
+// projects/{projectId} — a bundle of trade jobs a project manager sets up for ONE
+// client, optionally tied to a property. The PM drafts the bundle (jobSpecs) and
+// invites the client by email; the client claims the invite (magic link, account
+// auto-created → becomes clientId) and ACCEPTS, which is what triggers dispatch
+// (P3b-2: each spec becomes a quote request scoped to the PM's preferred
+// contractors). The whole doc is SERVER-MANAGED (createProject / claimProjectInvite /
+// respondToProject via the admin SDK): rules allow no direct client writes, because
+// `status` drives the dispatch + commission seam and the invite token is minted
+// server-side. Reads: owning PM, the linked client (clientId), admin.
+export type ProjectStatus =
+  | "invited" // created, client invite pending
+  | "claimed" // client claimed the invite (clientId set), awaiting their accept
+  | "accepted" // client accepted — dispatch happens here (P3b-2)
+  | "declined" // client declined the bundle
+  | "cancelled"; // PM cancelled before the client acted
+
+export type ProjectInviteStatus = "invited" | "claimed" | "revoked";
+
+// Embedded invite on a project — mirrors ClientInvite (the job-invite flow). The
+// raw token is returned ONCE to the PM (builds /project-invite/{token}); only its
+// sha256 hash is stored, so doc readability never leaks the credential.
+export interface ProjectInvite {
+  emailLower: string; // lowercased+trimmed at the boundary; claim matches on this
+  clientName: string; // what the PM entered; denormalized to project.clientName
+  status: ProjectInviteStatus;
+  invitedAt: Timestamp;
+  expiresAt: Timestamp; // gates the copy-link verify flow only
+  claimedAt: Timestamp | null;
+  revokedAt: Timestamp | null;
+  resendCount: number;
+  lastSentAt: Timestamp | null;
+  emailedAt: Timestamp | null; // null = the magic-link email never went out
+  tokenHash: string | null; // sha256 of the copy-link token; cleared on claim/revoke
+}
+
+// One trade task inside a project. `trade` is a canonical TRADES key (src/data/trades.ts).
+export interface ProjectJobSpec {
+  trade: string;
+  title: string;
+  description: string;
+}
+
+export interface ProjectDoc {
+  projectManagerId: string;
+  /** Set when the invited client claims (becomes the project's client). */
+  clientId: string | null;
+  /** Optional tie to one of the PM's properties. */
+  propertyId: string | null;
+  /** PM-facing project name, e.g. "Spring turnover - 14 Elm". */
+  label: string;
+  /** What the PM entered for the client; denormalized for display. */
+  clientName: string;
+  jobSpecs: ProjectJobSpec[];
+  status: ProjectStatus;
+  projectInvite: ProjectInvite | null;
+  claimedAt: Timestamp | null;
+  acceptedAt: Timestamp | null;
+  declinedAt: Timestamp | null;
+  cancelledAt: Timestamp | null;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
 // referralCodes/{codeLower} — uniqueness registry (mirrors profileSlugs). Maps a
 // lowercased code to the rep who owns it; resolved at signup to attribute a new
 // tradesperson + grant the free month. World-readable, server-only writes.

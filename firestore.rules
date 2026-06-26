@@ -562,6 +562,18 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // projects/{projectId} — a PM's bundle of trade jobs for one client. The whole
+    // doc is SERVER-MANAGED (createProject / claimProjectInvite / respondToProject
+    // via the admin SDK): no direct client writes, because `status` drives the
+    // dispatch + commission seam and the invite token is minted server-side. Read:
+    // the owning PM, the linked client (clientId, set on claim), or admin.
+    match /projects/{projectId} {
+      allow read: if (isSignedIn() && resource.data.projectManagerId == uid())
+        || (isSignedIn() && resource.data.get('clientId', null) == uid())
+        || isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
     // ---------- jobs ----------
     match /jobs/{jobId} {
       allow read: if isSignedIn() && (

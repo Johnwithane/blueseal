@@ -633,6 +633,20 @@ const faqs: FaqItem[] = [
     audience: "client",
   },
   {
+    question: "A project manager set up a project for me on Blue Seal. What is this?",
+    answer:
+      "Someone managing work for you (a real estate agent, property manager, or landlord) used Blue Seal to line up one or more jobs and invited you by email. The invite link signs you in without a password and creates your account. Once you're in, the project shows on your dashboard under **\"Projects set up for you\"** with the list of jobs. Nothing is committed until you **Accept**: accepting lets the work go out to trusted trades for quotes, which you'll choose between. You can **Decline** instead, and you're never charged just for being invited.",
+    categoryId: "for-clients",
+    audience: "client",
+  },
+  {
+    question: "Do I have to use the trades my project manager picked?",
+    answer:
+      "No. A project manager can line up the work and recommend trades they trust, but **you choose who does each job and you accept the quote**. The project they set up is a starting point, not a commitment. You can decline the whole project, and once quotes come in you compare them and pick the one you want, the same as any other Blue Seal job.",
+    categoryId: "for-clients",
+    audience: "client",
+  },
+  {
     question: "Why am I asked if Blue Seal is an additional insured on my policy?",
     answer:
       "When you upload your own liability policy, we ask whether Blue Seal is named as an **additional insured**. That's what actually extends your coverage to Blue Seal (being a \"certificate holder\" doesn't). It's automatic on a Blue Seal partner policy. If Blue Seal **is** named, an admin confirms it against your certificate. If it **isn't**, you sign a short liability release so everyone's clear that your policy doesn't cover Blue Seal and you're accepting responsibility for your work. You can skip the release any time by adding Blue Seal as an additional insured and uploading the updated certificate.",

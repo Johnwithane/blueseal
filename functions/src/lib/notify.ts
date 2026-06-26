@@ -12,7 +12,7 @@ import { enqueueWhatsApp } from "./whatsapp";
 // Recipient view-modes for a notification. Mirrors src/firebase/interfaces.ts
 // → Role, MINUS "qa": qa is a capability claim, never a notification target
 // (it has no view/dashboard to land in), so it can never be a recipientRole.
-export type Role = "client" | "tradesperson" | "admin" | "sales";
+export type Role = "client" | "tradesperson" | "admin" | "sales" | "projectManager";
 
 // Keep in sync with src/firebase/interfaces.ts → NotificationType.
 // Cross-package boundary means we can't share the type literally; the
