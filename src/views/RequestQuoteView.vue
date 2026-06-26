@@ -230,6 +230,11 @@ function urgencyLabel(u: string): string {
   return "Flexible";
 }
 
+// Logged-out visitor → auth, returning to this same request page afterwards.
+function goAuth(name: "SignIn" | "SignUp") {
+  router.push({ name, query: { redirect: route.fullPath } });
+}
+
 // ---- Wizard ---------------------------------------------------------------
 // Requesting a quote is a lot of fields for someone who's never hired a
 // tradesperson. Default to a guided, one-thing-per-screen flow (mirrors the
@@ -566,6 +571,32 @@ async function submit() {
     <div v-else-if="loadError" class="mt-4">
       <Message severity="error" :closable="false">{{ loadError }}</Message>
       <Button label="Try again" icon="pi pi-refresh" outlined size="small" class="mt-3" @click="retry" />
+    </div>
+
+    <!-- Logged-out visitor (came from a shared PM profile): show who they're
+         requesting from + a sign-up prompt, not a hard auth wall. -->
+    <div v-else-if="!auth.isAuthenticated" class="bs-card p-5 mt-4 text-center space-y-3">
+      <img
+        v-if="tradie?.photoURL"
+        :src="tradie.photoURL"
+        :alt="tradieName"
+        class="h-16 w-16 rounded-full object-cover mx-auto"
+      />
+      <div>
+        <p class="font-semibold text-lg">Request a quote from {{ tradieName }}</p>
+        <p class="text-sm text-[color:var(--bs-muted)] mt-1">
+          Create a free account (or sign in) to send your request and message {{ tradieName }}. It
+          takes a minute.
+        </p>
+      </div>
+      <div class="flex flex-wrap items-center justify-center gap-2">
+        <Button
+          label="Create a free account"
+          icon="pi pi-user-plus"
+          @click="goAuth('SignUp')"
+        />
+        <Button label="Sign in" text @click="goAuth('SignIn')" />
+      </div>
     </div>
 
     <form v-else class="bs-form bs-card p-5 mt-4 space-y-4" @submit.prevent="submit">

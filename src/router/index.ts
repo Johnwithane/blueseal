@@ -157,8 +157,13 @@ const routes: RouteRecordRaw[] = [
   {
     path: "/request/:uid",
     name: "RequestQuote",
+    // Public (hybrid): a PM shares their profile with clients, who tap a featured
+    // tradesperson to request a quote. A logged-out visitor sees the tradesperson +
+    // a sign-up prompt (RequestQuoteView gates the form on auth); the actual job
+    // create stays client-gated by the rules. Was role:"client", which bounced
+    // logged-out visitors to a sign-in wall and signed-in tradies/PMs to Home.
     component: () => import("@/views/RequestQuoteView.vue"),
-    meta: { requiresAuth: true, role: "client", layout: "app", title: "Request quote" },
+    meta: { layout: "hybrid", title: "Request quote" },
   },
   {
     // Request a seeded (unverified) prospect → outreach + claim flow.
