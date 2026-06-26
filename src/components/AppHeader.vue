@@ -12,6 +12,7 @@ import NotificationsPanel from "@/components/NotificationsPanel.vue";
 import BlueSealLockup from "@/components/brand/BlueSealLockup.vue";
 import type { NotificationDoc, WithId } from "@/firebase/interfaces";
 import { useNotificationsStore } from "@/stores/notifications";
+import { roleViewMeta, type ViewRole } from "@/data/roleViews";
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -39,16 +40,10 @@ async function onMarkAllRead() {
   }
 }
 
-const VIEW_LABEL: Record<string, string> = {
-  client: "Client",
-  tradesperson: "Tradesperson",
-  admin: "Admin",
-};
-
-async function switchTo(role: "client" | "tradesperson" | "admin") {
+async function switchTo(role: ViewRole) {
   try {
     await auth.switchActiveRole(role);
-    toast.success(`Switched to ${VIEW_LABEL[role]} view`);
+    toast.success(`Switched to ${roleViewMeta(role).label} view`);
     router.push({ name: "Dashboard" });
   } catch (e) {
     toast.error(humanizeError(e));
@@ -147,27 +142,17 @@ const items = computed(() => {
     });
   }
 
+  // One "Switch to X view" item per held view (except the one you're in).
+  // Iterates the shared viewRoles so a new view-mode appears here automatically.
   if (auth.canSwitchRole) {
     list.push({ separator: true });
-    if (auth.hasClientRole && auth.activeRole !== "client") {
+    for (const r of auth.viewRoles) {
+      if (r === auth.activeRole) continue;
+      const meta = roleViewMeta(r);
       list.push({
-        label: "Switch to Client view",
-        icon: "pi pi-user",
-        command: () => switchTo("client"),
-      });
-    }
-    if (auth.hasTradieRole && auth.activeRole !== "tradesperson") {
-      list.push({
-        label: "Switch to Tradesperson view",
-        icon: "pi pi-wrench",
-        command: () => switchTo("tradesperson"),
-      });
-    }
-    if (auth.hasAdminRole && auth.activeRole !== "admin") {
-      list.push({
-        label: "Switch to Admin view",
-        icon: "pi pi-shield",
-        command: () => switchTo("admin"),
+        label: `Switch to ${meta.label} view`,
+        icon: meta.icon,
+        command: () => switchTo(r),
       });
     }
   }

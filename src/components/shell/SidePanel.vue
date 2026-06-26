@@ -73,8 +73,8 @@ const qaActive = computed(() => route.path === "/qa");
       <span class="side-row__label">Help</span>
     </RouterLink>
 
-    <!-- Multi-role users get a segmented pill toggle just above the profile
-         row. The component self-hides when the user holds only one role. -->
+    <!-- Multi-role users get a "Viewing as" dropdown just above the profile
+         row. The component self-hides when the user holds only one view. -->
     <RoleSwitcher />
 
     <div class="side-panel__profile">

@@ -297,8 +297,17 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 
 ## 9. Cross-cutting
 
-1. **Role switching** — flip Client ⇄ Tradesperson (side panel / Account); the
-   view changes. → `switching-roles`
+1. **Role switching (all three surfaces stay in sync).** As an account holding
+   several views (e.g. Client + Tradesperson + Project manager + Sales + Admin),
+   check each switcher: **(a)** the header avatar menu lists a "Switch to X view"
+   item for every view you hold *except* the one you're in; **(b)** the side
+   panel "Viewing as" **dropdown** opens to the same full list (no truncated
+   "C.. T.. A.." labels) with the current view marked active; **(c)** Account →
+   Your roles lists every view with an "Active" badge on the current one and a
+   "Switch to this view" button on the rest. **Expected:** all three show the
+   same views with the same label + icon, switching from any of them flips the
+   view (and plays the switch animation). `qa` never appears as a switchable
+   view. → `switching-roles`
 2. **Account & profile** — edit profile, notification prefs. → `notifications`
 3. **Email notifications** — key events (new request, quote, message, invoice)
    send a branded email.

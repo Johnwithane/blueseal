@@ -27,6 +27,7 @@ import {
   requestEmailChange as callRequestEmailChange,
 } from "@/firebase/services/authEmails";
 import type { Role, UserDoc, WithId } from "@/firebase/interfaces";
+import { viewRolesFor } from "@/data/roleViews";
 import { LEGAL_VERSION } from "@/legal/version";
 import { useRoleSwitchAnimationStore } from "@/stores/roleSwitchAnimation";
 
@@ -142,9 +143,14 @@ export const useAuthStore = defineStore("auth", {
     // Report-a-bug button. There is no qa activeRole, so there's no `isQa`
     // view-mode getter to match isClient/isTradie/isAdmin.
     hasQaRole: (s) => s.roles.includes("qa"),
-    // True when the user holds more than one role — drives whether the
-    // header avatar menu shows a switcher.
-    canSwitchRole: (s) => s.roles.length > 1,
+    // The held roles that are switchable views (qa excluded), in canonical
+    // order. Single source for every switcher — header menu, side panel, and
+    // the Account page all iterate this so they stay in lockstep.
+    viewRoles: (s) => viewRolesFor(s.roles),
+    // True when the user holds more than one *view* — drives whether a
+    // switcher is shown at all. (qa alongside one view doesn't count, since
+    // there's nothing to switch to.)
+    canSwitchRole: (s) => viewRolesFor(s.roles).length > 1,
   },
 
   actions: {

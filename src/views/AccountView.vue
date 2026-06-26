@@ -63,11 +63,9 @@ import BrandingPanel from "@/components/BrandingPanel.vue";
 import GoogleBusinessPanel from "@/components/GoogleBusinessPanel.vue";
 import LocationPicker, { type LocationValue } from "@/components/LocationPicker.vue";
 import TabBar from "@/components/TabBar.vue";
+import { roleViewMeta, type ViewRole } from "@/data/roleViews";
 
 const auth = useAuthStore();
-// Roles the user can switch their *view* into. Excludes "qa", which is a
-// capability claim (it unlocks the /qa toolkit) and has no view-mode.
-const viewRoles = computed(() => auth.roles.filter((r) => r !== "qa"));
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
@@ -752,12 +750,6 @@ async function submitEmailChange() {
   }
 }
 
-const ROLE_LABEL: Record<string, string> = {
-  client: "Client",
-  tradesperson: "Tradesperson",
-  admin: "Admin",
-};
-
 async function becomeTradesperson() {
   addingTradie.value = true;
   error.value = null;
@@ -785,10 +777,10 @@ async function addClientView() {
   }
 }
 
-async function switchView(role: "client" | "tradesperson" | "admin") {
+async function switchView(role: ViewRole) {
   try {
     await auth.switchActiveRole(role);
-    toast.success(`Switched to ${ROLE_LABEL[role]} view`);
+    toast.success(`Switched to ${roleViewMeta(role).label} view`);
     router.push("/dashboard");
   } catch (e) {
     error.value = humanizeError(e);
@@ -1479,20 +1471,18 @@ async function grantAllTrades() {
       <div class="bs-card p-5">
         <h2 class="text-lg font-semibold">Your roles</h2>
         <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
-          You can hold both views on one account. Switch between them anytime.
+          You can hold more than one view on one account. Switch between them anytime.
         </p>
 
         <ul class="mt-3 space-y-2">
           <li
-            v-for="r in viewRoles"
+            v-for="r in auth.viewRoles"
             :key="r"
             class="flex items-center justify-between rounded-lg border border-[color:var(--bs-border)] px-3 py-2"
           >
             <span class="flex items-center gap-2 text-sm font-medium">
-              <i
-                :class="r === 'tradesperson' ? 'pi pi-wrench' : r === 'admin' ? 'pi pi-shield' : 'pi pi-user'"
-              ></i>
-              {{ ROLE_LABEL[r] }}
+              <i :class="roleViewMeta(r).icon"></i>
+              {{ roleViewMeta(r).label }}
               <span
                 v-if="auth.activeRole === r"
                 class="ml-1 rounded-full bg-[color:var(--bs-blue-light)] px-2 py-0.5 text-xs text-[color:var(--bs-blue-dark)]"
@@ -1505,7 +1495,7 @@ async function grantAllTrades() {
               label="Switch to this view"
               size="small"
               text
-              @click="switchView(r as 'client' | 'tradesperson' | 'admin')"
+              @click="switchView(r)"
             />
           </li>
         </ul>

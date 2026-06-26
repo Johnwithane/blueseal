@@ -1,36 +1,16 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useRoleSwitchAnimationStore } from "@/stores/roleSwitchAnimation";
-import type { Role } from "@/firebase/interfaces";
+import { roleViewMeta } from "@/data/roleViews";
 
 const store = useRoleSwitchAnimationStore();
 
-// qa never animates a view-switch (it has no view-mode); the keys exist only to
-// satisfy the exhaustive Record<Role> type.
-const ROLE_LABEL: Record<Role, string> = {
-  client: "Client",
-  tradesperson: "Tradesperson",
-  admin: "Admin",
-  qa: "QA",
-  sales: "Sales",
-  projectManager: "Project manager",
-};
-
-const ROLE_ICON: Record<Role, string> = {
-  client: "pi pi-user",
-  tradesperson: "pi pi-wrench",
-  admin: "pi pi-shield",
-  qa: "pi pi-bug",
-  sales: "pi pi-map-marker",
-  projectManager: "pi pi-briefcase",
-};
-
 const visible = computed(() => store.targetRole !== null);
 const label = computed(() =>
-  store.targetRole ? ROLE_LABEL[store.targetRole] : "",
+  store.targetRole ? roleViewMeta(store.targetRole).label : "",
 );
 const icon = computed(() =>
-  store.targetRole ? ROLE_ICON[store.targetRole] : "",
+  store.targetRole ? roleViewMeta(store.targetRole).icon : "",
 );
 </script>
 
