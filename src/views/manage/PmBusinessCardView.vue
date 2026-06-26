@@ -57,12 +57,12 @@ const pmName = computed(
 const company = computed(() => profile.value?.companyName?.trim() || "");
 
 // The accent line on the card = the distinct trades the PM recommends (from their
-// featured contractors), so the card hints at "+ my trusted trades". Falls back to
-// the role when nothing is featured yet.
-const featuredTradesLine = computed(() => {
+// featured contractors), so the card hints at "+ my trusted trades". Null when
+// nothing is featured yet, so we suppress the line rather than print a fake trade.
+const featuredTrades = computed(() => {
   const keys = new Set((profile.value?.featuredContractors ?? []).flatMap((c) => c.trades ?? []));
   const labels = [...keys].map((k) => tradeLabel(k)).filter(Boolean);
-  return labels.length ? labels.slice(0, 3).join(" · ") : "Project manager";
+  return labels.length ? labels.slice(0, 3).join(" · ") : null;
 });
 
 const photoUrl = computed(() =>
@@ -87,7 +87,7 @@ const content = computed<CardContent>(() => ({
   profile: {
     name: pmName.value,
     company: company.value || undefined,
-    trade: featuredTradesLine.value,
+    trade: featuredTrades.value ?? undefined,
     email: form.showEmail && auth.user?.email ? auth.user.email : undefined,
     phone: form.phone.trim() || undefined,
     badgeLabel: "Project manager on Blue Seal",
@@ -99,6 +99,9 @@ const fileBaseName = computed(() => `blueseal-pm-card-${form.theme}`);
 const hasProfile = computed(() => !!profile.value);
 const published = computed(() => !!profile.value?.isVisible);
 const hasSlug = computed(() => !!profile.value?.slug);
+// Don't let a PM print a card whose QR dead-ends: downloads are gated until the
+// public profile is published (a slug is optional — the canonical URL works).
+const canExport = computed(() => hasProfile.value && published.value);
 </script>
 
 <template>
@@ -121,7 +124,8 @@ const hasSlug = computed(() => !!profile.value?.slug);
       <RouterLink to="/manage/profile" class="font-medium underline">Set up my profile →</RouterLink>
     </Message>
     <Message v-else-if="loaded && !published" severity="warn" :closable="false" class="mb-5">
-      Your profile isn't published yet — publish it so clients who scan the card can see it.
+      Your profile isn't published yet, so the card's QR wouldn't work for a client. Downloads stay
+      locked until you publish it.
       <RouterLink to="/manage/profile" class="font-medium underline">Publish my profile →</RouterLink>
     </Message>
     <Message v-else-if="loaded && !hasSlug" severity="info" :closable="false" class="mb-5">
@@ -163,10 +167,15 @@ const hasSlug = computed(() => !!profile.value?.slug);
               <label for="pm-card-email" class="text-sm">Email</label>
             </span>
           </div>
-          <p class="text-xs text-[color:var(--bs-muted)]">
+          <p v-if="featuredTrades" class="text-xs text-[color:var(--bs-muted)]">
             The card shows your name{{ company ? ", brand" : "" }} and the trades you recommend
-            (<strong>{{ featuredTradesLine }}</strong>). Feature trades on your
-            <RouterLink to="/manage/profile" class="underline">public profile</RouterLink> to change this.
+            (<strong>{{ featuredTrades }}</strong>). Manage these by featuring trades on your
+            <RouterLink to="/manage/profile" class="underline">public profile</RouterLink>.
+          </p>
+          <p v-else class="text-xs text-[color:var(--bs-muted)]">
+            Feature trades on your
+            <RouterLink to="/manage/profile" class="underline">public profile</RouterLink> and
+            they'll appear on the card. Until then it shows your name{{ company ? " and brand" : "" }}.
           </p>
         </div>
       </div>
@@ -179,6 +188,8 @@ const hasSlug = computed(() => !!profile.value?.slug);
           :include-brandmark="true"
           :file-base-name="fileBaseName"
           :photo-url="photoUrl"
+          :can-export="canExport"
+          export-hint="Publish your public profile to download (so the QR works when a client scans it)."
         />
       </div>
     </div>

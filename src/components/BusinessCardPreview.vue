@@ -31,6 +31,11 @@ const props = defineProps<{
   includeBrandmark: boolean;
   fileBaseName: string;
   photoUrl?: string | null;
+  // Gate the downloads (preview still renders). Used when the QR target isn't live
+  // yet — e.g. a PM whose public profile is unpublished — so we never hand out a
+  // print-ready card whose QR dead-ends. Defaults to enabled (admin generator).
+  canExport?: boolean;
+  exportHint?: string;
 }>();
 
 const frontCanvas = ref<HTMLCanvasElement | null>(null);
@@ -211,12 +216,33 @@ watch(
         label="Print-ready PDF (2-sided)"
         icon="pi pi-file-pdf"
         :loading="busy"
+        :disabled="busy || canExport === false"
         @click="downloadPdf"
       />
-      <Button label="Front PNG" icon="pi pi-image" outlined :loading="busy" @click="downloadPng('front')" />
-      <Button label="Back PNG" icon="pi pi-image" outlined :loading="busy" @click="downloadPng('back')" />
+      <Button
+        label="Front PNG"
+        icon="pi pi-image"
+        outlined
+        :loading="busy"
+        :disabled="busy || canExport === false"
+        @click="downloadPng('front')"
+      />
+      <Button
+        label="Back PNG"
+        icon="pi pi-image"
+        outlined
+        :loading="busy"
+        :disabled="busy || canExport === false"
+        @click="downloadPng('back')"
+      />
     </div>
 
+    <p
+      v-if="canExport === false && exportHint"
+      class="text-center text-xs font-medium text-[color:var(--bs-warning,#d97706)]"
+    >
+      {{ exportHint }}
+    </p>
     <p class="text-center text-xs text-[color:var(--bs-muted)] break-all">
       QR opens: {{ targetUrl }}
     </p>

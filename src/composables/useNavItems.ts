@@ -387,7 +387,10 @@ export function useNavItems(): {
           icon: "pi-id-card",
           to: "/manage/profile",
           mobile: false,
-          matches: prefix("/manage/profile"),
+          // The business card (/manage/card) is part of the public-profile/share
+          // surface, so it lights up this nav item rather than orphaning the
+          // active state.
+          matches: (r) => r.path.startsWith("/manage/profile") || r.path.startsWith("/manage/card"),
         },
       ];
     }
