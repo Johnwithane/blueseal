@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { useSeo } from "@/composables/useSeo";
+import { subscribePmProfile } from "@/firebase/services/pmProfile";
 import PmProfilePanel from "@/components/manage/PmProfilePanel.vue";
 import PmFeaturedTradesPanel from "@/components/manage/PmFeaturedTradesPanel.vue";
+import type { ProjectManagerProfileDoc, WithId } from "@/firebase/interfaces";
 
 useSeo({ title: "Public profile", noindex: true });
 
@@ -13,6 +15,16 @@ const auth = useAuthStore();
 const publicPath = computed(() =>
   auth.fbUser ? `/project-managers/${auth.fbUser.uid}` : "/",
 );
+
+// Only offer "View page" once a profile doc exists — else the owner clicks through
+// to a "Profile not found" for their own page.
+const profile = ref<WithId<ProjectManagerProfileDoc> | null>(null);
+let unsub: (() => void) | null = null;
+onMounted(() => {
+  const uid = auth.fbUser?.uid;
+  if (uid) unsub = subscribePmProfile(uid, (p) => (profile.value = p));
+});
+onUnmounted(() => unsub?.());
 </script>
 
 <template>
@@ -25,7 +37,7 @@ const publicPath = computed(() =>
           recommend.
         </p>
       </div>
-      <RouterLink :to="publicPath" target="_blank">
+      <RouterLink v-if="profile" :to="publicPath" target="_blank">
         <span class="text-sm text-[color:var(--bs-blue)] no-underline whitespace-nowrap">View page ↗</span>
       </RouterLink>
     </div>

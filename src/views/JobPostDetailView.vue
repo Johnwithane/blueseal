@@ -538,6 +538,23 @@ async function onCancelPost() {
 const { geocodeAddress } = useGoogleMaps();
 const submittingPublic = ref(false);
 
+// Opening to the public board is irreversible (you can't re-scope it back to the
+// PM's trades), so confirm first — and warn harder if quotes already exist.
+function confirmOpenToPublic() {
+  const n = meta.value?.applicationCount ?? 0;
+  confirm.require({
+    header: "Open to all trades nearby?",
+    message:
+      n > 0
+        ? `You already have ${n} quote${n === 1 ? "" : "s"} to compare. Opening this to the whole board shares the job with all verified trades nearby and can't be undone.`
+        : "This shares the job with all verified trades nearby and can't be undone.",
+    icon: "pi pi-megaphone",
+    acceptLabel: "Open to the board",
+    rejectLabel: "Not yet",
+    accept: () => void onOpenToPublic(),
+  });
+}
+
 async function onOpenToPublic() {
   if (!post.value || !meta.value) return;
   submittingPublic.value = true;
@@ -633,6 +650,11 @@ const visibleApplications = computed(() => {
           <Tag :value="urgencyLabel" severity="warn" />
         </div>
       </div>
+
+      <!-- Invited contractor: make the hand-pick explicit (it's a high-intent lead). -->
+      <Message v-if="isTradie && amInvited" severity="info" :closable="false" class="mt-3">
+        <i class="pi pi-star mr-1"></i>A project manager hand-picked you to quote on this job.
+      </Message>
 
       <!-- A peer sent this post to the viewing tradesperson. -->
       <Message
@@ -732,8 +754,14 @@ const visibleApplications = computed(() => {
              Let the client open it to the whole board if no one quotes. -->
         <div v-if="post.status === 'invited'" class="mt-4">
           <Message severity="info" :closable="false">
-            Your project manager sent this to their trusted trades. No quotes yet?
-            Open it to all verified trades in your area.
+            <template v-if="(meta?.applicationCount ?? 0) > 0">
+              Your project manager sent this to their trusted trades, and you have quotes to
+              compare. Want more options? You can open it to all verified trades nearby.
+            </template>
+            <template v-else>
+              Your project manager sent this to their trusted trades. No quotes yet? Open it to all
+              verified trades in your area.
+            </template>
           </Message>
           <Button
             label="Open to all trades nearby"
@@ -742,7 +770,7 @@ const visibleApplications = computed(() => {
             size="small"
             class="mt-2"
             :loading="submittingPublic"
-            @click="onOpenToPublic"
+            @click="confirmOpenToPublic"
           />
         </div>
 

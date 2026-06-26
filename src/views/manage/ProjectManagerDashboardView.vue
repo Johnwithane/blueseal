@@ -42,7 +42,8 @@ const activeProjects = computed(() =>
   projects.value.filter((p) => p.status !== "declined" && p.status !== "cancelled"),
 );
 const jobsInProgress = computed(() => jobs.value.filter((j) => j.status === "in_progress").length);
-const recentProjects = computed(() => projects.value.slice(0, 4));
+// Surface live work, not cancelled/declined dead rows (which the stat tile excludes).
+const recentProjects = computed(() => activeProjects.value.slice(0, 4));
 
 // Payout setup nudge: shown until the PM has signed the current agreement AND
 // connected Stripe payouts.
