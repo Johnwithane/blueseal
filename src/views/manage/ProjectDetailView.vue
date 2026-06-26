@@ -8,12 +8,18 @@ import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, RouterLink } from "vue-router";
 import Tag from "primevue/tag";
 import Button from "primevue/button";
+import InputText from "primevue/inputtext";
 import { useAuthStore } from "@/stores/auth";
 import { useSeo } from "@/composables/useSeo";
 import { useFormatters } from "@/composables";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
-import { subscribeProject, redispatchProject } from "@/firebase/services/projects";
+import {
+  subscribeProject,
+  redispatchProject,
+  cancelProject,
+  resendProjectInvite,
+} from "@/firebase/services/projects";
 import { subscribeProjectPostingsForPm } from "@/firebase/services/jobPosts";
 import { subscribeProjectJobsForPm } from "@/firebase/services/jobs";
 import { subscribeApplicationsForPost } from "@/firebase/services/applications";
@@ -117,6 +123,15 @@ const postingStatusSeverity: Record<string, "info" | "success" | "warn" | "secon
 const dispatchFailed = computed(
   () => project.value?.status === "accepted" && !(project.value.jobPostIds?.length),
 );
+// Pending = the PM can still manage the invite (resend / fix email / cancel).
+const isPending = computed(
+  () => project.value?.status === "invited" || project.value?.status === "claimed",
+);
+
+const showEmailForm = ref(false);
+const newEmail = ref("");
+const confirmingCancel = ref(false);
+const newInviteLink = ref<string | null>(null);
 
 async function retryDispatch(): Promise<void> {
   busy.value = true;
@@ -127,6 +142,46 @@ async function retryDispatch(): Promise<void> {
     toast.error("Couldn't send", humanizeError(e));
   } finally {
     busy.value = false;
+  }
+}
+
+async function resendInvite(email?: string): Promise<void> {
+  busy.value = true;
+  try {
+    const res = await resendProjectInvite(projectId, email);
+    if (res.inviteLink) newInviteLink.value = res.inviteLink;
+    showEmailForm.value = false;
+    newEmail.value = "";
+    toast.success(
+      "Invite resent",
+      res.emailed ? "We emailed your client again." : "Share the invite link with them.",
+    );
+  } catch (e) {
+    toast.error("Couldn't resend", humanizeError(e));
+  } finally {
+    busy.value = false;
+  }
+}
+
+async function doCancel(): Promise<void> {
+  busy.value = true;
+  try {
+    await cancelProject(projectId);
+    confirmingCancel.value = false;
+    toast.success("Project cancelled", "It's been removed from your active list.");
+  } catch (e) {
+    toast.error("Couldn't cancel", humanizeError(e));
+  } finally {
+    busy.value = false;
+  }
+}
+
+async function copyLink(link: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(link);
+    toast.success("Copied", "Invite link copied.");
+  } catch {
+    toast.warn("Copy failed", "Copy the link manually.");
   }
 }
 
@@ -180,12 +235,90 @@ function liveQuotes(postId: string): WithId<ApplicationDoc>[] {
         <Button label="Re-send jobs" icon="pi pi-refresh" size="small" :loading="busy" @click="retryDispatch" />
       </div>
 
-      <!-- Before the client accepts, there are no postings yet. -->
-      <div v-else-if="myPostings.length === 0" class="bs-card p-6 text-center mt-6">
-        <i class="pi pi-clock text-2xl text-[color:var(--bs-muted)]"></i>
-        <p class="mt-2 font-medium">Waiting on your client</p>
-        <p class="text-sm text-[color:var(--bs-muted)]">
+      <!-- Pending invite — the PM can resend, fix the email, or cancel. -->
+      <div v-else-if="myPostings.length === 0 && isPending" class="bs-card p-5 mt-6 space-y-3">
+        <div class="flex items-center gap-2">
+          <i class="pi pi-clock text-[color:var(--bs-blue)]"></i>
+          <p class="font-medium">
+            {{ project.status === "claimed" ? "Your client joined — waiting for them to accept" : "Invite sent" }}
+          </p>
+        </div>
+        <p v-if="project.projectInvite?.emailLower" class="text-sm text-[color:var(--bs-muted)]">
+          Invited: {{ project.projectInvite.emailLower }}
+        </p>
+        <p class="text-xs text-[color:var(--bs-muted)]">
           Once they accept, each job goes to your matching trades and quotes show up here.
+        </p>
+
+        <!-- A corrected-email resend hands back a fresh link to share. -->
+        <div v-if="newInviteLink" class="flex items-center gap-2 flex-wrap text-sm">
+          <span
+            class="flex-1 min-w-0 truncate rounded border border-[color:var(--bs-border)] px-2 py-1 bg-[color:var(--bs-surface-alt)]"
+          >{{ newInviteLink }}</span>
+          <Button label="Copy" icon="pi pi-copy" size="small" @click="copyLink(newInviteLink)" />
+        </div>
+
+        <div v-if="confirmingCancel" class="flex flex-wrap items-center gap-2">
+          <span class="text-sm font-medium">Cancel this project? This can't be undone.</span>
+          <Button label="Yes, cancel" severity="danger" size="small" :loading="busy" @click="doCancel" />
+          <Button label="Keep it" text size="small" :disabled="busy" @click="confirmingCancel = false" />
+        </div>
+        <div v-else class="flex flex-wrap gap-2">
+          <Button
+            v-if="project.status === 'invited'"
+            label="Resend invite"
+            icon="pi pi-send"
+            size="small"
+            :loading="busy"
+            @click="resendInvite()"
+          />
+          <Button
+            v-if="project.status === 'invited'"
+            label="Change email"
+            icon="pi pi-pencil"
+            text
+            size="small"
+            @click="showEmailForm = !showEmailForm"
+          />
+          <Button
+            label="Cancel project"
+            icon="pi pi-trash"
+            text
+            severity="danger"
+            size="small"
+            @click="confirmingCancel = true"
+          />
+        </div>
+
+        <div
+          v-if="showEmailForm && project.status === 'invited' && !confirmingCancel"
+          class="flex flex-wrap items-end gap-2 border-t border-[color:var(--bs-border)] pt-3"
+        >
+          <div class="flex-1 min-w-[12rem]">
+            <label class="text-xs text-[color:var(--bs-muted)]">New client email</label>
+            <InputText v-model="newEmail" type="email" class="w-full mt-1" placeholder="them@example.com" />
+          </div>
+          <Button
+            label="Update & resend"
+            size="small"
+            :disabled="!newEmail.trim()"
+            :loading="busy"
+            @click="resendInvite(newEmail.trim())"
+          />
+        </div>
+      </div>
+
+      <!-- Terminal states (cancelled / declined). -->
+      <div v-else-if="myPostings.length === 0" class="bs-card p-6 text-center mt-6">
+        <i class="pi pi-folder-open text-2xl text-[color:var(--bs-muted)]"></i>
+        <p class="mt-2 font-medium">
+          {{
+            project.status === "declined"
+              ? "Your client declined this project"
+              : project.status === "cancelled"
+                ? "This project was cancelled"
+                : "Waiting on your client"
+          }}
         </p>
       </div>
 

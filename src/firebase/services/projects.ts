@@ -119,6 +119,29 @@ export async function redispatchProject(
   return res.data;
 }
 
+/** PM cancels a still-pending project (invited/claimed). */
+export async function cancelProject(projectId: string): Promise<{ ok: true }> {
+  const fn = httpsCallable<{ projectId: string }, { ok: true }>(functions, "cancelProject");
+  const res = await fn({ projectId });
+  return res.data;
+}
+
+/**
+ * PM re-sends a pending invite, optionally to a corrected email (which re-mints the
+ * link). Returns a new inviteLink only when the email changed.
+ */
+export async function resendProjectInvite(
+  projectId: string,
+  newEmail?: string,
+): Promise<{ ok: true; emailed: boolean; inviteLink: string | null }> {
+  const fn = httpsCallable<
+    { projectId: string; newEmail?: string },
+    { ok: true; emailed: boolean; inviteLink: string | null }
+  >(functions, "resendProjectInvite");
+  const res = await fn(newEmail ? { projectId, newEmail } : { projectId });
+  return res.data;
+}
+
 // ── Live reads ───────────────────────────────────────────────────────────────
 
 // The PM's projects for the cockpit. Newest first, sorted client-side (a PM's

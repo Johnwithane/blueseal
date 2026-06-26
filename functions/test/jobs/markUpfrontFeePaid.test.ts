@@ -131,9 +131,10 @@ describe("markUpfrontFeePaid (tradesperson confirms upfront payment received)", 
     expect(res).toEqual({ ok: true });
     const job = fakeDb.peek(`jobs/${JOB}`);
     expect(job?.status).toBe("in_progress");
-    // Dot-notation updates are stored verbatim by FakeFirestore's merge
-    expect(job?.["upfrontFee.paidAt"]).toBe("__serverTimestamp__");
-    expect(job?.["upfrontFee.paidBy"]).toBe("tradesperson_marked");
+    // Dot-notation updates are applied as nested field paths (like real Firestore).
+    const upfrontFee = job?.upfrontFee as { paidAt?: unknown; paidBy?: unknown } | undefined;
+    expect(upfrontFee?.paidAt).toBe("__serverTimestamp__");
+    expect(upfrontFee?.paidBy).toBe("tradesperson_marked");
   });
 
   it("posts a system message mentioning the fee amount", async () => {

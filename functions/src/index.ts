@@ -168,6 +168,8 @@ export { sendProjectInviteSignInLink } from "./projects/sendProjectInviteSignInL
 export { claimProjectInvite } from "./projects/claimProjectInvite";
 export { respondToProject } from "./projects/respondToProject";
 export { redispatchProject } from "./projects/redispatchProject";
+export { cancelProject } from "./projects/cancelProject";
+export { resendProjectInvite } from "./projects/resendProjectInvite";
 export { unsubscribeProjectInvite } from "./projects/unsubscribeProjectInvite";
 // Public-board fallback for a scoped PM posting that got no preferred-contractor bids.
 export { openPostingToPublic } from "./jobPosts/openPostingToPublic";

@@ -23,6 +23,28 @@ function makeSnap(ref: FakeDocRef, raw: Data | undefined): FakeSnap {
   };
 }
 
+// Apply an update map onto a doc, interpreting dotted keys ("a.b.c") as nested
+// field paths the way real Firestore does, cloning nested objects along each
+// path so the stored object isn't mutated in place.
+function applyUpdate(prev: Data, data: Data): Data {
+  const next: Data = { ...prev };
+  for (const [key, val] of Object.entries(data)) {
+    if (!key.includes(".")) {
+      next[key] = val;
+      continue;
+    }
+    const parts = key.split(".");
+    let obj = next;
+    for (let i = 0; i < parts.length - 1; i++) {
+      const cur = obj[parts[i]];
+      obj[parts[i]] = typeof cur === "object" && cur !== null ? { ...(cur as Data) } : {};
+      obj = obj[parts[i]] as Data;
+    }
+    obj[parts[parts.length - 1]] = val;
+  }
+  return next;
+}
+
 export class FakeDocRef {
   constructor(
     private readonly fs: FakeFirestore,
@@ -50,7 +72,7 @@ export class FakeDocRef {
   async update(data: Data): Promise<void> {
     const prev = this.fs._read(this.path);
     if (prev === undefined) throw new Error(`update on missing doc ${this.path}`);
-    this.fs._write(this.path, { ...prev, ...data });
+    this.fs._write(this.path, applyUpdate(prev, data));
   }
 
   async delete(): Promise<void> {
@@ -75,7 +97,7 @@ export class FakeTransaction {
   update(ref: FakeDocRef, data: Data): FakeTransaction {
     this.ops.push(() => {
       const prev = this.fs._read(ref.path) ?? {};
-      this.fs._write(ref.path, { ...prev, ...data });
+      this.fs._write(ref.path, applyUpdate(prev, data));
     });
     return this;
   }
