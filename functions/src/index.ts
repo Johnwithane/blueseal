@@ -106,6 +106,7 @@ export { claimReferralCode } from "./sales/claimReferralCode";
 // e-sign the liability agreement (gates payout, not the cockpit), and Stripe
 // Connect onboarding for the monthly commission payout (P4).
 export { claimPmCode } from "./projectManager/claimPmCode";
+export { claimPmProfileSlug } from "./projectManager/claimProfileSlug";
 export { signPmAgreement } from "./projectManager/signAgreement";
 export { createPmConnectAccount } from "./payments/createPmConnectAccount";
 export { createPmConnectOnboardingLink } from "./payments/createPmConnectOnboardingLink";

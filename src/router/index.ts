@@ -105,6 +105,21 @@ const routes: RouteRecordRaw[] = [
     meta: { layout: "chromeless" },
   },
   {
+    // Public Project Manager profile (P5). Canonical /project-managers/:uid +
+    // vanity /pm/:slug (resolved via pmProfileSlugs). Chromeless, same as the
+    // tradesperson profile.
+    path: "/project-managers/:uid",
+    name: "ProjectManagerProfile",
+    component: () => import("@/views/ProjectManagerProfileView.vue"),
+    meta: { layout: "chromeless" },
+  },
+  {
+    path: "/pm/:slug",
+    name: "ProjectManagerHome",
+    component: () => import("@/views/ProjectManagerProfileView.vue"),
+    meta: { layout: "chromeless" },
+  },
+  {
     // Public profile-preview for a seeded prospect, shown from the outreach
     // email (claim link rides in ?c=) and from the admin composer's preview.
     path: "/p/:id",

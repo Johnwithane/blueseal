@@ -208,6 +208,28 @@ export interface ProjectDoc {
   updatedAt: Timestamp;
 }
 
+// projectManagers/{uid} — a project manager's PUBLIC profile (P5). Mirrors the
+// public tradespeople doc but far simpler (no vetting / reviews / portfolio):
+// brand + bio, and (P5b) featured preferred contractors. World-read when isVisible
+// (PM-controlled, instant — no review gate); owner + admin otherwise. `slug` is
+// server-managed (claimPmProfileSlug -> pmProfileSlugs registry).
+export interface ProjectManagerProfileDoc {
+  /** Denormalized from users/{uid} at edit time. */
+  displayName: string | null;
+  photoURL: string | null;
+  companyName: string | null;
+  bio: string;
+  brandColor: string | null;
+  companyLogoUrl: string | null;
+  coverUrl: string | null;
+  /** Vanity handle -> blueseal.app/pm/<slug>. Server-managed (claimPmProfileSlug). */
+  slug?: string;
+  /** PM-controlled publish toggle (no vetting gate). */
+  isVisible: boolean;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
 // referralCodes/{codeLower} — uniqueness registry (mirrors profileSlugs). Maps a
 // lowercased code to the rep who owns it; resolved at signup to attribute a new
 // tradesperson + grant the free month. World-readable, server-only writes.

@@ -12,6 +12,7 @@ import TrustedTradesPanel from "@/components/TrustedTradesPanel.vue";
 import PropertiesPanel from "@/components/PropertiesPanel.vue";
 import ProjectsPanel from "@/components/ProjectsPanel.vue";
 import PmEarningsPanel from "@/components/manage/PmEarningsPanel.vue";
+import PmProfilePanel from "@/components/manage/PmProfilePanel.vue";
 
 useSeo({ title: "Manage", noindex: true });
 
@@ -149,6 +150,16 @@ async function copyRecruitLink() {
           Your referral commission accrues as your trades get paid. Set up payouts to get paid.
         </p>
         <PmEarningsPanel />
+      </div>
+
+      <div>
+        <h2 class="font-semibold flex items-center gap-2 mb-1">
+          <i class="pi pi-id-card text-[color:var(--bs-blue)]"></i> Public profile
+        </h2>
+        <p class="text-sm text-[color:var(--bs-muted)] mb-3">
+          Your own page at a shareable link. Publish it to introduce yourself and the trades you work with.
+        </p>
+        <PmProfilePanel />
       </div>
     </div>
   </section>

@@ -577,10 +577,20 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    live"; the monthly scheduler pays the PM the same way as a rep ($50 min,
    claim-before-pay) once their balance clears. The agreement gates payout setup only,
    never the cockpit. A PM reads only their own commission/payout entries (rules).
+10d. **Public profile (P5a).** In the cockpit **Public profile** section: edit the
+   business name + about + brand colour, upload a logo + cover, then **Claim** a
+   `/pm/<handle>` link (3-30 lowercase letters/numbers/hyphens; reserved words
+   rejected) and **toggle Publish on**. **Expected:** open `/pm/<handle>` (signed out
+   / incognito) and see the published profile (cover, logo, name, about). With Publish
+   **off**, the same link reads "Profile not found" to the public, but the owner sees
+   a preview banner. No vetting/review gate; publishing is instant. (Featured trades
+   on the profile + contractor opt-out are P5b.)
 11. **Mobile (375px).** Re-run the signup cards + cockpit + saved-trades + properties +
-   projects (incl. the client accept + address form) and the tradesperson "Invited to
-   quote" section at 375px. **Expected:** the role cards stack and stay tappable; the
-   cockpit cards, the new-project form, and the accept address form read cleanly.
+   projects (incl. the client accept + address form), the tradesperson "Invited to
+   quote" section, the cockpit Earnings + Public-profile editors, and the public
+   `/pm/<handle>` page at 375px. **Expected:** the role cards stack and stay tappable;
+   the cockpit cards, the new-project form, the accept address form, and the public
+   profile read cleanly.
 
 ---
 
@@ -636,5 +646,6 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 - [ ] 13.9 Project seam: client can't forge status; invited posting readable/appliable only by an invited contractor; job PM fields pinned (rules + unit tests)
 - [ ] 13.10b PM commission: card-paid PM-driven fee accrues BOTH rep + PM 10% (distinct ids); refund reverses both; off-list public win accrues none
 - [ ] 13.10c PM earnings/payouts: sign agreement → Stripe Connect → monthly payout ($50 min); agreement gates payout only; PM reads only own ledger
+- [ ] 13.10d Public profile: edit brand/bio, upload logo+cover, claim /pm/<handle>, publish on → world-visible; off → not found to public, preview to owner
 - [ ] 13.10 Public fallback: client opens a no-bid scoped posting to the board (geocoded, leaves the invited lists, enters the radius feed)
 - [ ] 13.11 PM visibility: project detail shows quote amounts + won-job status/schedule; never the chat/invoice; another PM is denied

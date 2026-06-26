@@ -584,6 +584,24 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    // projectManagers/{pmId} — a PM's PUBLIC profile (P5). WORLD-READ when the PM
+    // has published it (isVisible — PM-controlled, instant, no vetting); owner +
+    // admin otherwise. The owner edits brand/bio/visibility; `slug` is server-managed
+    // (claimPmProfileSlug) and `createdAt` is frozen.
+    match /projectManagers/{pmId} {
+      allow read: if (resource != null && resource.data.isVisible == true)
+        || isOwner(pmId) || isAdmin();
+      allow create: if isOwner(pmId) && hasRole('projectManager')
+        && request.resource.data.get('slug', null) == null
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+      allow update: if (isOwner(pmId) && hasRole('projectManager')
+          && request.resource.data.get('slug', null) == resource.data.get('slug', null)
+          && request.resource.data.createdAt == resource.data.createdAt)
+        || isAdmin();
+      allow delete: if isAdmin();
+    }
+
     // ---------- jobs ----------
     match /jobs/{jobId} {
       allow read: if isSignedIn() && (
@@ -1631,6 +1649,14 @@ service cloud.firestore {
     // by the claimProfileSlug callable (Admin SDK bypasses these rules), never by
     // clients, so the uniqueness guarantee can't be subverted.
     match /profileSlugs/{slug} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // PM vanity-handle registry (P5): world-readable so /pm/<slug> resolves;
+    // server-only writes (claimPmProfileSlug callable). Separate namespace from
+    // profileSlugs so a PM and a tradesperson handle never collide.
+    match /pmProfileSlugs/{slug} {
       allow read: if true;
       allow write: if false;
     }

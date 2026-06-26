@@ -647,6 +647,13 @@ const faqs: FaqItem[] = [
     audience: "client",
   },
   {
+    question: "Can I have my own public page as a project manager?",
+    answer:
+      "Yes. In your cockpit's **Public profile** section you can add a business name, a short about, a logo, a cover image, and a brand colour, then claim a shareable link like **blueseal.app/pm/your-name**. Flip **Publish** on and the page goes live instantly, there's no review. Turn it off any time and it's hidden again (only you can preview it while it's off). It's free.",
+    categoryId: "for-clients",
+    audience: "client",
+  },
+  {
     question: "I'm a project manager. How and when do I get paid?",
     answer:
       "When one of your preferred contractors completes paid work on a job you set up, you earn a referral commission. It builds up as a balance in your cockpit's **Earnings** section. To receive it, sign the short project-manager agreement and connect a bank account through Stripe (about five minutes, one time). After that, your balance pays out automatically each month once it clears a $50 minimum; anything under that rolls to the next month. You can recommend trades and set up projects before doing any of this, the payout setup only gates getting paid, not using the cockpit.",

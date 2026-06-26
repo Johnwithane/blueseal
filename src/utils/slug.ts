@@ -19,6 +19,7 @@ export const RESERVED_SLUGS = new Set<string>([
   "pricing", "about", "contact", "terms", "privacy", "support", "request",
   "onboarding", "new", "edit", "me", "profile", "profiles", "www", "static",
   "assets", "blueseal", "blue-seal", "auth", "verify", "app",
+  "pm", "project-managers", "manage", "join",
 ]);
 
 export function isValidSlug(s: string): boolean {
