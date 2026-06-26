@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import ToggleSwitch from "primevue/toggleswitch";
+import Button from "primevue/button";
 import { useAuthStore } from "@/stores/auth";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
@@ -26,6 +27,14 @@ let unsubProfile: (() => void) | null = null;
 const featuredIds = computed(
   () => new Set((profile.value?.featuredContractors ?? []).map((c) => c.tradieId)),
 );
+
+// Featured contractors who are no longer in the PM's saved+visible set (they went
+// invisible / were removed). They still show on the public profile but have no
+// toggle row above — surface them here so the PM can always un-feature them.
+const orphanedFeatured = computed(() => {
+  const savedIds = new Set(tradies.value.map((t) => t.id));
+  return (profile.value?.featuredContractors ?? []).filter((c) => !savedIds.has(c.tradieId));
+});
 
 onMounted(() => {
   const uid = auth.fbUser?.uid;
@@ -60,6 +69,18 @@ async function toggle(t: WithId<TradespersonDoc>, next: boolean) {
     busy.value = null;
   }
 }
+
+async function removeFeatured(tradieId: string) {
+  busy.value = tradieId;
+  try {
+    await setFeaturedContractor(tradieId, false);
+    toast.success("Removed", "They no longer appear on your profile.");
+  } catch (e) {
+    toast.error("Couldn't update", humanizeError(e));
+  } finally {
+    busy.value = null;
+  }
+}
 </script>
 
 <template>
@@ -87,7 +108,6 @@ async function toggle(t: WithId<TradespersonDoc>, next: boolean) {
           <p class="font-medium truncate">{{ t.displayName ?? "Tradesperson" }}</p>
           <p class="text-xs text-[color:var(--bs-muted)] truncate">{{ tradesText(t) }}</p>
         </div>
-        <span class="text-xs text-[color:var(--bs-muted)]">Featured</span>
         <ToggleSwitch
           :model-value="featuredIds.has(t.id)"
           :disabled="busy === t.id || !profile"
@@ -95,5 +115,37 @@ async function toggle(t: WithId<TradespersonDoc>, next: boolean) {
         />
       </li>
     </ul>
+
+    <!-- Featured contractors no longer in the saved/visible set — removable here. -->
+    <div v-if="orphanedFeatured.length" class="mt-3">
+      <p class="text-xs font-semibold text-[color:var(--bs-muted)] uppercase tracking-wide mb-1">
+        Featured but no longer in your saved trades
+      </p>
+      <ul class="grid grid-cols-1 gap-2">
+        <li
+          v-for="c in orphanedFeatured"
+          :key="c.tradieId"
+          class="bs-card p-3 flex items-center gap-3 opacity-80"
+        >
+          <img v-if="c.photoURL" :src="c.photoURL" alt="" class="w-9 h-9 rounded-full object-cover shrink-0" />
+          <span
+            v-else
+            class="w-9 h-9 rounded-full bg-[color:var(--bs-muted)] text-white grid place-items-center shrink-0"
+          >{{ (c.displayName ?? "?").charAt(0).toUpperCase() }}</span>
+          <div class="min-w-0 flex-1">
+            <p class="font-medium truncate">{{ c.displayName ?? "Tradesperson" }}</p>
+            <p class="text-xs text-[color:var(--bs-muted)] truncate">No longer available</p>
+          </div>
+          <Button
+            label="Remove"
+            size="small"
+            text
+            severity="danger"
+            :loading="busy === c.tradieId"
+            @click="removeFeatured(c.tradieId)"
+          />
+        </li>
+      </ul>
+    </div>
   </div>
 </template>

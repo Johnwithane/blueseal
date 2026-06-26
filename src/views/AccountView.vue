@@ -1623,6 +1623,21 @@ async function grantAllTrades() {
           <i class="pi pi-eye-slash"></i>
           Your profile is hidden — clients can't find you in search right now.
         </p>
+
+        <!-- Consent control: where project managers feature this tradesperson.
+             Must be findable beyond the one-time pm_featured notification. -->
+        <RouterLink
+          to="/featured-by-pms"
+          class="mt-3 flex items-center justify-between gap-3 rounded-lg border border-[color:var(--bs-border)] p-3 no-underline text-inherit hover:shadow-sm transition-shadow"
+        >
+          <div>
+            <div class="font-medium">Project managers featuring you</div>
+            <p class="text-xs text-[color:var(--bs-muted)] mt-0.5">
+              See which project managers recommend you on their public profile, and opt out anytime.
+            </p>
+          </div>
+          <i class="pi pi-chevron-right text-xs text-[color:var(--bs-muted)]"></i>
+        </RouterLink>
       </div>
 
       <!-- Password -->

@@ -120,7 +120,14 @@ async function togglePublish(next: boolean) {
   if (!uid) return;
   try {
     await createOrUpdatePmProfile(uid, { ...patchBase(), isVisible: next });
-    toast.success(next ? "Profile published" : "Profile hidden", next ? "It's live at your link." : "");
+    toast.success(
+      next ? "Profile published" : "Profile hidden",
+      next
+        ? profile.value?.slug
+          ? "It's live at your link."
+          : "Claim a handle below to get a shareable link."
+        : "",
+    );
   } catch (e) {
     toast.error("Couldn't update", humanizeError(e));
   }
@@ -128,8 +135,14 @@ async function togglePublish(next: boolean) {
 
 async function claimSlug() {
   if (slugMsg.value) return;
+  const uid = auth.fbUser?.uid;
+  if (!uid) return;
   claimingSlug.value = true;
   try {
+    // claimPmProfileSlug requires the profile doc to exist. Auto-create it for a
+    // brand-new PM who claims a handle before saving any details (avoids a raw
+    // "Set up your public profile first" failed-precondition).
+    if (!profile.value) await createOrUpdatePmProfile(uid, patchBase());
     await claimPmProfileSlug(slugDraft.value.trim().toLowerCase());
     slugDraft.value = "";
     toast.success("Handle claimed", "Your profile link is set.");
