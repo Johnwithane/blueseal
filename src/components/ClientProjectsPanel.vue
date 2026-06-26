@@ -7,6 +7,7 @@ import { useAuthStore } from "@/stores/auth";
 import {
   subscribeClientProjects,
   respondToProject,
+  redispatchProject,
   type ProjectAcceptAddress,
 } from "@/firebase/services/projects";
 import { tradeLabel } from "@/data/trades";
@@ -25,17 +26,28 @@ const rows = ref<WithId<ProjectDoc>[]>([]);
 const busy = ref<string | null>(null);
 // Which project is showing the accept address form (null = none).
 const acceptingId = ref<string | null>(null);
+// Which project is showing the "Decline — are you sure?" confirm (null = none).
+const confirmingDecline = ref<string | null>(null);
 const addr = reactive<ProjectAcceptAddress>({ line1: "", city: "", region: "", postalCode: "" });
 let unsub: (() => void) | null = null;
 
+const hasPosts = (p: WithId<ProjectDoc>) => Array.isArray(p.jobPostIds) && p.jobPostIds.length > 0;
 const pending = computed(() => rows.value.filter((p) => p.status === "claimed"));
-const decided = computed(() => rows.value.filter((p) => p.status !== "claimed"));
+// Accepted but never dispatched (dispatch failed) — recoverable.
+const needsDispatch = computed(() =>
+  rows.value.filter((p) => p.status === "accepted" && !hasPosts(p)),
+);
+const decided = computed(() =>
+  rows.value.filter((p) => p.status === "declined" || (p.status === "accepted" && hasPosts(p))),
+);
+// Canadian postal code (A1A 1A1) — target market is Canada.
+const POSTAL_RE = /^[A-Za-z]\d[A-Za-z]\s?\d[A-Za-z]\d$/;
 const addrValid = computed(
   () =>
     addr.line1.trim().length > 1 &&
     addr.city.trim().length > 1 &&
     addr.region.trim().length > 1 &&
-    addr.postalCode.trim().length > 2,
+    POSTAL_RE.test(addr.postalCode.trim()),
 );
 
 const statusSeverity: Record<string, "info" | "success" | "secondary"> = {
@@ -66,11 +78,32 @@ async function confirmAccept(p: WithId<ProjectDoc>) {
   if (!addrValid.value) return;
   busy.value = p.id;
   try {
-    await respondToProject(p.id, "accept", { ...addr });
+    const res = await respondToProject(p.id, "accept", { ...addr });
     acceptingId.value = null;
-    toast.success("Project accepted", "Your trades will be lined up for quotes.");
+    if (res.dispatched === false) {
+      toast.error("Almost there", "We couldn't send your jobs out. Tap Re-send to try again.");
+    } else if (res.unmatchedTrades && res.unmatchedTrades.length) {
+      toast.success(
+        "Project accepted",
+        "Some jobs had no preferred trade saved — open those to all trades nearby from the job.",
+      );
+    } else {
+      toast.success("Project accepted", "Your trades will be lined up for quotes.");
+    }
   } catch (e) {
     toast.error("Couldn't update", humanizeError(e));
+  } finally {
+    busy.value = null;
+  }
+}
+
+async function retryDispatch(p: WithId<ProjectDoc>) {
+  busy.value = p.id;
+  try {
+    await redispatchProject(p.id);
+    toast.success("Sent", "Your jobs are out for quotes.");
+  } catch (e) {
+    toast.error("Couldn't send", humanizeError(e));
   } finally {
     busy.value = null;
   }
@@ -80,6 +113,7 @@ async function decline(p: WithId<ProjectDoc>) {
   busy.value = p.id;
   try {
     await respondToProject(p.id, "decline");
+    confirmingDecline.value = null;
     toast.success("Project declined", "We let your project manager know.");
   } catch (e) {
     toast.error("Couldn't update", humanizeError(e));
@@ -131,10 +165,39 @@ async function decline(p: WithId<ProjectDoc>) {
             <Button label="Cancel" text size="small" :disabled="busy === p.id" @click="acceptingId = null" />
           </div>
         </div>
+        <div v-else-if="confirmingDecline === p.id" class="flex flex-wrap items-center gap-2 mt-3">
+          <span class="text-sm font-medium">Decline this project? This can't be undone.</span>
+          <Button
+            label="Yes, decline"
+            severity="danger"
+            size="small"
+            :loading="busy === p.id"
+            @click="decline(p)"
+          />
+          <Button label="Keep it" text size="small" :disabled="busy === p.id" @click="confirmingDecline = null" />
+        </div>
         <div v-else class="flex gap-2 mt-3">
           <Button label="Accept" icon="pi pi-check" size="small" @click="startAccept(p)" />
-          <Button label="Decline" text size="small" :disabled="busy === p.id" @click="decline(p)" />
+          <Button label="Decline" text size="small" :disabled="busy === p.id" @click="confirmingDecline = p.id" />
         </div>
+      </li>
+    </ul>
+
+    <!-- Accepted but the jobs didn't go out (dispatch failed) — recoverable. -->
+    <ul v-if="needsDispatch.length" class="grid grid-cols-1 gap-3 mt-2">
+      <li v-for="p in needsDispatch" :key="p.id" class="bs-card p-4 border-l-4 border-l-[color:var(--bs-warn,#d97706)]">
+        <p class="font-semibold">{{ p.label }}</p>
+        <p class="text-xs text-[color:var(--bs-muted)] mt-0.5">
+          You accepted this, but we couldn't send the jobs out for quotes. Tap Re-send to try again.
+        </p>
+        <Button
+          label="Re-send jobs"
+          icon="pi pi-refresh"
+          size="small"
+          class="mt-2"
+          :loading="busy === p.id"
+          @click="retryDispatch(p)"
+        />
       </li>
     </ul>
 

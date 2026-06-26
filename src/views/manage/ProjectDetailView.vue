@@ -7,10 +7,13 @@
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, RouterLink } from "vue-router";
 import Tag from "primevue/tag";
+import Button from "primevue/button";
 import { useAuthStore } from "@/stores/auth";
 import { useSeo } from "@/composables/useSeo";
 import { useFormatters } from "@/composables";
-import { subscribeProject } from "@/firebase/services/projects";
+import { useToast } from "@/composables/useToast";
+import { humanizeError } from "@/utils/errors";
+import { subscribeProject, redispatchProject } from "@/firebase/services/projects";
 import { subscribeProjectPostingsForPm } from "@/firebase/services/jobPosts";
 import { subscribeProjectJobsForPm } from "@/firebase/services/jobs";
 import { subscribeApplicationsForPost } from "@/firebase/services/applications";
@@ -26,11 +29,14 @@ import type {
 
 const route = useRoute();
 const auth = useAuthStore();
+const toast = useToast();
 const { money, date } = useFormatters();
 useSeo({ title: "Project", noindex: true });
 
 const projectId = String(route.params.projectId ?? "");
 const project = ref<WithId<ProjectDoc> | null>(null);
+const loaded = ref(false);
+const busy = ref(false);
 const postings = ref<WithId<JobPostDoc>[]>([]);
 const jobs = ref<WithId<JobDoc>[]>([]);
 const quotesByPost = ref<Record<string, WithId<ApplicationDoc>[]>>({});
@@ -76,7 +82,10 @@ function syncQuoteSubs(current: WithId<JobPostDoc>[]): void {
 onMounted(() => {
   const uid = auth.fbUser?.uid;
   if (!projectId || !uid) return;
-  unsubProject = subscribeProject(projectId, (p) => (project.value = p));
+  unsubProject = subscribeProject(projectId, (p) => {
+    project.value = p;
+    loaded.value = true;
+  });
   unsubPostings = subscribeProjectPostingsForPm(uid, (p) => (postings.value = p));
   unsubJobs = subscribeProjectJobsForPm(uid, (j) => (jobs.value = j));
 });
@@ -104,6 +113,23 @@ const postingStatusSeverity: Record<string, "info" | "success" | "warn" | "secon
   expired: "secondary",
 };
 
+// Accepted but no postings were ever created (dispatch failed) — recoverable.
+const dispatchFailed = computed(
+  () => project.value?.status === "accepted" && !(project.value.jobPostIds?.length),
+);
+
+async function retryDispatch(): Promise<void> {
+  busy.value = true;
+  try {
+    await redispatchProject(projectId);
+    toast.success("Sent", "The jobs are out to your trades for quotes.");
+  } catch (e) {
+    toast.error("Couldn't send", humanizeError(e));
+  } finally {
+    busy.value = false;
+  }
+}
+
 function quoteAmount(a: WithId<ApplicationDoc>): number {
   return a.quote?.total ?? a.proposedPrice?.amount ?? 0;
 }
@@ -121,7 +147,15 @@ function liveQuotes(postId: string): WithId<ApplicationDoc>[] {
       <i class="pi pi-arrow-left text-xs"></i> Back to cockpit
     </RouterLink>
 
-    <div v-if="!project" class="text-sm text-[color:var(--bs-muted)] py-8 text-center">Loading…</div>
+    <div v-if="!loaded" class="text-sm text-[color:var(--bs-muted)] py-8 text-center">Loading…</div>
+
+    <div v-else-if="!project" class="bs-card p-6 text-center mt-6">
+      <i class="pi pi-folder-open text-2xl text-[color:var(--bs-muted)]"></i>
+      <p class="mt-2 font-medium">Project not found</p>
+      <p class="text-sm text-[color:var(--bs-muted)]">
+        It may have been removed, or you don't have access to it.
+      </p>
+    </div>
 
     <template v-else>
       <img
@@ -136,8 +170,18 @@ function liveQuotes(postId: string): WithId<ApplicationDoc>[] {
         {{ project.jobSpecs.length }} {{ project.jobSpecs.length === 1 ? "job" : "jobs" }}
       </p>
 
+      <!-- Accepted but the dispatch failed — the PM can re-send. -->
+      <div v-if="myPostings.length === 0 && dispatchFailed" class="bs-card p-6 text-center mt-6 border-l-4 border-l-[color:var(--bs-warn,#d97706)]">
+        <i class="pi pi-exclamation-triangle text-2xl text-[color:var(--bs-warn,#d97706)]"></i>
+        <p class="mt-2 font-medium">Jobs didn't go out</p>
+        <p class="text-sm text-[color:var(--bs-muted)] mb-3">
+          Your client accepted, but we couldn't send the jobs to your trades. Re-send to try again.
+        </p>
+        <Button label="Re-send jobs" icon="pi pi-refresh" size="small" :loading="busy" @click="retryDispatch" />
+      </div>
+
       <!-- Before the client accepts, there are no postings yet. -->
-      <div v-if="myPostings.length === 0" class="bs-card p-6 text-center mt-6">
+      <div v-else-if="myPostings.length === 0" class="bs-card p-6 text-center mt-6">
         <i class="pi pi-clock text-2xl text-[color:var(--bs-muted)]"></i>
         <p class="mt-2 font-medium">Waiting on your client</p>
         <p class="text-sm text-[color:var(--bs-muted)]">
@@ -183,7 +227,15 @@ function liveQuotes(postId: string): WithId<ApplicationDoc>[] {
 
           <!-- Brokering: show the incoming quotes with amounts. -->
           <div v-else class="mt-3 border-t border-[color:var(--bs-border)] pt-3">
-            <p v-if="liveQuotes(post.id).length === 0" class="text-xs text-[color:var(--bs-muted)]">
+            <!-- Empty scope: no saved trade matched this job's trade. -->
+            <p
+              v-if="post.status === 'invited' && (post.invitedContractorIds?.length ?? 0) === 0"
+              class="text-xs text-[color:var(--bs-warn,#d97706)]"
+            >
+              No saved trade matched this job, so nobody was invited. Ask your client to open it to all
+              trades nearby (or save a {{ tradeLabel(post.trade) }} and re-send).
+            </p>
+            <p v-else-if="liveQuotes(post.id).length === 0" class="text-xs text-[color:var(--bs-muted)]">
               No quotes yet. Your trades have been invited.
             </p>
             <ul v-else class="space-y-1">
