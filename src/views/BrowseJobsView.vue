@@ -9,7 +9,7 @@ import Message from "primevue/message";
 import { useAuthStore } from "@/stores/auth";
 import { useNotificationsStore } from "@/stores/notifications";
 import { getTradesperson } from "@/firebase/services/tradespeople";
-import { subscribeJobPostFeed } from "@/firebase/services/jobPosts";
+import { subscribeJobPostFeed, subscribeInvitedJobPosts } from "@/firebase/services/jobPosts";
 import { subscribeMyApplications } from "@/firebase/services/applications";
 import type {
   ApplicationDoc,
@@ -31,6 +31,9 @@ const { relativeTime } = useFormatters();
 const tradie = ref<WithId<TradespersonDoc> | null>(null);
 const loadingTradie = ref(true);
 const posts = ref<WithId<JobPostDoc>[]>([]);
+// Scoped postings a project manager invited this tradie to quote on — shown
+// regardless of service area (the invite is direct, not proximity-based).
+const invitedPosts = ref<WithId<JobPostDoc>[]>([]);
 const appliedPostIds = ref<Set<string>>(new Set());
 
 // The exact service-area point is now private; the public tradesperson doc
@@ -79,6 +82,7 @@ const effectiveCenter = computed(() => {
 
 let unsubFeed: (() => void) | null = null;
 let unsubApps: (() => void) | null = null;
+let unsubInvited: (() => void) | null = null;
 
 const tradeOptions = computed(() => [
   { label: "Any trade", value: "any" },
@@ -110,6 +114,9 @@ onMounted(async () => {
   unsubApps = subscribeMyApplications(auth.fbUser.uid, (apps: WithId<ApplicationDoc>[]) => {
     appliedPostIds.value = new Set(apps.map((a) => a.postId));
   });
+
+  // PM invitations to quote — independent of service area / feed centre.
+  unsubInvited = subscribeInvitedJobPosts(auth.fbUser.uid, (p) => (invitedPosts.value = p));
 
   maybeStartFeed();
 });
@@ -149,10 +156,16 @@ function startFeed() {
 onUnmounted(() => {
   unsubFeed?.();
   unsubApps?.();
+  unsubInvited?.();
 });
 
 const visiblePosts = computed(() =>
   posts.value.filter((p) => !appliedPostIds.value.has(p.id) && p.clientId !== auth.fbUser?.uid),
+);
+
+// Invited postings the tradie hasn't applied to yet.
+const openInvites = computed(() =>
+  invitedPosts.value.filter((p) => !appliedPostIds.value.has(p.id)),
 );
 
 const urgencyTone: Record<string, "info" | "warn" | "danger"> = {
@@ -209,6 +222,44 @@ function openRefer(post: WithId<JobPostDoc>) {
       <p class="mt-1 text-xs text-[color:var(--bs-muted)]">
         QA only. Overrides the feed's centre point; your saved service area is unchanged.
       </p>
+    </div>
+
+    <!-- Invited to quote (PM dispatch): a standalone block (NOT part of the
+         loading/feed v-if chain) so it shows ABOVE the feed for any visible tradie
+         regardless of service-area setup — an invite is direct, not proximity-based. -->
+    <div v-if="tradie?.isVisible && openInvites.length" class="mt-6">
+      <h2 class="font-semibold flex items-center gap-2 mb-2">
+        <i class="pi pi-star text-[color:var(--bs-blue)]"></i> Invited to quote
+      </h2>
+      <p class="text-sm text-[color:var(--bs-muted)] mb-3">
+        A project manager picked you for these jobs. Send a quote to be considered.
+      </p>
+      <div class="grid sm:grid-cols-2 gap-4">
+        <RouterLink
+          v-for="post in openInvites"
+          :key="post.id"
+          :to="{ name: 'JobPostDetail', params: { postId: post.id } }"
+          class="bs-card p-5 hover:shadow-md transition-shadow no-underline text-inherit border border-[color:var(--bs-blue)]"
+        >
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <div class="font-semibold truncate">{{ post.title }}</div>
+              <div class="text-xs text-[color:var(--bs-muted)]">
+                {{ tradeLabel(post.trade) }} • {{ relativeTime(post.createdAt) }}
+              </div>
+            </div>
+            <Tag value="Invited" severity="info" />
+          </div>
+          <p class="text-sm mt-2 text-[color:var(--bs-muted)] line-clamp-3">{{ post.description }}</p>
+          <div class="mt-3 flex items-center justify-between text-xs">
+            <span class="text-[color:var(--bs-muted)]">
+              <i class="pi pi-map-marker mr-1"></i>
+              {{ post.addressPublic.city }}, {{ post.addressPublic.region }}
+            </span>
+            <span class="font-medium text-[color:var(--bs-blue)]">Quote requested</span>
+          </div>
+        </RouterLink>
+      </div>
     </div>
 
     <LoadingState v-if="loadingTradie" class="mt-6" label="Loading your profile…" />

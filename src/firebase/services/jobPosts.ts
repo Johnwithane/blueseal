@@ -101,6 +101,24 @@ export function subscribeJobPostMeta(
   );
 }
 
+// The scoped ("invited") postings a tradesperson has been invited to quote on
+// (Project Manager dispatch). Found by array-contains on invitedContractorIds, NOT
+// by proximity — an invite is direct, so it shows regardless of service area. The
+// read rule authorizes each doc to the invited contractor. (status, invitedContractorIds)
+// composite index.
+export function subscribeInvitedJobPosts(
+  tradieUid: string,
+  cb: (posts: WithId<JobPostDoc>[]) => void,
+): () => void {
+  const q = query(
+    postsCol(),
+    where("status", "==", "invited"),
+    where("invitedContractorIds", "array-contains", tradieUid),
+    limit(50),
+  );
+  return onSnapshot(q, (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
+}
+
 export interface FeedFilters {
   trade: string | null; // null = any trade
   center: { lat: number; lng: number };

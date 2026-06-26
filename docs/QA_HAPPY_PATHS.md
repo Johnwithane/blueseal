@@ -522,18 +522,34 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    CASL mailing address is configured). Open the invite link (or the emailed
    magic link) in a fresh session, confirm the client's email, sign in, and confirm
    the claim. **Expected:** you land on the client dashboard with a **"Projects set
-   up for you"** card listing the jobs and **Accept / Decline**. Accept it.
-   **Expected:** the card flips to **Accepted**, and back in the PM cockpit the
-   project shows **Accepted** (the PM also gets a notification). Decline on a second
-   project instead and confirm it shows **Declined**. (Dispatch to contractors is
-   P3b-2.)
-9. **Project money / permission seam (rules).** The project doc is server-managed:
+   up for you"** card listing the jobs and **Accept**. Accept opens an **address
+   form** (where the work is); fill it and **Confirm & accept**. **Expected:** the
+   card flips to **Accepted**, and back in the PM cockpit the project shows
+   **Accepted** (the PM gets a notification). Decline on a second project instead
+   and confirm it shows **Declined**.
+9. **Dispatch + compare-and-choose (P3b-2).** Pre-req: the PM has at least one
+   **saved trade** whose trade matches a job in the project, and that tradesperson
+   is **visible/approved**. After the client accepts (path 8), sign in as that
+   tradesperson and open **Browse jobs**. **Expected:** an **"Invited to quote"**
+   section shows the scoped posting (visible even with no service area set; NOT in
+   the public radius feed). Open it, submit a full quote. Sign back in as the client,
+   open the posting from **Posted jobs**, and **accept** the quote (sign).
+   **Expected:** a real job is created carrying `projectId`, `propertyId`, and
+   `drivenByProjectManagerId` (the winner was a preferred contractor — the
+   commission trigger, P4). A tradesperson NOT on the PM's list never sees the
+   posting. (Public-board fallback when no preferred contractor bids is P3b-2b.)
+10. **Project money / permission seam (rules).** The project doc is server-managed:
    the client cannot forge `status` (no direct write) and only the project's own
-   client can accept/decline; only the owning PM or linked client can read it
-   (covered by `tests/rules/projects.test.ts` + `respondToProject` unit tests).
-10. **Mobile (375px).** Re-run the signup cards + cockpit + saved-trades + properties +
-   projects (incl. the client accept card) at 375px. **Expected:** the role cards stack
-   and stay tappable; the cockpit cards and the new-project form read cleanly.
+   client can accept/decline; only the owning PM or linked client reads it. A scoped
+   posting is readable + appliable only by an invited contractor (`status:"invited"`
+   + `invitedContractorIds`), and the job's PM fields are pinned immutable against
+   party writes (covered by `tests/rules/projects.test.ts`, the invited-post tests
+   in `tests/rules/jobPosts.test.ts`, the jobs-update pins, and `respondToProject`
+   unit tests).
+11. **Mobile (375px).** Re-run the signup cards + cockpit + saved-trades + properties +
+   projects (incl. the client accept + address form) and the tradesperson "Invited to
+   quote" section at 375px. **Expected:** the role cards stack and stay tappable; the
+   cockpit cards, the new-project form, and the accept address form read cleanly.
 
 ---
 
@@ -584,5 +600,6 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 - [ ] 13.4 Save a trade → Saved trades tab + PM cockpit; Request re-hires; remove works
 - [ ] 13.5 Claim recruiting code; /join?pm= signup → tradesperson; free month at go-live + appears in PM saved trades; rep ?ref= unaffected
 - [ ] 13.6 Properties: add / edit / archive a property in the cockpit
-- [ ] 13.7 Projects: create + invite a client → claim via magic link → accept/decline on the dashboard (status reflects in the cockpit)
-- [ ] 13.8 Project seam: client can't forge status; only the linked client/PM read it (rules + respondToProject tests)
+- [ ] 13.7 Projects: create + invite a client → claim via magic link → accept (address form) / decline on the dashboard
+- [ ] 13.8 Dispatch: accepted project fans each job to matching preferred contractors ("Invited to quote"); client compares + accepts; won job carries projectId + drivenByProjectManagerId
+- [ ] 13.9 Project seam: client can't forge status; invited posting readable/appliable only by an invited contractor; job PM fields pinned (rules + unit tests)

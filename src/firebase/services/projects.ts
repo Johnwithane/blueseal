@@ -63,16 +63,32 @@ export async function claimProjectInvite(confirm: boolean): Promise<ClaimProject
   return res.data;
 }
 
-/** Client accepts or declines a claimed project bundle. Accept triggers dispatch (P3b-2). */
+export interface ProjectAcceptAddress {
+  line1: string;
+  city: string;
+  region: string;
+  postalCode: string;
+}
+
+/**
+ * Client accepts or declines a claimed project bundle. On accept, the client
+ * confirms the structured job address (required) — accept then fans each job out
+ * to the PM's preferred contractors as a scoped posting (P3b-2).
+ */
 export async function respondToProject(
   projectId: string,
   response: "accept" | "decline",
-): Promise<{ status: "accepted" | "declined" }> {
+  address: ProjectAcceptAddress | null = null,
+): Promise<{ status: "accepted" | "declined"; jobPostIds?: string[] }> {
   const fn = httpsCallable<
-    { projectId: string; response: "accept" | "decline" },
-    { status: "accepted" | "declined" }
+    {
+      projectId: string;
+      response: "accept" | "decline";
+      address: ProjectAcceptAddress | null;
+    },
+    { status: "accepted" | "declined"; jobPostIds?: string[] }
   >(functions, "respondToProject");
-  const res = await fn({ projectId, response });
+  const res = await fn({ projectId, response, address });
   return res.data;
 }
 

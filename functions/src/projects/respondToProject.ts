@@ -16,17 +16,31 @@ import { CALLABLE_OPTS } from "../lib/callable";
 import { db } from "../lib/admin";
 import { requireAuth } from "../lib/auth";
 import { notify } from "../lib/notify";
+import { dispatchScopedPostings, type DispatchJobSpec } from "./dispatch";
+
+// On accept, the client confirms a structured address for the work (P3b decision:
+// the address lives where the knowledge is). It's required to accept; geocoding
+// for the public-board fallback follows in P3b-2b.
+const AddressInput = z.object({
+  line1: z.string().trim().min(2).max(200),
+  city: z.string().trim().min(2).max(100),
+  region: z.string().trim().min(2).max(100),
+  postalCode: z.string().trim().min(3).max(12),
+});
 
 const Input = z.object({
   projectId: z.string().min(1).max(200),
   response: z.enum(["accept", "decline"]),
+  address: AddressInput.nullable().default(null),
 });
 
 interface ProjectData {
   projectManagerId: string;
   clientId: string | null;
+  propertyId?: string | null;
   label?: string;
   status?: string;
+  jobSpecs?: DispatchJobSpec[];
 }
 
 export const respondToProject = onCall(CALLABLE_OPTS, async (req) => {
@@ -53,13 +67,49 @@ export const respondToProject = onCall(CALLABLE_OPTS, async (req) => {
     (typeof user.displayName === "string" && user.displayName.trim()) || "Your client";
 
   if (response === "accept") {
-    await ref.update({
-      status: "accepted",
-      acceptedAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
+    if (!parsed.data.address) {
+      throw new HttpsError("invalid-argument", "An address is required to accept.");
+    }
+    const address = parsed.data.address;
+
+    // Flip claimed -> accepted in a transaction so two concurrent accepts can't
+    // both dispatch (the loser's guard fails). Dispatch happens AFTER, keyed off
+    // the now-accepted project.
+    await db.runTransaction(async (tx) => {
+      const fresh = await tx.get(ref);
+      if (!fresh.exists) throw new HttpsError("not-found", "Project not found.");
+      const p = fresh.data() as ProjectData;
+      if (p.clientId !== uid) {
+        throw new HttpsError("permission-denied", "This project isn't yours to respond to.");
+      }
+      if (p.status !== "claimed") {
+        throw new HttpsError("failed-precondition", "This project has already been responded to.");
+      }
+      tx.update(ref, {
+        status: "accepted",
+        acceptedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
     });
-    // P3b-2 DISPATCH HOOK: on accept, fan each jobSpec out to the PM's preferred
-    // contractors as a scoped ("invited") job posting. Added in the next increment.
+
+    // Dispatch one scoped posting per jobSpec to the PM's matching preferred
+    // contractors. Best-effort: a dispatch failure leaves the project accepted but
+    // un-posted (logged) rather than rolling back the client's accept.
+    let jobPostIds: string[] = [];
+    try {
+      jobPostIds = await dispatchScopedPostings({
+        projectId,
+        projectManagerId: project.projectManagerId,
+        propertyId: project.propertyId ?? null,
+        clientId: uid,
+        jobSpecs: Array.isArray(project.jobSpecs) ? project.jobSpecs : [],
+        address,
+      });
+      await ref.update({ jobPostIds, updatedAt: FieldValue.serverTimestamp() });
+    } catch (err) {
+      logger.error("respondToProject: dispatch failed after accept", { uid, projectId, err });
+    }
+
     try {
       await notify({
         userId: project.projectManagerId,
@@ -74,8 +124,8 @@ export const respondToProject = onCall(CALLABLE_OPTS, async (req) => {
     } catch (err) {
       logger.error("respondToProject: notify failed", { uid, projectId, err });
     }
-    logger.info("respondToProject: accepted", { uid, projectId });
-    return { status: "accepted" as const };
+    logger.info("respondToProject: accepted", { uid, projectId, postCount: jobPostIds.length });
+    return { status: "accepted" as const, jobPostIds };
   }
 
   await ref.update({

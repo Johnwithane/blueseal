@@ -668,6 +668,13 @@ const faqs: FaqItem[] = [
     audience: "tradesperson",
   },
   {
+    question: "What does \"Invited to quote\" mean on Browse jobs?",
+    answer:
+      "A project manager who has you in their trusted trades set up a job for their client and invited you to quote on it. It shows in a separate **Invited to quote** section on Browse jobs, and it appears even if your service area isn't set, because the invite is direct rather than based on distance. Open it and send a full quote like any other job post. The client compares the quotes from the trades the project manager invited and picks one. Only the invited trades can see and apply to it; if none of them bid, the client can open the job to the public board.",
+    categoryId: "for-tradespeople",
+    audience: "tradesperson",
+  },
+  {
     question: "How do I cancel or change my Blue Seal Pro plan?",
     answer:
       "Go to **Account → Blue Seal Pro** and open **Manage subscription**. That takes you to Stripe's secure portal where you can cancel, switch between monthly and annual, or update your card. If you cancel, you keep Pro until the end of the period you've already paid for. Cancelling during your free trial means no charge at all.",

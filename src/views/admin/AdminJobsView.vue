@@ -62,6 +62,7 @@ const regionOptions = computed(() =>
 // — these are only used here, so they stay local.
 const POST_STATUS_LABEL: Record<JobPostStatus, string> = {
   open: "Open",
+  invited: "Invited",
   closed: "Closed",
   cancelled: "Cancelled",
   expired: "Expired",
@@ -69,6 +70,7 @@ const POST_STATUS_LABEL: Record<JobPostStatus, string> = {
 };
 const POST_STATUS_SEVERITY: Record<JobPostStatus, StatusSeverity> = {
   open: "success",
+  invited: "info",
   closed: "secondary",
   cancelled: "danger",
   expired: "warn",

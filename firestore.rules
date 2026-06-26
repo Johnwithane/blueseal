@@ -627,75 +627,61 @@ service cloud.firestore {
           || request.resource.data.get('tradespersonArchivedAt', null)
               == resource.data.get('tradespersonArchivedAt', null)
         )
-        // pendingChange + statusBeforeHold are server-managed: only the
-        // request/respond/withdraw/resume callables (admin SDK, which bypasses
-        // rules) may write them. A party writing them directly would let the
-        // client fake/self-accept a cancel-or-hold request. `.get(field, null)`
-        // defaults so legacy docs (no field) don't lock every update out.
-        && (isAdmin()
-            || request.resource.data.get('pendingChange', null)
-                == resource.data.get('pendingChange', null))
-        && (isAdmin()
-            || request.resource.data.get('statusBeforeHold', null)
-                == resource.data.get('statusBeforeHold', null))
-        // clientInvite is server-managed: only createInviteJob / resendJobInvite /
-        // revokeJobInvite / claimJobInvite (admin SDK) may write it. A party
-        // forging status:"claimed" or swapping the email/tokenHash would subvert
-        // the bring-your-own-client claim flow.
-        && (isAdmin()
-            || request.resource.data.get('clientInvite', null)
-                == resource.data.get('clientInvite', null))
-        // acceptedOffline + inviteOriginated are server-stamped audit/reputation
-        // markers (offline-recorded jobs never feed public reviews) — a party
-        // must not be able to set or clear them.
-        && (isAdmin()
-            || request.resource.data.get('acceptedOffline', null)
-                == resource.data.get('acceptedOffline', null))
-        && (isAdmin()
-            || request.resource.data.get('inviteOriginated', null)
-                == resource.data.get('inviteOriginated', null))
-        // billingType is stamped server-side at quote acceptance and frozen
-        // thereafter — a party must not be able to flip their own job from
-        // fixed to hourly (or vice-versa) to change how clock-in prices time.
-        && (isAdmin()
-            || request.resource.data.get('billingType', null)
-                == resource.data.get('billingType', null))
-        // upfrontFee + serviceFeeCapUsedCents are server-managed (the upfront-fee
-        // callables + the Stripe webhook, admin SDK). Pinning upfrontFee also
-        // closes a tamper gap: a party could otherwise rewrite the amount/paidAt
-        // that onJobCompleted snapshots as the final-invoice credit.
-        // serviceFeeCapUsedCents is the cumulative per-job $99 fee counter — a
-        // party setting it could zero out the platform fee on later payments.
-        && (isAdmin()
-            || request.resource.data.get('upfrontFee', null)
-                == resource.data.get('upfrontFee', null))
-        && (isAdmin()
-            || request.resource.data.get('serviceFeeCapUsedCents', null)
-                == resource.data.get('serviceFeeCapUsedCents', null))
-        // originType / clientRef / recurringPlanId link a job to the Clients
-        // book + recurring-billing engine. Server-stamped at creation (recurring
-        // backing jobs) and frozen — a party must not be able to re-home a job
-        // to another contact or forge a recurring plan. `.get(field, null)`
-        // defaults so legacy jobs (no field) aren't locked out.
-        && (isAdmin()
-            || request.resource.data.get('originType', null)
-                == resource.data.get('originType', null))
-        && (isAdmin()
-            || request.resource.data.get('clientRef', null)
-                == resource.data.get('clientRef', null))
-        && (isAdmin()
-            || request.resource.data.get('recurringPlanId', null)
-                == resource.data.get('recurringPlanId', null))
-        // Uninsured-at-request acknowledgment is written once by the client at
-        // create and frozen thereafter — a party must not be able to add, clear,
-        // or backdate it after the fact. `.get(field, null)` defaults so legacy
-        // jobs (no field) aren't locked out.
-        && (isAdmin()
-            || request.resource.data.get('uninsuredAcknowledgedAtRequest', null)
-                == resource.data.get('uninsuredAcknowledgedAtRequest', null))
-        && (isAdmin()
-            || request.resource.data.get('uninsuredDisclosureVersion', null)
-                == resource.data.get('uninsuredDisclosureVersion', null))
+        // ── Server-managed fields, pinned immutable against direct party writes
+        // (only the matching admin-SDK callable may change them). isAdmin() is
+        // HOISTED ONCE over the whole group: by distribution,
+        //   (isAdmin() || p1) && (isAdmin() || p2) && ... ≡ isAdmin() || (p1 && p2 && ...)
+        // — same meaning, far fewer rule expressions (Firestore caps a single
+        // request at 1000 evaluated expressions, and re-checking isAdmin() per
+        // field blew past it). `.get(field, null)` defaults so legacy docs missing
+        // a field aren't locked out. Per field:
+        //  - pendingChange / statusBeforeHold: cancel-or-hold request state — a
+        //    party writing them could fake/self-accept a request.
+        //  - clientInvite: bring-your-own-client claim flow (status/email/tokenHash).
+        //  - acceptedOffline / inviteOriginated: audit/reputation markers (offline
+        //    jobs never feed public reviews).
+        //  - billingType: hourly-vs-fixed, frozen at acceptance.
+        //  - upfrontFee / serviceFeeCapUsedCents: money (upfront credit + the $99
+        //    cumulative platform-fee counter).
+        //  - originType / clientRef / recurringPlanId: Clients book + recurring linkage.
+        //  - drivenByProjectManagerId / projectId / propertyId: PM dispatch linkage
+        //    (drivenByProjectManagerId is the commission trigger).
+        //  - uninsuredAcknowledgedAtRequest / uninsuredDisclosureVersion: the
+        //    once-written uninsured-at-request acknowledgment.
+        && (isAdmin() || (
+            request.resource.data.get('pendingChange', null)
+                == resource.data.get('pendingChange', null)
+            && request.resource.data.get('statusBeforeHold', null)
+                == resource.data.get('statusBeforeHold', null)
+            && request.resource.data.get('clientInvite', null)
+                == resource.data.get('clientInvite', null)
+            && request.resource.data.get('acceptedOffline', null)
+                == resource.data.get('acceptedOffline', null)
+            && request.resource.data.get('inviteOriginated', null)
+                == resource.data.get('inviteOriginated', null)
+            && request.resource.data.get('billingType', null)
+                == resource.data.get('billingType', null)
+            && request.resource.data.get('upfrontFee', null)
+                == resource.data.get('upfrontFee', null)
+            && request.resource.data.get('serviceFeeCapUsedCents', null)
+                == resource.data.get('serviceFeeCapUsedCents', null)
+            && request.resource.data.get('originType', null)
+                == resource.data.get('originType', null)
+            && request.resource.data.get('clientRef', null)
+                == resource.data.get('clientRef', null)
+            && request.resource.data.get('recurringPlanId', null)
+                == resource.data.get('recurringPlanId', null)
+            && request.resource.data.get('drivenByProjectManagerId', null)
+                == resource.data.get('drivenByProjectManagerId', null)
+            && request.resource.data.get('projectId', null)
+                == resource.data.get('projectId', null)
+            && request.resource.data.get('propertyId', null)
+                == resource.data.get('propertyId', null)
+            && request.resource.data.get('uninsuredAcknowledgedAtRequest', null)
+                == resource.data.get('uninsuredAcknowledgedAtRequest', null)
+            && request.resource.data.get('uninsuredDisclosureVersion', null)
+                == resource.data.get('uninsuredDisclosureVersion', null)
+        ))
         // Direct (non-admin) status writes are limited to the two pre-commitment
         // client paths: marketplace intake advance (accepted→requested) and the
         // instant pre-commitment cancel (cancelJob, only from accepted/requested/
@@ -905,6 +891,13 @@ service cloud.firestore {
     // not by client-side stripping. All writes flow through callables.
     match /jobPosts/{postId} {
       function postOpen() { return resource.data.status == 'open'; }
+      // A scoped ("invited") posting (PM dispatch) is readable only by the
+      // contractors in invitedContractorIds (the PM's preferred trades for this
+      // job). `.get(...,[])` defaults so a normal post (no field) reads as empty.
+      function isInvitedToPost() {
+        return resource.data.status == 'invited'
+          && uid() in resource.data.get('invitedContractorIds', []);
+      }
       function isPostOwner() { return isSignedIn() && resource.data.clientId == uid(); }
       // Ownership by PARENT-post lookup, for nested subcollections whose own
       // docs don't carry clientId (private/meta) or that get LISTed unfiltered
@@ -921,9 +914,10 @@ service cloud.firestore {
           && get(/databases/$(database)/documents/tradespeople/$(uid())).data.isVisible == true;
       }
 
-      allow read:   if isPostOwner() || isAdmin() || (isVisibleTradie() && postOpen());
-      allow create: if false;  // createJobPost callable only
-      allow update: if false;  // marketplace callables only
+      allow read:   if isPostOwner() || isAdmin()
+        || (isVisibleTradie() && (postOpen() || isInvitedToPost()));
+      allow create: if false;  // createJobPost / project dispatch (admin SDK) only
+      allow update: if false;  // marketplace + project callables only
       allow delete: if isAdmin();
 
       match /private/{docId} {

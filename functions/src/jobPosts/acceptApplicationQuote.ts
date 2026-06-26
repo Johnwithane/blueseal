@@ -36,11 +36,20 @@ interface PostDoc {
   urgency: "flexible" | "this_week" | "urgent";
   preferredDateWindow: { start: Timestamp | null; end: Timestamp | null };
   addressPublic: { city: string; region: string };
+  // PM dispatch (P3b): set on scoped postings. createdByProjectManagerId is the
+  // originating PM; the job is PM-driven only when the winner is in the meta's
+  // preferredContractorIds (so a public-fallback win by an off-list contractor
+  // doesn't earn commission, but a preferred contractor who wins post-fallback does).
+  createdByProjectManagerId?: string | null;
+  projectId?: string | null;
+  propertyId?: string | null;
 }
 
 interface MetaDoc {
-  addressPrivate: { line1: string; fullPostal: string; geo: GeoPoint };
+  // geo is null on a scoped PM posting until the public-fallback geocode (P3b-2b).
+  addressPrivate: { line1: string; fullPostal: string; geo: GeoPoint | null };
   selectedApplicantId: string | null;
+  preferredContractorIds?: string[];
 }
 
 interface QuoteData {
@@ -139,7 +148,11 @@ export const acceptApplicationQuote = onCall(CALLABLE_OPTS, async (req) => {
       if (!postSnap.exists) throw new HttpsError("not-found", "Job post not found.");
       const post = postSnap.data() as PostDoc;
       if (post.clientId !== uid) throw new HttpsError("permission-denied", "Not your post.");
-      if (post.status !== "open") throw new HttpsError("failed-precondition", "Post is not open.");
+      // "invited" (PM-scoped) posts accept exactly like "open" ones — the client
+      // is still picking one quote; only the audience differed.
+      if (post.status !== "open" && post.status !== "invited") {
+        throw new HttpsError("failed-precondition", "Post is not open.");
+      }
       if (!metaSnap.exists) {
         throw new HttpsError("internal", "Post meta missing — refusing to accept.");
       }
@@ -201,6 +214,17 @@ export const acceptApplicationQuote = onCall(CALLABLE_OPTS, async (req) => {
       // Lock in hourly vs fixed from the accepted quote's line items.
       const billingType = resolveBillingType(quote.lineItems as QuoteLineKindLike[]);
 
+      // PM dispatch (P3b): the job carries its project/property; it's PM-DRIVEN
+      // (the commission trigger) only when the winning contractor is one of the
+      // PM's preferred contractors for this posting (meta.preferredContractorIds,
+      // which a public fallback never clears). An off-list public-fallback win
+      // keeps projectId but leaves drivenByProjectManagerId null.
+      const projectId = post.projectId ?? null;
+      const isPreferred =
+        Array.isArray(meta.preferredContractorIds) &&
+        meta.preferredContractorIds.includes(app.tradespersonId);
+      const drivenByProjectManagerId = isPreferred ? post.createdByProjectManagerId ?? null : null;
+
       tx.set(jobRef, {
         clientId: uid,
         tradespersonId: app.tradespersonId,
@@ -238,6 +262,15 @@ export const acceptApplicationQuote = onCall(CALLABLE_OPTS, async (req) => {
         cancelledBy: null,
         chatId: chatRef.id,
         sourcePostId: postId,
+        // PM dispatch linkage (null on a normal marketplace job).
+        ...(projectId
+          ? {
+              originType: "pm_project",
+              projectId,
+              propertyId: post.propertyId ?? null,
+              drivenByProjectManagerId,
+            }
+          : {}),
         ...(requiresUpfront
           ? {
               upfrontFee: {

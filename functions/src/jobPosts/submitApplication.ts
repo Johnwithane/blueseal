@@ -151,8 +151,15 @@ export const submitApplication = onCall(CALLABLE_OPTS, async (req) => {
         title?: string;
         trade?: string;
         addressPublic?: { city?: string };
+        invitedContractorIds?: string[];
       };
-      if (post.status !== "open") {
+      // A scoped ("invited") posting (PM dispatch) is open ONLY to the invited
+      // contractors; everyone else can apply to a public ("open") post.
+      const invitedOk =
+        post.status === "invited" &&
+        Array.isArray(post.invitedContractorIds) &&
+        post.invitedContractorIds.includes(uid);
+      if (post.status !== "open" && !invitedOk) {
         throw new HttpsError("failed-precondition", "This job post is no longer open.");
       }
       if (post.expiresAt && post.expiresAt.toMillis() < Date.now()) {

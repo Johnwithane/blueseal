@@ -196,6 +196,10 @@ export interface ProjectDoc {
   jobSpecs: ProjectJobSpec[];
   status: ProjectStatus;
   projectInvite: ProjectInvite | null;
+  // The scoped job postings created when the client accepted (P3b-2). One per
+  // jobSpec; lets the owning PM enumerate the project's postings for read-only
+  // visibility (P3b-3). Absent until accept.
+  jobPostIds?: string[];
   claimedAt: Timestamp | null;
   acceptedAt: Timestamp | null;
   declinedAt: Timestamp | null;
@@ -1354,7 +1358,7 @@ export interface JobDoc {
   // for a client's recurring charge — they're filtered out of the kanban /
   // calendar and surfaced only under the client. Absent on legacy jobs (treat
   // as "direct").
-  originType?: "direct" | "invite" | "marketplace" | "recurring_plan" | null;
+  originType?: "direct" | "invite" | "marketplace" | "recurring_plan" | "pm_project" | null;
   // -> clients/{clientId}: the tradesperson-owned contact this job belongs to.
   // Set server-side (currently only on recurring backing jobs); drives the
   // per-client history rollup. Null/absent when the job isn't linked to a
@@ -1364,6 +1368,16 @@ export interface JobDoc {
   // "plan" is jobs/{recurringPlanId} + its recurring template invoice. Null on
   // every non-recurring job.
   recurringPlanId?: string | null;
+  // ---- Project Manager dispatch linkage (P3b). All optional and server-stamped
+  // at quote acceptance (acceptApplicationQuote); rules pin them immutable against
+  // party writes. Legacy/non-PM jobs read them as undefined/null. ----
+  // The PM who ORIGINATED this job (set ONLY when the winning contractor is one of
+  // that PM's preferred contractors — the commission trigger). A public-fallback
+  // win by an off-list contractor leaves this null even when projectId is set.
+  drivenByProjectManagerId?: string | null;
+  // The project + property this job belongs to (carried from the scoped posting).
+  projectId?: string | null;
+  propertyId?: string | null;
   // ---- Uninsured-tradesperson awareness (direct-request flow) ----
   // Set by the client at request time (RequestQuoteView → createJob) when the
   // tradesperson they're requesting has no current liability insurance: the
@@ -1600,7 +1614,17 @@ export interface SiteVisitDoc {
 // callable: a NON-terminal status (so onJobPostClosed doesn't auto-reject pending
 // applicants) that the feed + public read rule exclude (both gate on "open").
 // Recoverable — statusBeforeHide carries the status to restore.
-export type JobPostStatus = "open" | "closed" | "cancelled" | "expired" | "admin_hidden";
+// "invited" is a SCOPED-open status (Project Manager dispatch, P3b): the post is
+// live but visible only to the contractors in `invitedContractorIds` (the PM's
+// preferred trades matching this job), NOT the public geohash feed (which gates on
+// "open"). A public fallback flips it "invited" -> "open" and clears the scope.
+export type JobPostStatus =
+  | "open"
+  | "invited"
+  | "closed"
+  | "cancelled"
+  | "expired"
+  | "admin_hidden";
 
 export interface AddressPublic {
   city: string;
@@ -1612,8 +1636,11 @@ export interface AddressPublic {
 export interface AddressPrivate {
   line1: string;
   fullPostal: string;
-  geo: GeoPoint;
-  geohashExact: string; // length 9
+  // Null on a Project Manager scoped posting created before the address is
+  // geocoded (P3b: the client confirms a structured address at accept; geocoding
+  // for the public-board fallback follows). A real posting always has it.
+  geo: GeoPoint | null;
+  geohashExact: string; // length 9 (empty on an un-geocoded scoped posting)
 }
 
 export interface BudgetRange {
@@ -1660,6 +1687,19 @@ export interface JobPostDoc {
   closedAt: Timestamp | null;
   acceptedAt: Timestamp | null;
   editedAt: Timestamp | null;
+  // ---- Project Manager dispatch (P3b). Present only on scoped postings created
+  // when a client accepts a PM project. ----
+  // The contractors allowed to see + apply while status === "invited" (the PM's
+  // preferred trades matching this job). The read rule + the invited-feed query
+  // key on this; a public fallback clears it (-> []) when flipping to "open", so
+  // it never leaks the invitee uids to the public board.
+  invitedContractorIds?: string[];
+  // The PM who set up the originating project, and the project/property it belongs
+  // to. Carried onto the converted JobDoc; the commission trigger
+  // (drivenByProjectManagerId) is set only when the winner is a preferred contractor.
+  createdByProjectManagerId?: string | null;
+  projectId?: string | null;
+  propertyId?: string | null;
 }
 
 // jobPosts/{postId}/private/meta — single doc, client + admin read only.
@@ -1667,6 +1707,12 @@ export interface JobPostMetaDoc {
   addressPrivate: AddressPrivate;
   applicationCount: number;
   selectedApplicantId: string | null;
+  // The PM's preferred-contractor set for this posting, captured at dispatch and
+  // NEVER cleared (unlike invitedContractorIds, which a public fallback wipes).
+  // acceptApplicationQuote checks membership here to decide PM-driven commission —
+  // so a preferred contractor who wins even AFTER a public fallback still counts.
+  // Lives in the bid-blind meta doc so the invitee set isn't exposed to bidders.
+  preferredContractorIds?: string[];
 }
 
 // ---------------------------------------------------------------------------

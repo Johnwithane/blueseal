@@ -18,6 +18,7 @@ import {
   CLIENT_CLAIMS,
   CLIENT_UID,
   OTHER_CLIENT_UID,
+  OTHER_TRADIE_UID,
   TRADIE_CLAIMS,
   TRADIE_UID,
   setupTestEnv,
@@ -72,5 +73,42 @@ describe("jobPosts/{id}/private/meta — owner read access", () => {
   it("a tradesperson cannot read a post's private meta (bid-blind)", async () => {
     await seed();
     await assertFails(getDoc(doc(fsAs(TRADIE_UID, TRADIE_CLAIMS), ...META_PATH)));
+  });
+});
+
+// Scoped ("invited") postings (PM dispatch): readable only by the invited
+// contractors (+ owner/admin), NOT every visible tradie — the read rule gates on
+// status == 'invited' && uid in invitedContractorIds.
+const INVITED_POST_ID = "post_invited_1";
+
+async function seedInvitedPost() {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const fs = ctx.firestore();
+    await setDoc(doc(fs, "tradespeople", TRADIE_UID), { isVisible: true });
+    await setDoc(doc(fs, "tradespeople", OTHER_TRADIE_UID), { isVisible: true });
+    await setDoc(doc(fs, "jobPosts", INVITED_POST_ID), {
+      clientId: CLIENT_UID,
+      status: "invited",
+      invitedContractorIds: [TRADIE_UID],
+    });
+  });
+}
+
+describe("jobPosts — invited (scoped) postings read access", () => {
+  it("an invited, visible tradesperson can read the scoped posting", async () => {
+    await seedInvitedPost();
+    await assertSucceeds(getDoc(doc(fsAs(TRADIE_UID, TRADIE_CLAIMS), "jobPosts", INVITED_POST_ID)));
+  });
+
+  it("a visible tradesperson NOT in the invited set cannot read it", async () => {
+    await seedInvitedPost();
+    await assertFails(
+      getDoc(doc(fsAs(OTHER_TRADIE_UID, TRADIE_CLAIMS), "jobPosts", INVITED_POST_ID)),
+    );
+  });
+
+  it("the post-owning client can read their scoped posting", async () => {
+    await seedInvitedPost();
+    await assertSucceeds(getDoc(doc(fsAs(CLIENT_UID, CLIENT_CLAIMS), "jobPosts", INVITED_POST_ID)));
   });
 });

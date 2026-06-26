@@ -200,6 +200,21 @@ const isClient = computed(
 );
 const isTradie = computed(() => auth.activeRole === "tradesperson");
 
+// A scoped ("invited") posting (PM dispatch) behaves like an open post for the
+// invited contractors: they can apply, and the owner can accept a quote. Treat
+// "open" and "invited" the same for the apply/accept surfaces.
+const amInvited = computed(
+  () =>
+    post.value?.status === "invited" &&
+    !!auth.fbUser?.uid &&
+    (post.value.invitedContractorIds ?? []).includes(auth.fbUser.uid),
+);
+const canApply = computed(() => post.value?.status === "open" || amInvited.value);
+// Owner-side: an applicant is acceptable while the post is still taking quotes.
+const acceptable = computed(
+  () => post.value?.status === "open" || post.value?.status === "invited",
+);
+
 // Trade-specific questionnaire captured at post time, shown read-only to both
 // the client and applying tradies so quotes are grounded in real detail.
 const postIntakeFields = computed<IntakeField[]>(() =>
@@ -621,7 +636,11 @@ const visibleApplications = computed(() => {
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
           <div>
             <div class="text-xs text-[color:var(--bs-muted)]">Budget</div>
-            <div class="font-medium">{{ formatBudget(post.budget.min, post.budget.max) }} CAD</div>
+            <!-- Scoped PM postings carry no budget (0/0) — the client wants a quote. -->
+            <div v-if="post.budget.max > 0" class="font-medium">
+              {{ formatBudget(post.budget.min, post.budget.max) }} CAD
+            </div>
+            <div v-else class="font-medium">Quote requested</div>
           </div>
           <div>
             <div class="text-xs text-[color:var(--bs-muted)]">Location</div>
@@ -708,7 +727,7 @@ const visibleApplications = computed(() => {
             :key="app.id"
             :app="app"
             :tradie="applicantTradies.get(app.tradespersonId) ?? null"
-            :post-open="post.status === 'open'"
+            :post-open="acceptable"
             :accepting="submittingAcceptQuote"
             :client-uid="auth.fbUser?.uid ?? null"
             @accept-quote="onAcceptQuote"
@@ -719,8 +738,8 @@ const visibleApplications = computed(() => {
         </div>
       </template>
 
-      <!-- TRADIE VIEW -->
-      <template v-else-if="isTradie && post.status === 'open'">
+      <!-- TRADIE VIEW (open posts + scoped postings the viewer is invited to) -->
+      <template v-else-if="isTradie && canApply">
         <!-- Know someone better suited? Available whether or not you've applied. -->
         <div class="mt-4 flex justify-end">
           <Button
@@ -967,7 +986,7 @@ const visibleApplications = computed(() => {
       </template>
 
       <Message
-        v-else-if="isTradie && post.status !== 'open'"
+        v-else-if="isTradie && !canApply"
         severity="info"
         :closable="false"
         class="mt-6"

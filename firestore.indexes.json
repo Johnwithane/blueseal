@@ -225,6 +225,14 @@
       ]
     },
     {
+      "collectionGroup": "jobPosts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "invitedContractorIds", "arrayConfig": "CONTAINS" }
+      ]
+    },
+    {
       "collectionGroup": "applications",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
