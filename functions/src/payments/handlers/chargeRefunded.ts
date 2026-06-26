@@ -12,6 +12,7 @@ import { logger } from "firebase-functions/v2";
 import { db } from "../../lib/admin";
 import { notify } from "../../lib/notify";
 import { reverseCommission } from "../../lib/commissionAccrual";
+import { reversePmServiceFee } from "../../lib/pmCommission";
 import type { StripeCharge, StripeRefund } from "./shared";
 
 /** The Stripe invoice id a charge settled (subscription charges only), or null. */
@@ -231,6 +232,15 @@ export async function handleChargeRefunded(
       await reverseCommission({ source: "service_fee", sourceRef: ref.id });
     } catch (err) {
       logger.error("chargeRefunded: service-fee commission reversal failed", {
+        invoiceId: ref.id,
+        err: err instanceof Error ? err.message : String(err),
+      });
+    }
+    // Mirror for the PM commission (P4) when the job was PM-driven. No-ops otherwise.
+    try {
+      await reversePmServiceFee({ invoiceId: ref.id });
+    } catch (err) {
+      logger.error("chargeRefunded: PM commission reversal failed", {
         invoiceId: ref.id,
         err: err instanceof Error ? err.message : String(err),
       });

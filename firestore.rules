@@ -483,12 +483,22 @@ service cloud.firestore {
     // are SERVER-ONLY (accrual hooks + the payout scheduler, Admin SDK) — a rep
     // can never mint or edit their own commission. A rep lists their own with
     // where('repId','==',uid()); the per-doc predicate authorizes that query.
+    // Read by admin, the owning rep (repId), or the owning PM (P4: ownerType "pm"
+    // + ownerId == uid). Writes are server-only (accrual hooks + payout scheduler).
     match /commissions/{commissionId} {
-      allow read: if isAdmin() || (resource != null && resource.data.repId == uid());
+      allow read: if isAdmin()
+        || (resource != null && resource.data.repId == uid())
+        || (resource != null
+            && resource.data.get('ownerType', null) == 'pm'
+            && resource.data.get('ownerId', null) == uid());
       allow create, update, delete: if false;
     }
     match /commissionPayouts/{batchId} {
-      allow read: if isAdmin() || (resource != null && resource.data.repId == uid());
+      allow read: if isAdmin()
+        || (resource != null && resource.data.repId == uid())
+        || (resource != null
+            && resource.data.get('ownerType', null) == 'pm'
+            && resource.data.get('ownerId', null) == uid());
       allow create, update, delete: if false;
     }
 

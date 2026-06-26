@@ -28,6 +28,7 @@ import { notify } from "../../lib/notify";
 import { postSystemMessage } from "../../lib/chatSystemMessage";
 import { seedReviewPairAndNotify } from "../../lib/reviewPair";
 import { accrueCommission } from "../../lib/commissionAccrual";
+import { accruePmServiceFee } from "../../lib/pmCommission";
 import type { StripePaymentIntent } from "./shared";
 
 interface InvoiceLookup {
@@ -238,6 +239,26 @@ export async function handlePaymentIntentSucceeded(
     });
   } catch (err) {
     logger.error("paymentIntent succeeded: commission accrual failed", {
+      invoiceId: inv.ref.id,
+      err: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  // PM commission accrual (P4) — ADDITIVE + independent of the rep accrual above.
+  // If this job was PM-driven (a PM's preferred contractor won a job they
+  // originated), the PM earns 10% of the SAME platform fee. Owner-scoped ledger
+  // id so it coexists with the rep entry; guarded so it can never roll back the
+  // payment. No-ops on non-PM jobs.
+  try {
+    await accruePmServiceFee({
+      // Service-fee invoices are keyed by jobId; fall back to the doc id.
+      jobId: inv.data.jobId ?? inv.ref.id,
+      invoiceId: inv.ref.id,
+      tradespersonId: result.tradespersonId,
+      grossCents: inv.data.payment?.serviceFee?.platformPortionCents ?? 0,
+    });
+  } catch (err) {
+    logger.error("paymentIntent succeeded: PM commission accrual failed", {
       invoiceId: inv.ref.id,
       err: err instanceof Error ? err.message : String(err),
     });

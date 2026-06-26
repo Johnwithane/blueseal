@@ -226,12 +226,22 @@ export interface ReferralCodeDoc {
 // `reversed` entry referencing the original, never a negative accrual.
 // ---------------------------------------------------------------------------
 export type CommissionSource = "subscription" | "service_fee";
-export type CommissionOwnerKind = "referral" | "region";
+// "pm_project": a Project Manager earned on a job they originated (P4). Rep
+// entries stay "referral"/"region".
+export type CommissionOwnerKind = "referral" | "region" | "pm_project";
 export type CommissionStatus = "accrued" | "reversed" | "paid";
+// Who the entry pays. Absent on legacy rep entries (treat as "rep"). A PM-driven
+// job accrues a SECOND "pm" entry alongside the rep entry on the same fee.
+export type CommissionOwnerType = "rep" | "pm";
 
 export interface CommissionDoc {
-  repId: string;
-  /** Region the tradesperson belongs to (null for a referral with no region). */
+  // The payee discriminator + uid. Absent on legacy rep entries; new rep entries
+  // still set repId as the payee, PM entries set ownerType "pm" + ownerId = pmId.
+  ownerType?: CommissionOwnerType;
+  ownerId?: string;
+  /** The owning rep, or null on a PM entry (which has no rep). */
+  repId: string | null;
+  /** Region the tradesperson belongs to (null for a referral with no region, or a PM entry). */
   regionId: string | null;
   tradespersonId: string;
   ownerKind: CommissionOwnerKind;
@@ -255,7 +265,12 @@ export interface CommissionDoc {
 export type CommissionPayoutStatus = "pending" | "paid" | "failed";
 
 export interface CommissionPayoutDoc {
-  repId: string;
+  // Payee discriminator + uid (P4). Absent on legacy rep batches (treat as "rep").
+  // PM batches set ownerType "pm" + ownerId = pmId; rep batches keep repId.
+  ownerType?: CommissionOwnerType;
+  ownerId?: string;
+  /** The owning rep, or null on a PM payout batch. */
+  repId: string | null;
   stripeTransferId: string | null;
   amountCents: number;
   commissionIds: string[];

@@ -24,6 +24,7 @@ import { db } from "../../lib/admin";
 import { logAdminAction } from "../../lib/audit";
 import { notify, notifyMany } from "../../lib/notify";
 import { reverseCommission } from "../../lib/commissionAccrual";
+import { reversePmServiceFee } from "../../lib/pmCommission";
 import type { StripeDispute } from "./shared";
 
 function chargeId(d: StripeDispute): string {
@@ -240,6 +241,15 @@ export async function handleChargeDisputeClosed(
         await reverseCommission({ source: "service_fee", sourceRef: inv.ref.id });
       } catch (err) {
         logger.error("disputeClosed: commission reversal failed", {
+          invoiceId: inv.ref.id,
+          err: err instanceof Error ? err.message : String(err),
+        });
+      }
+      // Mirror for the PM commission (P4) when the job was PM-driven. No-ops otherwise.
+      try {
+        await reversePmServiceFee({ invoiceId: inv.ref.id });
+      } catch (err) {
+        logger.error("disputeClosed: PM commission reversal failed", {
           invoiceId: inv.ref.id,
           err: err instanceof Error ? err.message : String(err),
         });

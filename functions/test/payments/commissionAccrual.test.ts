@@ -15,7 +15,13 @@ vi.mock("../../src/lib/admin", async () => {
 });
 
 import { resolveCommissionOwner } from "../../src/lib/commissionOwner";
-import { accrueCommission, reverseCommission } from "../../src/lib/commissionAccrual";
+import {
+  accrueCommission,
+  reverseCommission,
+  accruePmCommission,
+  reversePmCommission,
+} from "../../src/lib/commissionAccrual";
+import { accruePmServiceFee, reversePmServiceFee } from "../../src/lib/pmCommission";
 import { db } from "../../src/lib/admin";
 
 const fakeDb = db as unknown as FakeFirestore;
@@ -227,5 +233,153 @@ describe("reverseCommission", () => {
   it("no-ops when there was no accrual to reverse", async () => {
     await reverseCommission({ source: "service_fee", sourceRef: "never-accrued" });
     expect(fakeDb.peekUnder("commissions")).toHaveLength(0);
+  });
+});
+
+// ── Project Manager commission (P4) — additive to the rep accrual ────────────
+const PM = "pm-1";
+
+describe("accruePmCommission / reversePmCommission (owner-scoped, additive)", () => {
+  it("writes a pm-scoped 10% entry that COEXISTS with the rep entry on the same fee", async () => {
+    // Rep entry (existing path) + PM entry (new path) on the same invoice.
+    seedTradie({ referredByRepId: REP });
+    seedRep(REP);
+    await accrueCommission({
+      tradespersonId: TID,
+      source: "service_fee",
+      sourceRef: "inv-pm",
+      grossCents: 5000,
+    });
+    await accruePmCommission({
+      pmId: PM,
+      tradespersonId: TID,
+      source: "service_fee",
+      sourceRef: "inv-pm",
+      grossCents: 5000,
+    });
+
+    // Two distinct ledger docs, distinct ids — neither overwrote the other.
+    expect(fakeDb.peekUnder("commissions")).toHaveLength(2);
+    expect(fakeDb.peek("commissions/service_fee_inv-pm")).toMatchObject({
+      repId: REP,
+      commissionCents: 500,
+    });
+    expect(fakeDb.peek("commissions/service_fee_inv-pm_pm_pm-1")).toMatchObject({
+      ownerType: "pm",
+      ownerId: PM,
+      repId: null,
+      ownerKind: "pm_project",
+      commissionCents: 500,
+      status: "accrued",
+      reversalOf: null,
+    });
+  });
+
+  it("is idempotent — a PM replay overwrites the same pm-scoped doc", async () => {
+    const input = {
+      pmId: PM,
+      tradespersonId: TID,
+      source: "service_fee" as const,
+      sourceRef: "inv-rep",
+      grossCents: 5000,
+    };
+    await accruePmCommission(input);
+    await accruePmCommission(input);
+    expect(fakeDb.peekUnder("commissions")).toHaveLength(1);
+  });
+
+  it("no-ops when the PM commission rounds to 0", async () => {
+    await accruePmCommission({
+      pmId: PM,
+      tradespersonId: TID,
+      source: "service_fee",
+      sourceRef: "inv-zero",
+      grossCents: 0,
+    });
+    expect(fakeDb.peekUnder("commissions")).toHaveLength(0);
+  });
+
+  it("reverses with an offsetting pm-scoped entry, leaving the original accrual", async () => {
+    await accruePmCommission({
+      pmId: PM,
+      tradespersonId: TID,
+      source: "service_fee",
+      sourceRef: "inv-rev",
+      grossCents: 5000,
+    });
+    await reversePmCommission({ pmId: PM, source: "service_fee", sourceRef: "inv-rev" });
+
+    expect(fakeDb.peek("commissions/service_fee_inv-rev_pm_pm-1_reversal")).toMatchObject({
+      ownerType: "pm",
+      ownerId: PM,
+      status: "reversed",
+      reversalOf: "service_fee_inv-rev_pm_pm-1",
+      commissionCents: 500,
+    });
+    expect(fakeDb.peek("commissions/service_fee_inv-rev_pm_pm-1")).toMatchObject({
+      status: "accrued",
+    });
+    expect(fakeDb.peekUnder("commissions")).toHaveLength(2);
+  });
+
+  it("reversal no-ops when there was no PM accrual", async () => {
+    await reversePmCommission({ pmId: PM, source: "service_fee", sourceRef: "nope" });
+    expect(fakeDb.peekUnder("commissions")).toHaveLength(0);
+  });
+});
+
+describe("accruePmServiceFee / reversePmServiceFee (resolve the driving PM)", () => {
+  it("accrues to the PM when the job is PM-driven and the PM is active", async () => {
+    fakeDb.seed(`jobs/job-1`, { drivenByProjectManagerId: PM });
+    fakeDb.seed(`users/${PM}`, { projectManager: { active: true } });
+    await accruePmServiceFee({
+      jobId: "job-1",
+      invoiceId: "job-1",
+      tradespersonId: TID,
+      grossCents: 5000,
+    });
+    expect(fakeDb.peek("commissions/service_fee_job-1_pm_pm-1")).toMatchObject({
+      ownerType: "pm",
+      commissionCents: 500,
+    });
+  });
+
+  it("no-ops when the job is not PM-driven", async () => {
+    fakeDb.seed(`jobs/job-2`, { drivenByProjectManagerId: null });
+    await accruePmServiceFee({
+      jobId: "job-2",
+      invoiceId: "job-2",
+      tradespersonId: TID,
+      grossCents: 5000,
+    });
+    expect(fakeDb.peekUnder("commissions")).toHaveLength(0);
+  });
+
+  it("no-ops when the driving PM is deactivated", async () => {
+    fakeDb.seed(`jobs/job-3`, { drivenByProjectManagerId: PM });
+    fakeDb.seed(`users/${PM}`, { projectManager: { active: false } });
+    await accruePmServiceFee({
+      jobId: "job-3",
+      invoiceId: "job-3",
+      tradespersonId: TID,
+      grossCents: 5000,
+    });
+    expect(fakeDb.peekUnder("commissions")).toHaveLength(0);
+  });
+
+  it("reverses via the invoice -> job lookup (no active check, so a refund always lands)", async () => {
+    fakeDb.seed(`jobs/job-4`, { drivenByProjectManagerId: PM });
+    fakeDb.seed(`invoices/job-4`, { jobId: "job-4" });
+    await accruePmCommission({
+      pmId: PM,
+      tradespersonId: TID,
+      source: "service_fee",
+      sourceRef: "job-4",
+      grossCents: 5000,
+    });
+    await reversePmServiceFee({ invoiceId: "job-4" });
+    expect(fakeDb.peek("commissions/service_fee_job-4_pm_pm-1_reversal")).toMatchObject({
+      status: "reversed",
+    });
   });
 });

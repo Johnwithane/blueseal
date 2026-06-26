@@ -141,3 +141,113 @@ export async function reverseCommission(
     commissionCents: orig.commissionCents ?? 0,
   });
 }
+
+// ---------------------------------------------------------------------------
+// Project Manager commission (P4) — ADDITIVE to the rep accrual above. A
+// PM-driven job (job.drivenByProjectManagerId set) earns the PM 10% of the same
+// service fee the rep earns on, so BOTH entries coexist on one fee. The rep
+// functions above are deliberately untouched (their deterministic id stays
+// `${source}_${sourceRef}`); the PM entry uses an OWNER-SCOPED id
+// `${source}_${sourceRef}_pm_${pmId}` so the two never collide. Same idempotency
+// + non-destructive-reversal invariants.
+// ---------------------------------------------------------------------------
+
+/** Owner-scoped accrual id so the PM entry coexists with the rep entry on one fee. */
+function pmAccrualId(source: CommissionSource, sourceRef: string, pmId: string): string {
+  return `${source}_${sourceRef}_pm_${pmId}`;
+}
+function pmReversalId(source: CommissionSource, sourceRef: string, pmId: string): string {
+  return `${source}_${sourceRef}_pm_${pmId}_reversal`;
+}
+
+export interface AccruePmCommissionInput {
+  pmId: string;
+  tradespersonId: string;
+  source: CommissionSource;
+  sourceRef: string;
+  grossCents: number;
+}
+
+/**
+ * Accrue the project manager's 10% commission on a PM-driven job's fee. Mirrors
+ * accrueCommission but pays the PM (ownerType "pm", ownerId = pmId, repId null)
+ * with an owner-scoped deterministic id. No-ops when the commission rounds to 0.
+ * Idempotent: a webhook replay overwrites the same PM ledger doc.
+ */
+export async function accruePmCommission(input: AccruePmCommissionInput): Promise<void> {
+  const cents = commissionCents(input.grossCents);
+  if (cents === 0) return;
+
+  const id = pmAccrualId(input.source, input.sourceRef, input.pmId);
+  await db.doc(`commissions/${id}`).set(
+    {
+      ownerType: "pm",
+      ownerId: input.pmId,
+      repId: null,
+      regionId: null,
+      tradespersonId: input.tradespersonId,
+      ownerKind: "pm_project",
+      source: input.source,
+      sourceRef: input.sourceRef,
+      grossRevenueCents: input.grossCents,
+      rateBps: COMMISSION_RATE_BPS,
+      commissionCents: cents,
+      status: "accrued",
+      payoutBatchId: null,
+      reversalOf: null,
+      createdAt: FieldValue.serverTimestamp(),
+    },
+    { merge: false },
+  );
+
+  logger.info("pm commission accrued", {
+    id,
+    pmId: input.pmId,
+    source: input.source,
+    sourceRef: input.sourceRef,
+    commissionCents: cents,
+  });
+}
+
+export interface ReversePmCommissionInput {
+  pmId: string;
+  source: CommissionSource;
+  sourceRef: string;
+}
+
+/** Reverse a PM accrual (full refund / lost dispute) with an offsetting entry. */
+export async function reversePmCommission(input: ReversePmCommissionInput): Promise<void> {
+  const originalId = pmAccrualId(input.source, input.sourceRef, input.pmId);
+  const snap = await db.doc(`commissions/${originalId}`).get();
+  if (!snap.exists) return; // nothing accrued → nothing to reverse
+
+  const orig = snap.data() ?? {};
+  const id = pmReversalId(input.source, input.sourceRef, input.pmId);
+  await db.doc(`commissions/${id}`).set(
+    {
+      ownerType: "pm",
+      ownerId: input.pmId,
+      repId: null,
+      regionId: null,
+      tradespersonId: orig.tradespersonId,
+      ownerKind: "pm_project",
+      source: input.source,
+      sourceRef: input.sourceRef,
+      grossRevenueCents: orig.grossRevenueCents ?? 0,
+      rateBps: orig.rateBps ?? COMMISSION_RATE_BPS,
+      commissionCents: orig.commissionCents ?? 0,
+      status: "reversed",
+      payoutBatchId: null,
+      reversalOf: originalId,
+      createdAt: FieldValue.serverTimestamp(),
+    },
+    { merge: false },
+  );
+
+  logger.info("pm commission reversed", {
+    id,
+    reversalOf: originalId,
+    pmId: input.pmId,
+    commissionCents: orig.commissionCents ?? 0,
+  });
+}

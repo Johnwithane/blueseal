@@ -101,6 +101,54 @@ describe("commissions ledger — read access", () => {
   });
 });
 
+// P4: PM-driven commission entries (ownerType "pm" + ownerId). Read by the owning
+// PM, not by other PMs or via the repId path (repId is null on a PM entry).
+const PM_UID = "pm-comm-uid";
+const PM_CLAIMS = { roles: ["client", "projectManager"], role: "client" };
+const PM_COMMISSION_ID = "comm-pm-1";
+
+async function seedPmCommission() {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), "commissions", PM_COMMISSION_ID), {
+      ownerType: "pm",
+      ownerId: PM_UID,
+      repId: null,
+      regionId: null,
+      tradespersonId: "tradie-1",
+      ownerKind: "pm_project",
+      source: "service_fee",
+      sourceRef: "invoice-2",
+      grossRevenueCents: 5000,
+      rateBps: 1000,
+      commissionCents: 500,
+      status: "accrued",
+      payoutBatchId: null,
+      reversalOf: null,
+      createdAt: new Date(),
+    });
+  });
+}
+
+describe("commissions ledger — PM entries (P4)", () => {
+  it("the owning PM can read their PM commission", async () => {
+    await seedPmCommission();
+    const fs = env.authenticatedContext(PM_UID, PM_CLAIMS).firestore();
+    await assertSucceeds(getDoc(doc(fs, "commissions", PM_COMMISSION_ID)));
+  });
+
+  it("a different PM cannot read someone else's PM commission", async () => {
+    await seedPmCommission();
+    const fs = env.authenticatedContext("other-pm-uid", PM_CLAIMS).firestore();
+    await assertFails(getDoc(doc(fs, "commissions", PM_COMMISSION_ID)));
+  });
+
+  it("the owning rep on a different fee can't read a PM entry via the repId path", async () => {
+    await seedPmCommission();
+    const fs = env.authenticatedContext(REP_UID, REP_CLAIMS).firestore();
+    await assertFails(getDoc(doc(fs, "commissions", PM_COMMISSION_ID)));
+  });
+});
+
 describe("commissions ledger — server-only writes", () => {
   it("the rep cannot mint their own commission", async () => {
     const fs = env.authenticatedContext(REP_UID, REP_CLAIMS).firestore();
