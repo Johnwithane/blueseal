@@ -51,10 +51,11 @@ which hold **Jobs** (individual trade tasks).
 | `fba98db` | **P4b-1** monthly payout scheduler generalized to pay PMs (group by `(ownerType, ownerId)`, read `projectManager.payouts`) |
 | `2fd2bb0` | **P4b-2** `signPmAgreement` + PM Stripe Connect onboarding callables + `account.updated` PM routing |
 | `87636fb` | **P4b-3** cockpit Earnings UI: `PmEarningsPanel` + `PmAgreementDialog` + `usePmEarnings` + `pmPayoutsService` |
+| `9c009f3` | **P5a** public PM profile: `projectManagers/{uid}` doc + `claimPmProfileSlug` (+ `pmProfileSlugs` registry) + cockpit `PmProfilePanel` editor + public `ProjectManagerProfileView` (`/pm/:slug` + `/project-managers/:uid`) + rules/storage/tests |
 
 Note: the role switcher is now driven by `src/data/roleViews.ts` (commit `cf1f711`, another session) — the single source of truth for role label/icon; it already includes `projectManager`. Don't reintroduce inline role maps.
 
-Test counts after P4: 450 app unit + 518 rules + 171 functions, all green.
+Test counts after P5a: 450 app unit + 527 rules + 171 functions, all green.
 
 Key data added in P3b: `projects/{projectId}` (ProjectDoc + ProjectInvite + ProjectJobSpec, server-managed); `JobPostStatus += "invited"`; `JobPostDoc.invitedContractorIds`/`createdByProjectManagerId`/`projectId`/`propertyId`; `JobPostMetaDoc.preferredContractorIds`; `JobDoc.drivenByProjectManagerId`/`projectId`/`propertyId` + `originType "pm_project"`; `AddressPrivate.geo` nullable. The jobs-update rule's server-field pins were hoisted under one `isAdmin()` (distributive equivalence) to stay under Firestore's 1000-expression-per-request limit — keep that shape if you add more pins.
 
@@ -105,7 +106,15 @@ called at `paymentIntent`/`chargeRefunded`/`chargeDispute`), `scheduledRepCommis
 (now owner-generic), `createPmConnect*` + `signPmAgreement`, `accountUpdated.ts` (pmId
 routing), `pmPayoutsService.ts` + `usePmEarnings` + `PmEarningsPanel`/`PmAgreementDialog`.
 
-### Still NOT verified on real Firestore (P3b + P4)
+## P5a — public PM profile — SHIPPED ✅ (commit above)
+
+A PM publishes a brand + bio page at `/pm/<slug>` (free, instant, PM-controlled
+`isVisible` toggle — no vetting). `projectManagers/{uid}` is world-read when published;
+slug claimed via `claimPmProfileSlug` into the SEPARATE `pmProfileSlugs` registry
+(so PM + tradesperson handles never collide). Cockpit `PmProfilePanel` edits it;
+public `ProjectManagerProfileView` renders it.
+
+### Still NOT verified on real Firestore (P3b + P4 + P5a)
 Everything ships gates-green but **has not been exercised end-to-end on real Firestore +
 the Stripe test path** (per `feedback_verify_real_firestore` — the site has no live
 users). The right time is now that P4 is in (commission is only observable once a fee is
@@ -114,28 +123,44 @@ agreement + Connect, a project, a client), run invite -> claim -> accept -> quot
 confirm the won job carries `projectId` + `drivenByProjectManagerId` and the public feed
 is unaffected, then **card-pay the invoice** and confirm TWO commission entries (rep + PM,
 distinct ids, 10% each), a refund reverses both, and the PM never reads the chat/invoice.
-Clean up after. Requires the latest push to be CI-deployed first (new callables + rules).
+Also sanity-check `/pm/<slug>` publishes/hides correctly. Requires the latest push to be
+CI-deployed first.
 
 ---
 
-## NEXT TASK — P5: public Project Manager profile
+## NEXT TASK — P5b: feature contractors on the public profile (+ consent)
 
-Mirror `TradieProfileView` for PMs: a world-readable profile (instant, no vetting) at a
-vanity slug, featuring the PM's preferred trades, with a per-contractor opt-out.
+Add the PM's preferred contractors to their public profile, WITH a contractor opt-out +
+notify so nobody is shown publicly without recourse. The key constraint: the public
+profile is world-readable but `users/{pmId}/savedTradies` is PRIVATE — so the featured
+set must be **denormalized onto the public `projectManagers/{uid}` doc** (it can't be
+read live from the private subcollection).
 
-- `projectManagers/{uid}` public doc (mirror the `tradespeople` public doc: brand, logo,
-  bio, featured trades, `slug`, `isVisible`); world-read when visible, owner+admin else;
-  private contact subdoc. `claimProfileSlug` pattern + `slug.ts`.
-- `PropertyManagerProfileView.vue` mirroring `TradieProfileView.vue`: chromeless
-  `/project-managers/:uid` + vanity `/pm/:slug`. Brand + logo + featured Trusted Trades,
-  each linking to `/request/:tradieUid`. Reuse `BrandingPanel`.
-- Featured-contractor opt-out: notify a contractor when a PM features them; a
-  contractor-facing "PMs featuring you" view with a remove action (per-(PM, contractor)
-  opt-out so they drop off that PM's public profile).
-- A client requesting via the profile gets the job tagged so it appears in the PM's list.
-- Help/FAQ + QA + design.md.
+Suggested design (resolve before building):
+- `projectManagers/{uid}.featuredContractors: { tradieId, displayName, photoURL, trades }[]`
+  — denormalized, world-readable. Rendered as cards on the profile linking to
+  `/request/:tradieUid`.
+- `setFeaturedContractor({ tradieId, featured })` callable (PM): validates the tradie is
+  in the PM's savedTradies + visible + has NOT opted out; denormalizes their public info;
+  updates the array; writes a reverse index `users/{tradieId}/featuredByPms/{pmId}`;
+  notifies the contractor on add. (Server-side because it reads the tradie doc, enforces
+  the opt-out, and notifies.)
+- `setPmFeatureOptOut({ pmId, optedOut })` callable (contractor): writes
+  `users/{tradieId}/pmFeatureOptOuts/{pmId}` AND removes them from that PM's
+  featuredContractors + the reverse index. `setFeaturedContractor` refuses an opted-out
+  contractor.
+- Contractor "PMs featuring you" view: lists `users/{tradieId}/featuredByPms` with a
+  Remove (opt-out) action. New route + small view (or an Account section).
+- Featured-toggle UI in the cockpit (extend `TrustedTradesPanel` or `PmProfilePanel`).
+- **Request attribution:** add `JobDoc.requestedViaPmId` (server-stamped), have the
+  profile's featured links carry `?via=<pmId>`, and `createJob` stamp it so a request
+  off the PM's profile shows in their list (and could feed commission if it becomes a
+  PM-driven job). Pin it immutable in the jobs update rule.
+- Rules: `projectManagers` featuredContractors is owner/server-managed (pin against forging
+  someone else's identity); the opt-out + featuredByPms subcollections owner-scoped.
+  Allow + deny tests. Help/FAQ + QA section 13 + design.md.
 
-## After P5
+## After P5b
 - **P6 — multi-property paywall meter:** `requireMultiplePropertiesEntitlement` via the entitlements seam, open at launch.
 
 ## Working agreements (follow these)
