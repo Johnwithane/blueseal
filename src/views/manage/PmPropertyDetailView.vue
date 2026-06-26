@@ -43,6 +43,7 @@ const statusLabel: Record<string, string> = {
 };
 
 async function loadProperty() {
+  loading.value = true;
   property.value = propertyId.value ? await getProperty(propertyId.value) : null;
   loading.value = false;
 }
@@ -97,11 +98,13 @@ onUnmounted(() => unsub?.());
         A bundle of jobs for this property's client. They claim it, accept, and choose their trades.
       </p>
 
+      <!-- Don't close on `created` — the form swaps to a success card holding the
+           invite link (the parent unmounting it used to destroy that link). The
+           form's own "Done" emits cancel to close. -->
       <NewProjectForm
         v-if="showForm"
         :property-id="propertyId"
         class="mb-4"
-        @created="showForm = false"
         @cancel="showForm = false"
       />
 

@@ -130,19 +130,34 @@ async function copyInvite() {
 
 <template>
   <div class="space-y-3">
-    <!-- Invite link to share when the email didn't / can't send. -->
-    <div v-if="lastResult" class="bs-card p-3 space-y-2">
-      <p class="text-sm font-medium">Share this invite link with your client:</p>
+    <!-- Success state: the project was created. The sign-in link to share lives
+         HERE and persists (the parent no longer unmounts the form on created), so
+         the PM can always copy it — the only recovery when the email doesn't send. -->
+    <div v-if="lastResult" class="bs-card p-4 space-y-3">
+      <div class="flex items-center gap-2">
+        <i class="pi pi-check-circle text-xl text-[color:var(--bs-success)]"></i>
+        <p class="font-semibold">Project created</p>
+      </div>
+      <p class="text-sm text-[color:var(--bs-muted)]">
+        {{
+          lastResult.emailed
+            ? "We emailed your client a sign-in link. You can also share this link with them:"
+            : "Share this sign-in link with your client — pressing it signs them in to manage the jobs:"
+        }}
+      </p>
       <div class="flex items-center gap-2 flex-wrap">
         <span
           class="flex-1 min-w-0 truncate text-sm rounded border border-[color:var(--bs-border)] px-2 py-1 bg-[color:var(--bs-surface-alt)]"
         >{{ lastResult.inviteLink }}</span>
         <Button label="Copy" icon="pi pi-copy" size="small" @click="copyInvite" />
-        <Button label="Dismiss" text size="small" @click="lastResult = null" />
+      </div>
+      <div class="flex gap-2 pt-1">
+        <Button label="Create another" icon="pi pi-plus" text size="small" @click="lastResult = null" />
+        <Button label="Done" size="small" @click="$emit('cancel')" />
       </div>
     </div>
 
-    <div class="bs-card p-4 space-y-3">
+    <div v-else class="bs-card p-4 space-y-3">
       <div>
         <label class="text-sm font-medium">Project name</label>
         <InputText v-model="form.label" class="mt-1 w-full" placeholder="e.g. Spring turnover" />
