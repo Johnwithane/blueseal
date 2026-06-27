@@ -961,6 +961,15 @@ onMounted(async () => {
             Get verified as a tradesperson →
           </RouterLink>
         </p>
+        <p v-if="!auth.isAuthenticated" class="mt-2 text-[color:var(--bs-blue-dark)]/75">
+          Agent or property manager?
+          <RouterLink
+            to="/sign-up?as=projectManager"
+            class="font-semibold text-[color:var(--bs-blue)] underline-offset-2 hover:underline"
+          >
+            Manage projects with your own trades →
+          </RouterLink>
+        </p>
       </div>
     </section>
   </div>

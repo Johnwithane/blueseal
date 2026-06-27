@@ -212,7 +212,9 @@ const projectStatusLabel: Record<string, string> = {
       </div>
     </RouterLink>
 
-    <!-- Recent projects -->
+    <!-- Recent projects — hidden for a brand-new PM, whose Get started checklist
+         above already owns the "set up your first project" call to action. -->
+    <template v-if="!showGettingStarted">
     <div class="flex items-center justify-between mt-8 mb-2">
       <h2 class="text-lg font-bold">Recent projects</h2>
       <RouterLink to="/manage/properties" class="text-sm text-[color:var(--bs-blue)] no-underline">View all</RouterLink>
@@ -248,5 +250,6 @@ const projectStatusLabel: Record<string, string> = {
         </RouterLink>
       </li>
     </ul>
+    </template>
   </section>
 </template>

@@ -723,6 +723,27 @@ const faqs: FaqItem[] = [
     audience: "client",
   },
   {
+    question: "Is there any cost to use Blue Seal as a project manager?",
+    answer:
+      "No. Setting up your cockpit, adding properties and projects, building your roster, and inviting clients are all **free**. The only setup tied to money is your **payout details** (a short agreement plus connecting a bank through Stripe), and that's only needed when you want to receive the referral commission you earn, not to use any of the tools.",
+    categoryId: "for-project-managers",
+    audience: "client",
+  },
+  {
+    question: "Does my client need to download an app or create a password?",
+    answer:
+      "No. When you invite a client to a project, they get a **one-tap sign-in link** by email (you can also copy the link and send it however you like, by text or message). Tapping it signs them in and sets up their account automatically, **no password and nothing to install**. From there they review the project, accept, and choose their trade right in the browser. It only works for the email address you invited.",
+    categoryId: "for-project-managers",
+    audience: "all",
+  },
+  {
+    question: "Can I manage more than one property or client?",
+    answer:
+      "Yes. Add as many **properties** as you manage, and set up multiple **projects** under each one (a project is a bundle of jobs for a client). Your dashboard tracks them all, with each project's status, and the **Jobs** view shows every job your trades are working across all of your clients. There's no limit on the free tier.",
+    categoryId: "for-project-managers",
+    audience: "client",
+  },
+  {
     question: "Why am I asked if Blue Seal is an additional insured on my policy?",
     answer:
       "When you upload your own liability policy, we ask whether Blue Seal is named as an **additional insured**. That's what actually extends your coverage to Blue Seal (being a \"certificate holder\" doesn't). It's automatic on a Blue Seal partner policy. If Blue Seal **is** named, an admin confirms it against your certificate. If it **isn't**, you sign a short liability release so everyone's clear that your policy doesn't cover Blue Seal and you're accepting responsibility for your work. You can skip the release any time by adding Blue Seal as an additional insured and uploading the updated certificate.",
