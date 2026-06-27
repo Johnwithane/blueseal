@@ -58,19 +58,23 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
         ],
       },
       {
-        title: "Trades",
+        title: "Roster",
         items: [
           {
             id: "pm-find-trade",
-            title: "Find + save a tradesperson to refer",
-            steps: ["Trades → Find a tradesperson → search → Save one."],
-            expected: "The saved trade appears under Your saved trades.",
+            title: "Add a tradesperson already on Blue Seal to your roster",
+            steps: ["Roster → Already on Blue Seal? → search a name → Add to roster."],
+            expected:
+              "They appear under On your roster instantly; the result flips to an On-your-roster badge; Request re-hires; x removes.",
           },
           {
             id: "pm-recruit-link",
-            title: "Recruit link",
-            steps: ["Trades → claim/copy the /join?pm= recruit link."],
-            expected: "A tradesperson joining through it lands on your saved trades + gets a free Pro month.",
+            title: "Invite link for a tradesperson not on Blue Seal yet",
+            steps: [
+              "Roster → New to Blue Seal? Invite them → copy the /join?pm= invite link; tap the QR to view it full-screen.",
+            ],
+            expected:
+              "A tradesperson joining through it lands on your roster + gets a free Pro month.",
           },
         ],
       },

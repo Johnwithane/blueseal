@@ -507,15 +507,19 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 4. **Cannot forge PM identity (rules).** The `projectManager` object on the user doc
    is server-managed; the client cannot write it (covered by
    `tests/rules/projectManager.test.ts`).
-5. **Saved trades, re-hire fast.** Save a tradesperson from their profile (the save
-   toggle). **Expected:** they appear under **Saved trades** on the client dashboard
-   and in the PM cockpit's "Your saved trades" panel; **Request** opens a fresh quote
-   to them; the **x** removes them. (Reuses the existing `savedTradies` shortlist.)
-6. **Recruit trades (the acquisition link).** In the cockpit "Recruit trades" card,
-   claim a recruiting code and copy the `/join?pm=CODE` link. Open it in a fresh
-   session: signup preselects **tradesperson** with the free-month banner. Complete a
-   tradesperson signup through it. **Expected:** once that tradesperson goes live
-   (vetted), they appear in the PM's saved trades and get a free first month of Pro
+5. **Roster: add a tradesperson already on Blue Seal.** In the cockpit **Roster**
+   (`/manage/trades`), under "Already on Blue Seal?", search a visible tradesperson by
+   name and tap **Add to roster**. **Expected:** they appear instantly under **On your
+   roster**, and the search result flips to a "On your roster" badge (no duplicate add);
+   **Request** opens a fresh quote to them; the **x** removes them. The same list shows
+   under **Saved trades** on the client dashboard. (Reuses the existing `savedTradies`
+   shortlist.)
+6. **Roster: invite a tradesperson who isn't on Blue Seal (the acquisition link).** In
+   the **Roster** page's "New to Blue Seal? Invite them" card, claim/copy the
+   `/join?pm=CODE` invite link (tap the QR to enlarge it full-screen for scanning). Open
+   the link in a fresh session: signup preselects **tradesperson** with the free-month
+   banner. Complete a tradesperson signup through it. **Expected:** once that tradesperson
+   goes live (vetted), they appear on the PM's roster and get a free first month of Pro
    (granted at go-live, like a rep code). Sanity: the rep `?ref=` link still works
    unchanged. (Server attribution: `users/{tradieUid}.referredByPmId`.)
 7. **Properties book.** In the cockpit "Properties" section, add a property
@@ -675,8 +679,8 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 - [ ] 13.1 Sign up as a project manager (card) → lands on /manage
 - [ ] 13.2 Become a PM from /welcome → /manage, holds client + project manager
 - [ ] 13.3 Role switcher shows Project manager; /dashboard routes PM to /manage
-- [ ] 13.4 Save a trade → Saved trades tab + PM cockpit; Request re-hires; remove works
-- [ ] 13.5 Claim recruiting code; /join?pm= signup → tradesperson; free month at go-live + appears in PM saved trades; rep ?ref= unaffected
+- [ ] 13.4 Roster: search a tradesperson by name → Add to roster (in-cockpit); appears under On your roster + result flips to badge; Request re-hires; x removes
+- [ ] 13.5 Roster invite link: claim code; tap QR → full-screen; /join?pm= signup → tradesperson; free month at go-live + appears on PM roster; rep ?ref= unaffected
 - [ ] 13.6 Properties: add / edit / archive a property in the cockpit
 - [ ] 13.7 Projects: create + invite a client → claim via magic link → accept (address form) / decline on the dashboard
 - [ ] 13.8 Dispatch: accepted project fans each job to matching preferred contractors ("Invited to quote"); client compares + accepts; won job carries projectId + drivenByProjectManagerId

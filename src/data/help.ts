@@ -675,6 +675,13 @@ const faqs: FaqItem[] = [
     audience: "client",
   },
   {
+    question: "I'm a project manager. How do I add tradespeople to my roster?",
+    answer:
+      "Your roster is the tradespeople you work with. When you set up a project, each job goes to the matching people on your roster for a quote. Open **Roster** in your cockpit. There are two ways to add someone. If they're **already on Blue Seal**, search their name and tap **Add to roster**. If they're **not on Blue Seal yet**, share your personal invite link (also on the Roster page, with a QR code you can tap to enlarge and show at a job site). Anyone who signs up through your link lands straight on your roster and gets their first month of Blue Seal Pro free. Remove anyone any time with the x. Your roster is private to you.",
+    categoryId: "for-clients",
+    audience: "client",
+  },
+  {
     question: "Why am I asked if Blue Seal is an additional insured on my policy?",
     answer:
       "When you upload your own liability policy, we ask whether Blue Seal is named as an **additional insured**. That's what actually extends your coverage to Blue Seal (being a \"certificate holder\" doesn't). It's automatic on a Blue Seal partner policy. If Blue Seal **is** named, an admin confirms it against your certificate. If it **isn't**, you sign a short liability release so everyone's clear that your policy doesn't cover Blue Seal and you're accepting responsibility for your work. You can skip the release any time by adding Blue Seal as an additional insured and uploading the updated certificate.",

@@ -1,126 +1,152 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
-import InputText from "primevue/inputtext";
 import Button from "primevue/button";
 import { useAuthStore } from "@/stores/auth";
 import { useSeo } from "@/composables/useSeo";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
-import { claimPmCode } from "@/firebase/services/projectManagers";
-import { isValidReferralCode, normalizeReferralCode } from "@/utils/referralCode";
-import TrustedTradesPanel from "@/components/TrustedTradesPanel.vue";
+import {
+  subscribeSavedTradieIds,
+  hydrateSavedTradies,
+  saveTradie,
+  unsaveTradie,
+} from "@/firebase/services/savedTradies";
+import { tradeLabel } from "@/data/trades";
+import PmRosterSearch from "@/components/manage/PmRosterSearch.vue";
+import PmInviteLinkCard from "@/components/manage/PmInviteLinkCard.vue";
+import type { TradespersonDoc, WithId } from "@/firebase/interfaces";
 
-// The Trades hub: the trades you recommend (saved), plus the recruit link that brings
-// NEW tradespeople onto Blue Seal. Searching the directory to add existing trades +
-// featuring them on your public profile arrive in the next increment.
-useSeo({ title: "Trades", noindex: true });
+// The PM's roster: the tradespeople they work with. Two clear ways to grow it —
+// add someone already on Blue Seal (in-cockpit search), or invite someone who
+// isn't on Blue Seal yet via the personal /join?pm= link. Backed by the existing
+// savedTradies shortlist; dispatch sends each project job to the matching roster.
+useSeo({ title: "Roster", noindex: true });
 
 const auth = useAuthStore();
 const toast = useToast();
 
-const justClaimed = ref<string | null>(null);
-const code = computed(() => justClaimed.value ?? auth.user?.projectManager?.referralCode ?? "");
-const editing = ref(false);
-const draft = ref("");
-const saving = ref(false);
-const normalizedDraft = computed(() => normalizeReferralCode(draft.value));
-const draftValid = computed(() => isValidReferralCode(normalizedDraft.value));
-const recruitLink = computed(() =>
-  code.value ? `${window.location.origin}/join?pm=${code.value}` : "",
-);
+const loading = ref(true);
+const rosterIds = ref<Set<string>>(new Set());
+const roster = ref<WithId<TradespersonDoc>[]>([]);
+let unsub: (() => void) | null = null;
 
-function startEdit() {
-  draft.value = code.value;
-  editing.value = true;
-}
-
-async function saveCode() {
-  if (!draftValid.value) {
-    toast.warn("Check the code", "Use 3-20 letters or numbers.");
+onMounted(() => {
+  const uid = auth.fbUser?.uid;
+  if (!uid) {
+    loading.value = false;
     return;
   }
-  saving.value = true;
+  unsub = subscribeSavedTradieIds(uid, async (ids) => {
+    rosterIds.value = ids;
+    roster.value = await hydrateSavedTradies([...ids]);
+    loading.value = false;
+  });
+});
+onUnmounted(() => unsub?.());
+
+async function add(t: WithId<TradespersonDoc>): Promise<void> {
+  const uid = auth.fbUser?.uid;
+  if (!uid) return;
   try {
-    const { code: saved } = await claimPmCode(normalizedDraft.value);
-    justClaimed.value = saved;
-    editing.value = false;
-    toast.success("Saved", "Your recruiting code is set.");
-    await auth.reloadUserDoc();
+    await saveTradie(uid, t.id);
+    toast.success("Added to your roster", "Your matching project jobs will now go to them for a quote.");
   } catch (e) {
-    toast.error("Couldn't save", humanizeError(e));
-  } finally {
-    saving.value = false;
+    toast.error(humanizeError(e));
   }
 }
 
-async function copyRecruitLink() {
+async function remove(t: WithId<TradespersonDoc>): Promise<void> {
+  const uid = auth.fbUser?.uid;
+  if (!uid) return;
   try {
-    await navigator.clipboard.writeText(recruitLink.value);
-    toast.success("Copied", "Recruiting link copied.");
-  } catch {
-    toast.warn("Copy failed", "Copy the link manually.");
+    await unsaveTradie(uid, t.id);
+  } catch (e) {
+    toast.error(humanizeError(e));
   }
+}
+
+function tradesText(t: WithId<TradespersonDoc>): string {
+  const ts = (t.trades ?? []).map((k) => tradeLabel(k));
+  if (!ts.length) return "Tradesperson";
+  return ts.slice(0, 2).join(" · ") + (ts.length > 2 ? ` +${ts.length - 2}` : "");
+}
+
+function initial(name: string | null | undefined): string {
+  return (name ?? "?").trim().charAt(0).toUpperCase() || "?";
 }
 </script>
 
 <template>
   <section class="bs-container py-8 max-w-3xl">
-    <h1 class="text-2xl font-bold mb-1">Trades</h1>
-    <p class="text-sm text-[color:var(--bs-muted)] mb-5">
-      The tradespeople you recommend. Your projects send each job to the matching saved trades for
-      quotes.
-    </p>
-
-    <!-- Find + save trades from the directory (reuses the main search). -->
-    <RouterLink
-      to="/search"
-      class="block bs-card p-4 mb-6 no-underline text-inherit border border-[color:var(--bs-blue)] hover:shadow-md transition-shadow"
-    >
-      <div class="flex items-center gap-3">
-        <i class="pi pi-search text-xl text-[color:var(--bs-blue)]"></i>
-        <div class="flex-1 min-w-0">
-          <p class="font-medium">Find a tradesperson</p>
-          <p class="text-sm text-[color:var(--bs-muted)]">
-            Search the Blue Seal directory by trade and area, then save the ones you trust. Saved
-            trades are who your projects go to for quotes.
-          </p>
-        </div>
-        <i class="pi pi-chevron-right text-xs text-[color:var(--bs-muted)]"></i>
-      </div>
+    <RouterLink to="/manage" class="text-xs text-[color:var(--bs-muted)]">
+      <i class="pi pi-arrow-left text-xs"></i> Cockpit
     </RouterLink>
 
-    <h2 class="font-semibold flex items-center gap-2 mb-1">
-      <i class="pi pi-users text-[color:var(--bs-blue)]"></i> Your saved trades
-    </h2>
-    <p class="text-sm text-[color:var(--bs-muted)] mb-3">
-      Save tradespeople you trust from their profile, then re-hire for a client in one tap.
+    <h1 class="text-2xl font-bold mt-2 mb-1">Your roster</h1>
+    <p class="text-sm text-[color:var(--bs-muted)] mb-6 max-w-prose">
+      The tradespeople you work with. When you set up a project, each job goes to the matching people
+      on your roster for a quote.
     </p>
-    <TrustedTradesPanel />
 
-    <h2 class="font-semibold flex items-center gap-2 mb-1 mt-8">
-      <i class="pi pi-link text-[color:var(--bs-blue)]"></i> Recruit link
-    </h2>
-    <p class="text-sm text-[color:var(--bs-muted)] mb-3">
-      Share this with a tradesperson who isn't on Blue Seal yet. Anyone who joins through it lands
-      on your saved trades and gets their first month of Blue Seal Pro free.
-    </p>
-    <div class="bs-card p-4">
-      <div v-if="code && !editing" class="flex items-center gap-2 flex-wrap">
-        <span
-          class="flex-1 min-w-0 truncate text-sm rounded border border-[color:var(--bs-border)] px-2 py-1 bg-[color:var(--bs-surface-alt)]"
-        >{{ recruitLink }}</span>
-        <Button label="Copy" icon="pi pi-copy" size="small" @click="copyRecruitLink" />
-        <Button label="Change" text size="small" @click="startEdit" />
-      </div>
-      <div v-else class="flex items-start gap-2">
-        <div class="flex-1">
-          <InputText v-model="draft" placeholder="e.g. ACME" class="w-full" />
-          <small class="text-[color:var(--bs-muted)] block mt-1">3-20 letters or numbers.</small>
-        </div>
-        <Button label="Save" :loading="saving" :disabled="!draftValid" size="small" @click="saveCode" />
-        <Button v-if="code" label="Cancel" text size="small" @click="editing = false" />
-      </div>
+    <div class="flex items-center gap-3 mb-3">
+      <span class="h-px flex-1 bg-[color:var(--bs-border)]"></span>
+      <span class="text-xs font-semibold uppercase tracking-wide text-[color:var(--bs-muted)]">
+        Add to your roster
+      </span>
+      <span class="h-px flex-1 bg-[color:var(--bs-border)]"></span>
     </div>
+
+    <div class="space-y-3">
+      <PmRosterSearch :roster-ids="rosterIds" @add="add" />
+      <PmInviteLinkCard />
+    </div>
+
+    <div class="flex items-center justify-between mt-8 mb-3">
+      <h2 class="font-semibold flex items-center gap-2">
+        <i class="pi pi-users text-[color:var(--bs-blue)]"></i> On your roster
+      </h2>
+      <span v-if="roster.length" class="text-xs font-semibold text-[color:var(--bs-muted)]">
+        {{ roster.length }} {{ roster.length === 1 ? "person" : "people" }}
+      </span>
+    </div>
+
+    <div v-if="loading" class="text-sm text-[color:var(--bs-muted)] py-6 text-center">Loading…</div>
+    <div v-else-if="roster.length === 0" class="bs-card p-6 text-center">
+      <i class="pi pi-users text-2xl text-[color:var(--bs-muted)]"></i>
+      <p class="mt-2 font-medium">No one on your roster yet</p>
+      <p class="text-sm text-[color:var(--bs-muted)]">
+        Add tradespeople above. They're who your projects go to for quotes.
+      </p>
+    </div>
+    <ul v-else class="grid grid-cols-1 gap-2">
+      <li v-for="t in roster" :key="t.id" class="bs-card p-3 flex items-center gap-3">
+        <img
+          v-if="t.photoURL"
+          :src="t.photoURL"
+          alt=""
+          class="w-10 h-10 rounded-full object-cover shrink-0"
+        />
+        <span
+          v-else
+          class="w-10 h-10 rounded-full bg-[color:var(--bs-blue)] text-white grid place-items-center shrink-0"
+        >{{ initial(t.displayName) }}</span>
+        <div class="min-w-0 flex-1">
+          <p class="font-medium truncate">{{ t.displayName ?? "Tradesperson" }}</p>
+          <p class="text-xs text-[color:var(--bs-muted)] truncate">{{ tradesText(t) }}</p>
+        </div>
+        <RouterLink :to="{ name: 'RequestQuote', params: { uid: t.id } }">
+          <Button label="Request" icon="pi pi-send" size="small" outlined />
+        </RouterLink>
+        <Button
+          icon="pi pi-times"
+          text
+          rounded
+          severity="secondary"
+          aria-label="Remove from roster"
+          @click="remove(t)"
+        />
+      </li>
+    </ul>
   </section>
 </template>

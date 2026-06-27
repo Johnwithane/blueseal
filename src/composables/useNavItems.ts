@@ -325,8 +325,8 @@ export function useNavItems(): {
     if (auth.activeRole === "projectManager") {
       // Project manager cockpit: its own dedicated nav (previously fell through to
       // the client nav). Home (Dashboard), Notifications, then the daily destinations
-      // — Properties (which hold projects + jobs), the flat Jobs board, the Trades
-      // hub (find/refer/recruit), Earnings, and the public Profile. Mobile bottom
+      // — Properties (which hold projects + jobs), the flat Jobs board, the Roster
+      // (add/invite the trades they work with), Earnings, and the public Profile. Mobile bottom
       // bar = Dashboard + Properties + Alerts (the rest are desktop-side / Profile menu).
       return [
         {
@@ -367,7 +367,7 @@ export function useNavItems(): {
         },
         {
           key: "trades",
-          label: "Trades",
+          label: "Roster",
           icon: "pi-users",
           to: "/manage/trades",
           mobile: false,
