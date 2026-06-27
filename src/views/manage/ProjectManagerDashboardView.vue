@@ -165,6 +165,12 @@ const projectStatusLabel: Record<string, string> = {
           </RouterLink>
         </li>
       </ul>
+      <RouterLink
+        to="/help/getting-started-as-a-project-manager"
+        class="mt-3 inline-flex items-center gap-1.5 text-sm text-[color:var(--bs-blue)] no-underline"
+      >
+        <i class="pi pi-book text-xs"></i> New to this? Read the 2-minute guide
+      </RouterLink>
     </div>
 
     <!-- Stat tiles -->
