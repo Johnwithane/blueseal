@@ -9,6 +9,7 @@ import { useFormatters } from "@/composables";
 import { subscribeProperties } from "@/firebase/services/properties";
 import { subscribeProjectsForPm } from "@/firebase/services/projects";
 import { subscribeProjectJobsForPm } from "@/firebase/services/jobs";
+import { subscribeSavedTradieIds } from "@/firebase/services/savedTradies";
 import { usePmEarnings } from "@/composables/usePmEarnings";
 import { PM_AGREEMENT_VERSION } from "@/projectManager/agreement";
 import { tradeLabel } from "@/data/trades";
@@ -27,6 +28,7 @@ const firstName = computed(() => (auth.user?.displayName ?? "").trim().split(/\s
 const properties = ref<WithId<PropertyDoc>[]>([]);
 const projects = ref<WithId<ProjectDoc>[]>([]);
 const jobs = ref<WithId<JobDoc>[]>([]);
+const rosterCount = ref(0);
 const unsubs: Array<() => void> = [];
 
 onMounted(() => {
@@ -35,6 +37,7 @@ onMounted(() => {
   unsubs.push(subscribeProperties(uid, (p) => (properties.value = p)));
   unsubs.push(subscribeProjectsForPm(uid, (p) => (projects.value = p)));
   unsubs.push(subscribeProjectJobsForPm(uid, (j) => (jobs.value = j)));
+  unsubs.push(subscribeSavedTradieIds(uid, (ids) => (rosterCount.value = ids.size)));
 });
 onUnmounted(() => unsubs.forEach((u) => u()));
 
@@ -44,6 +47,41 @@ const activeProjects = computed(() =>
 const jobsInProgress = computed(() => jobs.value.filter((j) => j.status === "in_progress").length);
 // Surface live work, not cancelled/declined dead rows (which the stat tile excludes).
 const recentProjects = computed(() => activeProjects.value.slice(0, 4));
+
+// First-run guidance: a brand-new PM with an empty cockpit needs an ordered nudge.
+// The order matters — adding trusted trades FIRST is what makes a project dispatch
+// to *their* trades; create a project with an empty roster and the jobs fall through
+// to the public board, which defeats the whole "refer my trades" pitch. We hide the
+// card once they're activated (≥1 saved trade AND ≥1 project); a property is
+// recommended but optional (a project can stand on its own), so it doesn't gate.
+const setupSteps = computed(() => [
+  {
+    key: "trades",
+    done: rosterCount.value > 0,
+    label: "Add your trusted trades",
+    hint: "Do this first — projects go out to the trades on your roster.",
+    to: "/manage/trades",
+    cta: "Add trades",
+  },
+  {
+    key: "property",
+    done: properties.value.length > 0,
+    label: "Add a property",
+    hint: "Organise work by address (optional, but keeps multi-job clients tidy).",
+    to: "/manage/properties",
+    cta: "Add a property",
+  },
+  {
+    key: "project",
+    done: projects.value.length > 0,
+    label: "Set up your first project",
+    hint: "Bundle the jobs for a client and invite them to choose their trades.",
+    to: "/manage/properties?new=1",
+    cta: "New project",
+  },
+]);
+const setupDoneCount = computed(() => setupSteps.value.filter((s) => s.done).length);
+const showGettingStarted = computed(() => rosterCount.value === 0 || projects.value.length === 0);
 
 // Payout setup nudge: shown until the PM has signed the current agreement AND
 // connected Stripe payouts.
@@ -82,6 +120,36 @@ const projectStatusLabel: Record<string, string> = {
       Your command centre. Set up work for clients across your properties, refer the trades you
       trust, and track everything in one place.
     </p>
+
+    <!-- First-run checklist: an ordered nudge for a new PM, hidden once activated. -->
+    <div v-if="showGettingStarted" class="bs-card p-4 mb-6">
+      <div class="flex items-center justify-between gap-2">
+        <h2 class="text-lg font-bold">Get started</h2>
+        <span class="text-sm text-[color:var(--bs-muted)]">{{ setupDoneCount }}/3 done</span>
+      </div>
+      <ul class="mt-3 space-y-2">
+        <li
+          v-for="step in setupSteps"
+          :key="step.key"
+          class="flex items-start gap-3 rounded-lg p-2"
+          :class="step.done ? 'opacity-60' : 'bg-[color:var(--bs-surface-alt)]'"
+        >
+          <i
+            class="pi mt-0.5 text-lg"
+            :class="step.done
+              ? 'pi-check-circle text-[color:var(--bs-success)]'
+              : 'pi-circle text-[color:var(--bs-muted)]'"
+          ></i>
+          <div class="min-w-0 flex-1">
+            <p class="font-medium" :class="step.done ? 'line-through' : ''">{{ step.label }}</p>
+            <p v-if="!step.done" class="text-xs text-[color:var(--bs-muted)]">{{ step.hint }}</p>
+          </div>
+          <RouterLink v-if="!step.done" :to="step.to" class="shrink-0">
+            <Button :label="step.cta" size="small" outlined />
+          </RouterLink>
+        </li>
+      </ul>
+    </div>
 
     <!-- Stat tiles -->
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">

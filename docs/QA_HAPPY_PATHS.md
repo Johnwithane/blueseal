@@ -613,6 +613,15 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    tiles for properties / active projects / jobs in progress / unpaid earnings, quick
    actions, a payout-setup nudge, recent projects), and each nav item / tile routes to
    its own section. Mobile bottom bar = Dashboard + Properties + Alerts.
+
+   **First-run Get started checklist.** As a *brand-new* PM (empty roster, no
+   projects), the dashboard shows an ordered **Get started** card above the tiles with
+   three steps — **Add your trusted trades** (listed first, on purpose), Add a property,
+   Set up your first project — each with a button into its section and an `x/3 done`
+   counter. **Expected:** completing a step ticks it off (line-through, check icon);
+   the card disappears once you have **≥1 roster trade AND ≥1 project** (a property is
+   recommended but optional). The "trades first" order matters: a project created with
+   an empty roster dispatches to nobody and falls back to the public board.
 10f. **Property -> Projects -> Jobs drill-down.** From **Properties**, tap a property to
    open it; tap **New project here** and create a project (it's scoped to that property,
    no property picker). **Expected:** the project appears under that property and opens
@@ -700,7 +709,7 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 - [ ] 13.10b PM commission: card-paid PM-driven fee accrues BOTH rep + PM 10% (distinct ids); refund reverses both; off-list public win accrues none
 - [ ] 13.10c PM earnings/payouts: sign agreement → Stripe Connect → monthly payout ($50 min); agreement gates payout only; PM reads only own ledger
 - [ ] 13.10d Public profile: edit brand/bio, upload logo+cover, claim /pm/<handle>, publish on → world-visible; off → not found to public, preview to owner
-- [ ] 13.10e PM nav + dashboard: PM-specific side nav (not client); /manage overview with stat tiles + quick actions routing into sections
+- [ ] 13.10e PM nav + dashboard: PM-specific side nav (not client); /manage overview with stat tiles + quick actions routing into sections; new-PM Get started checklist (trades first) ticks off + hides once activated
 - [ ] 13.10f Property → Projects → Jobs drill-down; New-project scoped to a property; Jobs board reflects PM-driven jobs
 - [ ] 13.10g Photos: attach a photo to a property + a project; hero on detail, thumbnail on lists, visible to the invited client
 - [ ] 13.10h Find/feature trades: search → save; feature on profile → public card + pm_featured notif; contractor /featured-by-pms → Remove me (opt-out)

@@ -55,6 +55,16 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
             expected:
               "Stat tiles (properties / active projects / jobs in progress / unpaid earnings), quick actions, payout nudge, recent projects — each routes to its section.",
           },
+          {
+            id: "pm-getting-started",
+            title: "First-run Get started checklist",
+            steps: [
+              "As a brand-new PM (no roster, no project), open the dashboard.",
+              "Add a tradesperson to your roster, then create a project; re-open the dashboard.",
+            ],
+            expected:
+              "An ordered Get started card shows above the tiles with 3 steps (Add trades / Add a property / First project), trades listed first; each step's button routes to its section and the step ticks off (line-through) as you complete it. The card disappears once you have ≥1 roster trade AND ≥1 project.",
+          },
         ],
       },
       {
