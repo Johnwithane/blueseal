@@ -29,15 +29,29 @@ const properties = ref<WithId<PropertyDoc>[]>([]);
 const projects = ref<WithId<ProjectDoc>[]>([]);
 const jobs = ref<WithId<JobDoc>[]>([]);
 const rosterCount = ref(0);
+// First-snapshot flags so the "Get started" card never flashes for an established
+// PM before their live data has loaded (subscriptions start empty).
+const rosterLoaded = ref(false);
+const projectsLoaded = ref(false);
 const unsubs: Array<() => void> = [];
 
 onMounted(() => {
   const uid = auth.fbUser?.uid;
   if (!uid) return;
   unsubs.push(subscribeProperties(uid, (p) => (properties.value = p)));
-  unsubs.push(subscribeProjectsForPm(uid, (p) => (projects.value = p)));
+  unsubs.push(
+    subscribeProjectsForPm(uid, (p) => {
+      projects.value = p;
+      projectsLoaded.value = true;
+    }),
+  );
   unsubs.push(subscribeProjectJobsForPm(uid, (j) => (jobs.value = j)));
-  unsubs.push(subscribeSavedTradieIds(uid, (ids) => (rosterCount.value = ids.size)));
+  unsubs.push(
+    subscribeSavedTradieIds(uid, (ids) => {
+      rosterCount.value = ids.size;
+      rosterLoaded.value = true;
+    }),
+  );
 });
 onUnmounted(() => unsubs.forEach((u) => u()));
 
@@ -81,7 +95,9 @@ const setupSteps = computed(() => [
   },
 ]);
 const setupDoneCount = computed(() => setupSteps.value.filter((s) => s.done).length);
-const showGettingStarted = computed(() => rosterCount.value === 0 || projects.value.length === 0);
+const showGettingStarted = computed(
+  () => rosterLoaded.value && projectsLoaded.value && (rosterCount.value === 0 || projects.value.length === 0),
+);
 
 // Payout setup nudge: shown until the PM has signed the current agreement AND
 // connected Stripe payouts.
