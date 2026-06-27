@@ -497,6 +497,28 @@ export interface SavedTradieDoc {
 }
 
 // ---------------------------------------------------------------------------
+// rosterInvites/{inviteId}
+// A project manager's email invite to a tradesperson NOT yet on Blue Seal.
+// Server-managed (sendRosterInvite creates it; linkRosterInvitesOnSignup flips it
+// to "joined" + adds them to the PM's savedTradies when they sign up as a
+// tradesperson with this email; revokeRosterInvite / the unsubscribe endpoint
+// cancel it). Owner-read only (the email is on the doc).
+// ---------------------------------------------------------------------------
+export interface RosterInviteDoc {
+  pmId: string;
+  pmName: string;
+  inviteeName: string;
+  emailLower: string;
+  status: "pending_signup" | "joined" | "revoked";
+  tradieId: string | null; // set when they sign up
+  createdAt: Timestamp;
+  lastSentAt: Timestamp;
+  resendCount: number;
+  joinedAt: Timestamp | null;
+  revokedAt?: Timestamp;
+}
+
+// ---------------------------------------------------------------------------
 // users/{uid}/devices/{token}
 // One web-push (FCM) registration per opted-in device. Doc id IS the FCM
 // token so notify()'s dead-token cleanup can delete by id after a failed

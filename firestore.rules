@@ -1666,6 +1666,17 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    // ---------- rosterInvites (PM invites a tradesperson to their roster by email) ----------
+    // Created by sendRosterInvite; linkRosterInvitesOnSignup flips it to joined when
+    // the invitee signs up as a tradesperson; revokeRosterInvite / the unsubscribe
+    // endpoint cancel it. All writes flow through those callables/triggers on the
+    // Admin SDK. Read is owner-only (the inviting PM) — the invitee's email lives on
+    // the doc, so it must never be world- or invitee-readable.
+    match /rosterInvites/{inviteId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.pmId == uid());
+      allow create, update, delete: if false;
+    }
+
     // ---------- referrals (job-board posts referred between tradespeople) ----------
     // All writes flow through callables: sendJobReferral creates the doc
     // (dedupe via the deterministic {postId}_{from}_{to} id) and

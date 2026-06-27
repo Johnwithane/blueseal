@@ -112,6 +112,11 @@ export { claimPmProfileSlug } from "./projectManager/claimProfileSlug";
 export { signPmAgreement } from "./projectManager/signAgreement";
 // Feature preferred contractors on the public profile (P5b), with a contractor opt-out.
 export { setFeaturedContractor, setPmFeatureOptOut } from "./projectManager/featuredContractors";
+// Invite a tradesperson to the PM's roster by name + email; auto-join on signup.
+export { sendRosterInvite } from "./projectManager/sendRosterInvite";
+export { revokeRosterInvite } from "./projectManager/revokeRosterInvite";
+export { linkRosterInvitesOnSignup } from "./projectManager/linkRosterInvitesOnSignup";
+export { unsubscribeRosterInvite } from "./projectManager/unsubscribeRosterInvite";
 export { createPmConnectAccount } from "./payments/createPmConnectAccount";
 export { createPmConnectOnboardingLink } from "./payments/createPmConnectOnboardingLink";
 export { createPmConnectLoginLink } from "./payments/createPmConnectLoginLink";

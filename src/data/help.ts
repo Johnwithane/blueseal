@@ -677,7 +677,7 @@ const faqs: FaqItem[] = [
   {
     question: "I'm a project manager. How do I add tradespeople to my roster?",
     answer:
-      "Your roster is the tradespeople you work with. When you set up a project, each job goes to the matching people on your roster for a quote. Open **Roster** in your cockpit. There are two ways to add someone. If they're **already on Blue Seal**, search their name and tap **Add to roster**. If they're **not on Blue Seal yet**, share your personal invite link (also on the Roster page, with a QR code you can tap to enlarge and show at a job site). Anyone who signs up through your link lands straight on your roster and gets their first month of Blue Seal Pro free. Remove anyone any time with the x. Your roster is private to you.",
+      "Your roster is the tradespeople you work with. When you set up a project, each job goes to the matching people on your roster for a quote. Open **Roster** in your cockpit. If they're **already on Blue Seal**, search their name and tap **Add to roster**. If they're **not on Blue Seal yet**, you have two ways to invite them: **email them an invite** (enter their name and email and we send the invite for you), or **share your personal invite link** (with a QR code you can tap to enlarge and show at a job site). Either way, when they sign up they land on your roster and get their first month of Blue Seal Pro free. You can see who you've invited and whether they've joined, and cancel a pending invite any time. Remove anyone from your roster with the x. Your roster is private to you.",
     categoryId: "for-clients",
     audience: "client",
   },

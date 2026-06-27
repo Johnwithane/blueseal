@@ -515,13 +515,24 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    under **Saved trades** on the client dashboard. (Reuses the existing `savedTradies`
    shortlist.)
 6. **Roster: invite a tradesperson who isn't on Blue Seal (the acquisition link).** In
-   the **Roster** page's "New to Blue Seal? Invite them" card, claim/copy the
+   the **Roster** page's "Or share your invite link" card, claim/copy the
    `/join?pm=CODE` invite link (tap the QR to enlarge it full-screen for scanning). Open
    the link in a fresh session: signup preselects **tradesperson** with the free-month
    banner. Complete a tradesperson signup through it. **Expected:** once that tradesperson
    goes live (vetted), they appear on the PM's roster and get a free first month of Pro
    (granted at go-live, like a rep code). Sanity: the rep `?ref=` link still works
    unchanged. (Server attribution: `users/{tradieUid}.referredByPmId`.)
+6a. **Roster: email invite a tradesperson by name + email.** In the **Roster** page's
+   "New to Blue Seal? Email them an invite" card, enter a name + a fresh email and **Send
+   invite** (`sendRosterInvite`). **Expected:** a row appears under **Invites** as pending
+   ("Invited just now") and the recipient gets a CASL-compliant email (mailing address +
+   working unsubscribe) with a "Join Blue Seal" link to `/sign-up?as=tradesperson&invite=…`.
+   Complete that signup as a **tradesperson** with the same email. **Expected:**
+   `linkRosterInvitesOnSignup` adds them to the PM's `savedTradies`, stamps
+   `referredByPmId` (free Pro month at go-live), and the **Invites** row flips to
+   **Joined**. Edge checks: inviting an email that already has an account is rejected with
+   a "search their name" message; **Cancel** revokes a pending invite; the email's
+   unsubscribe link (`/roster-invite-unsub`) suppresses future invites to that address.
 7. **Properties book.** In the cockpit "Properties" section, add a property
    (label + optional address + notes), edit it, then archive it. **Expected:** it
    appears in the list and persists; archive drops it from the default list.
@@ -681,6 +692,7 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 - [ ] 13.3 Role switcher shows Project manager; /dashboard routes PM to /manage
 - [ ] 13.4 Roster: search a tradesperson by name → Add to roster (in-cockpit); appears under On your roster + result flips to badge; Request re-hires; x removes
 - [ ] 13.5 Roster invite link: claim code; tap QR → full-screen; /join?pm= signup → tradesperson; free month at go-live + appears on PM roster; rep ?ref= unaffected
+- [ ] 13.6 Roster email invite: name+email → Send (sendRosterInvite); pending row + compliant email; tradesperson signup w/ same email auto-joins roster + sets referredByPmId; row flips Joined; existing-account rejected; Cancel revokes; unsubscribe suppresses
 - [ ] 13.6 Properties: add / edit / archive a property in the cockpit
 - [ ] 13.7 Projects: create + invite a client → claim via magic link → accept (address form) / decline on the dashboard
 - [ ] 13.8 Dispatch: accepted project fans each job to matching preferred contractors ("Invited to quote"); client compares + accepts; won job carries projectId + drivenByProjectManagerId

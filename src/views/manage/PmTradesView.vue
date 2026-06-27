@@ -14,6 +14,7 @@ import {
 } from "@/firebase/services/savedTradies";
 import { tradeLabel } from "@/data/trades";
 import PmRosterSearch from "@/components/manage/PmRosterSearch.vue";
+import PmEmailInviteForm from "@/components/manage/PmEmailInviteForm.vue";
 import PmInviteLinkCard from "@/components/manage/PmInviteLinkCard.vue";
 import type { TradespersonDoc, WithId } from "@/firebase/interfaces";
 
@@ -99,6 +100,7 @@ function initial(name: string | null | undefined): string {
 
     <div class="space-y-3">
       <PmRosterSearch :roster-ids="rosterIds" @add="add" />
+      <PmEmailInviteForm />
       <PmInviteLinkCard />
     </div>
 

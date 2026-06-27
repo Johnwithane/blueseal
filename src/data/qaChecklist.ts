@@ -71,10 +71,20 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
             id: "pm-recruit-link",
             title: "Invite link for a tradesperson not on Blue Seal yet",
             steps: [
-              "Roster → New to Blue Seal? Invite them → copy the /join?pm= invite link; tap the QR to view it full-screen.",
+              "Roster → Or share your invite link → copy the /join?pm= invite link; tap the QR to view it full-screen.",
             ],
             expected:
               "A tradesperson joining through it lands on your roster + gets a free Pro month.",
+          },
+          {
+            id: "pm-email-invite",
+            title: "Email invite a tradesperson by name + email",
+            steps: [
+              "Roster → New to Blue Seal? Email them an invite → enter a name + fresh email → Send invite.",
+              "Complete that signup as a tradesperson with the same email; back on Roster, watch the Invites row.",
+            ],
+            expected:
+              "Pending row appears + a compliant email sends; signing up auto-adds them to your roster (referredByPmId set, free Pro month at go-live) and the row flips to Joined. An email that already has an account is rejected; Cancel revokes a pending invite.",
           },
         ],
       },

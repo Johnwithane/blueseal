@@ -9,6 +9,14 @@
       ]
     },
     {
+      "collectionGroup": "rosterInvites",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "pmId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "auditLog",
       "queryScope": "COLLECTION",
       "fields": [

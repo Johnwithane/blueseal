@@ -115,10 +115,10 @@ async function shareLink() {
         <i class="pi pi-send"></i>
       </span>
       <div class="min-w-0">
-        <p class="font-semibold">New to Blue Seal? Invite them</p>
+        <p class="font-semibold">Or share your invite link</p>
         <p class="text-sm text-[color:var(--bs-muted)] mt-0.5">
-          Not on Blue Seal yet? Send your personal invite link. When they sign up through it, they
-          land straight on your roster and get their first month of Blue Seal Pro free.
+          Prefer to share a link directly (text, WhatsApp, in person)? Anyone who signs up through it
+          lands on your roster and gets their first month of Blue Seal Pro free.
         </p>
       </div>
     </div>
