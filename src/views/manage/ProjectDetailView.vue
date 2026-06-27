@@ -154,7 +154,9 @@ async function resendInvite(email?: string): Promise<void> {
     newEmail.value = "";
     toast.success(
       "Invite resent",
-      res.emailed ? "We emailed your client again." : "Share the invite link with them.",
+      res.emailed
+        ? "We emailed your client again — or copy the link below to send it directly."
+        : "Copy the link below to share it with your client directly.",
     );
   } catch (e) {
     toast.error("Couldn't resend", humanizeError(e));
@@ -250,7 +252,8 @@ function liveQuotes(postId: string): WithId<ApplicationDoc>[] {
           Once they accept, each job goes to your matching trades and quotes show up here.
         </p>
 
-        <!-- A corrected-email resend hands back a fresh link to share. -->
+        <!-- Every resend hands back a fresh link the PM can share directly (text/DM). -->
+        <p v-if="newInviteLink" class="text-xs font-medium">Shareable sign-in link:</p>
         <div v-if="newInviteLink" class="flex items-center gap-2 flex-wrap text-sm">
           <span
             class="flex-1 min-w-0 truncate rounded border border-[color:var(--bs-border)] px-2 py-1 bg-[color:var(--bs-surface-alt)]"

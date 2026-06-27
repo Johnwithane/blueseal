@@ -543,7 +543,22 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    a property, add one or more jobs (each = trade + title + description), then
    **Create & invite client**. **Expected:** the project lists with an **Invite
    sent** tag; an invite link is shown to copy (the email also goes out when the
-   CASL mailing address is configured). Open the invite link (or the emailed
+   CASL mailing address is configured).
+
+   **Roster-coverage hint (while adding jobs).** As you pick each job's trade, the
+   form tells you whether it will reach your roster: a green "**N of your trades
+   will be invited**" when you have a match, or an amber "**No saved trade for this
+   — it'll go to the public board**" when you don't. **Expected:** the warning is
+   live (add a matching trade to your roster and it clears) — it's the pre-accept
+   catch for the empty-scope dispatch.
+
+   **Re-copy the invite link later.** Re-open a pending project and tap **Resend
+   invite**. **Expected:** a fresh "**Shareable sign-in link**" appears with a Copy
+   button for the **same** client email (not only on an email change), and the
+   client is re-emailed; the newest link is the one that works. *(Requires the
+   `resendProjectInvite` function deploy — see HUMANTASKS.)*
+
+   Open the invite link (or the emailed
    magic link) in a fresh session, confirm the client's email, sign in, and confirm
    the claim. **Expected:** you land on the client dashboard with a **"Projects set
    up for you"** card listing the jobs and **Accept**. Accept opens an **address

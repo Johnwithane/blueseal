@@ -6,6 +6,27 @@ Tasks are grouped by the phase that introduced them so you can see why each one 
 
 ---
 
+## Project-manager onboarding pass (added 2026-06-27)
+
+### [ ] Deploy the `resendProjectInvite` function (re-copyable project invite link)
+
+- **Why:** PMs (esp. agents) share invite links directly (text/DM), not just by
+  email. `resendProjectInvite` now **re-mints the token on every resend** and hands
+  back a fresh shareable link for the *same* client email (previously only an
+  email-change returned a link; the raw token is hash-only, so re-sharing requires a
+  re-mint). The cockpit UI already surfaces the returned link — it just stays empty
+  on a same-email resend until the new function is live.
+- **What:** `firebase deploy --only functions` (confirm `✔ Deploy complete!`). No
+  rules/indexes changed; the client change is backward-compatible (degrades to the
+  current email-only resend against the old function), so deploying after the
+  hosting release won't break anything — it only lights up the direct-share link.
+- **Verify:** Open a pending project → **Resend invite** → a "Shareable sign-in
+  link" with a Copy button appears for the same client email; opening it in a fresh
+  session signs the client in. The previous link for that project stops working
+  (latest-wins).
+
+---
+
 ## Google One Tap — "Continue as <name>" popup (added 2026-06-25)
 
 One Tap is built and wired into `/sign-in` and `/sign-up`, but stays **OFF** until

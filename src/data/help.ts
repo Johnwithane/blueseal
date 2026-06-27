@@ -44,6 +44,13 @@ const categories: HelpCategory[] = [
     icon: "pi pi-wrench",
   },
   {
+    id: "for-project-managers",
+    title: "Managing work for clients",
+    description:
+      "For agents, property managers, and landlords: set up properties and projects, refer your trusted trades, and track the work.",
+    icon: "pi pi-briefcase",
+  },
+  {
     id: "verification-trust",
     title: "Verification & trust",
     description: "How we verify pros: government ID, trade certification, insurance, and WSIB.",
@@ -563,6 +570,40 @@ Don't have a Google Business Profile yet? You don't need one; it's an optional e
 
 If a request feels off (someone pushing you off-platform, or asking for payment in an unusual way) pause and contact support.`,
   },
+  {
+    slug: "getting-started-as-a-project-manager",
+    categoryId: "for-project-managers",
+    title: "Getting started as a project manager",
+    excerpt: "Set up your roster, properties, and projects, then refer your trusted trades.",
+    audience: "all",
+    popular: true,
+    keywords: [
+      "project manager",
+      "real estate agent",
+      "property manager",
+      "landlord",
+      "roster",
+      "property",
+      "project",
+      "refer trades",
+      "manage",
+    ],
+    body: `Blue Seal lets you manage work for your clients and put your own trusted trades on it. It's built for **real estate agents, property managers, and landlords**, anyone who lines up work for someone else and wants it done by people they trust.
+
+Your home base is the **cockpit** at **/manage**. Set it up in three steps, in this order:
+
+**1. Add your trusted trades first.** Open **Roster** and add the tradespeople you rely on. If they're already on Blue Seal, search their name and add them. If they're not, send them an email invite or share your personal invite link, and they land on your roster when they join. This matters first: a project only goes to your trades if they're on your roster, so building it up before you set up work is what keeps jobs in-house rather than opening them to the wider board.
+
+**2. Add a property.** A property is just an address you manage, with an optional photo. It's the folder your projects live in, handy when one client or building has several jobs over time. A project can stand on its own without a property, but properties keep multi-job clients tidy.
+
+**3. Set up a project and invite your client.** A project is a bundle of jobs (each one a trade, like "repaint the unit" or "fix the sink"). Add the jobs and invite your client by email. As you pick each trade, Blue Seal tells you whether one of your roster trades will be invited, so there are no surprises. Your client gets a one-tap sign-in link (no password), reviews the project, and accepts.
+
+**What happens next.** On accept, each job goes out for a quote to the trades on your roster that match it. Your client compares the quotes and picks who they want, the choice is always theirs. You can watch status and quote amounts the whole way; you don't see their private chat or invoice. When one of your trades is hired and does the work, you earn a referral commission.
+
+**Make it yours.** You can claim a free public page (like **blueseal.app/pm/your-name**) that shows your brand and the trades you recommend, and download a print-ready business card with a QR code to it, both from the **Public profile** section.
+
+There's nothing to pay to use the cockpit. Setting up payouts (a short agreement plus connecting a bank through Stripe) is only needed when you want your commission to pay out, not to set up work.`,
+  },
 ];
 
 // Keep this list broad and current. When a major feature ships, add or update
@@ -650,35 +691,35 @@ const faqs: FaqItem[] = [
     question: "I'm a project manager. How do I set up work for a client?",
     answer:
       "From your cockpit at **/manage**: add the **property** you manage (an address, with an optional photo), open it, and create a **project** there. A project is a bundle of jobs (each a trade, like \"repaint unit\" or \"fix the sink\"). Add the jobs, then invite your client by email. They get a one-tap sign-in link, review the project, and accept. On accept, each job is sent for quotes to the trades you've saved that match it, and your client compares the quotes and picks. You can watch status and quote amounts the whole way (you never see their private chat or invoice), and you earn a commission when one of your trades does the work.",
-    categoryId: "for-clients",
+    categoryId: "for-project-managers",
     audience: "client",
   },
   {
     question: "Can I have my own public page as a project manager?",
     answer:
       "Yes. In your cockpit's **Public profile** section you can add a business name, a short about, a logo, a cover image, and a brand colour, then claim a shareable link like **blueseal.app/pm/your-name**. Flip **Publish** on and the page goes live instantly, there's no review. Turn it off any time and it's hidden again (only you can preview it while it's off). It's free.",
-    categoryId: "for-clients",
+    categoryId: "for-project-managers",
     audience: "client",
   },
   {
     question: "I'm a project manager. How and when do I get paid?",
     answer:
       "When one of your preferred contractors completes paid work on a job you set up, you earn a referral commission. It builds up as a balance in your cockpit's **Earnings** section. To receive it, sign the short project-manager agreement and connect a bank account through Stripe (about five minutes, one time). After that, your balance pays out automatically each month once it clears a $50 minimum; anything under that rolls to the next month. You can recommend trades and set up projects before doing any of this, the payout setup only gates getting paid, not using the cockpit.",
-    categoryId: "for-clients",
+    categoryId: "for-project-managers",
     audience: "client",
   },
   {
     question: "I'm a project manager. Can I get a business card to give my clients?",
     answer:
       "Yes. In your cockpit, tap **My business card** (on the dashboard, or from the **Public profile** section). Pick a theme, add an optional phone number, and download a print-ready, two-sided PDF (or PNGs). The card shows your name, brand, and the trades you recommend, with a QR code that opens your public profile, where clients see your featured trades and can request a quote. Publish your public profile first so the QR works for anyone who scans it; claiming a **blueseal.app/pm/your-name** handle gives the card a cleaner link. It's free.",
-    categoryId: "for-clients",
+    categoryId: "for-project-managers",
     audience: "client",
   },
   {
     question: "I'm a project manager. How do I add tradespeople to my roster?",
     answer:
       "Your roster is the tradespeople you work with. When you set up a project, each job goes to the matching people on your roster for a quote. Open **Roster** in your cockpit. If they're **already on Blue Seal**, search their name and tap **Add to roster**. If they're **not on Blue Seal yet**, you have two ways to invite them: **email them an invite** (enter their name and email and we send the invite for you), or **share your personal invite link** (with a QR code you can tap to enlarge and show at a job site). Either way, when they sign up they land on your roster and get their first month of Blue Seal Pro free. You can see who you've invited and whether they've joined, and cancel a pending invite any time. Remove anyone from your roster with the x. Your roster is private to you.",
-    categoryId: "for-clients",
+    categoryId: "for-project-managers",
     audience: "client",
   },
   {

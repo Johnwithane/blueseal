@@ -117,12 +117,30 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
               "The project is scoped to that property (no picker), shows Invite sent, and an invite link is shown.",
           },
           {
+            id: "pm-coverage-preview",
+            title: "Roster-coverage hint while building a project",
+            steps: [
+              "In the new-project form, pick a trade you HAVE a saved trade for, then one you DON'T.",
+            ],
+            expected:
+              "The covered trade shows a green 'N of your trades will be invited'; the uncovered one shows an amber 'No saved trade for this — it'll go to the public board'. Adding a matching trade to your roster clears the warning live.",
+          },
+          {
             id: "pm-client-claim-accept",
             title: "Client claims + accepts the project",
             steps: [
               "Open the invite link (or emailed magic link) as the client → confirm email → claim → on the dashboard, Accept and enter the job address.",
             ],
             expected: "Each job dispatches to your matching saved trades; the project shows Accepted.",
+          },
+          {
+            id: "pm-resend-link",
+            title: "Re-copy a shareable invite link for a pending project",
+            steps: [
+              "Open a pending (Invite sent) project → Resend invite.",
+            ],
+            expected:
+              "A fresh 'Shareable sign-in link' appears with a Copy button (works for the SAME client email, not only on an email change); the client is also re-emailed. The newest link is the one that works. (Requires the resendProjectInvite function deploy.)",
           },
         ],
       },

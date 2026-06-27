@@ -68,20 +68,22 @@ export const resendProjectInvite = onCall(CALLABLE_OPTS, async (req) => {
   }
 
   const changingEmail = !!newEmail && newEmail !== p.projectInvite?.emailLower;
+  // Every resend re-mints the token and hands back a fresh shareable link. The
+  // raw token is never stored (only its hash), so re-sharing an existing invite is
+  // impossible WITHOUT re-minting — and re-minting is the correct latest-wins
+  // behaviour (the newest link is the one to use). This lets a PM grab a link to
+  // text/DM a client directly, not only at create time or on an email correction.
+  const token = randomBytes(32).toString("base64url");
   const update: Record<string, unknown> = {
+    "projectInvite.tokenHash": sha256(token),
+    "projectInvite.invitedAt": FieldValue.serverTimestamp(),
+    "projectInvite.expiresAt": Timestamp.fromMillis(Date.now() + INVITE_TTL_MS),
     "projectInvite.resendCount": FieldValue.increment(1),
     "projectInvite.lastSentAt": FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
   };
-  let inviteLink: string | null = null;
-  if (changingEmail) {
-    const token = randomBytes(32).toString("base64url");
-    update["projectInvite.emailLower"] = newEmail;
-    update["projectInvite.tokenHash"] = sha256(token);
-    update["projectInvite.invitedAt"] = FieldValue.serverTimestamp();
-    update["projectInvite.expiresAt"] = Timestamp.fromMillis(Date.now() + INVITE_TTL_MS);
-    inviteLink = `${appBaseUrl()}/project-invite/${token}`;
-  }
+  if (changingEmail) update["projectInvite.emailLower"] = newEmail;
+  const inviteLink = `${appBaseUrl()}/project-invite/${token}`;
   await ref.update(update);
 
   const pmSnap = await db.doc(`users/${uid}`).get();

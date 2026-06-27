@@ -10,6 +10,7 @@ import {
   type CreateProjectResult,
 } from "@/firebase/services/projects";
 import { subscribeProperties } from "@/firebase/services/properties";
+import { subscribeSavedTradieIds, hydrateSavedTradies } from "@/firebase/services/savedTradies";
 import { uploadPmPhoto } from "@/firebase/services/pmImages";
 import { projectSchema } from "@/validation/projects";
 import { TRADES } from "@/data/trades";
@@ -28,6 +29,15 @@ const toast = useToast();
 
 const properties = ref<WithId<PropertyDoc>[]>([]);
 let unsubProps: (() => void) | null = null;
+
+// Roster coverage preview: mirror dispatch's matching (a saved+visible tradie whose
+// `trades[]` includes the job's trade) so the PM sees BEFORE inviting the client
+// whether each job will reach their trades — or fall through to the public board.
+const rosterTradeCounts = ref<Record<string, number>>({});
+let unsubRoster: (() => void) | null = null;
+function matchCount(trade: string): number {
+  return trade ? (rosterTradeCounts.value[trade] ?? 0) : 0;
+}
 
 const tradeOptions = TRADES.map((t) => ({ label: t.label, value: t.key }));
 const propertyOptions = computed(() => [
@@ -52,9 +62,21 @@ const lastResult = ref<CreateProjectResult | null>(null);
 
 onMounted(() => {
   const uid = auth.fbUser?.uid;
-  if (uid && !scoped.value) unsubProps = subscribeProperties(uid, (next) => (properties.value = next));
+  if (!uid) return;
+  if (!scoped.value) unsubProps = subscribeProperties(uid, (next) => (properties.value = next));
+  // Recompute trade coverage whenever the roster changes. Roster size is small
+  // (dozens at most), so re-hydrating on each change is cheap.
+  unsubRoster = subscribeSavedTradieIds(uid, async (ids) => {
+    const tradies = await hydrateSavedTradies([...ids]);
+    const counts: Record<string, number> = {};
+    for (const t of tradies) for (const tr of t.trades ?? []) counts[tr] = (counts[tr] ?? 0) + 1;
+    rosterTradeCounts.value = counts;
+  });
 });
-onUnmounted(() => unsubProps?.());
+onUnmounted(() => {
+  unsubProps?.();
+  unsubRoster?.();
+});
 
 function reset() {
   form.label = "";
@@ -225,6 +247,21 @@ async function copyInvite() {
             />
           </div>
           <small v-if="fieldErrors[`jobs.${i}.trade`]" class="text-[color:var(--bs-danger)] block">{{ fieldErrors[`jobs.${i}.trade`] }}</small>
+          <!-- Roster coverage: warn before the client accepts if no saved trade matches. -->
+          <p
+            v-if="job.trade && matchCount(job.trade) === 0"
+            class="text-xs text-[color:var(--bs-warn,#d97706)] flex items-start gap-1"
+          >
+            <i class="pi pi-exclamation-triangle text-[10px] mt-0.5"></i>
+            <span>No saved trade for this — it'll go to the public board. Add one to your roster to keep it in-house.</span>
+          </p>
+          <p
+            v-else-if="job.trade"
+            class="text-xs text-[color:var(--bs-success)] flex items-center gap-1"
+          >
+            <i class="pi pi-check-circle text-[10px]"></i>
+            <span>{{ matchCount(job.trade) }} of your trades will be invited to quote.</span>
+          </p>
           <InputText v-model="job.title" class="w-full" placeholder="Job title (e.g. Repaint unit)" />
           <small v-if="fieldErrors[`jobs.${i}.title`]" class="text-[color:var(--bs-danger)] block">{{ fieldErrors[`jobs.${i}.title`] }}</small>
           <Textarea v-model="job.description" class="w-full" rows="2" placeholder="What needs doing?" />
