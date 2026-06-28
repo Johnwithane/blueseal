@@ -661,6 +661,29 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    your public profile (`/pm/<handle>`, or `/project-managers/<uid>` if you haven't
    claimed a handle). If your profile isn't published yet, a warning tells you to publish
    it first (so the scan resolves for clients).
+10j. **PM tools expansion (2026-06).** A batch of cockpit additions; the Pro ones gate
+   behind the **same Blue Seal Pro subscription tradespeople use** (a PM can subscribe
+   through the normal paywall → trial → Stripe, no "add the tradesperson role" bounce).
+   - **Welcome email.** Become a PM → a one-time "Welcome to Blue Seal" email + in-app
+     notification arrives, linking to `/manage` (re-adding the role doesn't re-send).
+   - **Restore archived property.** Properties → archive one → **Archived (N)** section
+     → **Restore** → it's back in the active list.
+   - **Multi-unit.** Edit a property → add **units** (chips) → Save (card shows "N
+     units"). New project on it → a **Unit** picker appears → pick one → the unit shows
+     on the project detail + the property's project list.
+   - **Edit a project.** On a pending project, **Edit project** → change label / add a
+     job → **Save changes**. Offered only pre-accept (server rejects edits after accept).
+   - **Roster availability.** Roster cards show each contractor's available weekdays.
+   - **Clients (Pro)** `/manage/clients`: all clients gathered from your projects,
+     searchable, active/total counts. Non-Pro → the Pro gate.
+   - **Calendar (Pro)** `/manage/calendar`: every scheduled job across your projects on
+     the read-only calendar. Non-Pro → the Pro gate.
+   - **Branded profile + business card (Pro).** Non-Pro PMs see the Pro gate on Public
+     profile + Business card.
+   - **AI — draft a project (Pro).** New project → "Draft the jobs with AI" → describe
+     the work → **Draft jobs** → rows populate to review. Non-Pro → paywall.
+   - **AI — Catch me up (Pro).** Dashboard → **Catch me up** → a plain-language status
+     digest (status only — never the chat/invoice). Non-Pro → paywall.
 11. **Mobile (375px).** Re-run the signup cards + cockpit + saved-trades + properties +
    projects (incl. the client accept + address form), the tradesperson "Invited to
    quote" section, the cockpit Earnings + Public-profile editors, and the public
