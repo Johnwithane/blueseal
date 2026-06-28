@@ -127,6 +127,7 @@ onUnmounted(() => unsub?.());
               <p class="font-medium truncate">{{ p.label }}</p>
               <p class="text-xs text-[color:var(--bs-muted)] truncate">
                 {{ p.clientName }} ·
+                <template v-if="p.unit">{{ p.unit }} · </template>
                 {{ p.jobSpecs.length }} {{ p.jobSpecs.length === 1 ? "job" : "jobs" }}
                 <template v-if="p.jobSpecs.length">
                   ({{ p.jobSpecs.map((j) => tradeLabel(j.trade)).join(", ") }})

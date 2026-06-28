@@ -226,6 +226,7 @@ function liveQuotes(postId: string): WithId<ApplicationDoc>[] {
       <h1 class="text-2xl font-bold mt-3">{{ project.label }}</h1>
       <p class="text-sm text-[color:var(--bs-muted)] mt-1">
         For {{ project.clientName }} ·
+        <template v-if="project.unit">{{ project.unit }} · </template>
         {{ project.jobSpecs.length }} {{ project.jobSpecs.length === 1 ? "job" : "jobs" }}
       </p>
 

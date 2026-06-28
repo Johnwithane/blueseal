@@ -23,6 +23,17 @@ following commits). **Deploy the functions once when you pull this branch:**
 - **Verify:** Become a PM (new account or add the role) → a "Welcome to Blue Seal"
   email + in-app notification arrives, linking to /manage.
 
+### [ ] (Covered by the functions deploy) Multi-unit properties
+
+- **Why:** A property can now carry a list of **unit labels** (e.g. "Unit 1",
+  "Basement"), and a project can be scoped to one unit. `createProject` +
+  `updateProject` now persist the optional `unit` field — so they must be redeployed
+  with the rest (`firebase deploy --only functions`). **No firestore.rules change**
+  (the properties `units` array is additive and not field-locked; the project `unit`
+  is server-written via the callables).
+- **Verify:** Edit a property → add a couple of units → New project on that property →
+  a Unit picker appears → pick one → the project shows the unit.
+
 ### [ ] Deploy functions: PM can edit a project before it's accepted
 
 - **Why:** New `updateProject` callable lets the owning PM edit a project's label,

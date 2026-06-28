@@ -34,6 +34,7 @@ export interface UpdateProjectInput {
   label: string;
   clientName: string;
   propertyId: string | null;
+  unit: string | null;
   photoUrl: string | null;
   jobs: { trade: string; title: string; description: string }[];
 }

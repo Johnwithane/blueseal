@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import Textarea from "primevue/textarea";
@@ -105,8 +105,23 @@ const form = reactive({
   clientName: "",
   clientEmail: "",
   propertyId: null as string | null,
+  unit: null as string | null,
   photoUrl: "" as string,
   jobs: [{ trade: "", title: "", description: "" }],
+});
+
+// Units of the currently-selected property (multi-unit support). The unit picker
+// only appears when the chosen property actually has units.
+const selectedPropertyId = computed(() => (scoped.value ? (props.propertyId ?? null) : form.propertyId));
+const selectedUnits = computed(
+  () => properties.value.find((p) => p.id === selectedPropertyId.value)?.units ?? [],
+);
+const unitOptions = computed(() => [
+  { label: "Whole property", value: null as string | null },
+  ...selectedUnits.value.map((u) => ({ label: u, value: u as string | null })),
+]);
+watch(selectedPropertyId, () => {
+  if (form.unit && !selectedUnits.value.includes(form.unit)) form.unit = null;
 });
 const fieldErrors = ref<Record<string, string>>({});
 const lastResult = ref<CreateProjectResult | null>(null);
@@ -122,10 +137,13 @@ onMounted(() => {
     form.clientName = p.clientName;
     form.clientEmail = p.projectInvite?.emailLower ?? "noreply@example.com";
     form.propertyId = p.propertyId ?? null;
+    form.unit = p.unit ?? null;
     form.photoUrl = p.photoUrl ?? "";
     form.jobs = p.jobSpecs.map((j) => ({ ...j }));
   }
-  if (!scoped.value) unsubProps = subscribeProperties(uid, (next) => (properties.value = next));
+  // Always subscribe (even when scoped) so the unit picker can look up the
+  // selected property's units; the property PICKER itself stays hidden when scoped.
+  unsubProps = subscribeProperties(uid, (next) => (properties.value = next));
   // Recompute trade coverage whenever the roster changes. Roster size is small
   // (dozens at most), so re-hydrating on each change is cheap.
   unsubRoster = subscribeSavedTradieIds(uid, async (ids) => {
@@ -145,6 +163,7 @@ function reset() {
   form.clientName = "";
   form.clientEmail = "";
   form.propertyId = null;
+  form.unit = null;
   form.photoUrl = "";
   form.jobs = [{ trade: "", title: "", description: "" }];
   fieldErrors.value = {};
@@ -192,6 +211,7 @@ async function save() {
         label: parsed.data.label,
         clientName: parsed.data.clientName,
         propertyId: parsed.data.propertyId,
+        unit: parsed.data.unit,
         photoUrl: parsed.data.photoUrl,
         jobs: parsed.data.jobs,
       });
@@ -283,6 +303,21 @@ async function copyInvite() {
           option-value="value"
           class="mt-1 w-full"
           placeholder="No property"
+        />
+      </div>
+
+      <!-- Unit picker: only when the chosen property is multi-unit. -->
+      <div v-if="selectedUnits.length">
+        <label class="text-sm font-medium">
+          Unit <span class="text-[color:var(--bs-muted)] font-normal">(optional)</span>
+        </label>
+        <Select
+          v-model="form.unit"
+          :options="unitOptions"
+          option-label="label"
+          option-value="value"
+          class="mt-1 w-full"
+          placeholder="Whole property"
         />
       </div>
 

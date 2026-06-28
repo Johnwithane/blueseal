@@ -37,6 +37,7 @@ function draftFields(draft: PropertyDraft) {
     addressText: draft.addressText,
     notes: draft.notes,
     photoUrl: draft.photoUrl,
+    units: draft.units,
   };
 }
 

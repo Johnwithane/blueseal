@@ -20,6 +20,13 @@ export const propertySchema = z.object({
     .nullable()
     .transform((v) => (v ? v : null))
     .default(null),
+  // Optional unit labels for a multi-unit property. Trimmed, de-duped, empties
+  // dropped; a single-unit property just leaves this empty.
+  units: z
+    .array(z.string().trim().min(1).max(40))
+    .max(100)
+    .default([])
+    .transform((arr) => [...new Set(arr.map((u) => u.trim()).filter(Boolean))]),
 });
 
 export type PropertyDraft = z.infer<typeof propertySchema>;

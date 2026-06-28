@@ -137,6 +137,9 @@ export interface PropertyDoc {
   notes: string | null;
   /** Optional photo of the property (PM-uploaded, world-read storage). */
   photoUrl?: string | null;
+  /** Optional unit labels for a multi-unit property (e.g. "Unit 1", "Basement").
+   *  A project can be scoped to one of these via ProjectDoc.unit. */
+  units?: string[];
   linkedClientId: string | null;
   archivedAt: Timestamp | null;
   createdAt: Timestamp;
@@ -191,6 +194,9 @@ export interface ProjectDoc {
   clientId: string | null;
   /** Optional tie to one of the PM's properties. */
   propertyId: string | null;
+  /** Optional unit within the property this project is for (one of the property's
+   *  units). Null for single-unit properties / unscoped projects. */
+  unit?: string | null;
   /** PM-facing project name, e.g. "Spring turnover - 14 Elm". */
   label: string;
   /** What the PM entered for the client; denormalized for display. */

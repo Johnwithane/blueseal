@@ -21,6 +21,7 @@ const Input = z.object({
   label: z.string().trim().min(2).max(120),
   clientName: z.string().trim().min(1).max(80),
   propertyId: z.string().trim().min(1).max(200).nullable().default(null),
+  unit: z.string().trim().max(40).nullable().default(null),
   photoUrl: z.string().trim().max(1000).nullable().default(null),
   jobs: z
     .array(
@@ -71,6 +72,7 @@ export const updateProject = onCall(CALLABLE_OPTS, async (req) => {
     clientName: input.clientName,
     photoUrl: input.photoUrl,
     propertyId: input.propertyId,
+    unit: input.unit,
     jobSpecs: input.jobs,
     // Keep the denormalized invite name in step with the client name.
     "projectInvite.clientName": input.clientName,
