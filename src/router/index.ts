@@ -418,6 +418,18 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, role: "projectManager", layout: "app", title: "Jobs" },
   },
   {
+    path: "/manage/clients",
+    name: "PmClients",
+    component: () => import("@/views/manage/PmClientsView.vue"),
+    meta: { requiresAuth: true, role: "projectManager", layout: "app", title: "Clients" },
+  },
+  {
+    path: "/manage/calendar",
+    name: "PmCalendar",
+    component: () => import("@/views/manage/PmCalendarView.vue"),
+    meta: { requiresAuth: true, role: "projectManager", layout: "app", title: "Calendar" },
+  },
+  {
     path: "/manage/trades",
     name: "PmTrades",
     component: () => import("@/views/manage/PmTradesView.vue"),
