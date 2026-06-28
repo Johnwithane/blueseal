@@ -12,6 +12,19 @@ A batch of project-manager features (Pro paywall enablement, plus more landing i
 following commits). **Deploy the functions once when you pull this branch:**
 `firebase deploy --only functions` (and `firestore:rules` where noted below).
 
+### [ ] Deploy functions: PM AI — draft a project from a prompt
+
+- **Why:** New callable `aiGenerateProjectFromPrompt` lets a PM describe work in
+  plain language and get the project's trade jobs drafted (they review/edit before
+  creating). Gated behind Blue Seal Pro (`requireAiEntitlement` → "pmProject") and
+  the shared AI daily cap. Reuses the existing Vertex/Gemini setup — no new config.
+- **What:** `firebase deploy --only functions`. The new-project form's "Draft jobs"
+  button calls it; until deployed it returns a not-found and the form's manual entry
+  still works.
+- **Verify:** As a Pro PM, open New project → type a description → Draft jobs → the
+  job rows populate with trade + title + description to review. As a non-Pro PM, the
+  button opens the Blue Seal Pro paywall.
+
 ### [ ] Deploy functions: project managers can subscribe to Blue Seal Pro
 
 - **Why:** The AI tools, clients CRM, branded-profile tools, and global calendar are

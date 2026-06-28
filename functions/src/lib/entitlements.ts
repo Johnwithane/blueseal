@@ -22,6 +22,8 @@ export type AiFeature =
   | "draftQuote"
   | "draftInvoiceNote"
   | "updateJobLog"
+  | "pmProject" // PM: draft a project's jobs from a freeform description
+  | "pmDigest" // PM: a plain-language digest of their projects' status
   | "legacyTools"; // aiDiagnose/aiQuote/aiSummarize — slated for retirement into chat
 
 export async function requireAiEntitlement(uid: string, feature: AiFeature): Promise<void> {

@@ -11,10 +11,13 @@ import {
 } from "@/firebase/services/projects";
 import { subscribeProperties } from "@/firebase/services/properties";
 import { subscribeSavedTradieIds, hydrateSavedTradies } from "@/firebase/services/savedTradies";
+import { generateProjectJobsWithAi } from "@/firebase/services/aiDrafts";
 import { uploadPmPhoto } from "@/firebase/services/pmImages";
 import { projectSchema } from "@/validation/projects";
 import { TRADES } from "@/data/trades";
 import { useToast } from "@/composables/useToast";
+import { usePaywallStore } from "@/stores/paywall";
+import { useSubscriptionStore } from "@/stores/subscription";
 import { humanizeError } from "@/utils/errors";
 import type { PropertyDoc, WithId } from "@/firebase/interfaces";
 
@@ -26,6 +29,44 @@ const emit = defineEmits<{ created: []; cancel: [] }>();
 
 const auth = useAuthStore();
 const toast = useToast();
+const paywall = usePaywallStore();
+const subscription = useSubscriptionStore();
+
+// AI: draft the project's jobs from a freeform description (Blue Seal Pro).
+const aiPrompt = ref("");
+const aiBusy = ref(false);
+async function draftWithAi() {
+  const text = aiPrompt.value.trim();
+  if (!text) return;
+  const isAdmin = (auth.roles ?? []).includes("admin");
+  // Pre-flight the paywall so a non-Pro PM doesn't burn a server round-trip.
+  if (!subscription.isPro && !isAdmin) {
+    paywall.open(
+      "Drafting a project with AI is part of Blue Seal Pro. Start a free trial to use it.",
+    );
+    return;
+  }
+  aiBusy.value = true;
+  try {
+    const jobs = await generateProjectJobsWithAi(
+      text,
+      TRADES.map((t) => ({ key: t.key, label: t.label })),
+    );
+    const mapped = jobs.map((j) => ({ trade: j.trade, title: j.title, description: j.description }));
+    // Replace the lone empty starter row; otherwise append to what's there.
+    const onlyEmpty =
+      form.jobs.length === 1 && !form.jobs[0].trade && !form.jobs[0].title && !form.jobs[0].description;
+    if (onlyEmpty) form.jobs.splice(0, form.jobs.length, ...mapped);
+    else form.jobs.push(...mapped);
+    aiPrompt.value = "";
+    toast.success("Jobs drafted", "Review and tweak them, then create the project.");
+  } catch (e) {
+    if (paywall.fromError(e)) return;
+    toast.error("Couldn't draft", humanizeError(e));
+  } finally {
+    aiBusy.value = false;
+  }
+}
 
 const properties = ref<WithId<PropertyDoc>[]>([]);
 let unsubProps: (() => void) | null = null;
@@ -220,6 +261,27 @@ async function copyInvite() {
           <input type="file" accept="image/*" :disabled="uploading" @change="onPickPhoto" />
           <button v-if="form.photoUrl" type="button" class="text-xs text-[color:var(--bs-muted)] underline" @click="form.photoUrl = ''">Remove</button>
         </div>
+      </div>
+
+      <!-- AI: describe the work, get the jobs drafted (Blue Seal Pro). -->
+      <div class="rounded-lg border border-dashed border-[color:var(--bs-blue)]/40 bg-[color:var(--bs-blue)]/5 p-3 space-y-2">
+        <label class="text-sm font-medium flex items-center gap-1.5">
+          <i class="pi pi-sparkles text-[color:var(--bs-blue)]"></i> Draft the jobs with AI
+        </label>
+        <Textarea
+          v-model="aiPrompt"
+          class="w-full"
+          rows="2"
+          placeholder="Describe the work in plain words, e.g. Kitchen reno — new outlets, under-cabinet lighting, a plumber for the sink, repaint the cabinets"
+        />
+        <Button
+          label="Draft jobs"
+          icon="pi pi-sparkles"
+          size="small"
+          :loading="aiBusy"
+          :disabled="!aiPrompt.trim()"
+          @click="draftWithAi"
+        />
       </div>
 
       <div class="space-y-2">
