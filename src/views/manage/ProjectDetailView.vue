@@ -25,6 +25,7 @@ import { subscribeProjectJobsForPm } from "@/firebase/services/jobs";
 import { subscribeApplicationsForPost } from "@/firebase/services/applications";
 import { tradeLabel } from "@/data/trades";
 import { statusLabel } from "@/utils/jobStatus";
+import NewProjectForm from "@/components/manage/NewProjectForm.vue";
 import type {
   ApplicationDoc,
   JobDoc,
@@ -132,6 +133,7 @@ const showEmailForm = ref(false);
 const newEmail = ref("");
 const confirmingCancel = ref(false);
 const newInviteLink = ref<string | null>(null);
+const editing = ref(false);
 
 async function retryDispatch(): Promise<void> {
   busy.value = true;
@@ -227,6 +229,16 @@ function liveQuotes(postId: string): WithId<ApplicationDoc>[] {
         {{ project.jobSpecs.length }} {{ project.jobSpecs.length === 1 ? "job" : "jobs" }}
       </p>
 
+      <!-- Edit mode: reuses the project form (prefilled), saving via updateProject. -->
+      <NewProjectForm
+        v-if="editing"
+        :edit-project="project"
+        class="mt-4"
+        @updated="editing = false"
+        @cancel="editing = false"
+      />
+
+      <template v-else>
       <!-- Accepted but the dispatch failed — the PM can re-send. -->
       <div v-if="myPostings.length === 0 && dispatchFailed" class="bs-card p-6 text-center mt-6 border-l-4 border-l-[color:var(--bs-warn,#d97706)]">
         <i class="pi pi-exclamation-triangle text-2xl text-[color:var(--bs-warn,#d97706)]"></i>
@@ -282,6 +294,13 @@ function liveQuotes(postId: string): WithId<ApplicationDoc>[] {
             text
             size="small"
             @click="showEmailForm = !showEmailForm"
+          />
+          <Button
+            label="Edit project"
+            icon="pi pi-pencil"
+            text
+            size="small"
+            @click="editing = true"
           />
           <Button
             label="Cancel project"
@@ -392,6 +411,7 @@ function liveQuotes(postId: string): WithId<ApplicationDoc>[] {
           </div>
         </li>
       </ul>
+      </template>
     </template>
   </section>
 </template>

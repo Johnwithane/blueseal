@@ -12,6 +12,17 @@ A batch of project-manager features (Pro paywall enablement, plus more landing i
 following commits). **Deploy the functions once when you pull this branch:**
 `firebase deploy --only functions` (and `firestore:rules` where noted below).
 
+### [ ] Deploy functions: PM can edit a project before it's accepted
+
+- **Why:** New `updateProject` callable lets the owning PM edit a project's label,
+  client name, photo, property, and job list while it's still `invited`/`claimed`
+  (before the client accepts and dispatch fans the jobs out). Previously the only
+  option was cancel. Server rejects edits once accepted.
+- **What:** `firebase deploy --only functions`. The project detail page's "Edit
+  project" button calls it; until deployed the button errors and cancel still works.
+- **Verify:** Open a pending project → Edit project → change the label / add a job →
+  Save changes → the detail updates. Editing an accepted project is rejected.
+
 ### [ ] Deploy functions: PM AI — draft a project from a prompt
 
 - **Why:** New callable `aiGenerateProjectFromPrompt` lets a PM describe work in

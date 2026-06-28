@@ -7,6 +7,7 @@ import Select from "primevue/select";
 import { useAuthStore } from "@/stores/auth";
 import {
   createProject,
+  updateProject,
   type CreateProjectResult,
 } from "@/firebase/services/projects";
 import { subscribeProperties } from "@/firebase/services/properties";
@@ -19,13 +20,22 @@ import { useToast } from "@/composables/useToast";
 import { usePaywallStore } from "@/stores/paywall";
 import { useSubscriptionStore } from "@/stores/subscription";
 import { humanizeError } from "@/utils/errors";
-import type { PropertyDoc, WithId } from "@/firebase/interfaces";
+import type { ProjectDoc, PropertyDoc, WithId } from "@/firebase/interfaces";
 
 // The create-a-project form. When `propertyId` is passed (the property-scoped flow
 // inside a property), the project is fixed to that property and the picker is hidden;
 // otherwise it shows a property picker. Emits `created` so the parent can refresh.
-const props = defineProps<{ propertyId?: string | null }>();
-const emit = defineEmits<{ created: []; cancel: [] }>();
+//
+// EDIT MODE: pass `editProject` (a project the client hasn't accepted yet) to reuse
+// the same job editor for edits — it prefills, hides the client-email field (email
+// changes go through Resend invite), and saves via updateProject, emitting `updated`.
+const props = defineProps<{
+  propertyId?: string | null;
+  editProject?: WithId<ProjectDoc> | null;
+}>();
+const emit = defineEmits<{ created: []; updated: []; cancel: [] }>();
+
+const isEdit = computed(() => !!props.editProject);
 
 const auth = useAuthStore();
 const toast = useToast();
@@ -104,6 +114,17 @@ const lastResult = ref<CreateProjectResult | null>(null);
 onMounted(() => {
   const uid = auth.fbUser?.uid;
   if (!uid) return;
+  // Edit mode: prefill from the project. clientEmail is kept (hidden) so the
+  // shared projectSchema still validates; updateProject ignores it.
+  if (props.editProject) {
+    const p = props.editProject;
+    form.label = p.label;
+    form.clientName = p.clientName;
+    form.clientEmail = p.projectInvite?.emailLower ?? "noreply@example.com";
+    form.propertyId = p.propertyId ?? null;
+    form.photoUrl = p.photoUrl ?? "";
+    form.jobs = p.jobSpecs.map((j) => ({ ...j }));
+  }
   if (!scoped.value) unsubProps = subscribeProperties(uid, (next) => (properties.value = next));
   // Recompute trade coverage whenever the roster changes. Roster size is small
   // (dozens at most), so re-hydrating on each change is cheap.
@@ -165,6 +186,19 @@ async function save() {
   }
   saving.value = true;
   try {
+    if (props.editProject) {
+      await updateProject({
+        projectId: props.editProject.id,
+        label: parsed.data.label,
+        clientName: parsed.data.clientName,
+        propertyId: parsed.data.propertyId,
+        photoUrl: parsed.data.photoUrl,
+        jobs: parsed.data.jobs,
+      });
+      emit("updated");
+      toast.success("Project updated", "Your changes are saved.");
+      return;
+    }
     const res = await createProject(parsed.data);
     lastResult.value = res;
     reset();
@@ -174,7 +208,7 @@ async function save() {
       res.emailed ? "We emailed your client a sign-in link." : "Copy the invite link to share it.",
     );
   } catch (e) {
-    toast.error("Couldn't create", humanizeError(e));
+    toast.error(isEdit.value ? "Couldn't save" : "Couldn't create", humanizeError(e));
   } finally {
     saving.value = false;
   }
@@ -232,7 +266,7 @@ async function copyInvite() {
           <InputText v-model="form.clientName" class="mt-1 w-full" placeholder="Their name" />
           <small v-if="fieldErrors.clientName" class="text-[color:var(--bs-danger)]">{{ fieldErrors.clientName }}</small>
         </div>
-        <div>
+        <div v-if="!isEdit">
           <label class="text-sm font-medium">Client email</label>
           <InputText v-model="form.clientEmail" type="email" class="mt-1 w-full" placeholder="them@example.com" />
           <small v-if="fieldErrors.clientEmail" class="text-[color:var(--bs-danger)]">{{ fieldErrors.clientEmail }}</small>
@@ -334,7 +368,12 @@ async function copyInvite() {
       </div>
 
       <div class="flex gap-2">
-        <Button label="Create & invite client" :loading="saving || uploading" size="small" @click="save" />
+        <Button
+          :label="isEdit ? 'Save changes' : 'Create & invite client'"
+          :loading="saving || uploading"
+          size="small"
+          @click="save"
+        />
         <Button label="Cancel" text size="small" @click="$emit('cancel')" />
       </div>
     </div>
