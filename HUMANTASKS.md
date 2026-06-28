@@ -12,6 +12,17 @@ A batch of project-manager features (Pro paywall enablement, plus more landing i
 following commits). **Deploy the functions once when you pull this branch:**
 `firebase deploy --only functions` (and `firestore:rules` where noted below).
 
+### [ ] Deploy functions: PM welcome email
+
+- **Why:** New PMs got no welcome (tradespeople get a "you're approved" email). A
+  best-effort `pm_welcome` notification (email + in-app) now fires the first time a
+  user becomes a PM, from both real provisioning paths (addRoleToSelf + provisionAccount).
+- **What:** `firebase deploy --only functions`. Uses the existing notify()/mail queue
+  (Resend) — no new config beyond the CASL mailing-address env already used by other
+  account emails.
+- **Verify:** Become a PM (new account or add the role) → a "Welcome to Blue Seal"
+  email + in-app notification arrives, linking to /manage.
+
 ### [ ] Deploy functions: PM can edit a project before it's accepted
 
 - **Why:** New `updateProject` callable lets the owning PM edit a project's label,

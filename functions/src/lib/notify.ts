@@ -32,6 +32,7 @@ export type NotificationType =
   | "vetting_approved"
   | "vetting_rejected"
   | "vetting_info_requested"
+  | "pm_welcome"
   | "cert_approved"
   | "id_approved"
   | "insurance_approved"
@@ -298,6 +299,7 @@ const CTA_BY_TYPE: Record<string, string> = {
   new_application: "View applicants",
   application_accepted: "View the job",
   vetting_approved: "View your profile",
+  pm_welcome: "Open your cockpit",
   vetting_rejected: "See what's needed",
   vetting_info_requested: "See what's needed",
   job_change_requested: "Respond on Blue Seal",

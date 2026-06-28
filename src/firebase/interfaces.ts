@@ -2780,6 +2780,7 @@ export type NotificationType =
   | "vetting_approved"
   | "vetting_rejected"
   | "vetting_info_requested"
+  | "pm_welcome"
   | "cert_approved"
   | "id_approved"
   | "insurance_approved"
