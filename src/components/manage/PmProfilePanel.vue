@@ -173,9 +173,22 @@ function suggestFromName() {
     <!-- Publish toggle -->
     <div class="bs-card p-4 flex items-center justify-between gap-3">
       <div class="min-w-0">
-        <p class="font-medium">Public profile</p>
+        <p class="font-medium flex items-center gap-2">
+          Public profile
+          <span
+            class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold"
+            :class="profile?.isVisible
+              ? 'bg-[color:var(--bs-success)]/15 text-[color:var(--bs-success)]'
+              : 'bg-[color:var(--bs-surface-alt)] text-[color:var(--bs-muted)]'"
+          >
+            <i class="pi text-[8px]" :class="profile?.isVisible ? 'pi-circle-fill' : 'pi-circle'"></i>
+            {{ profile?.isVisible ? "Live" : "Not published" }}
+          </span>
+        </p>
         <p class="text-xs text-[color:var(--bs-muted)]">
-          When on, anyone with your link can see your profile. No review needed.
+          {{ profile?.isVisible
+            ? "Anyone with your link can see your profile."
+            : "Hidden from clients. Turn on to share it — no review needed." }}
         </p>
       </div>
       <ToggleSwitch :model-value="profile?.isVisible ?? false" @update:model-value="togglePublish" />
@@ -195,6 +208,12 @@ function suggestFromName() {
             <InputText v-model="slugDraft" placeholder="your-name" class="flex-1" @keydown.enter="claimSlug" />
           </div>
           <small v-if="slugMsg" class="text-[color:var(--bs-danger)]">{{ slugMsg }}</small>
+          <small
+            v-else-if="profile?.slug && slugDraft.trim()"
+            class="block text-[color:var(--bs-warn,#d97706)]"
+          >
+            Changing your handle breaks your old <strong>/pm/{{ profile.slug }}</strong> link — anywhere you've shared it stops working.
+          </small>
           <button type="button" class="text-xs text-[color:var(--bs-blue)] underline mt-1" @click="suggestFromName">Suggest from my name</button>
         </div>
         <Button :label="profile?.slug ? 'Change' : 'Claim'" :loading="claimingSlug" :disabled="!slugDraft || !!slugMsg" size="small" @click="claimSlug" />
@@ -209,7 +228,14 @@ function suggestFromName() {
       </div>
       <div>
         <label class="text-sm font-medium">About</label>
-        <Textarea v-model="form.bio" class="mt-1 w-full" rows="3" placeholder="Tell clients who you are and the trades you work with." />
+        <Textarea
+          v-model="form.bio"
+          class="mt-1 w-full"
+          rows="3"
+          maxlength="600"
+          placeholder="Tell clients who you are and the trades you work with."
+        />
+        <div class="text-[11px] text-[color:var(--bs-muted)] text-right mt-0.5">{{ form.bio.length }}/600</div>
       </div>
       <div class="flex items-center gap-3">
         <label class="text-sm font-medium">Brand colour</label>
