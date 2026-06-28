@@ -16,7 +16,7 @@ import { tradeLabel } from "@/data/trades";
 import PmRosterSearch from "@/components/manage/PmRosterSearch.vue";
 import PmEmailInviteForm from "@/components/manage/PmEmailInviteForm.vue";
 import PmInviteLinkCard from "@/components/manage/PmInviteLinkCard.vue";
-import type { TradespersonDoc, WithId } from "@/firebase/interfaces";
+import type { TradespersonDoc, WeeklyAvailability, WithId } from "@/firebase/interfaces";
 
 // The PM's roster: the tradespeople they work with. Two clear ways to grow it —
 // add someone already on Blue Seal (in-cockpit search), or invite someone who
@@ -75,6 +75,18 @@ function tradesText(t: WithId<TradespersonDoc>): string {
 
 function initial(name: string | null | undefined): string {
   return (name ?? "?").trim().charAt(0).toUpperCase() || "?";
+}
+
+// Which weekdays the contractor lists as available (mon→sun), for the roster
+// at-a-glance. Empty when they haven't set any availability.
+const DAY_LABELS: Array<[keyof WeeklyAvailability, string]> = [
+  ["mon", "Mon"], ["tue", "Tue"], ["wed", "Wed"], ["thu", "Thu"],
+  ["fri", "Fri"], ["sat", "Sat"], ["sun", "Sun"],
+];
+function availableDays(t: WithId<TradespersonDoc>): string[] {
+  const a = t.weeklyAvailability;
+  if (!a) return [];
+  return DAY_LABELS.filter(([k]) => (a[k]?.length ?? 0) > 0).map(([, l]) => l);
 }
 </script>
 
@@ -136,6 +148,12 @@ function initial(name: string | null | undefined): string {
         <div class="min-w-0 flex-1">
           <p class="font-medium truncate">{{ t.displayName ?? "Tradesperson" }}</p>
           <p class="text-xs text-[color:var(--bs-muted)] truncate">{{ tradesText(t) }}</p>
+          <p
+            v-if="availableDays(t).length"
+            class="text-[11px] text-[color:var(--bs-muted)] truncate mt-0.5"
+          >
+            <i class="pi pi-calendar text-[9px] mr-1"></i>Available {{ availableDays(t).join(", ") }}
+          </p>
         </div>
         <RouterLink :to="{ name: 'RequestQuote', params: { uid: t.id } }">
           <Button label="Request" icon="pi pi-send" size="small" outlined />

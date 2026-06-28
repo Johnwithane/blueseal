@@ -600,7 +600,7 @@ Your home base is the **cockpit** at **/manage**. Set it up in three steps, in t
 
 **What happens next.** On accept, each job goes out for a quote to the trades on your roster that match it. Your client compares the quotes and picks who they want, the choice is always theirs. You can watch status and quote amounts the whole way; you don't see their private chat or invoice. When one of your trades is hired and does the work, you earn a referral commission.
 
-**Make it yours.** You can claim a free public page (like **blueseal.app/pm/your-name**) that shows your brand and the trades you recommend, and download a print-ready business card with a QR code to it, both from the **Public profile** section.
+**Make it yours (Blue Seal Pro).** With Blue Seal Pro you can claim your own public page (like **blueseal.app/pm/your-name**) that shows your brand and the trades you recommend, and download a print-ready business card with a QR code to it, both from the **Public profile** section. The same subscription unlocks your clients view, the calendar, and the AI tools.
 
 There's nothing to pay to use the cockpit. Setting up payouts (a short agreement plus connecting a bank through Stripe) is only needed when you want your commission to pay out, not to set up work.`,
   },
@@ -697,7 +697,7 @@ const faqs: FaqItem[] = [
   {
     question: "Can I have my own public page as a project manager?",
     answer:
-      "Yes. In your cockpit's **Public profile** section you can add a business name, a short about, a logo, a cover image, and a brand colour, then claim a shareable link like **blueseal.app/pm/your-name**. Flip **Publish** on and the page goes live instantly, there's no review. Turn it off any time and it's hidden again (only you can preview it while it's off). It's free.",
+      "Yes, with **Blue Seal Pro**. In your cockpit's **Public profile** section you can add a business name, a short about, a logo, a cover image, and a brand colour, then claim a shareable link like **blueseal.app/pm/your-name**. Flip **Publish** on and the page goes live instantly, there's no review. Turn it off any time and it's hidden again (only you can preview it while it's off). The branded profile and business card are part of Blue Seal Pro (the same subscription that unlocks your clients view, the calendar, and the AI tools); it starts with a free trial.",
     categoryId: "for-project-managers",
     audience: "client",
   },
@@ -711,7 +711,7 @@ const faqs: FaqItem[] = [
   {
     question: "I'm a project manager. Can I get a business card to give my clients?",
     answer:
-      "Yes. In your cockpit, tap **My business card** (on the dashboard, or from the **Public profile** section). Pick a theme, add an optional phone number, and download a print-ready, two-sided PDF (or PNGs). The card shows your name, brand, and the trades you recommend, with a QR code that opens your public profile, where clients see your featured trades and can request a quote. Publish your public profile first so the QR works for anyone who scans it; claiming a **blueseal.app/pm/your-name** handle gives the card a cleaner link. It's free.",
+      "Yes, with **Blue Seal Pro**. In your cockpit, tap **My business card** (on the dashboard, or from the **Public profile** section). Pick a theme, add an optional phone number, and download a print-ready, two-sided PDF (or PNGs). The card shows your name, brand, and the trades you recommend, with a QR code that opens your public profile, where clients see your featured trades and can request a quote. Publish your public profile first so the QR works for anyone who scans it; claiming a **blueseal.app/pm/your-name** handle gives the card a cleaner link. The branded profile and card are part of Blue Seal Pro, which starts with a free trial.",
     categoryId: "for-project-managers",
     audience: "client",
   },
