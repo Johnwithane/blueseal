@@ -34,6 +34,18 @@ following commits). **Deploy the functions once when you pull this branch:**
 - **Verify:** Open a pending project → Edit project → change the label / add a job →
   Save changes → the detail updates. Editing an accepted project is rejected.
 
+### [ ] Deploy functions: PM AI — "catch me up" projects digest
+
+- **Why:** New callable `aiProjectsDigest` gives a PM a plain-language status
+  catch-up across their projects + the jobs their trades won. Reads ONLY
+  PM-readable status (never the client/tradesperson chat or invoices — the
+  firewall holds). Gated behind Blue Seal Pro + the AI daily cap.
+- **What:** `firebase deploy --only functions`. The dashboard's "Catch me up"
+  button calls it. Reuses the existing projects/jobs indexes (same queries the
+  cockpit already runs), so no new Firestore index.
+- **Verify:** As a Pro PM with a few projects, dashboard → Catch me up → a short
+  status summary appears. Non-Pro PM → the Blue Seal Pro paywall.
+
 ### [ ] Deploy functions: PM AI — draft a project from a prompt
 
 - **Why:** New callable `aiGenerateProjectFromPrompt` lets a PM describe work in

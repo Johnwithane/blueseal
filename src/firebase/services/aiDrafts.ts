@@ -56,6 +56,19 @@ export async function generateProjectJobsWithAi(
   return res.data.jobs;
 }
 
+/**
+ * Project manager: a plain-language "catch me up" across their projects and the
+ * jobs their trades won (status only — never the private chat/invoice). Pro.
+ */
+export async function projectsDigestWithAi(): Promise<string> {
+  const fn = httpsCallable<undefined, { ok: boolean; digest: string }>(
+    functions,
+    "aiProjectsDigest",
+  );
+  const res = await fn();
+  return res.data.digest;
+}
+
 /** Draft the invoice wrap-up note from the job's tracked work. */
 export async function draftInvoiceNoteWithAi(jobId: string): Promise<string> {
   const fn = httpsCallable<{ jobId: string }, { ok: boolean; note: string }>(

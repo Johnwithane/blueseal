@@ -204,6 +204,7 @@ export { aiUpdateJobLog } from "./ai/updateJobLog";
 export { parseReceipt } from "./ai/parseReceipt";
 export { aiDraftQuote } from "./ai/draftQuote";
 export { aiGenerateProjectFromPrompt } from "./ai/generateProjectFromPrompt";
+export { aiProjectsDigest } from "./ai/projectsDigest";
 export { aiDraftInvoiceNote } from "./ai/draftInvoiceNote";
 export { aiDraftSupportReply } from "./ai/draftSupportReply";
 

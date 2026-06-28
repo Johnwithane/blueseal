@@ -11,6 +11,11 @@ import { subscribeProjectsForPm } from "@/firebase/services/projects";
 import { subscribeProjectJobsForPm } from "@/firebase/services/jobs";
 import { subscribeSavedTradieIds } from "@/firebase/services/savedTradies";
 import { usePmEarnings } from "@/composables/usePmEarnings";
+import { projectsDigestWithAi } from "@/firebase/services/aiDrafts";
+import { usePaywallStore } from "@/stores/paywall";
+import { useSubscriptionStore } from "@/stores/subscription";
+import { useToast } from "@/composables/useToast";
+import { humanizeError } from "@/utils/errors";
 import { PM_AGREEMENT_VERSION } from "@/projectManager/agreement";
 import { tradeLabel } from "@/data/trades";
 import type { JobDoc, ProjectDoc, PropertyDoc, WithId } from "@/firebase/interfaces";
@@ -21,7 +26,30 @@ import type { JobDoc, ProjectDoc, PropertyDoc, WithId } from "@/firebase/interfa
 const auth = useAuthStore();
 const { money } = useFormatters();
 const { summary } = usePmEarnings();
+const toast = useToast();
+const paywall = usePaywallStore();
+const subscription = useSubscriptionStore();
 useSeo({ title: "Dashboard", noindex: true });
+
+// AI "catch me up": a plain-language status digest across the PM's work (Pro).
+const digest = ref("");
+const digestBusy = ref(false);
+async function catchMeUp() {
+  const isAdmin = (auth.roles ?? []).includes("admin");
+  if (!subscription.isPro && !isAdmin) {
+    paywall.open("The AI catch-up is part of Blue Seal Pro. Start a free trial to use it.");
+    return;
+  }
+  digestBusy.value = true;
+  try {
+    digest.value = await projectsDigestWithAi();
+  } catch (e) {
+    if (paywall.fromError(e)) return;
+    toast.error("Couldn't catch you up", humanizeError(e));
+  } finally {
+    digestBusy.value = false;
+  }
+}
 
 const firstName = computed(() => (auth.user?.displayName ?? "").trim().split(/\s+/)[0] || "");
 
@@ -196,9 +224,21 @@ const projectStatusLabel: Record<string, string> = {
     <!-- Quick actions -->
     <div class="flex flex-wrap gap-2 mt-5">
       <RouterLink to="/manage/properties?new=1"><Button label="New project" icon="pi pi-plus" size="small" /></RouterLink>
+      <Button label="Catch me up" icon="pi pi-sparkles" size="small" outlined :loading="digestBusy" @click="catchMeUp" />
       <RouterLink to="/manage/trades"><Button label="My roster" icon="pi pi-users" size="small" outlined /></RouterLink>
       <RouterLink to="/manage/card"><Button label="My business card" icon="pi pi-id-card" size="small" severity="secondary" outlined /></RouterLink>
       <RouterLink to="/manage/profile"><Button label="Share my profile" icon="pi pi-link" size="small" severity="secondary" outlined /></RouterLink>
+    </div>
+
+    <!-- AI catch-up digest -->
+    <div v-if="digest" class="bs-card p-4 mt-4 border-l-4 border-l-[color:var(--bs-blue)]">
+      <div class="flex items-start gap-2">
+        <i class="pi pi-sparkles text-[color:var(--bs-blue)] mt-0.5"></i>
+        <div class="min-w-0 flex-1">
+          <p class="text-sm whitespace-pre-line">{{ digest }}</p>
+          <button type="button" class="text-xs text-[color:var(--bs-muted)] mt-2" @click="digest = ''">Dismiss</button>
+        </div>
+      </div>
     </div>
 
     <!-- Payout nudge -->
