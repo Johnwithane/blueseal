@@ -6,6 +6,25 @@ Tasks are grouped by the phase that introduced them so you can see why each one 
 
 ---
 
+## PM feature expansion — deploy (added 2026-06-28)
+
+A batch of project-manager features (Pro paywall enablement, plus more landing in
+following commits). **Deploy the functions once when you pull this branch:**
+`firebase deploy --only functions` (and `firestore:rules` where noted below).
+
+### [ ] Deploy functions: project managers can subscribe to Blue Seal Pro
+
+- **Why:** The AI tools, clients CRM, branded-profile tools, and global calendar are
+  gated behind the **same** Blue Seal Pro subscription tradespeople have. The checkout
+  callable previously required the tradesperson role, so a pure PM couldn't subscribe.
+- **What:** `createSubscriptionCheckout` now accepts **tradesperson OR projectManager**
+  (`requireAnyRole`). Same plan, same 30-day trial, same Stripe flow — nothing new to
+  configure. Deploy: `firebase deploy --only functions`.
+- **Verify:** As a PM (no tradesperson role), hit any Pro feature → the paywall → Start
+  trial → Stripe Checkout opens (test mode). Tradesperson checkout still works.
+
+---
+
 ## Project-manager onboarding pass (added 2026-06-27)
 
 ### [ ] Deploy the `resendProjectInvite` function (re-copyable project invite link)

@@ -13,7 +13,7 @@ import { Timestamp } from "firebase-admin/firestore";
 import { z } from "zod";
 import { CALLABLE_OPTS } from "../lib/callable";
 import { db } from "../lib/admin";
-import { requireRole } from "../lib/auth";
+import { requireAnyRole } from "../lib/auth";
 import type { SubscriptionState } from "../lib/subscription";
 import {
   STRIPE_SECRET_KEY,
@@ -34,7 +34,9 @@ export const createSubscriptionCheckout = onCall(
     secrets: [STRIPE_SECRET_KEY],
   },
   async (req) => {
-    const uid = requireRole(req, "tradesperson");
+    // Blue Seal Pro is one subscription shared by both pro roles: tradespeople and
+    // project managers subscribe through the same flow / trial.
+    const uid = requireAnyRole(req, ["tradesperson", "projectManager"]);
     const parsed = Input.safeParse(req.data);
     if (!parsed.success) throw new HttpsError("invalid-argument", "Invalid input");
     const { plan } = parsed.data;
