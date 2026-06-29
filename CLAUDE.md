@@ -302,8 +302,11 @@ npm run test:run         # Vitest single run
 
 # Build & deploy
 npm run build            # Type-check + Vite build → dist/
-npm run deploy:prod      # Build + deploy hosting
-npm run deploy           # Build + deploy everything
+npm run deploy:hosting   # Build + deploy hosting only
+npm run deploy:prod      # Build + deploy hosting + firestore rules/indexes + storage (NOT functions)
+npm run functions:deploy # Deploy ALL functions at once. Avoid: trips the per-minute quota
+npm run rules:deploy     # Deploy firestore:rules + storage rules
+# Preferred for functions: firebase deploy --only functions:<name>  (targeted, quota-safe)
 ```
 
 **Before any commit:** `npm run lint && npm run build && npm run test:run` must pass *and* any Firebase-side changes must be deployed (see below).
