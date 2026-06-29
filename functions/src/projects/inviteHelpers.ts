@@ -9,6 +9,7 @@
 import { logger } from "firebase-functions/v2";
 import { adminAuth } from "../lib/admin";
 import { enqueueMail } from "../lib/mail";
+import { brandedEmailHtml } from "../lib/emailTemplate";
 import {
   appBaseUrl,
   caslMailingAddress,
@@ -65,26 +66,40 @@ export async function sendProjectInviteEmail(args: {
     `You're receiving this because ${args.pmName} set up a project for you on ` +
     `Blue Seal and asked us to invite you.`;
 
+  // CASL footer (legal name + mailing address + consent basis + unsubscribe).
+  // This recipient has no Blue Seal account yet, so we override the wrapper's
+  // default "you have an account" footer. brandedEmailHtml injects it verbatim,
+  // so every interpolation is escaped here. Palette matches emailTemplate.ts
+  // (MUTED #6B6862 text, BLUE #374C76 link).
+  const footerHtml =
+    `<p style="margin:0;font-size:12px;line-height:1.5;color:#6B6862;">` +
+    `${escapeHtml(sender)}<br/>${escapeHtml(address)}<br/>` +
+    `${escapeHtml(basis)} <a href="${escapeHtml(unsubUrl)}" style="color:#374C76;text-decoration:underline;">Unsubscribe</a>.</p>`;
+
   await enqueueMail({
     to: args.toEmail,
     subject: `${args.pmName} set up a project for you on Blue Seal`,
     text:
       `Hi ${args.clientName},\n\n` +
-      `${args.pmName} is using Blue Seal to organize "${args.projectLabel}" — ` +
+      `${args.pmName} is using Blue Seal to organize "${args.projectLabel}": ` +
       `${jobLine} they'd like to line up trusted trades for. You choose who does the work.\n\n` +
       `One click signs you in (no password needed):\n${args.signinLink}\n\n` +
-      `—\n${sender}\n${address}\n` +
+      `${sender}\n${address}\n` +
       `${basis} Unsubscribe: ${unsubUrl}\n`,
-    html:
-      `<p>Hi ${escapeHtml(args.clientName)},</p>` +
-      `<p><strong>${escapeHtml(args.pmName)}</strong> is using <strong>Blue Seal</strong> to organize ` +
-      `"${escapeHtml(args.projectLabel)}" — ${escapeHtml(jobLine)} they'd like to line up trusted trades for. ` +
-      `You choose who does the work.</p>` +
-      `<p>One click signs you in — no password needed:</p>` +
-      `<p><a href="${escapeHtml(args.signinLink)}" style="display:inline-block;background:#1d4ed8;color:white;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">View your project</a></p>` +
-      `<hr style="margin-top:20px;border:none;border-top:1px solid #e5e7eb;"/>` +
-      `<p style="color:#6b7280;font-size:12px;">${escapeHtml(sender)}<br/>${escapeHtml(address)}<br/>` +
-      `${escapeHtml(basis)} <a href="${escapeHtml(unsubUrl)}">Unsubscribe</a>.</p>`,
+    // Same branded shell (logo header, signature footer) as the tradesperson
+    // and project-manager welcome emails — the client's first impression of
+    // Blue Seal should match, not a plainer one-off template.
+    html: brandedEmailHtml({
+      title: "Welcome to Blue Seal",
+      bodyLines: [
+        `Hi ${args.clientName}, ${args.pmName} is using Blue Seal to organize "${args.projectLabel}": ${jobLine} they'd like to line up trusted trades for. You choose who does the work.`,
+        "One click signs you in. No password needed.",
+      ],
+      ctaLabel: "View your project",
+      ctaUrl: args.signinLink,
+      preheader: `${args.pmName} set up a project for you on Blue Seal.`,
+      footerHtml,
+    }),
   });
   return true;
 }
