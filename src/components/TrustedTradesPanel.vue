@@ -12,6 +12,7 @@ import { tradeLabel } from "@/data/trades";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 import type { TradespersonDoc, WithId } from "@/firebase/interfaces";
+import InitialsAvatar from "@/components/InitialsAvatar.vue";
 
 // The signed-in user's saved tradespeople (the existing `savedTradies` shortlist),
 // surfaced as a re-hire list. Universal for clients; for a project manager this is
@@ -66,18 +67,7 @@ async function remove(id: string): Promise<void> {
     </div>
     <ul v-else class="grid grid-cols-1 gap-2">
       <li v-for="t in tradies" :key="t.id" class="bs-card p-3 flex items-center gap-3">
-        <img
-          v-if="t.photoURL"
-          :src="t.photoURL"
-          alt=""
-          class="w-10 h-10 rounded-full object-cover shrink-0"
-        />
-        <span
-          v-else
-          class="w-10 h-10 rounded-full bg-[color:var(--bs-blue)] text-white grid place-items-center shrink-0"
-        >
-          {{ (t.displayName ?? "?").charAt(0).toUpperCase() }}
-        </span>
+        <InitialsAvatar :name="t.displayName" :photo-url="t.photoURL" :size="40" tone="solid" />
         <div class="min-w-0 flex-1">
           <p class="font-medium truncate">{{ t.displayName ?? "Tradesperson" }}</p>
           <p class="text-xs text-[color:var(--bs-muted)] truncate">{{ tradesText(t) }}</p>

@@ -9,6 +9,7 @@ import { subscribeSavedTradieIds, hydrateSavedTradies } from "@/firebase/service
 import { subscribePmProfile, setFeaturedContractor } from "@/firebase/services/pmProfile";
 import { tradeLabel } from "@/data/trades";
 import type { ProjectManagerProfileDoc, TradespersonDoc, WithId } from "@/firebase/interfaces";
+import InitialsAvatar from "@/components/InitialsAvatar.vue";
 
 // P5b featuring UI: pick which of the PM's saved trades appear on their public
 // profile. Each toggle calls setFeaturedContractor (server denormalizes + notifies +
@@ -99,11 +100,7 @@ async function removeFeatured(tradieId: string) {
     </div>
     <ul v-else class="grid grid-cols-1 gap-2">
       <li v-for="t in tradies" :key="t.id" class="bs-card p-3 flex items-center gap-3">
-        <img v-if="t.photoURL" :src="t.photoURL" alt="" class="w-9 h-9 rounded-full object-cover shrink-0" />
-        <span
-          v-else
-          class="w-9 h-9 rounded-full bg-[color:var(--bs-blue)] text-white grid place-items-center shrink-0"
-        >{{ (t.displayName ?? "?").charAt(0).toUpperCase() }}</span>
+        <InitialsAvatar :name="t.displayName" :photo-url="t.photoURL" :size="36" tone="solid" />
         <div class="min-w-0 flex-1">
           <p class="font-medium truncate">{{ t.displayName ?? "Tradesperson" }}</p>
           <p class="text-xs text-[color:var(--bs-muted)] truncate">{{ tradesText(t) }}</p>

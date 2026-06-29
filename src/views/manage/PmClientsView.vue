@@ -14,6 +14,7 @@ import { useSubscriptionStore } from "@/stores/subscription";
 import { useSeo } from "@/composables/useSeo";
 import { subscribeProjectsForPm } from "@/firebase/services/projects";
 import type { ProjectDoc, WithId } from "@/firebase/interfaces";
+import InitialsAvatar from "@/components/InitialsAvatar.vue";
 
 useSeo({ title: "Clients", noindex: true });
 
@@ -101,12 +102,7 @@ const filtered = computed(() => {
 
       <ul v-if="filtered.length" class="space-y-2">
         <li v-for="c in filtered" :key="c.key" class="bs-card p-3 flex items-center gap-3">
-          <div
-            class="h-9 w-9 rounded-full bg-[color:var(--bs-blue-light,#dbeafe)] text-[color:var(--bs-blue-dark)] flex items-center justify-center font-semibold shrink-0"
-            aria-hidden="true"
-          >
-            {{ c.name.charAt(0).toUpperCase() }}
-          </div>
+          <InitialsAvatar :name="c.name" :size="36" />
           <div class="min-w-0 flex-1">
             <div class="font-medium truncate">{{ c.name }}</div>
             <div v-if="c.email" class="text-xs text-[color:var(--bs-muted)] truncate">{{ c.email }}</div>
