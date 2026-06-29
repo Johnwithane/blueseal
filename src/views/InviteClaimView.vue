@@ -10,7 +10,7 @@
 // their email and presses a button; after sign-in we PREVIEW the invites
 // ("<tradie> invited you to <job>") so the wrong person can stop before
 // being attached, then claim on explicit confirmation.
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
@@ -30,18 +30,17 @@ const status = ref<"confirm_email" | "signing_in" | "preview" | "claiming" | "do
 const error = ref<string | null>(null);
 const invites = ref<InvitePreview[]>([]);
 const claimedJobIds = ref<string[]>([]);
+// True while we settle persisted auth on mount, to decide whether to skip the
+// email-confirm step. Shows a brief spinner instead of flashing the form.
+const checking = ref(true);
 
 const hasOfflineRecords = computed(() => invites.value.some((i) => i.acceptedOffline));
 
-async function signIn() {
-  if (status.value === "signing_in") return;
-  const addr = email.value.trim().toLowerCase();
-  if (!addr) return;
-  status.value = "signing_in";
-  error.value = null;
+// Preview the pending invites for the now-signed-in account. Read-only —
+// nothing is attached until confirmClaim(). Shared by the manual sign-in path
+// and the already-signed-in shortcut.
+async function loadInvites() {
   try {
-    await auth.init();
-    await auth.completeEmailLinkSignIn(addr, { role: "client" });
     const res = await claimJobInvite(false);
     if (res.status === "needs_verification") {
       error.value = "We couldn't verify your email from this link. Ask your tradesperson to re-send it.";
@@ -64,6 +63,47 @@ async function signIn() {
     status.value = "error";
   }
 }
+
+async function signIn() {
+  if (status.value === "signing_in") return;
+  const addr = email.value.trim().toLowerCase();
+  if (!addr) return;
+  status.value = "signing_in";
+  error.value = null;
+  try {
+    await auth.init();
+    await auth.completeEmailLinkSignIn(addr, { role: "client" });
+  } catch (e) {
+    error.value = humanizeError(e);
+    status.value = "error";
+    return;
+  }
+  await loadInvites();
+}
+
+// If the visitor is ALREADY signed in as the invited client, skip the
+// email-confirm + magic-link round-trip and go straight to their invite(s).
+// Safe against the mail-scanner exposure this view guards against (see file
+// header): a prefetching scanner is never authenticated, so this branch never
+// runs for it, and it consumes no one-time link (completeEmailLinkSignIn is
+// skipped). We only auto-run when the signed-in email matches the link's, so a
+// different signed-in account still gets the form and can use the link to
+// switch accounts.
+onMounted(async () => {
+  try {
+    await auth.init();
+    const linkEmail = email.value.trim().toLowerCase();
+    const sessionEmail = auth.fbUser?.email?.toLowerCase() ?? "";
+    if (auth.isAuthenticated && sessionEmail && sessionEmail === linkEmail) {
+      await loadInvites();
+      checking.value = false;
+      return;
+    }
+  } catch {
+    // fall through to the manual confirm form
+  }
+  checking.value = false;
+});
 
 async function confirmClaim() {
   if (status.value === "claiming") return;
@@ -91,6 +131,12 @@ async function confirmClaim() {
   <section class="bs-container py-10 max-w-md">
     <h1 class="text-2xl font-bold text-center">Join your job on Blue Seal</h1>
 
+    <div v-if="checking" class="bs-empty mt-6 text-center">
+      <i class="pi pi-spin pi-spinner text-3xl mb-2 block text-[color:var(--bs-blue)]"></i>
+      <p class="text-sm text-[color:var(--bs-muted)]">Signing you in…</p>
+    </div>
+
+    <template v-else>
     <div v-if="status === 'confirm_email' || status === 'signing_in'" class="mt-6 space-y-3">
       <p class="text-sm text-[color:var(--bs-muted)] text-center">
         Confirm the email this link was sent to and we'll sign you in — no
@@ -167,5 +213,6 @@ async function confirmClaim() {
     <Message v-else-if="status === 'error'" severity="error" :closable="false" class="mt-6">
       {{ error }}
     </Message>
+    </template>
   </section>
 </template>
