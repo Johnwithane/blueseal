@@ -39,5 +39,3 @@ export const businessCardConfigSchema = z.object({
   showPhone: z.boolean().default(true),
   showPhoto: z.boolean().default(true),
 });
-
-export type BusinessCardConfig = z.infer<typeof businessCardConfigSchema>;

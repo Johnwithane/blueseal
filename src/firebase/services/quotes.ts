@@ -15,7 +15,6 @@ import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/firebase/config";
 import type { InvoiceDiscount, LineItem, QuoteDoc, WithId } from "@/firebase/interfaces";
 import { typedConverter } from "@/firebase/converters";
-import { recomputeTotals } from "./invoices";
 
 const quoteRef = (id: string) =>
   doc(db, "quotes", id).withConverter(typedConverter<QuoteDoc>());
@@ -61,38 +60,6 @@ export function subscribeQuote(
       onError?.(err);
     },
   );
-}
-
-// Quotes carry their own QuoteDoc shape that doesn't include the
-// upfront-fee-credit fields (those live on invoices). Persist just the
-// subtotal/discountAmount/taxTotal/total to keep doc shape clean — the
-// extra display fields recomputeTotals returns are for the editor UI only.
-function persistableQuoteTotals(totals: ReturnType<typeof recomputeTotals>) {
-  return {
-    subtotal: totals.subtotal,
-    discountAmount: totals.discountAmount,
-    taxTotal: totals.taxTotal,
-    total: totals.total,
-  };
-}
-
-/** Tradesperson edit of quote line items (only valid in draft/sent states). */
-export async function updateQuoteLineItems(id: string, items: LineItem[]): Promise<void> {
-  const snap = await getDoc(quoteRef(id));
-  const discount = snap.exists() ? (snap.data().discount ?? null) : null;
-  const totals = recomputeTotals(items, discount);
-  await updateDoc(doc(db, "quotes", id), { lineItems: items, ...persistableQuoteTotals(totals) });
-}
-
-export async function updateQuoteDiscount(
-  id: string,
-  discount: InvoiceDiscount | null,
-): Promise<void> {
-  const snap = await getDoc(quoteRef(id));
-  if (!snap.exists()) return;
-  const items = snap.data().lineItems ?? [];
-  const totals = recomputeTotals(items, discount);
-  await updateDoc(doc(db, "quotes", id), { discount, ...persistableQuoteTotals(totals) });
 }
 
 /** Soft signal: client viewed the quote. Only stamps on transition from sent → viewed. */

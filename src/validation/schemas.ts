@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { TRADES } from "@/data/trades";
 import { SUPPORT_TOPICS } from "@/data/support";
-import { SERVICES_MAX, SERVICE_NAME_MAX } from "@/utils/services";
 
 const tradeKeys = TRADES.map((t) => t.key) as [string, ...string[]];
 // Friendly fallback so an empty/invalid trade surfaces as "Please choose a
@@ -13,8 +12,6 @@ const tradeKeyEnum = z.enum(tradeKeys, {
 
 // Canadian postal format (e.g. "V8V 2P1"). Tolerates lowercase + hyphen, normalize before storing.
 const caPostalRegex = /^[A-Za-z]\d[A-Za-z][\s-]?\d[A-Za-z]\d$/;
-// Liberal phone format — country prefix optional, allow spaces / dashes / parens.
-const phoneRegex = /^\+?[\d\s\-()]{10,20}$/;
 
 const safeName = z
   .string()
@@ -34,71 +31,14 @@ export const signUpSchema = z.object({
     }),
   }),
 });
-export type SignUpInput = z.infer<typeof signUpSchema>;
 
 export const signInSchema = z.object({
   email: z.string().trim().toLowerCase().email().max(200),
   password: z.string().min(1).max(128),
 });
-export type SignInInput = z.infer<typeof signInSchema>;
 
 export const forgotPasswordSchema = z.object({
   email: z.string().trim().toLowerCase().email("Enter a valid email").max(200),
-});
-export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
-
-export const profileBasicsSchema = z.object({
-  displayName: safeName,
-  phone: z
-    .string()
-    .trim()
-    .regex(phoneRegex, "Enter a valid phone number")
-    .optional()
-    .or(z.literal("")),
-  photoURL: z.string().url().nullable().optional(),
-});
-
-// Free-text "services offered" list (e.g. "Boiler installation"). Bounds mirror
-// src/utils/services.ts so the editor, this schema, and the normalizer agree.
-export const servicesSchema = z
-  .array(z.string().trim().min(1).max(SERVICE_NAME_MAX))
-  .max(SERVICES_MAX, `Up to ${SERVICES_MAX} services`);
-
-export const tradieTradesSchema = z
-  .object({
-    primaryTrade: tradeKeyEnum,
-    secondaryTrades: z.array(tradeKeyEnum).max(3, "Up to 3 secondary trades"),
-    yearsExperience: z.record(z.number().int().min(0).max(80)),
-    services: servicesSchema.optional(),
-    bio: z.string().trim().min(20, "Tell clients a bit about your work").max(2000),
-  })
-  .refine(
-    (v) => {
-      const all = new Set([v.primaryTrade, ...v.secondaryTrades]);
-      return Object.keys(v.yearsExperience).every((k) => all.has(k));
-    },
-    { message: "yearsExperience keys must match selected trades", path: ["yearsExperience"] },
-  );
-
-export const tradiePricingSchema = z
-  .object({
-    pricingModel: z.enum(["hourly", "quote", "both"]),
-    // Cents. Cap at $10,000/hr to catch unit-mistake typos early.
-    hourlyRate: z.number().int().min(0).max(1_000_000).nullable(),
-    // Optional separate travel/callout rate (cents). Null falls back to hourlyRate.
-    travelRate: z.number().int().min(0).max(1_000_000).nullable(),
-    providesFreeQuotes: z.boolean(),
-  })
-  .refine(
-    (v) => v.pricingModel === "quote" || (v.hourlyRate != null && v.hourlyRate > 0),
-    { message: "Set an hourly rate or switch to quote-only", path: ["hourlyRate"] },
-  );
-
-export const tradieServiceAreaSchema = z.object({
-  primaryAddressText: z.string().trim().min(3).max(200),
-  lat: z.number().refine((n) => n >= -90 && n <= 90),
-  lng: z.number().refine((n) => n >= -180 && n <= 180),
-  serviceRadiusKm: z.number().min(1).max(200),
 });
 
 export const availabilityBlockSchema = z.object({
@@ -114,22 +54,6 @@ export const weeklyAvailabilitySchema = z.object({
   fri: z.array(availabilityBlockSchema),
   sat: z.array(availabilityBlockSchema),
   sun: z.array(availabilityBlockSchema),
-});
-
-export const certificationFormSchema = z.object({
-  trade: tradeKeyEnum,
-  issuingBody: z.string().trim().min(2).max(200),
-  certNumber: z.string().trim().min(1).max(100),
-  expiresAt: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "Use a YYYY-MM-DD date")
-    .nullable(),
-  fileUrl: z.string().url().max(2000),
-});
-
-export const idVerificationFormSchema = z.object({
-  documentType: z.enum(["drivers_license", "passport", "provincial_id"]),
-  fileUrl: z.string().url().max(2000),
 });
 
 export const jobRequestSchema = z.object({
@@ -285,13 +209,6 @@ export const createJobPostSchema = z.object({
 });
 export type CreateJobPostInput = z.infer<typeof createJobPostSchema>;
 
-export const proposedPriceSchema = z.object({
-  type: z.enum(["fixed", "hourly"]),
-  // Cents. $5 floor, $100,000 cap.
-  amount: z.number().int().min(500).max(10_000_000),
-  notes: z.string().trim().max(500).optional(),
-});
-
 // Upfront-fee input for a quote. Discriminated union: a fixed dollar amount
 // (cents) or a percentage in basis points (1bps = 0.01%, capped 0–5000 = 0–50%).
 // The server always re-derives the cents from the pre-tax base.
@@ -309,7 +226,6 @@ export const siteVisitFeeSchema = z.object({
   feeCents: z.number().int().nonnegative().max(10_000_000), // 0 allowed = free
   taxRate: z.number().min(0).max(0.5).default(0),
 });
-export type SiteVisitFeeInput = z.infer<typeof siteVisitFeeSchema>;
 
 // Itemized quote attached to a marketplace application. Mirrors the submitQuote
 // callable input (functions/src/lib/quoteSchemas.ts) so client + server agree
@@ -331,7 +247,6 @@ export const applicationQuoteSchema = z.object({
   upfrontFee: quoteUpfrontFeeSchema.nullable().default(null),
   estimatedDuration: z.string().max(80).default(""),
 });
-export type ApplicationQuoteInput = z.infer<typeof applicationQuoteSchema>;
 
 // Shared across both application kinds. The cover message is a suggestion,
 // not a gate — an empty message must never block a quote (per Johnny,
@@ -399,25 +314,6 @@ export const respondSiteVisitSchema = z.object({
   accept: z.boolean(),
   declinedReason: z.string().trim().max(1000).default(""),
 });
-export type RespondSiteVisitInput = z.infer<typeof respondSiteVisitSchema>;
-
-export const acceptApplicationSchema = z.object({
-  postId: z.string().min(1).max(128),
-  applicationId: z.string().min(1).max(128),
-});
-
-export const returnToApplicantsSchema = z.object({
-  postId: z.string().min(1).max(128),
-});
-
-export const cancelJobPostSchema = z.object({
-  postId: z.string().min(1).max(128),
-  reason: z.string().trim().max(500).nullable().optional(),
-});
-
-export const withdrawApplicationSchema = z.object({
-  postId: z.string().min(1).max(128),
-});
 
 // Pre-acceptance applicant Q&A. The thread is keyed by (postId, applicationId)
 // where applicationId == the tradesperson uid (the application doc id).
@@ -427,15 +323,6 @@ export const sendApplicationMessageSchema = z.object({
   text: z.string().trim().min(1, "Write a message").max(2000),
 });
 export type SendApplicationMessageInput = z.infer<typeof sendApplicationMessageSchema>;
-
-// Client declines an applicant's quote with a reason — mirrors clientDeclineQuote
-// on the direct-request side (same 1–1000 bounds).
-export const declineApplicationSchema = z.object({
-  postId: z.string().min(1).max(128),
-  applicationId: z.string().min(1).max(128),
-  reason: z.string().trim().min(1, "Give a brief reason").max(1000),
-});
-export type DeclineApplicationInput = z.infer<typeof declineApplicationSchema>;
 
 // Tradesperson resubmits a revised quote on an existing pending application.
 // Same quote shape as submitApplication; the message is an optional refreshed

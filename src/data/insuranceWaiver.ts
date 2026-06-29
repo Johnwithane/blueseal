@@ -56,8 +56,6 @@ export const TRADIE_WAIVER_FOOTNOTE =
 // waiver; MUST stay in sync with functions/src/lib/insurance.ts. Not lawyer-
 // reviewed — see HUMANTASKS.md.
 
-export const INSURANCE_RELEASE_VERSION = "1.0";
-
 export const INSURANCE_RELEASE_TITLE = "Your policy doesn't cover Blue Seal";
 
 /** Points the tradesperson signs when their own policy doesn't name Blue Seal. */

@@ -16,6 +16,7 @@ import { tradeLabel } from "@/data/trades";
 import PmRosterSearch from "@/components/manage/PmRosterSearch.vue";
 import PmEmailInviteForm from "@/components/manage/PmEmailInviteForm.vue";
 import PmInviteLinkCard from "@/components/manage/PmInviteLinkCard.vue";
+import InitialsAvatar from "@/components/InitialsAvatar.vue";
 import type { TradespersonDoc, WeeklyAvailability, WithId } from "@/firebase/interfaces";
 
 // The PM's roster: the tradespeople they work with. Two clear ways to grow it —
@@ -71,10 +72,6 @@ function tradesText(t: WithId<TradespersonDoc>): string {
   const ts = (t.trades ?? []).map((k) => tradeLabel(k));
   if (!ts.length) return "Tradesperson";
   return ts.slice(0, 2).join(" · ") + (ts.length > 2 ? ` +${ts.length - 2}` : "");
-}
-
-function initial(name: string | null | undefined): string {
-  return (name ?? "?").trim().charAt(0).toUpperCase() || "?";
 }
 
 // Which weekdays the contractor lists as available (mon→sun), for the roster
@@ -135,16 +132,7 @@ function availableDays(t: WithId<TradespersonDoc>): string[] {
     </div>
     <ul v-else class="grid grid-cols-1 gap-2">
       <li v-for="t in roster" :key="t.id" class="bs-card p-3 flex items-center gap-3">
-        <img
-          v-if="t.photoURL"
-          :src="t.photoURL"
-          alt=""
-          class="w-10 h-10 rounded-full object-cover shrink-0"
-        />
-        <span
-          v-else
-          class="w-10 h-10 rounded-full bg-[color:var(--bs-blue)] text-white grid place-items-center shrink-0"
-        >{{ initial(t.displayName) }}</span>
+        <InitialsAvatar :name="t.displayName" :photo-url="t.photoURL" :size="40" tone="solid" />
         <div class="min-w-0 flex-1">
           <p class="font-medium truncate">{{ t.displayName ?? "Tradesperson" }}</p>
           <p class="text-xs text-[color:var(--bs-muted)] truncate">{{ tradesText(t) }}</p>

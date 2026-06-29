@@ -27,7 +27,6 @@
   --bs-red-light:   #E8C2C4;               /* soft red tint */
   --bs-red-dark:    #8C2B30;               /* deep red: hover */
   --bs-amber:       #D49A2E;               /* rating gold (stars) — functional */
-  --bs-on-dark:     var(--bs-beige);       /* warm text/accent on dark sections */
 
   /* Neutrals — CLEAN white / off-white base (Airbnb-calm work screens). The
      beige & light-blue families are reserved as deliberate ACCENT surfaces
@@ -39,7 +38,6 @@
   --bs-border:      #EAE7DF;  /* clean hairline border / divider */
   --bs-surface-alt: #F4F2EC;  /* subtle well: hover/zebra/unread tint */
   --bs-text-muted:  var(--bs-muted);
-  --bs-accent-surface: var(--bs-beige);  /* deliberate warm accent block */
 
   /* Functional semantic set — NOT brand identity. success/warn exist because
      the palette has no green/amber; danger reuses brand red. base + tint + text. */
@@ -64,11 +62,6 @@
   --bs-radius-sm: 6px;
   --bs-radius: 12px;
   --bs-radius-lg: 16px;
-  --bs-radius-pill: 999px;
-
-  /* Micro typography — the tier below Tailwind's text-xs (12px), previously
-     re-invented as text-[10px]/text-[11px] in 50+ places. */
-  --bs-text-micro: 0.6875rem; /* 11px */
 
   /* Elevation — --bs-shadow-sm matches the current .bs-card shadow exactly. */
   --bs-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
@@ -312,21 +305,6 @@ a:hover, a:focus-visible { text-decoration: underline; }
 .bs-gradient-deep {
   background: linear-gradient(180deg, var(--bs-blue-dark) 0%, #161F30 100%);
 }
-.bs-gradient-soft {
-  background: linear-gradient(180deg, #ffffff 0%, var(--bs-bg) 100%);
-}
-.bs-gradient-overlay {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--bs-blue-dark) 78%, transparent) 0%, color-mix(in srgb, var(--bs-blue-dark) 55%, transparent) 50%, color-mix(in srgb, var(--bs-blue-dark) 85%, transparent) 100%);
-}
-.bs-gradient-overlay-r {
-  background: linear-gradient(100deg, color-mix(in srgb, var(--bs-blue-dark) 92%, transparent) 0%, color-mix(in srgb, var(--bs-blue-dark) 65%, transparent) 55%, color-mix(in srgb, var(--bs-blue) 25%, transparent) 100%);
-}
-.bs-gradient-text {
-  background: linear-gradient(120deg, var(--bs-blue-light), var(--bs-beige) 60%, var(--bs-blue-light));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
 
 /* Scroll reveal */
 .bs-reveal {
@@ -337,25 +315,6 @@ a:hover, a:focus-visible { text-decoration: underline; }
 .bs-reveal.bs-in {
   opacity: 1;
   transform: translateY(0);
-}
-
-/* Logo character — floats gently */
-@keyframes bs-float {
-  0%, 100% { transform: translateY(0) rotate(-2deg); }
-  50%      { transform: translateY(-10px) rotate(2deg); }
-}
-.bs-float {
-  animation: bs-float 6s ease-in-out infinite;
-}
-
-@keyframes bs-spin-slow {
-  to { transform: rotate(360deg); }
-}
-.bs-spin-slow { animation: bs-spin-slow 30s linear infinite; }
-
-/* Decorative seal glow */
-.bs-glow {
-  filter: drop-shadow(0 10px 30px color-mix(in srgb, var(--bs-blue) 45%, transparent)) drop-shadow(0 0 20px color-mix(in srgb, var(--bs-blue-light) 35%, transparent));
 }
 
 /* Trade tile hover */
@@ -371,13 +330,6 @@ a:hover, a:focus-visible { text-decoration: underline; }
   transform: translateY(-4px);
   box-shadow: 0 18px 40px -18px rgba(55,76,118,0.35);
   border-color: var(--bs-blue);
-}
-.bs-trade-tile:hover .bs-trade-icon {
-  transform: scale(1.1) rotate(-6deg);
-  color: var(--bs-blue-dark);
-}
-.bs-trade-icon {
-  transition: transform 250ms ease, color 250ms ease;
 }
 
 /* Section heading kicker */
@@ -479,11 +431,8 @@ a:hover, a:focus-visible { text-decoration: underline; }
 .bs-home .bs-display { font-weight: 700; }
 
 /* Colour-block knockout for one operative word in a headline. box-decoration
-   so it wraps cleanly across lines. Red is the default "spice"; navy/light for
-   alternate bands. */
-.bs-mark,
-.bs-mark-navy,
-.bs-mark-light {
+   so it wraps cleanly across lines. Red is the default "spice". */
+.bs-mark {
   /* Draw the fill as a centred band that hugs the word (≈0.86em tall) rather
      than the whole line box, so the highlight isn't taller than the text. */
   padding: 0 0.18em;
@@ -495,8 +444,6 @@ a:hover, a:focus-visible { text-decoration: underline; }
   box-decoration-break: clone;
 }
 .bs-mark       { background-image: linear-gradient(var(--bs-red), var(--bs-red));             color: var(--bs-beige); }
-.bs-mark-navy  { background-image: linear-gradient(var(--bs-blue-dark), var(--bs-blue-dark)); color: var(--bs-beige); }
-.bs-mark-light { background-image: linear-gradient(var(--bs-beige), var(--bs-beige));         color: var(--bs-blue-dark); }
 
 /* ── Identity buttons. Opt-in via .bs-btn on marketing/CTAs ONLY — never wired
    through the PrimeVue preset, so every work-screen <Button> stays untouched. */

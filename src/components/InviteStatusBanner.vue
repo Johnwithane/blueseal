@@ -6,6 +6,7 @@
 // claimed (the real client renders as the counterparty instead).
 import { computed, ref } from "vue";
 import Button from "primevue/button";
+import StatusBanner from "@/components/StatusBanner.vue";
 import Dialog from "primevue/dialog";
 import InputText from "primevue/inputtext";
 import { resendJobInvite, revokeJobInvite } from "@/firebase/services/jobs";
@@ -123,67 +124,68 @@ function openFix() {
 </script>
 
 <template>
-  <div class="bs-card p-4 border-l-4 border-l-[color:var(--bs-blue-light)]">
-    <div class="flex items-start gap-3">
-      <i
-        class="pi text-[color:var(--bs-blue)] text-lg mt-0.5"
-        :class="isInvited ? 'pi-user-plus' : 'pi-user'"
-      ></i>
-      <div class="min-w-0 flex-1">
-        <template v-if="isInvited">
-          <div class="font-semibold">Waiting for {{ invite.clientName }} to join</div>
-          <p class="text-sm text-[color:var(--bs-muted)] mt-1 break-words">
-            Invite for <span class="font-medium">{{ invite.emailLower }}</span>
-            <template v-if="invite.emailedAt"> — sign-in link emailed.</template>
-            <template v-else> — not emailed yet; copy the link and text it to them.</template>
-            Until they join, you can run the whole job yourself.
-          </p>
-          <div class="flex flex-wrap gap-2 mt-3">
-            <Button
-              label="Copy link"
-              icon="pi pi-copy"
-              size="small"
-              outlined
-              :loading="busy === 'link'"
-              @click="copyLink"
-            />
-            <Button
-              label="Resend email"
-              icon="pi pi-envelope"
-              size="small"
-              outlined
-              :loading="busy === 'email'"
-              @click="resendEmail"
-            />
-            <Button label="Fix email" icon="pi pi-pencil" size="small" text @click="openFix" />
-            <Button
-              label="Revoke"
-              icon="pi pi-times"
-              size="small"
-              text
-              severity="danger"
-              :loading="busy === 'revoke'"
-              @click="revoke"
-            />
-          </div>
-        </template>
-        <template v-else>
-          <div class="font-semibold">Solo job</div>
-          <p class="text-sm text-[color:var(--bs-muted)] mt-1">
-            The invite was revoked — you're running this one yourself. Quotes,
-            time tracking and invoicing all work as usual.
-          </p>
+  <div>
+    <!-- Invited: waiting for the client to join. -->
+    <StatusBanner v-if="isInvited" severity="info" icon="pi-user-plus">
+      <template #title>Waiting for {{ invite.clientName }} to join</template>
+      <template #body>
+        <p class="text-sm text-[color:var(--bs-muted)] mt-1 break-words">
+          Invite for <span class="font-medium">{{ invite.emailLower }}</span>
+          <template v-if="invite.emailedAt"> — sign-in link emailed.</template>
+          <template v-else> — not emailed yet; copy the link and text it to them.</template>
+          Until they join, you can run the whole job yourself.
+        </p>
+      </template>
+      <template #actions>
+        <div class="flex flex-wrap gap-2">
           <Button
-            label="Re-invite client"
-            icon="pi pi-user-plus"
+            label="Copy link"
+            icon="pi pi-copy"
             size="small"
             outlined
-            class="mt-3"
-            @click="openFix"
+            :loading="busy === 'link'"
+            @click="copyLink"
           />
-        </template>
-      </div>
-    </div>
+          <Button
+            label="Resend email"
+            icon="pi pi-envelope"
+            size="small"
+            outlined
+            :loading="busy === 'email'"
+            @click="resendEmail"
+          />
+          <Button label="Fix email" icon="pi pi-pencil" size="small" text @click="openFix" />
+          <Button
+            label="Revoke"
+            icon="pi pi-times"
+            size="small"
+            text
+            severity="danger"
+            :loading="busy === 'revoke'"
+            @click="revoke"
+          />
+        </div>
+      </template>
+    </StatusBanner>
+
+    <!-- Revoked: solo job. -->
+    <StatusBanner v-else severity="info" icon="pi-user" title="Solo job">
+      <template #body>
+        <p class="text-sm text-[color:var(--bs-muted)] mt-1">
+          The invite was revoked — you're running this one yourself. Quotes,
+          time tracking and invoicing all work as usual.
+        </p>
+      </template>
+      <template #actions>
+        <Button
+          label="Re-invite client"
+          icon="pi pi-user-plus"
+          size="small"
+          outlined
+          @click="openFix"
+        />
+      </template>
+    </StatusBanner>
 
     <Dialog
       v-model:visible="showFixDialog"

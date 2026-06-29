@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import Dialog from "primevue/dialog";
-import Button from "primevue/button";
-import SignatureCanvas from "@/components/SignatureCanvas.vue";
+import BaseSignatureDialog from "@/components/BaseSignatureDialog.vue";
 import MarkdownProse from "@/components/help/MarkdownProse.vue";
 import { REP_AGREEMENT_MARKDOWN } from "@/sales/agreement";
 import { signSalesAgreement } from "@/firebase/services/salesReps";
@@ -19,16 +17,9 @@ const auth = useAuthStore();
 const toast = useToast();
 
 const visible = ref(true);
-const sig = ref<InstanceType<typeof SignatureCanvas> | null>(null);
-const empty = ref(true);
 const saving = ref(false);
 
-async function submit() {
-  const dataUrl = sig.value?.extract() ?? "";
-  if (!dataUrl) {
-    toast.warn("Sign first", "Please draw your signature to agree.");
-    return;
-  }
+async function onConfirm(dataUrl: string) {
   saving.value = true;
   try {
     await signSalesAgreement(dataUrl);
@@ -46,14 +37,14 @@ async function submit() {
 </script>
 
 <template>
-  <Dialog
+  <BaseSignatureDialog
     v-model:visible="visible"
-    modal
-    :closable="false"
-    :close-on-escape="false"
-    :draggable="false"
+    :busy="saving"
+    blocking
     header="Sales representative agreement"
-    class="w-[min(36rem,92vw)]"
+    dialog-class="w-[min(36rem,92vw)]"
+    :cancelable="false"
+    @confirm="onConfirm"
   >
     <p class="text-sm text-[color:var(--bs-muted)] mb-3">
       Before you can refer tradespeople or review applications, please read and sign the agreement
@@ -63,16 +54,5 @@ async function submit() {
       <MarkdownProse :source="REP_AGREEMENT_MARKDOWN" />
     </div>
     <label class="text-xs font-medium block mb-1">Your signature</label>
-    <SignatureCanvas ref="sig" @update:empty="(v) => (empty = v)" />
-    <div class="flex justify-end gap-2 mt-3">
-      <Button label="Clear" text :disabled="saving || empty" @click="sig?.clear()" />
-      <Button
-        :label="saving ? 'Signing…' : 'Agree & sign'"
-        icon="pi pi-check"
-        :loading="saving"
-        :disabled="empty"
-        @click="submit"
-      />
-    </div>
-  </Dialog>
+  </BaseSignatureDialog>
 </template>

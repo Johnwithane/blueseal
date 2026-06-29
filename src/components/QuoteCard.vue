@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import Button from "primevue/button";
-import Tag from "primevue/tag";
 import { subscribeQuote, getQuoteByJobId, markQuoteViewed } from "@/firebase/services/quotes";
 import { getInvoicePartyInfo } from "@/firebase/services/jobs";
 import { ref as storageRef, getDownloadURL } from "firebase/storage";
@@ -11,6 +10,7 @@ import { useFormatters } from "@/composables/useFormatters";
 import { usePdfDocument } from "@/composables/usePdfDocument";
 import PdfPreviewDialog from "@/components/PdfPreviewDialog.vue";
 import QuoteBreakdown from "@/components/QuoteBreakdown.vue";
+import CollapsibleDocumentCard from "@/components/CollapsibleDocumentCard.vue";
 
 const props = defineProps<{
   jobId: string;
@@ -23,17 +23,6 @@ const props = defineProps<{
   /** When true, start collapsed (header-only). User can toggle open. */
   defaultCollapsed?: boolean;
 }>();
-
-// Local open/close state — initialised from defaultCollapsed but the user
-// toggles it freely after that.
-const collapsed = ref(false);
-watch(
-  () => props.defaultCollapsed,
-  (v) => {
-    collapsed.value = !!v;
-  },
-  { immediate: true },
-);
 
 // Preview on desktop; download to the OS viewer on touch (see usePdfDocument).
 const { renderingPdf, pdfBlob, pdfFilename, showPdfPreview, downloadMode, present } =
@@ -75,17 +64,14 @@ async function findQuoteId() {
 
 function attach(id: string) {
   unsub?.();
-  unsub = subscribeQuote(
-    id,
-    (q) => {
-      quote.value = q;
-      if (q && props.stampViewedOnLoad && q.status === "sent") {
-        // Best-effort: only the client has the rules permission for this
-        // transition, so silent failure on tradesperson side is expected.
-        void markQuoteViewed(id);
-      }
-    },
-  );
+  unsub = subscribeQuote(id, (q) => {
+    quote.value = q;
+    if (q && props.stampViewedOnLoad && q.status === "sent") {
+      // Best-effort: only the client has the rules permission for this
+      // transition, so silent failure on tradesperson side is expected.
+      void markQuoteViewed(id);
+    }
+  });
 }
 
 function detach() {
@@ -113,11 +99,15 @@ watch(
   { immediate: true },
 );
 
-watch(() => props.jobId, () => {
-  detach();
-  loading.value = true;
-  void findQuoteId();
-}, { immediate: true });
+watch(
+  () => props.jobId,
+  () => {
+    detach();
+    loading.value = true;
+    void findQuoteId();
+  },
+  { immediate: true },
+);
 
 onBeforeUnmount(detach);
 
@@ -141,6 +131,12 @@ const STATUS_LABEL: Record<QuoteStatus, string> = {
   withdrawn: "Withdrawn",
 };
 
+// Quote number, plus the sent date once it's been sent — the header subtitle.
+const subtitle = computed(() => {
+  const q = quote.value;
+  if (!q) return "";
+  return q.sentAt ? `${q.quoteNumber} • Sent ${date(q.sentAt)}` : q.quoteNumber;
+});
 </script>
 
 <template>
@@ -148,43 +144,26 @@ const STATUS_LABEL: Record<QuoteStatus, string> = {
     <div class="text-sm text-[color:var(--bs-muted)]">Loading quote…</div>
   </div>
 
-  <div v-else-if="quote" class="bs-card p-4">
-    <!-- Header doubles as the collapse toggle so a tap anywhere on it
-         opens/closes the quote body. The status tag stays visible
-         while collapsed so the user knows the state without expanding. -->
-    <button
-      type="button"
-      class="flex items-center justify-between w-full text-left"
-      :class="{ 'mb-3': !collapsed }"
-      :aria-expanded="!collapsed"
-      @click="collapsed = !collapsed"
-    >
-      <div class="flex items-center gap-2 min-w-0">
-        <i
-          class="pi text-xs text-[color:var(--bs-muted)] shrink-0"
-          :class="collapsed ? 'pi-chevron-right' : 'pi-chevron-down'"
-          aria-hidden="true"
-        ></i>
-        <div class="min-w-0">
-          <h3 class="font-semibold">Quote</h3>
-          <div class="text-xs text-[color:var(--bs-muted)] truncate">
-            {{ quote.quoteNumber }}
-            <template v-if="quote.sentAt"> • Sent {{ date(quote.sentAt) }}</template>
-          </div>
-        </div>
-      </div>
-      <Tag :value="STATUS_LABEL[quote.status]" :severity="STATUS_SEVERITY[quote.status]" />
-    </button>
-
-    <template v-if="!collapsed">
+  <CollapsibleDocumentCard
+    v-else-if="quote"
+    title="Quote"
+    :subtitle="subtitle"
+    :status-label="STATUS_LABEL[quote.status]"
+    :status-severity="STATUS_SEVERITY[quote.status]"
+    :default-collapsed="props.defaultCollapsed"
+  >
     <QuoteBreakdown :quote="quote" :expired="quote.status === 'expired'" />
 
     <div
       v-if="quote.status === 'declined' && quote.declinedReason"
       class="mt-3 rounded-lg border border-[color:var(--bs-warning)] bg-[color:var(--bs-warning-tint)] p-3"
     >
-      <div class="text-xs font-semibold text-[color:var(--bs-warning-text)] mb-1">Client asked to discuss</div>
-      <p class="text-xs text-[color:var(--bs-warning-text)] whitespace-pre-wrap">{{ quote.declinedReason }}</p>
+      <div class="text-xs font-semibold text-[color:var(--bs-warning-text)] mb-1">
+        Client asked to discuss
+      </div>
+      <p class="text-xs text-[color:var(--bs-warning-text)] whitespace-pre-wrap">
+        {{ quote.declinedReason }}
+      </p>
     </div>
 
     <div
@@ -216,13 +195,14 @@ const STATUS_LABEL: Record<QuoteStatus, string> = {
         @click="openPdfPreview"
       />
     </div>
-    </template>
 
-    <PdfPreviewDialog
-      v-model:visible="showPdfPreview"
-      :blob="pdfBlob"
-      :filename="pdfFilename"
-      :title="`Quote ${quote.quoteNumber}`"
-    />
-  </div>
+    <template #footer>
+      <PdfPreviewDialog
+        v-model:visible="showPdfPreview"
+        :blob="pdfBlob"
+        :filename="pdfFilename"
+        :title="`Quote ${quote.quoteNumber}`"
+      />
+    </template>
+  </CollapsibleDocumentCard>
 </template>

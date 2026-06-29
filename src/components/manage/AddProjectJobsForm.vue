@@ -17,6 +17,7 @@ import { generateProjectJobsWithAi } from "@/firebase/services/aiDrafts";
 import { addProjectJobsSchema } from "@/validation/projects";
 import { TRADES } from "@/data/trades";
 import { useToast } from "@/composables/useToast";
+import { useFormErrors } from "@/composables/useFormErrors";
 import { usePaywallStore } from "@/stores/paywall";
 import { useSubscriptionStore } from "@/stores/subscription";
 import { humanizeError } from "@/utils/errors";
@@ -31,7 +32,7 @@ const subscription = useSubscriptionStore();
 
 const tradeOptions = TRADES.map((t) => ({ label: t.label, value: t.key }));
 const form = reactive({ jobs: [{ trade: "", title: "", description: "" }] });
-const fieldErrors = ref<Record<string, string>>({});
+const { errors, clear: clearErrors, setFromZod } = useFormErrors();
 const saving = ref(false);
 
 // AI: draft the added jobs from a freeform description (Blue Seal Pro), same as
@@ -98,12 +99,10 @@ function removeJob(i: number) {
 }
 
 async function save() {
-  fieldErrors.value = {};
+  clearErrors();
   const parsed = addProjectJobsSchema.safeParse({ projectId: props.projectId, jobs: form.jobs });
   if (!parsed.success) {
-    for (const issue of parsed.error.issues) {
-      fieldErrors.value[issue.path.join(".")] = issue.message;
-    }
+    setFromZod(parsed.error, (path) => path.join("."));
     return;
   }
   saving.value = true;
@@ -176,7 +175,7 @@ async function save() {
             @click="removeJob(i)"
           />
         </div>
-        <small v-if="fieldErrors[`jobs.${i}.trade`]" class="text-[color:var(--bs-danger)] block">{{ fieldErrors[`jobs.${i}.trade`] }}</small>
+        <small v-if="errors[`jobs.${i}.trade`]" class="text-[color:var(--bs-danger)] block">{{ errors[`jobs.${i}.trade`] }}</small>
         <!-- Roster coverage: warn before adding if no saved trade matches. -->
         <p
           v-if="job.trade && matchCount(job.trade) === 0"
@@ -193,12 +192,12 @@ async function save() {
           <span>{{ matchCount(job.trade) }} of your trades will be invited to quote.</span>
         </p>
         <InputText v-model="job.title" class="w-full" placeholder="Job title (e.g. Repaint hallway)" />
-        <small v-if="fieldErrors[`jobs.${i}.title`]" class="text-[color:var(--bs-danger)] block">{{ fieldErrors[`jobs.${i}.title`] }}</small>
+        <small v-if="errors[`jobs.${i}.title`]" class="text-[color:var(--bs-danger)] block">{{ errors[`jobs.${i}.title`] }}</small>
         <Textarea v-model="job.description" class="w-full" rows="2" placeholder="What needs doing?" />
-        <small v-if="fieldErrors[`jobs.${i}.description`]" class="text-[color:var(--bs-danger)] block">{{ fieldErrors[`jobs.${i}.description`] }}</small>
+        <small v-if="errors[`jobs.${i}.description`]" class="text-[color:var(--bs-danger)] block">{{ errors[`jobs.${i}.description`] }}</small>
       </div>
       <Button label="Add another job" icon="pi pi-plus" text size="small" @click="addJob" />
-      <small v-if="fieldErrors.jobs" class="text-[color:var(--bs-danger)] block">{{ fieldErrors.jobs }}</small>
+      <small v-if="errors.jobs" class="text-[color:var(--bs-danger)] block">{{ errors.jobs }}</small>
     </div>
 
     <div class="flex gap-2">

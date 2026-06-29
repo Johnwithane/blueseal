@@ -7,6 +7,7 @@ import { searchVisibleTradiesByName } from "@/firebase/services/tradespeople";
 import { tradeLabel } from "@/data/trades";
 import { humanizeError } from "@/utils/errors";
 import type { TradespersonDoc, WithId } from "@/firebase/interfaces";
+import InitialsAvatar from "@/components/InitialsAvatar.vue";
 
 // "Already on Blue Seal?" — the in-cockpit way a project manager adds a
 // tradesperson to their roster without leaving the page. Type a name, the
@@ -55,10 +56,6 @@ function tradesText(t: WithId<TradespersonDoc>): string {
   if (!ts.length) return "Tradesperson";
   return ts.slice(0, 2).join(" · ") + (ts.length > 2 ? ` +${ts.length - 2}` : "");
 }
-
-function initial(name: string | null | undefined): string {
-  return (name ?? "?").trim().charAt(0).toUpperCase() || "?";
-}
 </script>
 
 <template>
@@ -97,16 +94,7 @@ function initial(name: string | null | undefined): string {
         :key="t.id"
         class="flex items-center gap-3 rounded-lg border border-[color:var(--bs-border)] p-2"
       >
-        <img
-          v-if="t.photoURL"
-          :src="t.photoURL"
-          alt=""
-          class="w-9 h-9 rounded-full object-cover shrink-0"
-        />
-        <span
-          v-else
-          class="w-9 h-9 rounded-full bg-[color:var(--bs-blue)] text-white grid place-items-center shrink-0 text-sm"
-        >{{ initial(t.displayName) }}</span>
+        <InitialsAvatar :name="t.displayName" :photo-url="t.photoURL" :size="36" tone="solid" />
         <div class="min-w-0 flex-1">
           <p class="font-medium text-sm truncate">{{ t.displayName ?? "Tradesperson" }}</p>
           <p class="text-xs text-[color:var(--bs-muted)] truncate">{{ tradesText(t) }}</p>

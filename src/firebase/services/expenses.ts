@@ -88,11 +88,6 @@ export function subscribeJobExpenses(
   );
 }
 
-export async function listJobExpenses(jobId: string): Promise<WithId<ExpenseDoc>[]> {
-  const snap = await getDocs(query(expensesCol(jobId), orderBy("createdAt", "desc")));
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-}
-
 /** Watch a single expense — used by AddExpenseDialog to reflect OCR results. */
 export function subscribeExpense(
   jobId: string,

@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
-import Dialog from "primevue/dialog";
-import Button from "primevue/button";
 import Checkbox from "primevue/checkbox";
-import SignatureCanvas from "@/components/SignatureCanvas.vue";
+import BaseSignatureDialog from "@/components/BaseSignatureDialog.vue";
 import {
   TRADIE_WAIVER_TITLE,
   TRADIE_WAIVER_POINTS,
@@ -26,8 +24,6 @@ const emit = defineEmits<{
   confirm: [dataUrl: string];
 }>();
 
-const sig = ref<InstanceType<typeof SignatureCanvas> | null>(null);
-const isEmpty = ref(true);
 const agreed = ref(false);
 
 // Re-arm the checkbox each open so a previous session can't carry through.
@@ -37,24 +33,18 @@ watch(
     if (v) agreed.value = false;
   },
 );
-
-function onConfirm() {
-  if (isEmpty.value || props.busy || !agreed.value) return;
-  const dataUrl = sig.value?.extract() ?? "";
-  if (!dataUrl) return;
-  emit("confirm", dataUrl);
-}
 </script>
 
 <template>
-  <Dialog
+  <BaseSignatureDialog
     :visible="props.visible"
-    modal
-    :draggable="false"
-    :closable="!props.busy"
+    :busy="props.busy"
     :header="TRADIE_WAIVER_TITLE"
-    :pt="{ root: { class: 'sign-dialog' } }"
+    confirm-label="Sign waiver"
+    confirm-severity="warn"
+    :confirm-disabled="!agreed"
     @update:visible="(v) => emit('update:visible', v)"
+    @confirm="(dataUrl) => emit('confirm', dataUrl)"
   >
     <div
       class="rounded-md border border-[color:var(--bs-warning)] bg-[color:var(--bs-warning-tint)] px-3 py-2.5"
@@ -91,54 +81,10 @@ function onConfirm() {
       <span>{{ TRADIE_WAIVER_CHECKBOX }}</span>
     </label>
 
-    <div class="mt-3">
-      <SignatureCanvas ref="sig" @update:empty="(v) => (isEmpty = v)" />
-    </div>
-
-    <p class="mt-2 text-[0.7rem] leading-snug text-[color:var(--bs-muted)]">
-      {{ TRADIE_WAIVER_FOOTNOTE }}
-    </p>
-
-    <template #footer>
-      <div class="flex items-center gap-2 w-full">
-        <Button
-          label="Clear"
-          text
-          icon="pi pi-eraser"
-          :disabled="isEmpty || props.busy"
-          @click="sig?.clear()"
-        />
-        <span class="flex-1"></span>
-        <Button label="Cancel" text :disabled="props.busy" @click="emit('update:visible', false)" />
-        <Button
-          label="Sign waiver"
-          icon="pi pi-check"
-          severity="warn"
-          :loading="props.busy"
-          :disabled="isEmpty || props.busy || !agreed"
-          @click="onConfirm"
-        />
-      </div>
+    <template #below-canvas>
+      <p class="mt-2 text-[0.7rem] leading-snug text-[color:var(--bs-muted)]">
+        {{ TRADIE_WAIVER_FOOTNOTE }}
+      </p>
     </template>
-  </Dialog>
+  </BaseSignatureDialog>
 </template>
-
-<style>
-/* Self-contained copy of the signature-dialog sizing (mirrors
-   QuoteSignatureDialog) so this dialog stands alone if that one isn't loaded. */
-.sign-dialog {
-  width: 100vw;
-  max-width: 420px;
-  margin: 0;
-}
-.sign-dialog .p-dialog-footer {
-  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
-}
-@media (max-width: 639px) {
-  .sign-dialog {
-    height: 100dvh;
-    max-height: 100dvh;
-    border-radius: 0;
-  }
-}
-</style>

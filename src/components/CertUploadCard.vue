@@ -4,11 +4,12 @@ import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import Select from "primevue/select";
 import DatePicker from "primevue/datepicker";
-import Dialog from "primevue/dialog";
 import Tag from "primevue/tag";
 import Message from "primevue/message";
 import type { CertificationDoc, WithId } from "@/firebase/interfaces";
 import { tradeLabel } from "@/data/trades";
+import VerificationDocPreview from "@/components/VerificationDocPreview.vue";
+import { toJsDate } from "@/utils/firestore";
 import {
   ISSUING_BODIES,
   OTHER_CERT,
@@ -211,13 +212,7 @@ function enterEdit() {
 
   const rawExpiry = props.existing.expiresAt;
   if (rawExpiry) {
-    // Firestore returns a Timestamp on the wire but JS Date instances when
-    // the converter has already run — handle both.
-    const asDate =
-      typeof (rawExpiry as { toDate?: unknown }).toDate === "function"
-        ? (rawExpiry as { toDate: () => Date }).toDate()
-        : (rawExpiry as unknown as Date);
-    expiresAtDate.value = asDate;
+    expiresAtDate.value = toJsDate(rawExpiry);
     neverExpires.value = false;
   } else {
     expiresAtDate.value = null;
@@ -255,11 +250,6 @@ async function saveEdit() {
     saving.value = false;
   }
 }
-
-const isPdf = computed(() => {
-  const url = props.existing?.fileUrl ?? "";
-  return url.toLowerCase().includes(".pdf");
-});
 
 const isNoCertDoc = computed(() =>
   props.existing ? isSelfDeclaredNoCert(props.existing) : false,
@@ -378,32 +368,12 @@ const defaultOpen = computed(
         />
       </div>
 
-      <Dialog
+      <VerificationDocPreview
         v-model:visible="viewerOpen"
-        modal
+        :file-url="existing.fileUrl"
         :header="tradeLabel(trade) + ' — certification'"
-        :style="{ width: '90vw', maxWidth: '900px' }"
-      >
-        <div class="w-full" style="height: 70vh">
-          <iframe
-            v-if="isPdf"
-            :src="existing.fileUrl"
-            class="w-full h-full rounded border"
-            title="Certification PDF"
-          />
-          <img
-            v-else
-            :src="existing.fileUrl"
-            alt="Certification"
-            class="w-full h-full object-contain rounded border"
-          />
-        </div>
-        <template #footer>
-          <a :href="existing.fileUrl" target="_blank" rel="noopener" class="text-sm">
-            Open in new tab →
-          </a>
-        </template>
-      </Dialog>
+        label="Certification"
+      />
     </template>
 
     <!-- EMPTY STATE + EDIT MODE: the same form drives both initial upload

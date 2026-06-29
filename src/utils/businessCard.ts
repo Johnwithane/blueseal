@@ -37,7 +37,6 @@ export const CARD_BLEED_PX = 37.5; // 0.125in
 export const CARD_SAFE_X = 80;
 export const CARD_SAFE_Y = 56;
 export const CARD_FULL = { w: 1125, h: 675 } as const;
-export const CARD_DPI = 300;
 export const CARD_BLEED_MM = { w: 95.25, h: 57.15 } as const; // PDF page, incl. bleed
 
 export function cardPixelSize(bleed: boolean): { w: number; h: number } {

@@ -42,7 +42,6 @@ export const projectSchema = z.object({
 });
 
 export type ProjectDraft = z.infer<typeof projectSchema>;
-export type ProjectJobSpecDraft = z.infer<typeof projectJobSpecSchema>;
 
 // Adding jobs to an ALREADY-ACCEPTED project (proposeProjectJobs). Each added job
 // needs the client's per-job approval before it dispatches, so this is a separate,
@@ -52,5 +51,3 @@ export const addProjectJobsSchema = z.object({
   projectId: z.string().trim().min(1).max(200),
   jobs: z.array(projectJobSpecSchema).min(1, "Add at least one job").max(20),
 });
-
-export type AddProjectJobsDraft = z.infer<typeof addProjectJobsSchema>;

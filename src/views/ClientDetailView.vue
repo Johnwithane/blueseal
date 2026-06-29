@@ -17,6 +17,7 @@ import type { ClientDoc, WithId } from "@/firebase/interfaces";
 import ClientFormDialog from "@/components/clients/ClientFormDialog.vue";
 import ClientHistory from "@/components/clients/ClientHistory.vue";
 import ClientRecurringList from "@/components/clients/ClientRecurringList.vue";
+import InitialsAvatar from "@/components/InitialsAvatar.vue";
 
 useSeo({ title: "Client — Blue Seal", noindex: true });
 
@@ -104,12 +105,7 @@ async function toggleArchive() {
       <!-- Header -->
       <div class="bs-card p-4 mb-4">
         <div class="flex items-start gap-3">
-          <div
-            class="h-12 w-12 rounded-full bg-[color:var(--bs-blue-light)] text-[color:var(--bs-blue-dark)] flex items-center justify-center text-lg font-semibold shrink-0"
-            aria-hidden="true"
-          >
-            {{ client.displayName.charAt(0).toUpperCase() }}
-          </div>
+          <InitialsAvatar :name="client.displayName" :size="48" />
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2 flex-wrap">
               <h1 class="text-lg font-bold">{{ client.displayName }}</h1>

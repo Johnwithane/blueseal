@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
-import Dialog from "primevue/dialog";
-import Button from "primevue/button";
 import Checkbox from "primevue/checkbox";
 import { useFormatters } from "@/composables/useFormatters";
-import SignatureCanvas from "@/components/SignatureCanvas.vue";
+import BaseSignatureDialog from "@/components/BaseSignatureDialog.vue";
 import {
   CLIENT_UNINSURED_TITLE,
   CLIENT_UNINSURED_CHECKBOX,
@@ -39,8 +37,6 @@ const emit = defineEmits<{
 
 const { money } = useFormatters();
 
-const sig = ref<InstanceType<typeof SignatureCanvas> | null>(null);
-const isEmpty = ref(true);
 const uninsuredAck = ref(false);
 
 // Reset the acknowledgment each time the dialog opens so a previous tick can't
@@ -53,25 +49,18 @@ watch(
 );
 
 const tradieName = () => props.tradieName?.trim() || "This tradesperson";
-
-function onConfirm() {
-  if (isEmpty.value || props.busy) return;
-  if (props.uninsured && !uninsuredAck.value) return;
-  const dataUrl = sig.value?.extract() ?? "";
-  if (!dataUrl) return;
-  emit("confirm", dataUrl);
-}
 </script>
 
 <template>
-  <Dialog
+  <BaseSignatureDialog
     :visible="props.visible"
-    modal
-    :draggable="false"
-    :closable="!props.busy"
+    :busy="props.busy"
     header="Sign to accept"
-    :pt="{ root: { class: 'sign-dialog' } }"
+    confirm-label="Confirm & accept"
+    confirm-severity="success"
+    :confirm-disabled="!!props.uninsured && !uninsuredAck"
     @update:visible="(v) => emit('update:visible', v)"
+    @confirm="(dataUrl) => emit('confirm', dataUrl)"
   >
     <p class="text-sm text-[color:var(--bs-text)]">
       By signing you accept this quote<template v-if="props.quoteTotal">
@@ -103,51 +92,5 @@ function onConfirm() {
         <span>{{ CLIENT_UNINSURED_CHECKBOX }}</span>
       </label>
     </div>
-
-    <div class="mt-3">
-      <SignatureCanvas ref="sig" @update:empty="(v) => (isEmpty = v)" />
-    </div>
-
-    <template #footer>
-      <div class="flex items-center gap-2 w-full">
-        <Button
-          label="Clear"
-          text
-          icon="pi pi-eraser"
-          :disabled="isEmpty || props.busy"
-          @click="sig?.clear()"
-        />
-        <span class="flex-1"></span>
-        <Button label="Cancel" text :disabled="props.busy" @click="emit('update:visible', false)" />
-        <Button
-          label="Confirm & accept"
-          icon="pi pi-check"
-          severity="success"
-          :loading="props.busy"
-          :disabled="isEmpty || props.busy || (props.uninsured && !uninsuredAck)"
-          @click="onConfirm"
-        />
-      </div>
-    </template>
-  </Dialog>
+  </BaseSignatureDialog>
 </template>
-
-<style>
-/* Compact sheet on desktop, full-height on mobile for a large touch target —
-   mirrors the PdfPreviewDialog pattern. */
-.sign-dialog {
-  width: 100vw;
-  max-width: 420px;
-  margin: 0;
-}
-.sign-dialog .p-dialog-footer {
-  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
-}
-@media (max-width: 639px) {
-  .sign-dialog {
-    height: 100dvh;
-    max-height: 100dvh;
-    border-radius: 0;
-  }
-}
-</style>

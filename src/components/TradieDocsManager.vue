@@ -27,6 +27,7 @@ import type {
 } from "@/firebase/interfaces";
 import { useToast } from "@/composables/useToast";
 import { useFormatters } from "@/composables/useFormatters";
+import { VERIFICATION_SEVERITY } from "@/utils/verificationStatus";
 import CertUploadCard from "@/components/CertUploadCard.vue";
 import IdUploadCard from "@/components/IdUploadCard.vue";
 import InsuranceUploadCard from "@/components/InsuranceUploadCard.vue";
@@ -131,11 +132,6 @@ async function reloadWsib() {
   wsibDoc.value = await getWsib(props.tradieUid);
 }
 
-const statusSeverity = {
-  pending: "warn" as const,
-  approved: "success" as const,
-  rejected: "danger" as const,
-};
 </script>
 
 <template>
@@ -173,7 +169,7 @@ const statusSeverity = {
       <div v-if="idDoc && !showIdReupload" class="bs-card p-3 mt-2">
         <div class="flex items-center justify-between gap-2 flex-wrap">
           <div class="font-medium">{{ idDoc.documentType }}</div>
-          <Tag :value="idDoc.status" :severity="statusSeverity[idDoc.status]" />
+          <Tag :value="idDoc.status" :severity="VERIFICATION_SEVERITY[idDoc.status]" />
         </div>
         <div class="text-xs text-[color:var(--bs-muted)] mt-1">
           Submitted {{ date(idDoc.submittedAt) }}

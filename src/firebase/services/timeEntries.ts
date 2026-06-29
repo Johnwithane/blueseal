@@ -2,7 +2,6 @@ import {
   collection,
   deleteDoc,
   doc,
-  getDocs,
   onSnapshot,
   orderBy,
   query,
@@ -45,30 +44,6 @@ export function subscribeJobTimeEntries(
       onError?.(err);
     },
   );
-}
-
-export async function listJobTimeEntries(jobId: string): Promise<WithId<TimeEntryDoc>[]> {
-  const snap = await getDocs(query(entriesCol(jobId), orderBy("startedAt", "asc")));
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-}
-
-// Find an open (un-clocked-out) entry for the caller. Used by the UI to
-// decide whether the button reads "Clock in" or "Stop". The callable is
-// the authoritative gate — this is just a UI convenience.
-export async function getOpenEntryForTradie(
-  jobId: string,
-  tradieUid: string,
-): Promise<WithId<TimeEntryDoc> | null> {
-  const snap = await getDocs(
-    query(
-      entriesCol(jobId),
-      where("tradespersonId", "==", tradieUid),
-      where("endedAt", "==", null),
-    ),
-  );
-  if (snap.empty) return null;
-  const d = snap.docs[0];
-  return { id: d.id, ...d.data() };
 }
 
 export async function updateTimeEntryNotes(

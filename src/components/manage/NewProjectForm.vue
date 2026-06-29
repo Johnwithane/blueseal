@@ -17,6 +17,7 @@ import { uploadPmPhoto } from "@/firebase/services/pmImages";
 import { projectSchema } from "@/validation/projects";
 import { TRADES } from "@/data/trades";
 import { useToast } from "@/composables/useToast";
+import { useFormErrors } from "@/composables/useFormErrors";
 import { usePaywallStore } from "@/stores/paywall";
 import { useSubscriptionStore } from "@/stores/subscription";
 import { humanizeError } from "@/utils/errors";
@@ -123,7 +124,7 @@ const unitOptions = computed(() => [
 watch(selectedPropertyId, () => {
   if (form.unit && !selectedUnits.value.includes(form.unit)) form.unit = null;
 });
-const fieldErrors = ref<Record<string, string>>({});
+const { errors, clear: clearErrors, setFromZod } = useFormErrors();
 const lastResult = ref<CreateProjectResult | null>(null);
 
 onMounted(() => {
@@ -166,7 +167,7 @@ function reset() {
   form.unit = null;
   form.photoUrl = "";
   form.jobs = [{ trade: "", title: "", description: "" }];
-  fieldErrors.value = {};
+  clearErrors();
 }
 
 async function onPickPhoto(e: Event) {
@@ -192,15 +193,13 @@ function removeJob(i: number) {
 }
 
 async function save() {
-  fieldErrors.value = {};
+  clearErrors();
   const parsed = projectSchema.safeParse({
     ...form,
     propertyId: scoped.value ? props.propertyId : form.propertyId,
   });
   if (!parsed.success) {
-    for (const issue of parsed.error.issues) {
-      fieldErrors.value[issue.path.join(".")] = issue.message;
-    }
+    setFromZod(parsed.error, (path) => path.join("."));
     return;
   }
   saving.value = true;
@@ -278,18 +277,18 @@ async function copyInvite() {
       <div>
         <label class="text-sm font-medium">Project name</label>
         <InputText v-model="form.label" class="mt-1 w-full" placeholder="e.g. Spring turnover" />
-        <small v-if="fieldErrors.label" class="text-[color:var(--bs-danger)]">{{ fieldErrors.label }}</small>
+        <small v-if="errors.label" class="text-[color:var(--bs-danger)]">{{ errors.label }}</small>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label class="text-sm font-medium">Client name</label>
           <InputText v-model="form.clientName" class="mt-1 w-full" placeholder="Their name" />
-          <small v-if="fieldErrors.clientName" class="text-[color:var(--bs-danger)]">{{ fieldErrors.clientName }}</small>
+          <small v-if="errors.clientName" class="text-[color:var(--bs-danger)]">{{ errors.clientName }}</small>
         </div>
         <div v-if="!isEdit">
           <label class="text-sm font-medium">Client email</label>
           <InputText v-model="form.clientEmail" type="email" class="mt-1 w-full" placeholder="them@example.com" />
-          <small v-if="fieldErrors.clientEmail" class="text-[color:var(--bs-danger)]">{{ fieldErrors.clientEmail }}</small>
+          <small v-if="errors.clientEmail" class="text-[color:var(--bs-danger)]">{{ errors.clientEmail }}</small>
         </div>
       </div>
       <div v-if="!scoped">
@@ -377,7 +376,7 @@ async function copyInvite() {
               @click="removeJob(i)"
             />
           </div>
-          <small v-if="fieldErrors[`jobs.${i}.trade`]" class="text-[color:var(--bs-danger)] block">{{ fieldErrors[`jobs.${i}.trade`] }}</small>
+          <small v-if="errors[`jobs.${i}.trade`]" class="text-[color:var(--bs-danger)] block">{{ errors[`jobs.${i}.trade`] }}</small>
           <!-- Roster coverage: warn before the client accepts if no saved trade matches. -->
           <p
             v-if="job.trade && matchCount(job.trade) === 0"
@@ -394,12 +393,12 @@ async function copyInvite() {
             <span>{{ matchCount(job.trade) }} of your trades will be invited to quote.</span>
           </p>
           <InputText v-model="job.title" class="w-full" placeholder="Job title (e.g. Repaint unit)" />
-          <small v-if="fieldErrors[`jobs.${i}.title`]" class="text-[color:var(--bs-danger)] block">{{ fieldErrors[`jobs.${i}.title`] }}</small>
+          <small v-if="errors[`jobs.${i}.title`]" class="text-[color:var(--bs-danger)] block">{{ errors[`jobs.${i}.title`] }}</small>
           <Textarea v-model="job.description" class="w-full" rows="2" placeholder="What needs doing?" />
-          <small v-if="fieldErrors[`jobs.${i}.description`]" class="text-[color:var(--bs-danger)] block">{{ fieldErrors[`jobs.${i}.description`] }}</small>
+          <small v-if="errors[`jobs.${i}.description`]" class="text-[color:var(--bs-danger)] block">{{ errors[`jobs.${i}.description`] }}</small>
         </div>
         <Button label="Add another job" icon="pi pi-plus" text size="small" @click="addJob" />
-        <small v-if="fieldErrors.jobs" class="text-[color:var(--bs-danger)] block">{{ fieldErrors.jobs }}</small>
+        <small v-if="errors.jobs" class="text-[color:var(--bs-danger)] block">{{ errors.jobs }}</small>
       </div>
 
       <div class="flex gap-2">

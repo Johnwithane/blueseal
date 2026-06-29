@@ -5,6 +5,7 @@
 import { computed } from "vue";
 import { RouterLink } from "vue-router";
 import type { ClientDoc, WithId } from "@/firebase/interfaces";
+import InitialsAvatar from "@/components/InitialsAvatar.vue";
 
 const props = defineProps<{ client: WithId<ClientDoc> }>();
 
@@ -21,12 +22,7 @@ const subtitle = computed(() =>
       :to="`/clients/${client.id}`"
       class="bs-card p-3 flex items-center gap-3 hover:border-[color:var(--bs-blue)] transition-colors"
     >
-      <div
-        class="h-9 w-9 rounded-full bg-[color:var(--bs-blue-light)] text-[color:var(--bs-blue-dark)] flex items-center justify-center font-semibold shrink-0"
-        aria-hidden="true"
-      >
-        {{ client.displayName.charAt(0).toUpperCase() }}
-      </div>
+      <InitialsAvatar :name="client.displayName" :size="36" />
       <div class="min-w-0 flex-1">
         <div class="font-medium truncate">{{ client.displayName }}</div>
         <div v-if="subtitle" class="text-xs text-[color:var(--bs-muted)] truncate">

@@ -11,8 +11,7 @@ import {
   serverTimestamp,
   where,
 } from "firebase/firestore";
-import { httpsCallable } from "firebase/functions";
-import { db, functions } from "@/firebase/config";
+import { db } from "@/firebase/config";
 import type {
   ClientReviewDoc,
   ReviewDoc,
@@ -106,12 +105,6 @@ export async function listClientReviewsFor(
 // The InvoiceTab subscribes to this so the UI can render the right state
 // (waiting on you, waiting on them, both revealed) without polling.
 // ---------------------------------------------------------------------------
-export async function getReviewPair(jobId: string): Promise<WithId<ReviewPairDoc> | null> {
-  const snap = await getDoc(doc(reviewPairsCol(), jobId));
-  if (!snap.exists()) return null;
-  return { id: snap.id, ...snap.data() };
-}
-
 /** Realtime listener — UI reflects reveal the moment it lands. */
 export function subscribeReviewPair(
   jobId: string,
@@ -146,25 +139,3 @@ export async function getClientReviewById(
   return { id: snap.id, ...snap.data() };
 }
 
-// ---------------------------------------------------------------------------
-// Admin one-shot: backfill clientName + clientPhotoURL onto legacy reviews
-// that pre-date the ReviewPrompt denormalization. Idempotent — re-running
-// is safe. Wrapped here (not in a separate admin-only service file) so the
-// callable name + response shape live alongside the other review services.
-// ---------------------------------------------------------------------------
-export interface BackfillReviewReviewersResult {
-  scanned: number;
-  updated: number;
-  alreadyPresent: number;
-  pages: number;
-  fallbackUsed: number;
-}
-
-export async function backfillReviewReviewers(): Promise<BackfillReviewReviewersResult> {
-  const callable = httpsCallable<undefined, BackfillReviewReviewersResult>(
-    functions,
-    "backfillReviewReviewers",
-  );
-  const { data } = await callable();
-  return data;
-}

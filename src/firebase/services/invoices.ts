@@ -196,19 +196,6 @@ export async function markInvoiceViewed(id: string): Promise<void> {
   await updateDoc(doc(db, "invoices", id), { status: "viewed", viewedAt: serverTimestamp() });
 }
 
-export function subscribeTradieInvoices(
-  uid: string,
-  cb: (inv: WithId<InvoiceDoc>[]) => void,
-): () => void {
-  const q = query(
-    invCol(),
-    where("tradespersonId", "==", uid),
-    orderBy("issuedAt", "desc"),
-    limit(100),
-  );
-  return onSnapshot(q, (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
-}
-
 export async function listClientInvoices(clientUid: string): Promise<WithId<InvoiceDoc>[]> {
   const q = query(
     invCol(),
