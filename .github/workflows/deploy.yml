@@ -53,6 +53,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Detect what actually changed in this push so we only deploy the affected
+      # targets. Frontend-only pushes (the common case) skip the Cloud Functions
+      # deploy entirely. Deploying all ~180 functions on every push trips the
+      # per-minute Functions mutation quota and fails the whole release.
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            functions:
+              - 'functions/**'
+              - 'firebase.json'
+            rules:
+              - 'firestore.rules'
+              - 'storage.rules'
+              - 'firestore.indexes.json'
+
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -62,6 +78,7 @@ jobs:
         run: npm ci
 
       - name: Install functions deps
+        if: steps.changes.outputs.functions == 'true'
         run: npm ci
         working-directory: functions
 
@@ -69,6 +86,7 @@ jobs:
         run: npm run build
 
       - name: Build functions
+        if: steps.changes.outputs.functions == 'true'
         run: npm run build
         working-directory: functions
 
@@ -84,11 +102,13 @@ jobs:
           project_id: blueseal-762af
 
       - name: Deploy Firestore rules + indexes + Storage rules
+        if: steps.changes.outputs.rules == 'true'
         run: npx firebase-tools deploy --only firestore:rules,firestore:indexes,storage --project blueseal-762af --non-interactive
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}
 
       - name: Deploy Cloud Functions
+        if: steps.changes.outputs.functions == 'true'
         run: npx firebase-tools deploy --only functions --project blueseal-762af --non-interactive --force
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}

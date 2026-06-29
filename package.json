@@ -23,7 +23,7 @@
     "functions:deploy": "firebase deploy --only functions",
     "rules:deploy": "firebase deploy --only firestore:rules,storage",
     "deploy:hosting": "npm run build && firebase deploy --only hosting",
-    "deploy:prod": "npm run build && firebase deploy"
+    "deploy:prod": "npm run build && firebase deploy --only hosting,firestore:rules,firestore:indexes,storage"
   },
   "dependencies": {
     "@googlemaps/js-api-loader": "^2.0.2",
