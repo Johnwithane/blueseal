@@ -16,6 +16,16 @@ npm run dev
 
 Then open <http://localhost:5173>.
 
+### Tests
+
+```bash
+npm run lint         # ESLint
+npm run build        # type-check (vue-tsc) + Vite build + prerender
+npm run test:run     # Vitest unit + component tests
+npm run test:rules   # Firestore security-rules tests (firebase emulator)
+npm run test:e2e     # Playwright SEO/prerender smoke against the built dist/
+```
+
 ### Production deploy
 
 ```bash
@@ -95,6 +105,9 @@ functions/src/
 firestore.rules    # default-deny + per-collection allows
 storage.rules      # ID admin-only, owner-write per scope
 firebase.json      # hosting headers (CSP, HSTS, etc.), emulators
+legal/             # Terms, Privacy, fee schedule, insurance waiver (Markdown, ?raw-imported)
+tests/rules/       # Firestore security-rules tests (allow + deny)
+brand-assets/      # source brand files (.eps print masters) — kept in git, NOT web-served
 ```
 
 ---
