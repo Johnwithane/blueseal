@@ -8,18 +8,22 @@
 //     offline mark-as-paid dialog otherwise)
 //   • complete / reviewed → View receipt (Stripe payments)
 // View PDF is always available.
-import { onBeforeUnmount, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
 import Button from "primevue/button";
 import Dialog from "primevue/dialog";
-import Tag from "primevue/tag";
 import Textarea from "primevue/textarea";
 import { subscribeInvoice } from "@/firebase/services/invoices";
-import { clientApproveJob, clientRequestChanges, getInvoicePartyInfo } from "@/firebase/services/jobs";
+import {
+  clientApproveJob,
+  clientRequestChanges,
+  getInvoicePartyInfo,
+} from "@/firebase/services/jobs";
 import type { InvoiceDoc, InvoiceStatus, JobDoc, WithId } from "@/firebase/interfaces";
 import InvoiceBreakdown from "@/components/InvoiceBreakdown.vue";
 import PayInvoiceDialog from "@/components/PayInvoiceDialog.vue";
 import PdfPreviewDialog from "@/components/PdfPreviewDialog.vue";
+import CollapsibleDocumentCard from "@/components/CollapsibleDocumentCard.vue";
 import { useFormatters } from "@/composables/useFormatters";
 import { usePdfDocument } from "@/composables/usePdfDocument";
 import { useToast } from "@/composables/useToast";
@@ -53,8 +57,6 @@ watch(
 );
 onBeforeUnmount(() => unsub?.());
 
-const collapsed = ref(false);
-
 // Client-friendly status labels — raw invoice statuses lean accounting-speak.
 const STATUS_LABEL: Partial<Record<InvoiceStatus, string>> = {
   draft: "For your review",
@@ -74,6 +76,22 @@ const STATUS_SEVERITY: Partial<
   paid: "success",
   overdue: "danger",
 };
+
+// Invoice number, plus the issued date once it's been issued — header subtitle.
+const subtitle = computed(() => {
+  const inv = invoice.value;
+  if (!inv) return "";
+  return inv.issuedAt ? `${inv.invoiceNumber} • Issued ${date(inv.issuedAt)}` : inv.invoiceNumber;
+});
+const statusLabel = computed(() => {
+  const inv = invoice.value;
+  if (!inv) return "";
+  return STATUS_LABEL[inv.status] ?? inv.status;
+});
+const statusSeverity = computed(() => {
+  const inv = invoice.value;
+  return (inv && STATUS_SEVERITY[inv.status]) ?? "secondary";
+});
 
 // ---- approve / request changes (awaiting_client_approval) ----
 const approving = ref(false);
@@ -142,177 +160,155 @@ function openPdfPreview() {
 </script>
 
 <template>
-  <div v-if="invoice" class="bs-card p-4">
-    <!-- Header doubles as the collapse toggle — same affordance as the quote. -->
-    <button
-      type="button"
-      class="flex items-center justify-between w-full text-left"
-      :class="{ 'mb-3': !collapsed }"
-      :aria-expanded="!collapsed"
-      @click="collapsed = !collapsed"
+  <CollapsibleDocumentCard
+    v-if="invoice"
+    title="Invoice"
+    :subtitle="subtitle"
+    :status-label="statusLabel"
+    :status-severity="statusSeverity"
+  >
+    <InvoiceBreakdown :invoice="invoice" />
+
+    <!-- Review actions: the work is done, the invoice needs a yes/no. -->
+    <div
+      v-if="job.status === 'awaiting_client_approval'"
+      class="mt-4 rounded-lg border border-[color:var(--bs-border)] p-3"
     >
-      <div class="flex items-center gap-2 min-w-0">
-        <i
-          class="pi text-xs text-[color:var(--bs-muted)] shrink-0"
-          :class="collapsed ? 'pi-chevron-right' : 'pi-chevron-down'"
-          aria-hidden="true"
-        ></i>
-        <div class="min-w-0">
-          <h3 class="font-semibold">Invoice</h3>
-          <div class="text-xs text-[color:var(--bs-muted)] truncate">
-            {{ invoice.invoiceNumber }}
-            <template v-if="invoice.issuedAt"> • Issued {{ date(invoice.issuedAt) }}</template>
-          </div>
-        </div>
+      <p class="text-sm text-[color:var(--bs-muted)] mb-3">
+        Your tradesperson marked the work as done. Approve this invoice to pay it, or request
+        changes if anything's off.
+      </p>
+      <div class="grid sm:grid-cols-2 gap-2">
+        <Button
+          label="Request changes"
+          icon="pi pi-undo"
+          severity="secondary"
+          outlined
+          :disabled="approving || requesting"
+          @click="openRequestDialog"
+        />
+        <Button
+          label="Approve & pay"
+          icon="pi pi-check"
+          severity="success"
+          :loading="approving"
+          :disabled="approving || requesting"
+          @click="onApprove"
+        />
       </div>
-      <Tag
-        :value="STATUS_LABEL[invoice.status] ?? invoice.status"
-        :severity="STATUS_SEVERITY[invoice.status] ?? 'secondary'"
-      />
-    </button>
+    </div>
 
-    <template v-if="!collapsed">
-      <InvoiceBreakdown :invoice="invoice" />
-
-      <!-- Review actions: the work is done, the invoice needs a yes/no. -->
-      <div
-        v-if="job.status === 'awaiting_client_approval'"
-        class="mt-4 rounded-lg border border-[color:var(--bs-border)] p-3"
-      >
-        <p class="text-sm text-[color:var(--bs-muted)] mb-3">
-          Your tradesperson marked the work as done. Approve this invoice to pay
-          it, or request changes if anything's off.
-        </p>
-        <div class="grid sm:grid-cols-2 gap-2">
-          <Button
-            label="Request changes"
-            icon="pi pi-undo"
-            severity="secondary"
-            outlined
-            :disabled="approving || requesting"
-            @click="openRequestDialog"
-          />
-          <Button
-            label="Approve & pay"
-            icon="pi pi-check"
-            severity="success"
-            :loading="approving"
-            :disabled="approving || requesting"
-            @click="onApprove"
-          />
-        </div>
-      </div>
-
-      <!-- Payment due. Card (with the Blue Seal service fee) is primary when the
+    <!-- Payment due. Card (with the Blue Seal service fee) is primary when the
            tradesperson can accept it; the fee-free offline path is always
            available as a secondary option. -->
-      <div v-else-if="job.status === 'awaiting_payment'" class="mt-4">
-        <!-- The client has reported sending offline payment — the nudge is
+    <div v-else-if="job.status === 'awaiting_payment'" class="mt-4">
+      <!-- The client has reported sending offline payment — the nudge is
              logged and the tradesperson notified. Show a waiting state instead
              of the (re-clickable) pay button so the action visibly "took". -->
-        <div
-          v-if="job.clientReportedPaidAt"
-          class="rounded-lg border border-[color:var(--bs-success)] p-3 flex items-start gap-2"
-          style="background: color-mix(in srgb, var(--bs-success) 8%, transparent);"
-        >
-          <i class="pi pi-clock text-[color:var(--bs-success)] mt-0.5"></i>
-          <div class="text-sm">
-            <p class="font-medium">Payment marked as sent</p>
-            <p class="text-xs text-[color:var(--bs-muted)] mt-0.5">
-              We've let the tradesperson know. Once they confirm they've received
-              it, the job is complete and your receipt is issued.
-            </p>
-          </div>
-        </div>
-        <template v-else-if="invoicePayable">
-          <RouterLink :to="`/invoices/${invoiceId}/pay`" class="block">
-            <Button label="Pay by card" icon="pi pi-credit-card" severity="success" class="w-full" />
-          </RouterLink>
-          <button
-            type="button"
-            class="mt-2 w-full text-center text-xs text-[color:var(--bs-muted)] underline"
-            @click="showPayDialog = true"
-          >
-            Paid by e-transfer or cash? Mark it here — no fee
-          </button>
-        </template>
-        <template v-else>
-          <Button
-            label="I've paid the tradesperson"
-            icon="pi pi-wallet"
-            severity="success"
-            class="w-full"
-            @click="showPayDialog = true"
-          />
-          <p class="text-xs text-[color:var(--bs-muted)] mt-2">
-            Pay the tradesperson directly (e-transfer, cash, etc.), then let them know here.
+      <div
+        v-if="job.clientReportedPaidAt"
+        class="rounded-lg border border-[color:var(--bs-success)] p-3 flex items-start gap-2"
+        style="background: color-mix(in srgb, var(--bs-success) 8%, transparent)"
+      >
+        <i class="pi pi-clock text-[color:var(--bs-success)] mt-0.5"></i>
+        <div class="text-sm">
+          <p class="font-medium">Payment marked as sent</p>
+          <p class="text-xs text-[color:var(--bs-muted)] mt-0.5">
+            We've let the tradesperson know. Once they confirm they've received it, the job is
+            complete and your receipt is issued.
           </p>
-        </template>
+        </div>
       </div>
-
-      <div class="flex items-center gap-2 mt-4 flex-wrap">
-        <Button
-          :label="downloadMode ? 'Download PDF' : 'View PDF'"
-          :icon="downloadMode ? 'pi pi-download' : 'pi pi-file-pdf'"
-          outlined
-          size="small"
-          :loading="renderingPdf"
-          :disabled="renderingPdf"
-          @click="openPdfPreview"
-        />
-        <RouterLink
-          v-if="job.status === 'complete' || job.status === 'reviewed'"
-          :to="`/invoices/${invoiceId}/receipt`"
-        >
-          <Button label="View receipt" icon="pi pi-file" outlined size="small" />
+      <template v-else-if="invoicePayable">
+        <RouterLink :to="`/invoices/${invoiceId}/pay`" class="block">
+          <Button label="Pay by card" icon="pi pi-credit-card" severity="success" class="w-full" />
         </RouterLink>
-      </div>
-    </template>
-
-    <Dialog
-      v-model:visible="showRequestDialog"
-      modal
-      header="Request changes"
-      :style="{ width: '30rem', maxWidth: '92vw' }"
-    >
-      <p class="text-sm text-[color:var(--bs-text)] mb-3">
-        Tell the tradesperson what you'd like adjusted on this invoice. They'll
-        see it in the job chat and can fix it before re-sending.
-      </p>
-      <Textarea
-        v-model="requestReason"
-        rows="4"
-        class="w-full"
-        :maxlength="1000"
-        placeholder="e.g. The drain still leaks, please come back. Or — please remove the extra hour, you were here for 2."
-        autofocus
-      />
-      <template #footer>
-        <Button label="Cancel" text :disabled="requesting" @click="showRequestDialog = false" />
-        <Button
-          label="Send request"
-          icon="pi pi-send"
-          severity="warn"
-          :loading="requesting"
-          :disabled="requesting"
-          @click="onSubmitRequest"
-        />
+        <button
+          type="button"
+          class="mt-2 w-full text-center text-xs text-[color:var(--bs-muted)] underline"
+          @click="showPayDialog = true"
+        >
+          Paid by e-transfer or cash? Mark it here — no fee
+        </button>
       </template>
-    </Dialog>
+      <template v-else>
+        <Button
+          label="I've paid the tradesperson"
+          icon="pi pi-wallet"
+          severity="success"
+          class="w-full"
+          @click="showPayDialog = true"
+        />
+        <p class="text-xs text-[color:var(--bs-muted)] mt-2">
+          Pay the tradesperson directly (e-transfer, cash, etc.), then let them know here.
+        </p>
+      </template>
+    </div>
 
-    <PayInvoiceDialog
-      v-model:visible="showPayDialog"
-      :job-id="job.id"
-      :invoice-id="invoiceId"
-      :invoice-payable="invoicePayable"
-      @paid="emit('paid')"
-    />
+    <div class="flex items-center gap-2 mt-4 flex-wrap">
+      <Button
+        :label="downloadMode ? 'Download PDF' : 'View PDF'"
+        :icon="downloadMode ? 'pi pi-download' : 'pi pi-file-pdf'"
+        outlined
+        size="small"
+        :loading="renderingPdf"
+        :disabled="renderingPdf"
+        @click="openPdfPreview"
+      />
+      <RouterLink
+        v-if="job.status === 'complete' || job.status === 'reviewed'"
+        :to="`/invoices/${invoiceId}/receipt`"
+      >
+        <Button label="View receipt" icon="pi pi-file" outlined size="small" />
+      </RouterLink>
+    </div>
 
-    <PdfPreviewDialog
-      v-model:visible="showPdfPreview"
-      :blob="pdfBlob"
-      :filename="pdfFilename"
-      :title="`Invoice ${invoice.invoiceNumber}`"
-    />
-  </div>
+    <template #footer>
+      <Dialog
+        v-model:visible="showRequestDialog"
+        modal
+        header="Request changes"
+        :style="{ width: '30rem', maxWidth: '92vw' }"
+      >
+        <p class="text-sm text-[color:var(--bs-text)] mb-3">
+          Tell the tradesperson what you'd like adjusted on this invoice. They'll see it in the job
+          chat and can fix it before re-sending.
+        </p>
+        <Textarea
+          v-model="requestReason"
+          rows="4"
+          class="w-full"
+          :maxlength="1000"
+          placeholder="e.g. The drain still leaks, please come back. Or — please remove the extra hour, you were here for 2."
+          autofocus
+        />
+        <template #footer>
+          <Button label="Cancel" text :disabled="requesting" @click="showRequestDialog = false" />
+          <Button
+            label="Send request"
+            icon="pi pi-send"
+            severity="warn"
+            :loading="requesting"
+            :disabled="requesting"
+            @click="onSubmitRequest"
+          />
+        </template>
+      </Dialog>
+
+      <PayInvoiceDialog
+        v-model:visible="showPayDialog"
+        :job-id="job.id"
+        :invoice-id="invoiceId"
+        :invoice-payable="invoicePayable"
+        @paid="emit('paid')"
+      />
+
+      <PdfPreviewDialog
+        v-model:visible="showPdfPreview"
+        :blob="pdfBlob"
+        :filename="pdfFilename"
+        :title="`Invoice ${invoice.invoiceNumber}`"
+      />
+    </template>
+  </CollapsibleDocumentCard>
 </template>
