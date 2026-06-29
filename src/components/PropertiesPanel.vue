@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, reactive, ref } from "vue";
+import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
 import { RouterLink } from "vue-router";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
@@ -26,14 +26,29 @@ const confirm = useConfirm();
 
 const loading = ref(true);
 const rows = ref<WithId<PropertyDoc>[]>([]);
+const showArchived = ref(false);
 let unsub: (() => void) | null = null;
+
+// Split live + archived from one subscription (the PM's property book is small).
+const activeRows = computed(() => rows.value.filter((p) => !p.archivedAt));
+const archivedRows = computed(() => rows.value.filter((p) => p.archivedAt));
 
 const formOpen = ref(false);
 const editingId = ref<string | null>(null); // null = adding
 const saving = ref(false);
-const form = reactive({ label: "", addressText: "", notes: "", photoUrl: "" });
+const form = reactive({ label: "", addressText: "", notes: "", photoUrl: "", units: [] as string[] });
+const newUnit = ref("");
 const fieldErrors = ref<Record<string, string>>({});
 const uploading = ref(false);
+
+function addUnit() {
+  const u = newUnit.value.trim();
+  if (u && !form.units.includes(u)) form.units.push(u);
+  newUnit.value = "";
+}
+function removeUnit(u: string) {
+  form.units = form.units.filter((x) => x !== u);
+}
 
 onMounted(() => {
   const uid = auth.fbUser?.uid;
@@ -41,10 +56,14 @@ onMounted(() => {
     loading.value = false;
     return;
   }
-  unsub = subscribeProperties(uid, (next) => {
-    rows.value = next;
-    loading.value = false;
-  });
+  unsub = subscribeProperties(
+    uid,
+    (next) => {
+      rows.value = next;
+      loading.value = false;
+    },
+    { includeArchived: true },
+  );
 });
 onUnmounted(() => unsub?.());
 
@@ -54,6 +73,8 @@ function openAdd() {
   form.addressText = "";
   form.notes = "";
   form.photoUrl = "";
+  form.units = [];
+  newUnit.value = "";
   fieldErrors.value = {};
   formOpen.value = true;
 }
@@ -64,6 +85,8 @@ function openEdit(p: WithId<PropertyDoc>) {
   form.addressText = p.addressText;
   form.notes = p.notes ?? "";
   form.photoUrl = p.photoUrl ?? "";
+  form.units = [...(p.units ?? [])];
+  newUnit.value = "";
   fieldErrors.value = {};
   formOpen.value = true;
 }
@@ -90,6 +113,7 @@ async function save() {
     addressText: form.addressText,
     notes: form.notes,
     photoUrl: form.photoUrl,
+    units: form.units,
   });
   if (!parsed.success) {
     for (const issue of parsed.error.issues) {
@@ -129,6 +153,15 @@ function archive(p: WithId<PropertyDoc>) {
     },
   });
 }
+
+async function restore(p: WithId<PropertyDoc>) {
+  try {
+    await setPropertyArchived(p.id, false);
+    toast.success("Restored", `"${p.label}" is back in your list.`);
+  } catch (e) {
+    toast.error("Couldn't restore", humanizeError(e));
+  }
+}
 </script>
 
 <template>
@@ -165,6 +198,32 @@ function archive(p: WithId<PropertyDoc>) {
           <button v-if="form.photoUrl" type="button" class="text-xs text-[color:var(--bs-muted)] underline" @click="form.photoUrl = ''">Remove</button>
         </div>
       </div>
+      <div>
+        <label class="text-sm font-medium">
+          Units <span class="text-[color:var(--bs-muted)] font-normal">(optional — for multi-unit buildings)</span>
+        </label>
+        <div class="flex items-center gap-2 mt-1">
+          <InputText
+            v-model="newUnit"
+            class="flex-1"
+            placeholder="e.g. Unit 1, Basement"
+            @keydown.enter.prevent="addUnit"
+          />
+          <Button label="Add" icon="pi pi-plus" size="small" outlined :disabled="!newUnit.trim()" @click="addUnit" />
+        </div>
+        <div v-if="form.units.length" class="flex flex-wrap gap-1.5 mt-2">
+          <span
+            v-for="u in form.units"
+            :key="u"
+            class="inline-flex items-center gap-1 rounded-full bg-[color:var(--bs-surface-alt)] px-2.5 py-1 text-xs"
+          >
+            {{ u }}
+            <button type="button" aria-label="Remove unit" @click="removeUnit(u)">
+              <i class="pi pi-times text-[10px]"></i>
+            </button>
+          </span>
+        </div>
+      </div>
       <div class="flex gap-2">
         <Button label="Save" :loading="saving || uploading" size="small" @click="save" />
         <Button label="Cancel" text size="small" @click="formOpen = false" />
@@ -172,15 +231,15 @@ function archive(p: WithId<PropertyDoc>) {
     </div>
 
     <div v-if="loading" class="text-sm text-[color:var(--bs-muted)] py-4 text-center">Loading…</div>
-    <div v-else-if="rows.length === 0 && !formOpen" class="bs-card p-6 text-center">
+    <div v-else-if="activeRows.length === 0 && !formOpen" class="bs-card p-6 text-center">
       <i class="pi pi-home text-2xl text-[color:var(--bs-muted)]"></i>
       <p class="mt-2 font-medium">No properties yet</p>
       <p class="text-sm text-[color:var(--bs-muted)]">
         Add the addresses you manage to organize your projects.
       </p>
     </div>
-    <ul v-else-if="rows.length" class="grid grid-cols-1 gap-2">
-      <li v-for="p in rows" :key="p.id" class="bs-card p-3 flex items-start gap-3">
+    <ul v-else-if="activeRows.length" class="grid grid-cols-1 gap-2">
+      <li v-for="p in activeRows" :key="p.id" class="bs-card p-3 flex items-start gap-3">
         <RouterLink
           :to="{ name: 'PmPropertyDetail', params: { propertyId: p.id } }"
           class="flex items-start gap-3 flex-1 min-w-0 no-underline text-inherit"
@@ -195,6 +254,9 @@ function archive(p: WithId<PropertyDoc>) {
           <div class="min-w-0 flex-1">
             <p class="font-medium truncate">{{ p.label }}</p>
             <p v-if="p.addressText" class="text-xs text-[color:var(--bs-muted)] truncate">{{ p.addressText }}</p>
+            <p v-if="p.units?.length" class="text-xs text-[color:var(--bs-blue)] mt-0.5">
+              <i class="pi pi-building text-[10px] mr-1"></i>{{ p.units.length }} {{ p.units.length === 1 ? "unit" : "units" }}
+            </p>
             <p v-if="p.notes" class="text-xs text-[color:var(--bs-muted)] mt-0.5 line-clamp-2">{{ p.notes }}</p>
           </div>
         </RouterLink>
@@ -224,5 +286,32 @@ function archive(p: WithId<PropertyDoc>) {
         </RouterLink>
       </li>
     </ul>
+
+    <!-- Archived properties: collapsed by default, restorable. -->
+    <div v-if="archivedRows.length" class="mt-5">
+      <button
+        type="button"
+        class="flex items-center gap-1.5 text-sm text-[color:var(--bs-muted)]"
+        :aria-expanded="showArchived"
+        @click="showArchived = !showArchived"
+      >
+        <i class="pi text-xs" :class="showArchived ? 'pi-chevron-down' : 'pi-chevron-right'"></i>
+        Archived ({{ archivedRows.length }})
+      </button>
+      <ul v-if="showArchived" class="grid grid-cols-1 gap-2 mt-2">
+        <li
+          v-for="p in archivedRows"
+          :key="p.id"
+          class="bs-card p-3 flex items-center gap-3 opacity-70"
+        >
+          <i class="pi pi-inbox text-[color:var(--bs-muted)]"></i>
+          <div class="min-w-0 flex-1">
+            <p class="font-medium truncate">{{ p.label }}</p>
+            <p v-if="p.addressText" class="text-xs text-[color:var(--bs-muted)] truncate">{{ p.addressText }}</p>
+          </div>
+          <Button label="Restore" icon="pi pi-undo" text size="small" @click="restore(p)" />
+        </li>
+      </ul>
+    </div>
   </div>
 </template>

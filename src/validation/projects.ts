@@ -30,6 +30,14 @@ export const projectSchema = z.object({
     .nullable()
     .transform((v) => (v ? v : null))
     .default(null),
+  // Optional unit within the chosen property (one of its unit labels).
+  unit: z
+    .string()
+    .trim()
+    .max(40)
+    .nullable()
+    .transform((v) => (v ? v : null))
+    .default(null),
   jobs: z.array(projectJobSpecSchema).min(1, "Add at least one job").max(20),
 });
 

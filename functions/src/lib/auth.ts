@@ -25,6 +25,15 @@ export function requireRole(req: CallableRequest<unknown>, role: string): string
   return uid;
 }
 
+/** Allows the caller through if they hold ANY of the given roles. */
+export function requireAnyRole(req: CallableRequest<unknown>, roles: string[]): string {
+  const uid = requireAuth(req);
+  if (!roles.some((r) => tokenHasRole(req, r))) {
+    throw new HttpsError("permission-denied", `One of roles [${roles.join(", ")}] required.`);
+  }
+  return uid;
+}
+
 export function requireRoleOrAdmin(req: CallableRequest<unknown>, role: string): string {
   const uid = requireAuth(req);
   if (!tokenHasRole(req, role) && !tokenHasRole(req, "admin")) {

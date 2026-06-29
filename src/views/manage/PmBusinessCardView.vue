@@ -6,11 +6,14 @@
 // view just resolves a `pm_profile` CardContent from the PM's own profile.
 import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
 import { RouterLink } from "vue-router";
+import Button from "primevue/button";
 import SelectButton from "primevue/selectbutton";
 import InputText from "primevue/inputtext";
 import ToggleSwitch from "primevue/toggleswitch";
 import Message from "primevue/message";
+import { storeToRefs } from "pinia";
 import { useAuthStore } from "@/stores/auth";
+import { useSubscriptionStore } from "@/stores/subscription";
 import { useSeo } from "@/composables/useSeo";
 import { subscribePmProfile } from "@/firebase/services/pmProfile";
 import BusinessCardPreview from "@/components/BusinessCardPreview.vue";
@@ -21,6 +24,11 @@ import type { ProjectManagerProfileDoc, WithId } from "@/firebase/interfaces";
 useSeo({ title: "Business card", noindex: true });
 
 const auth = useAuthStore();
+// Branded business card is a Blue Seal Pro tool (same gate as the public profile).
+const store = useSubscriptionStore();
+const { isPro, loaded: subLoaded } = storeToRefs(store);
+const isAdmin = computed(() => (auth.roles ?? []).includes("admin"));
+const gated = computed(() => subLoaded.value && !isPro.value && !isAdmin.value);
 
 const profile = ref<WithId<ProjectManagerProfileDoc> | null>(null);
 const loaded = ref(false);
@@ -110,6 +118,19 @@ const canExport = computed(() => hasProfile.value && published.value);
       <i class="pi pi-arrow-left text-xs"></i> Cockpit
     </RouterLink>
 
+    <!-- Pro gate: the branded business card is a Blue Seal Pro tool. -->
+    <div v-if="gated" class="bs-card p-6 text-center mt-4">
+      <i class="pi pi-lock text-3xl text-[color:var(--bs-blue)]"></i>
+      <h2 class="mt-3 text-lg font-semibold">The business card is part of Blue Seal Pro</h2>
+      <p class="mt-2 text-sm text-[color:var(--bs-muted)] max-w-sm mx-auto">
+        Download a print-ready, QR-coded card that points clients to your branded profile.
+      </p>
+      <RouterLink to="/pricing" class="inline-block mt-5">
+        <Button label="Start 30-day free trial" icon="pi pi-star" />
+      </RouterLink>
+    </div>
+
+    <template v-else>
     <header class="mt-2 mb-6">
       <h1 class="text-2xl font-bold">Your business card</h1>
       <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
@@ -193,5 +214,6 @@ const canExport = computed(() => hasProfile.value && published.value);
         />
       </div>
     </div>
+    </template>
   </section>
 </template>

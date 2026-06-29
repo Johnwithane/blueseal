@@ -55,6 +55,16 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
             expected:
               "Stat tiles (properties / active projects / jobs in progress / unpaid earnings), quick actions, payout nudge, recent projects — each routes to its section.",
           },
+          {
+            id: "pm-getting-started",
+            title: "First-run Get started checklist",
+            steps: [
+              "As a brand-new PM (no roster, no project), open the dashboard.",
+              "Add a tradesperson to your roster, then create a project; re-open the dashboard.",
+            ],
+            expected:
+              "An ordered Get started card shows above the tiles with 3 steps (Add trades / Add a property / First project), trades listed first; each step's button routes to its section and the step ticks off (line-through) as you complete it. The card disappears once you have ≥1 roster trade AND ≥1 project.",
+          },
         ],
       },
       {
@@ -107,12 +117,30 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
               "The project is scoped to that property (no picker), shows Invite sent, and an invite link is shown.",
           },
           {
+            id: "pm-coverage-preview",
+            title: "Roster-coverage hint while building a project",
+            steps: [
+              "In the new-project form, pick a trade you HAVE a saved trade for, then one you DON'T.",
+            ],
+            expected:
+              "The covered trade shows a green 'N of your trades will be invited'; the uncovered one shows an amber 'No saved trade for this — it'll go to the public board'. Adding a matching trade to your roster clears the warning live.",
+          },
+          {
             id: "pm-client-claim-accept",
             title: "Client claims + accepts the project",
             steps: [
               "Open the invite link (or emailed magic link) as the client → confirm email → claim → on the dashboard, Accept and enter the job address.",
             ],
             expected: "Each job dispatches to your matching saved trades; the project shows Accepted.",
+          },
+          {
+            id: "pm-resend-link",
+            title: "Re-copy a shareable invite link for a pending project",
+            steps: [
+              "Open a pending (Invite sent) project → Resend invite.",
+            ],
+            expected:
+              "A fresh 'Shareable sign-in link' appears with a Copy button (works for the SAME client email, not only on an email change); the client is also re-emailed. The newest link is the one that works. (Requires the resendProjectInvite function deploy.)",
           },
         ],
       },
@@ -212,6 +240,90 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
             ],
             expected:
               "The card shows your name/brand + recommended trades; the QR opens your public profile (/pm/<slug>, or /project-managers/<uid> if no slug). A warning shows if your profile isn't published yet.",
+          },
+        ],
+      },
+      {
+        title: "PM tools expansion (2026-06)",
+        items: [
+          {
+            id: "pm-welcome-email",
+            title: "Welcome email on becoming a PM",
+            steps: ["Become a PM (new account, or add the role from /welcome / account)."],
+            expected:
+              "A 'Welcome to Blue Seal' email + in-app notification arrives once, linking to /manage. Re-adding the role doesn't re-send.",
+          },
+          {
+            id: "pm-restore-archive",
+            title: "Restore an archived property",
+            steps: ["Properties → archive one → open the Archived (N) section → Restore."],
+            expected: "It returns to the active list; nothing was lost.",
+          },
+          {
+            id: "pm-multi-unit",
+            title: "Multi-unit property + unit-scoped project",
+            steps: [
+              "Edit a property → add a couple of units (chips) → Save (card shows 'N units').",
+              "New project on that property → a Unit picker appears → pick one → create.",
+            ],
+            expected:
+              "The Unit picker only shows for multi-unit properties; the chosen unit shows on the project detail + the property's project list.",
+          },
+          {
+            id: "pm-edit-project",
+            title: "Edit a project before it's accepted",
+            steps: ["Open a pending (Invite sent / Client joined) project → Edit project → change the label / add a job → Save changes."],
+            expected:
+              "The detail updates. Editing is offered only pre-accept; an accepted project has no Edit (server rejects it too).",
+          },
+          {
+            id: "pm-roster-availability",
+            title: "Roster shows contractor availability",
+            steps: ["Open Roster with at least one saved trade who has set weekly availability."],
+            expected: "Each card shows 'Available Mon, Tue, …' from their weekly availability (omitted if none set).",
+          },
+          {
+            id: "pm-pro-checkout",
+            title: "A PM can start Blue Seal Pro (shared subscription)",
+            steps: ["As a non-Pro PM, hit any Pro tool → the paywall → Start free trial."],
+            expected:
+              "Stripe Checkout opens (test mode) — the PM subscribes to the SAME Pro plan/trial as tradespeople (no 'add the tradesperson role' bounce).",
+          },
+          {
+            id: "pm-clients-pro",
+            title: "Clients CRM (Pro)",
+            steps: ["Open /manage/clients."],
+            expected:
+              "Non-Pro: the Blue Seal Pro gate. Pro: every client gathered from your projects (dedup by client/email), searchable, with active/total counts.",
+          },
+          {
+            id: "pm-calendar-pro",
+            title: "Global calendar (Pro)",
+            steps: ["Open /manage/calendar."],
+            expected:
+              "Non-Pro: the Pro gate. Pro: every scheduled job across your projects on the shared read-only calendar (week/month).",
+          },
+          {
+            id: "pm-profile-pro-gate",
+            title: "Branded profile + business card behind Pro",
+            steps: ["As a non-Pro PM, open Public profile and Business card."],
+            expected: "Both show the Blue Seal Pro gate; a Pro PM gets the full editor + card.",
+          },
+          {
+            id: "pm-ai-project",
+            title: "AI: draft a project from a prompt (Pro)",
+            steps: [
+              "New project → in 'Draft the jobs with AI', describe the work → Draft jobs.",
+            ],
+            expected:
+              "Pro: the job rows populate with trade + title + description to review/edit before creating. Non-Pro: the Blue Seal Pro paywall.",
+          },
+          {
+            id: "pm-ai-digest",
+            title: "AI: 'Catch me up' digest (Pro)",
+            steps: ["Dashboard → Catch me up."],
+            expected:
+              "Pro: a 2-4 sentence plain-language status across your projects + won jobs (never the chat/invoice). Non-Pro: the paywall.",
           },
         ],
       },

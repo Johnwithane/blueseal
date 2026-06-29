@@ -25,6 +25,7 @@ import { subscribeProjectJobsForPm } from "@/firebase/services/jobs";
 import { subscribeApplicationsForPost } from "@/firebase/services/applications";
 import { tradeLabel } from "@/data/trades";
 import { statusLabel } from "@/utils/jobStatus";
+import NewProjectForm from "@/components/manage/NewProjectForm.vue";
 import type {
   ApplicationDoc,
   JobDoc,
@@ -132,6 +133,7 @@ const showEmailForm = ref(false);
 const newEmail = ref("");
 const confirmingCancel = ref(false);
 const newInviteLink = ref<string | null>(null);
+const editing = ref(false);
 
 async function retryDispatch(): Promise<void> {
   busy.value = true;
@@ -154,7 +156,9 @@ async function resendInvite(email?: string): Promise<void> {
     newEmail.value = "";
     toast.success(
       "Invite resent",
-      res.emailed ? "We emailed your client again." : "Share the invite link with them.",
+      res.emailed
+        ? "We emailed your client again — or copy the link below to send it directly."
+        : "Copy the link below to share it with your client directly.",
     );
   } catch (e) {
     toast.error("Couldn't resend", humanizeError(e));
@@ -222,9 +226,20 @@ function liveQuotes(postId: string): WithId<ApplicationDoc>[] {
       <h1 class="text-2xl font-bold mt-3">{{ project.label }}</h1>
       <p class="text-sm text-[color:var(--bs-muted)] mt-1">
         For {{ project.clientName }} ·
+        <template v-if="project.unit">{{ project.unit }} · </template>
         {{ project.jobSpecs.length }} {{ project.jobSpecs.length === 1 ? "job" : "jobs" }}
       </p>
 
+      <!-- Edit mode: reuses the project form (prefilled), saving via updateProject. -->
+      <NewProjectForm
+        v-if="editing"
+        :edit-project="project"
+        class="mt-4"
+        @updated="editing = false"
+        @cancel="editing = false"
+      />
+
+      <template v-else>
       <!-- Accepted but the dispatch failed — the PM can re-send. -->
       <div v-if="myPostings.length === 0 && dispatchFailed" class="bs-card p-6 text-center mt-6 border-l-4 border-l-[color:var(--bs-warn,#d97706)]">
         <i class="pi pi-exclamation-triangle text-2xl text-[color:var(--bs-warn,#d97706)]"></i>
@@ -250,7 +265,8 @@ function liveQuotes(postId: string): WithId<ApplicationDoc>[] {
           Once they accept, each job goes to your matching trades and quotes show up here.
         </p>
 
-        <!-- A corrected-email resend hands back a fresh link to share. -->
+        <!-- Every resend hands back a fresh link the PM can share directly (text/DM). -->
+        <p v-if="newInviteLink" class="text-xs font-medium">Shareable sign-in link:</p>
         <div v-if="newInviteLink" class="flex items-center gap-2 flex-wrap text-sm">
           <span
             class="flex-1 min-w-0 truncate rounded border border-[color:var(--bs-border)] px-2 py-1 bg-[color:var(--bs-surface-alt)]"
@@ -279,6 +295,13 @@ function liveQuotes(postId: string): WithId<ApplicationDoc>[] {
             text
             size="small"
             @click="showEmailForm = !showEmailForm"
+          />
+          <Button
+            label="Edit project"
+            icon="pi pi-pencil"
+            text
+            size="small"
+            @click="editing = true"
           />
           <Button
             label="Cancel project"
@@ -389,6 +412,7 @@ function liveQuotes(postId: string): WithId<ApplicationDoc>[] {
           </div>
         </li>
       </ul>
+      </template>
     </template>
   </section>
 </template>

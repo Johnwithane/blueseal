@@ -543,7 +543,22 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    a property, add one or more jobs (each = trade + title + description), then
    **Create & invite client**. **Expected:** the project lists with an **Invite
    sent** tag; an invite link is shown to copy (the email also goes out when the
-   CASL mailing address is configured). Open the invite link (or the emailed
+   CASL mailing address is configured).
+
+   **Roster-coverage hint (while adding jobs).** As you pick each job's trade, the
+   form tells you whether it will reach your roster: a green "**N of your trades
+   will be invited**" when you have a match, or an amber "**No saved trade for this
+   — it'll go to the public board**" when you don't. **Expected:** the warning is
+   live (add a matching trade to your roster and it clears) — it's the pre-accept
+   catch for the empty-scope dispatch.
+
+   **Re-copy the invite link later.** Re-open a pending project and tap **Resend
+   invite**. **Expected:** a fresh "**Shareable sign-in link**" appears with a Copy
+   button for the **same** client email (not only on an email change), and the
+   client is re-emailed; the newest link is the one that works. *(Requires the
+   `resendProjectInvite` function deploy — see HUMANTASKS.)*
+
+   Open the invite link (or the emailed
    magic link) in a fresh session, confirm the client's email, sign in, and confirm
    the claim. **Expected:** you land on the client dashboard with a **"Projects set
    up for you"** card listing the jobs and **Accept**. Accept opens an **address
@@ -613,6 +628,15 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    tiles for properties / active projects / jobs in progress / unpaid earnings, quick
    actions, a payout-setup nudge, recent projects), and each nav item / tile routes to
    its own section. Mobile bottom bar = Dashboard + Properties + Alerts.
+
+   **First-run Get started checklist.** As a *brand-new* PM (empty roster, no
+   projects), the dashboard shows an ordered **Get started** card above the tiles with
+   three steps — **Add your trusted trades** (listed first, on purpose), Add a property,
+   Set up your first project — each with a button into its section and an `x/3 done`
+   counter. **Expected:** completing a step ticks it off (line-through, check icon);
+   the card disappears once you have **≥1 roster trade AND ≥1 project** (a property is
+   recommended but optional). The "trades first" order matters: a project created with
+   an empty roster dispatches to nobody and falls back to the public board.
 10f. **Property -> Projects -> Jobs drill-down.** From **Properties**, tap a property to
    open it; tap **New project here** and create a project (it's scoped to that property,
    no property picker). **Expected:** the project appears under that property and opens
@@ -637,6 +661,29 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    your public profile (`/pm/<handle>`, or `/project-managers/<uid>` if you haven't
    claimed a handle). If your profile isn't published yet, a warning tells you to publish
    it first (so the scan resolves for clients).
+10j. **PM tools expansion (2026-06).** A batch of cockpit additions; the Pro ones gate
+   behind the **same Blue Seal Pro subscription tradespeople use** (a PM can subscribe
+   through the normal paywall → trial → Stripe, no "add the tradesperson role" bounce).
+   - **Welcome email.** Become a PM → a one-time "Welcome to Blue Seal" email + in-app
+     notification arrives, linking to `/manage` (re-adding the role doesn't re-send).
+   - **Restore archived property.** Properties → archive one → **Archived (N)** section
+     → **Restore** → it's back in the active list.
+   - **Multi-unit.** Edit a property → add **units** (chips) → Save (card shows "N
+     units"). New project on it → a **Unit** picker appears → pick one → the unit shows
+     on the project detail + the property's project list.
+   - **Edit a project.** On a pending project, **Edit project** → change label / add a
+     job → **Save changes**. Offered only pre-accept (server rejects edits after accept).
+   - **Roster availability.** Roster cards show each contractor's available weekdays.
+   - **Clients (Pro)** `/manage/clients`: all clients gathered from your projects,
+     searchable, active/total counts. Non-Pro → the Pro gate.
+   - **Calendar (Pro)** `/manage/calendar`: every scheduled job across your projects on
+     the read-only calendar. Non-Pro → the Pro gate.
+   - **Branded profile + business card (Pro).** Non-Pro PMs see the Pro gate on Public
+     profile + Business card.
+   - **AI — draft a project (Pro).** New project → "Draft the jobs with AI" → describe
+     the work → **Draft jobs** → rows populate to review. Non-Pro → paywall.
+   - **AI — Catch me up (Pro).** Dashboard → **Catch me up** → a plain-language status
+     digest (status only — never the chat/invoice). Non-Pro → paywall.
 11. **Mobile (375px).** Re-run the signup cards + cockpit + saved-trades + properties +
    projects (incl. the client accept + address form), the tradesperson "Invited to
    quote" section, the cockpit Earnings + Public-profile editors, and the public
@@ -700,7 +747,7 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 - [ ] 13.10b PM commission: card-paid PM-driven fee accrues BOTH rep + PM 10% (distinct ids); refund reverses both; off-list public win accrues none
 - [ ] 13.10c PM earnings/payouts: sign agreement → Stripe Connect → monthly payout ($50 min); agreement gates payout only; PM reads only own ledger
 - [ ] 13.10d Public profile: edit brand/bio, upload logo+cover, claim /pm/<handle>, publish on → world-visible; off → not found to public, preview to owner
-- [ ] 13.10e PM nav + dashboard: PM-specific side nav (not client); /manage overview with stat tiles + quick actions routing into sections
+- [ ] 13.10e PM nav + dashboard: PM-specific side nav (not client); /manage overview with stat tiles + quick actions routing into sections; new-PM Get started checklist (trades first) ticks off + hides once activated
 - [ ] 13.10f Property → Projects → Jobs drill-down; New-project scoped to a property; Jobs board reflects PM-driven jobs
 - [ ] 13.10g Photos: attach a photo to a property + a project; hero on detail, thumbnail on lists, visible to the invited client
 - [ ] 13.10h Find/feature trades: search → save; feature on profile → public card + pm_featured notif; contractor /featured-by-pms → Remove me (opt-out)

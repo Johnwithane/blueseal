@@ -12,8 +12,11 @@ import type { SubscriptionPlan } from "@/firebase/interfaces";
  * the right thing from the pricing page, the paywall popup, or anywhere else:
  *  - already Pro → Manage your subscription (account)
  *  - signed-out → sign up as a tradesperson
- *  - client-only account → account page to add the tradesperson role
- *  - eligible tradesperson → Stripe Checkout (30-day trial)
+ *  - client-only account (no pro role) → account page to add the tradesperson role
+ *  - eligible tradesperson OR project manager → Stripe Checkout (30-day trial)
+ *
+ * Blue Seal Pro is one subscription shared by both pro roles (tradespeople and
+ * project managers), so either can subscribe through this same path.
  *
  * `busy` drives the button spinner during the checkout round-trip.
  */
@@ -33,10 +36,11 @@ export function useProCheckout() {
       void router.push({ path: "/sign-up", query: { as: "tradesperson" } });
       return;
     }
-    if (!auth.hasTradieRole) {
-      // Client-only account — they need the tradesperson role to subscribe.
+    if (!auth.hasTradieRole && !auth.hasProjectManagerRole) {
+      // Client-only account — they need a pro role (tradesperson or project
+      // manager) to subscribe.
       void router.push({ path: "/account", query: { tab: "account" } });
-      toast.info("Blue Seal Pro is for tradespeople", "Add the tradesperson role to subscribe.");
+      toast.info("Add a pro role to subscribe", "Blue Seal Pro is for tradespeople and project managers.");
       return;
     }
     busy.value = true;

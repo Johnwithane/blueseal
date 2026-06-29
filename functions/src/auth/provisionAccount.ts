@@ -7,6 +7,7 @@ import { adminAuth, db } from "../lib/admin";
 import { requireAuth } from "../lib/auth";
 import { resolveReferralRepId } from "../lib/referralResolve";
 import { initialProjectManagerState, resolvePmId } from "../lib/projectManager";
+import { sendPmWelcomeEmail } from "../projectManager/welcomeEmail";
 
 const Input = z.object({
   role: z.enum(["client", "tradesperson", "projectManager"]),
@@ -119,6 +120,8 @@ export const provisionAccount = onCall(CALLABLE_OPTS, async (req) => {
       ...(role === "projectManager" ? { projectManager: initialProjectManagerState() } : {}),
     });
     logger.info("Provisioned account", { uid, roles, referredByRepId });
+    // Direct signup as a project manager — welcome them (best-effort).
+    if (role === "projectManager") await sendPmWelcomeEmail(uid);
     // PM-recruited tradesperson: add them to the recruiting PM's saved trades so
     // they appear as a preferred contractor once live (the free Pro month is
     // granted at go-live; see maybeMarkVisible).

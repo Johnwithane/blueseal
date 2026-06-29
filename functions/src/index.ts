@@ -169,6 +169,7 @@ export { unsubscribeJobInvite } from "./jobs/unsubscribeJobInvite";
 // and accepts/declines. Accept is the dispatch trigger (P3b-2). Mirrors the
 // bring-your-own-client invite flow.
 export { createProject } from "./projects/createProject";
+export { updateProject } from "./projects/updateProject";
 export { sendProjectInviteSignInLink } from "./projects/sendProjectInviteSignInLink";
 export { claimProjectInvite } from "./projects/claimProjectInvite";
 export { respondToProject } from "./projects/respondToProject";
@@ -202,6 +203,8 @@ export { aiSuggestReplies } from "./ai/suggestReplies";
 export { aiUpdateJobLog } from "./ai/updateJobLog";
 export { parseReceipt } from "./ai/parseReceipt";
 export { aiDraftQuote } from "./ai/draftQuote";
+export { aiGenerateProjectFromPrompt } from "./ai/generateProjectFromPrompt";
+export { aiProjectsDigest } from "./ai/projectsDigest";
 export { aiDraftInvoiceNote } from "./ai/draftInvoiceNote";
 export { aiDraftSupportReply } from "./ai/draftSupportReply";
 

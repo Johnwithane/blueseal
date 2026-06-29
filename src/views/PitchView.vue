@@ -503,20 +503,21 @@ function fmt(n: number): string {
       <section class="band band--beige">
         <div class="container reveal">
           <div class="kicker">Go-to-market</div>
-          <h2 class="h-lg">Win one city. Then copy-paste.</h2>
+          <h2 class="h-lg">Win one city through the people who already run the trades.</h2>
+          <p class="lead">Our wedge is B2B. One real estate agent or property manager brings a roster of trades they trust <em>and</em> a stream of clients they serve, both sides of the marketplace, in a single conversation and at ~$0 to acquire. Then we win one city and copy-paste.</p>
           <div class="grid split grid-top">
             <div>
-              <div class="step"><span class="si">1</span><p class="m0"><strong>Build verified supply first</strong>, so the marketplace is full before we spend on demand.</p></div>
-              <div class="step"><span class="si">2</span><p class="m0"><strong>Pour in demand</strong>: paid client acquisition onto a stocked shelf.</p></div>
-              <div class="step"><span class="si">3</span><p class="m0"><strong>Saturate the Okanagan</strong>, prove the playbook, then repeat.</p></div>
+              <div class="step"><span class="si">1</span><p class="m0"><strong>Land the managers of trade work.</strong> Agents, property managers and landlords each bring the trades they trust (supply) and the clients they serve (demand).</p></div>
+              <div class="step"><span class="si">2</span><p class="m0"><strong>They set up the work on Blue Seal.</strong> Their trades quote, their client picks, and we run the whole job. The manager earns a residual; we take the capped fee.</p></div>
+              <div class="step"><span class="si">3</span><p class="m0"><strong>Saturate the Okanagan through these B2B hubs</strong>, prove the playbook, then copy-paste into the next city.</p></div>
               <div class="region-pills">
                 <span class="pill pill--next">Okanagan</span><span class="pill pill--next">Kamloops</span><span class="pill pill--next">BC</span><span class="pill pill--next">Alberta</span><span class="pill pill--next">Canada</span>
               </div>
             </div>
             <div class="grid loops">
-              <div class="card"><h4>Free loop 1: bring your own client</h4><p class="m0">A pro invites their existing customer by link. A real client, acquired at $0.</p></div>
-              <div class="card"><h4>Free loop 2: Pro waives the fee</h4><p class="m0">A Pro pro is cheaper to hire. That's a built-in referral engine.</p></div>
-              <div class="card"><h4>Free loop 3: property managers <span class="pill pill--test">IN BUILD</span></h4><p class="m0">A property manager recruits the trades they trust (supply) and emails jobs to their tenants and buyers (demand). Both sides, no ad spend.</p></div>
+              <div class="card"><h4>Project Manager mode <span class="pill pill--live">LIVE</span></h4><p class="m0">An agent recruits the trades they trust (supply) and sets up jobs for their tenants and buyers (demand). Both sides, no ad spend. Shipped and running.</p></div>
+              <div class="card"><h4>Free loop: bring your own client</h4><p class="m0">A pro or a manager invites their existing customer by link. A real client, acquired at $0.</p></div>
+              <div class="card"><h4>Free loop: Pro waives the fee</h4><p class="m0">A Pro pro is cheaper to hire. That's a built-in referral engine.</p></div>
             </div>
           </div>
         </div>
@@ -547,7 +548,7 @@ function fmt(n: number): string {
         <div class="container reveal">
           <div class="kicker">Where it grows</div>
           <h2 class="h-lg">Four more revenue lines on a base we already own.</h2>
-          <p class="lead">Each turns the verified audience we've earned into new revenue and reach. Two of them, insurance and property managers, are in build right now.</p>
+          <p class="lead">Each turns the verified audience we've earned into new revenue and reach. Property Manager mode is already live (now our lead go-to-market wedge); insurance is in build right now.</p>
           <div class="grid g2 eqh grid-top">
             <div class="card">
               <div class="bignum">~$135 / pro / yr</div>
@@ -557,9 +558,9 @@ function fmt(n: number): string {
             </div>
             <div class="card">
               <div class="bignum">B2B channel</div>
-              <h3 class="mt-s">Property managers <span class="pill pill--test">IN BUILD</span></h3>
+              <h3 class="mt-s">Property managers <span class="pill pill--live">LIVE</span></h3>
               <p>Agents, landlords and property managers recruit the trades they trust and dispatch jobs to their clients, earning a residual. It grows supply and demand at $0 CAC, then managing multiple properties becomes the paid tier.</p>
-              <p class="src">A B2B lane no local competitor serves. In build now.</p>
+              <p class="src">A B2B lane no local competitor serves. Now our lead go-to-market wedge — shipped and running.</p>
             </div>
             <div class="card">
               <div class="bignum">$40 / seat / mo</div>
@@ -574,7 +575,7 @@ function fmt(n: number): string {
               <p class="src">SkilledTradesBC: ~47,000 apprentices registered.</p>
             </div>
           </div>
-          <p class="note"><strong>Insurance is in build now</strong> (live this year) and is modelled into the projection below alongside enterprise; apprenticeship is a supply/mission play (revenue later). <strong>Property Manager mode</strong> is in build as a two-sided growth channel and B2B moat; its multi-property paid tier is not yet priced, so it is excluded from the projection. Sources: BC Construction Association / SkilledTradesBC 2024; ServiceTitan FY26 filing; Canadian insurtech affiliate benchmarks.</p>
+          <p class="note"><strong>Insurance is in build now</strong> (live this year) and is modelled into the projection below alongside enterprise; apprenticeship is a supply/mission play (revenue later). <strong>Property Manager mode</strong> is live as our lead B2B go-to-market wedge and moat (two-sided growth at ~$0 CAC); its multi-property paid tier is not yet priced, so it is conservatively excluded from the projection. Sources: BC Construction Association / SkilledTradesBC 2024; ServiceTitan FY26 filing; Canadian insurtech affiliate benchmarks.</p>
         </div>
       </section>
 

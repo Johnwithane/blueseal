@@ -6,6 +6,104 @@ Tasks are grouped by the phase that introduced them so you can see why each one 
 
 ---
 
+## PM feature expansion — deploy (added 2026-06-28)
+
+A batch of project-manager features (Pro paywall enablement, plus more landing in
+following commits). **Deploy the functions once when you pull this branch:**
+`firebase deploy --only functions` (and `firestore:rules` where noted below).
+
+### [ ] Deploy functions: PM welcome email
+
+- **Why:** New PMs got no welcome (tradespeople get a "you're approved" email). A
+  best-effort `pm_welcome` notification (email + in-app) now fires the first time a
+  user becomes a PM, from both real provisioning paths (addRoleToSelf + provisionAccount).
+- **What:** `firebase deploy --only functions`. Uses the existing notify()/mail queue
+  (Resend) — no new config beyond the CASL mailing-address env already used by other
+  account emails.
+- **Verify:** Become a PM (new account or add the role) → a "Welcome to Blue Seal"
+  email + in-app notification arrives, linking to /manage.
+
+### [ ] (Covered by the functions deploy) Multi-unit properties
+
+- **Why:** A property can now carry a list of **unit labels** (e.g. "Unit 1",
+  "Basement"), and a project can be scoped to one unit. `createProject` +
+  `updateProject` now persist the optional `unit` field — so they must be redeployed
+  with the rest (`firebase deploy --only functions`). **No firestore.rules change**
+  (the properties `units` array is additive and not field-locked; the project `unit`
+  is server-written via the callables).
+- **Verify:** Edit a property → add a couple of units → New project on that property →
+  a Unit picker appears → pick one → the project shows the unit.
+
+### [ ] Deploy functions: PM can edit a project before it's accepted
+
+- **Why:** New `updateProject` callable lets the owning PM edit a project's label,
+  client name, photo, property, and job list while it's still `invited`/`claimed`
+  (before the client accepts and dispatch fans the jobs out). Previously the only
+  option was cancel. Server rejects edits once accepted.
+- **What:** `firebase deploy --only functions`. The project detail page's "Edit
+  project" button calls it; until deployed the button errors and cancel still works.
+- **Verify:** Open a pending project → Edit project → change the label / add a job →
+  Save changes → the detail updates. Editing an accepted project is rejected.
+
+### [ ] Deploy functions: PM AI — "catch me up" projects digest
+
+- **Why:** New callable `aiProjectsDigest` gives a PM a plain-language status
+  catch-up across their projects + the jobs their trades won. Reads ONLY
+  PM-readable status (never the client/tradesperson chat or invoices — the
+  firewall holds). Gated behind Blue Seal Pro + the AI daily cap.
+- **What:** `firebase deploy --only functions`. The dashboard's "Catch me up"
+  button calls it. Reuses the existing projects/jobs indexes (same queries the
+  cockpit already runs), so no new Firestore index.
+- **Verify:** As a Pro PM with a few projects, dashboard → Catch me up → a short
+  status summary appears. Non-Pro PM → the Blue Seal Pro paywall.
+
+### [ ] Deploy functions: PM AI — draft a project from a prompt
+
+- **Why:** New callable `aiGenerateProjectFromPrompt` lets a PM describe work in
+  plain language and get the project's trade jobs drafted (they review/edit before
+  creating). Gated behind Blue Seal Pro (`requireAiEntitlement` → "pmProject") and
+  the shared AI daily cap. Reuses the existing Vertex/Gemini setup — no new config.
+- **What:** `firebase deploy --only functions`. The new-project form's "Draft jobs"
+  button calls it; until deployed it returns a not-found and the form's manual entry
+  still works.
+- **Verify:** As a Pro PM, open New project → type a description → Draft jobs → the
+  job rows populate with trade + title + description to review. As a non-Pro PM, the
+  button opens the Blue Seal Pro paywall.
+
+### [ ] Deploy functions: project managers can subscribe to Blue Seal Pro
+
+- **Why:** The AI tools, clients CRM, branded-profile tools, and global calendar are
+  gated behind the **same** Blue Seal Pro subscription tradespeople have. The checkout
+  callable previously required the tradesperson role, so a pure PM couldn't subscribe.
+- **What:** `createSubscriptionCheckout` now accepts **tradesperson OR projectManager**
+  (`requireAnyRole`). Same plan, same 30-day trial, same Stripe flow — nothing new to
+  configure. Deploy: `firebase deploy --only functions`.
+- **Verify:** As a PM (no tradesperson role), hit any Pro feature → the paywall → Start
+  trial → Stripe Checkout opens (test mode). Tradesperson checkout still works.
+
+---
+
+## Project-manager onboarding pass (added 2026-06-27)
+
+### [ ] Deploy the `resendProjectInvite` function (re-copyable project invite link)
+
+- **Why:** PMs (esp. agents) share invite links directly (text/DM), not just by
+  email. `resendProjectInvite` now **re-mints the token on every resend** and hands
+  back a fresh shareable link for the *same* client email (previously only an
+  email-change returned a link; the raw token is hash-only, so re-sharing requires a
+  re-mint). The cockpit UI already surfaces the returned link — it just stays empty
+  on a same-email resend until the new function is live.
+- **What:** `firebase deploy --only functions` (confirm `✔ Deploy complete!`). No
+  rules/indexes changed; the client change is backward-compatible (degrades to the
+  current email-only resend against the old function), so deploying after the
+  hosting release won't break anything — it only lights up the direct-share link.
+- **Verify:** Open a pending project → **Resend invite** → a "Shareable sign-in
+  link" with a Copy button appears for the same client email; opening it in a fresh
+  session signs the client in. The previous link for that project stops working
+  (latest-wins).
+
+---
+
 ## Google One Tap — "Continue as <name>" popup (added 2026-06-25)
 
 One Tap is built and wired into `/sign-in` and `/sign-up`, but stays **OFF** until

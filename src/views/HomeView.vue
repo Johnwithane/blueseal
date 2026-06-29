@@ -825,7 +825,63 @@ onMounted(async () => {
       </div>
     </section>
 
-    <!-- ══ CHAPTER 6 · FOR TRADESPEOPLE — beige band, red accents, dark text ══ -->
+    <!-- ══ CHAPTER 6 · FOR AGENTS & PROPERTY MANAGERS — white, blue accents ══ -->
+    <section class="bs-band bg-white py-20 text-[color:var(--bs-blue-dark)] sm:py-24">
+      <div class="bs-container grid items-center gap-10 md:grid-cols-2">
+        <!-- Character on the LEFT, so it reads as a distinct band from the
+             tradesperson one that follows (text-left / character-right). -->
+        <div class="bs-reveal order-last hidden items-end justify-center md:order-first md:flex">
+          <SealCharacter
+            name="pose-clipboard"
+            fallback="pose-toolbelt"
+            class="pointer-events-none h-80 w-auto drop-shadow-2xl"
+          />
+        </div>
+        <div class="bs-reveal">
+          <span class="bs-kicker !text-[color:var(--bs-blue)]">For agents &amp; property managers</span>
+          <h2 class="bs-display mt-3 text-4xl leading-[1.02] tracking-[-0.015em] sm:text-5xl">
+            Bring your trades.<br class="hidden sm:block" />
+            We'll <span class="text-[color:var(--bs-blue)]">manage the jobs.</span>
+          </h2>
+          <p class="mt-4 max-w-prose text-lg text-[color:var(--bs-blue-dark)]/80">
+            Real estate agents, property managers, and landlords use Blue Seal to set up work for
+            their clients and put the trades they trust on it. Add a property, bundle the jobs into a
+            project, and invite your client. Quotes, scheduling, and progress all stay in one place.
+          </p>
+          <ul class="mt-6 space-y-3">
+            <li class="flex items-start gap-3">
+              <i class="pi pi-check-circle mt-1 text-[color:var(--bs-blue)]"></i
+              ><span>Set up properties and projects for your clients in minutes.</span>
+            </li>
+            <li class="flex items-start gap-3">
+              <i class="pi pi-check-circle mt-1 text-[color:var(--bs-blue)]"></i
+              ><span>Refer the trades you trust — your client compares the quotes and picks.</span>
+            </li>
+            <li class="flex items-start gap-3">
+              <i class="pi pi-check-circle mt-1 text-[color:var(--bs-blue)]"></i
+              ><span>Track status and quotes the whole way, without the back-and-forth.</span>
+            </li>
+            <li class="flex items-start gap-3">
+              <i class="pi pi-check-circle mt-1 text-[color:var(--bs-blue)]"></i
+              ><span>Earn a referral commission when one of your trades is hired.</span>
+            </li>
+          </ul>
+          <div class="mt-8 flex flex-wrap gap-3">
+            <RouterLink to="/sign-up?as=projectManager" class="bs-btn bs-btn--primary bs-btn--lg">
+              <i class="pi pi-briefcase" aria-hidden="true"></i>Start managing projects
+            </RouterLink>
+            <RouterLink
+              to="/help/getting-started-as-a-project-manager"
+              class="bs-btn bs-btn--secondary bs-btn--lg"
+            >
+              <i class="pi pi-arrow-right" aria-hidden="true"></i>How it works
+            </RouterLink>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ CHAPTER 6b · FOR TRADESPEOPLE — beige band, red accents, dark text ══ -->
     <section
       class="bs-band bg-[color:var(--bs-beige)] py-20 text-[color:var(--bs-blue-dark)] sm:py-24"
     >
@@ -903,6 +959,15 @@ onMounted(async () => {
             class="font-semibold text-[color:var(--bs-red)] underline-offset-2 hover:underline"
           >
             Get verified as a tradesperson →
+          </RouterLink>
+        </p>
+        <p v-if="!auth.isAuthenticated" class="mt-2 text-[color:var(--bs-blue-dark)]/75">
+          Agent or property manager?
+          <RouterLink
+            to="/sign-up?as=projectManager"
+            class="font-semibold text-[color:var(--bs-blue)] underline-offset-2 hover:underline"
+          >
+            Manage projects with your own trades →
           </RouterLink>
         </p>
       </div>

@@ -29,6 +29,27 @@ export async function createProject(draft: ProjectDraft): Promise<CreateProjectR
   return res.data;
 }
 
+export interface UpdateProjectInput {
+  projectId: string;
+  label: string;
+  clientName: string;
+  propertyId: string | null;
+  unit: string | null;
+  photoUrl: string | null;
+  jobs: { trade: string; title: string; description: string }[];
+}
+
+/**
+ * PM edits a project that the client hasn't accepted yet (label, client name,
+ * photo, property, and the job list). Changing the client's email is a separate
+ * flow (resendProjectInvite). Server rejects edits once the project is accepted.
+ */
+export async function updateProject(input: UpdateProjectInput): Promise<{ ok: true }> {
+  const fn = httpsCallable<UpdateProjectInput, { ok: true }>(functions, "updateProject");
+  const res = await fn(input);
+  return res.data;
+}
+
 /** Copy-link path: emails a fresh magic sign-in link to the invite's stored address. */
 export async function sendProjectInviteSignInLink(
   token: string,

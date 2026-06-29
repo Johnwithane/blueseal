@@ -52,6 +52,10 @@ Three tiers gated by Firebase Auth custom claims (`role`).
 - Suspends accounts, hides reviews, processes refunds
 - All admin actions are written to `auditLog`
 
+### 3.4 Project manager (`role: "projectManager"`) & Sales rep (`role: "sales"`)
+- **Project manager** — self-serve (no vetting); manages properties/projects and refers preferred trades on a client's behalf. Full spec in § 4.9.
+- **Sales rep** — admin-granted; owns a region or referral code and earns commission on the trades it brings. (Both roles include the `client` role and switch views like a tradesperson does.)
+
 ## 4. User Flows
 
 ### 4.1 Tradesperson Signup & Vetting
@@ -321,6 +325,22 @@ A vetted tradesperson creates a job for an **off-platform client** (`/jobs/new` 
 **Reputation firewall (non-negotiable).** Jobs with `clientId: null` or `acceptedOffline: true` never feed public reputation: `markJobPaid`/`clientMarkPaid` skip `ensureReviewPair`, and the `/reviews` + `/clientReviews` create rules reject them (`/clientReviews` additionally requires `jobDoc.clientId is string` — `null == null` would otherwise allow a phantom client review). A tradesperson cannot fabricate reviews by inventing solo jobs.
 
 **Subscription seam.** `createInviteJob` routes through `requireInviteJobEntitlement` (no-op today). Flip-time intent: gate **active solo-job volume**, never the invite link — every invite to an off-platform client is free user acquisition.
+
+### 4.9 Project-Manager B2B flow (added 2026-06; go-to-market pivot)
+
+**Why.** A competitor analysis soured the original supply-first/consumer plan. The pivot is **B2B**: onboard **project managers** (PMs) — real estate agents, property managers, landlords — who already line up and refer trades. They bring their preferred tradespeople, set up work on behalf of clients, and the platform "manages the job." First target: real estate agents. (This section is the canonical spec; the feature shipped ahead of the doc — `docs/PROJECT_MANAGER_BUILD.md` tracks build status.)
+
+**Role.** `projectManager` is a self-serve role (added at `/sign-up?as=projectManager` or via `/welcome` → `addRoleToSelf`). **No vetting gate** — the cockpit (`/manage/*`) is active immediately; the liability agreement gates *payout* only, not access. The role carries `users/{uid}.projectManager` (`active`, `referralCode`, `liability`, `payouts`). Distinct from `sales` (admin-granted regional/referral rep): a PM owns **properties + projects** and earns on jobs *their* preferred trades win for clients *they* brought; a rep owns territory/codes.
+
+**Roster (preferred contractors).** `users/{pmUid}/savedTradies/{tradieId}` (reuses the client shortlist). Built by searching trades already on Blue Seal, or inviting by email (`rosterInvites/{id}` → `linkRosterInvitesOnSignup` auto-adds on signup) / a personal `/join?pm=CODE` link. A tradie is added directly (no accept gate today); they can opt out of *being featured* on a PM's public page but not the roster relationship.
+
+**Property → Project → Jobs.** A **property** (`properties/{id}`: `projectManagerId`, `label`, `addressText`, `linkedClientId`) is an address folder. A **project** (`projects/{id}`) is a bundle of `jobSpecs` (trade + title + description) for one client, with status `invited → claimed → accepted → declined/cancelled` and an embedded magic-link `projectInvite` (hash-only token, same firewall as 4.8). The PM creates a project (`createProject`, 30/day cap, self-deal guard rejects client email == PM email) and invites the client by email; the client claims (`claimProjectInvite`), confirms a structured address, and accepts (`respondToProject`).
+
+**Dispatch (scoped).** On accept, `dispatchScopedPostings` fans each jobSpec out as one **`"invited"`** JobPost (off the public geohash feed), scoped via `invitedContractorIds` to the PM's saved+visible trades whose `trades[]` includes that trade. The same set is mirrored to the bid-blind meta as `preferredContractorIds` (never cleared). A spec with **no matching roster trade** still gets an empty-scope posting and is returned in `unmatchedTrades` — the client can open it to the public board (P3b-2b fallback). The cockpit warns the PM of an empty-scope trade *before* the client accepts (NewProjectForm coverage hint) and after (ProjectDetailView).
+
+**Attribution + commission.** When the client picks a quote (`acceptApplicationQuote`), if the winner is a `preferredContractorId` of a PM-created posting, the won job is stamped `drivenByProjectManagerId` + `originType: "pm_project"` (immutable). On card payment, the platform service-fee portion accrues a **10% PM commission** (`CommissionDoc` `ownerType: "pm"`), *additive* with any rep commission on the same fee; a refund reverses both. Public-board fallback wins (off-roster) carry `projectId` but **no** `drivenByProjectManagerId`, so no PM commission. Payout reuses the rep monthly Stripe Connect scheduler (grouped by `(ownerType, ownerId)`; $50 min; agreement-gated).
+
+**Read-only firewall.** The PM is a broker, not a party: they see posting status, quote **amounts**, and the won job's status/schedule — never the job chat or invoice (rules expose only the job doc).
 
 ---
 

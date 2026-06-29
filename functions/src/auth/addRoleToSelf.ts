@@ -6,6 +6,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { adminAuth, db } from "../lib/admin";
 import { requireAuth } from "../lib/auth";
 import { initialProjectManagerState } from "../lib/projectManager";
+import { sendPmWelcomeEmail } from "../projectManager/welcomeEmail";
 
 const Input = z.object({ role: z.enum(["client", "tradesperson", "projectManager"]) });
 
@@ -135,6 +136,10 @@ export const addRoleToSelf = onCall(CALLABLE_OPTS, async (req) => {
     role,
   });
   logger.info("Added role to self", { uid, role, roles: claimRoles });
+
+  // First time becoming a PM (this path returns early above if already had it):
+  // fire the welcome email. Best-effort — never blocks the role-enable.
+  if (role === "projectManager") await sendPmWelcomeEmail(uid);
 
   return { ok: true, roles: nextRoles, activeRole: role };
 });

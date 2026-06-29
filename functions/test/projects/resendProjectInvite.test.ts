@@ -76,14 +76,17 @@ describe("resendProjectInvite", () => {
     );
   });
 
-  it("resends to the stored email, bumps resendCount, no new link", async () => {
+  it("resends to the stored email, bumps resendCount, re-mints a shareable link", async () => {
     seed();
     const res = await callFn(resendProjectInvite, reqAs(PM));
     expect(res.emailed).toBe(true);
-    expect(res.inviteLink).toBeNull();
+    // Same-email resend now also re-mints a fresh link the PM can share directly.
+    expect(res.inviteLink).toContain("https://app/project-invite/");
     expect(sendProjectInviteEmail).toHaveBeenCalledOnce();
     const p = fakeDb.peek(`projects/${PROJECT}`);
     expect((p?.projectInvite as { resendCount?: unknown })?.resendCount).toEqual({ __inc: 1 });
+    // The stored email is unchanged on a same-email resend.
+    expect((p?.projectInvite as { emailLower?: string })?.emailLower).toBe("client@example.com");
   });
 
   it("re-mints the token + returns a new link when the email is corrected", async () => {
