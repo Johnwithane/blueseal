@@ -9,6 +9,7 @@ import Message from "primevue/message";
 import type { CertificationDoc, WithId } from "@/firebase/interfaces";
 import { tradeLabel } from "@/data/trades";
 import VerificationDocPreview from "@/components/VerificationDocPreview.vue";
+import { toJsDate } from "@/utils/firestore";
 import {
   ISSUING_BODIES,
   OTHER_CERT,
@@ -211,13 +212,7 @@ function enterEdit() {
 
   const rawExpiry = props.existing.expiresAt;
   if (rawExpiry) {
-    // Firestore returns a Timestamp on the wire but JS Date instances when
-    // the converter has already run — handle both.
-    const asDate =
-      typeof (rawExpiry as { toDate?: unknown }).toDate === "function"
-        ? (rawExpiry as { toDate: () => Date }).toDate()
-        : (rawExpiry as unknown as Date);
-    expiresAtDate.value = asDate;
+    expiresAtDate.value = toJsDate(rawExpiry);
     neverExpires.value = false;
   } else {
     expiresAtDate.value = null;

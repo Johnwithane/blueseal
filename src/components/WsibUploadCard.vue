@@ -14,6 +14,7 @@ import type {
 import { submitWsib, updateWsib } from "@/firebase/services/wsibVerifications";
 import VerificationDocPreview from "@/components/VerificationDocPreview.vue";
 import { uploadFile, makeStoragePath } from "@/firebase/services/storage";
+import { toJsDate } from "@/utils/firestore";
 import { compressOrPassPdf } from "@/utils/image";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
@@ -103,11 +104,7 @@ function enterEdit() {
   clearanceNumber.value = props.existing.clearanceNumber;
   const rawExpiry = props.existing.expiresAt;
   if (rawExpiry) {
-    const asDate =
-      typeof (rawExpiry as { toDate?: unknown }).toDate === "function"
-        ? (rawExpiry as { toDate: () => Date }).toDate()
-        : (rawExpiry as unknown as Date);
-    expiresAt.value = asDate;
+    expiresAt.value = toJsDate(rawExpiry);
   } else {
     expiresAt.value = null;
   }

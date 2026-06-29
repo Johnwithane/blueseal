@@ -8,6 +8,7 @@ import DatePicker from "primevue/datepicker";
 import Tag from "primevue/tag";
 import Message from "primevue/message";
 import type { InsuranceVerificationDoc, WithId } from "@/firebase/interfaces";
+import { toJsDate } from "@/utils/firestore";
 import {
   submitInsurance,
   updateInsurance,
@@ -114,11 +115,7 @@ function enterEdit() {
   coverageMillions.value = props.existing.coverageAmount / 100_000_000;
   const rawExpiry = props.existing.expiresAt;
   if (rawExpiry) {
-    const asDate =
-      typeof (rawExpiry as { toDate?: unknown }).toDate === "function"
-        ? (rawExpiry as { toDate: () => Date }).toDate()
-        : (rawExpiry as unknown as Date);
-    expiresAt.value = asDate;
+    expiresAt.value = toJsDate(rawExpiry);
   } else {
     expiresAt.value = null;
   }
