@@ -243,8 +243,10 @@ async function onHeaderClockIn() {
   }
 }
 
-// Sign the uninsured-work waiver, then auto-clock-in so signing flows straight
-// into starting the timer (the dialog is reached from the Clock-in button).
+// Sign the uninsured-work waiver. This only records the waiver — it does NOT
+// start the timer. Once signed, needsUninsuredWaiver flips false and the header
+// button becomes a plain "Clock in", so the tradesperson starts the clock with
+// a deliberate second tap rather than signing auto-starting it.
 async function onSignWaiver(signatureDataUrl: string) {
   if (signingWaiver.value || !job.value) return;
   signingWaiver.value = true;
@@ -252,14 +254,7 @@ async function onSignWaiver(signatureDataUrl: string) {
     await signUninsuredWaiver(job.value.id, signatureDataUrl);
     waiver.value = await getInsuranceWaiver(job.value.id);
     showWaiverDialog.value = false;
-    toast.success("Waiver signed", "You're cleared to start. Clocking you in…");
-    try {
-      await clockIn(job.value.id);
-      toast.success("Clocked in");
-    } catch (e) {
-      // Waiver is saved; clock-in is a best-effort follow-on (they can tap again).
-      toast.error("Couldn't clock in", humanizeError(e));
-    }
+    toast.success("Waiver signed", "You're cleared to start. Tap Clock in when you're ready.");
   } catch (e) {
     toast.error("Couldn't sign the waiver", humanizeError(e));
   } finally {
@@ -1140,7 +1135,7 @@ function onReturnToApplicants() {
           />
           <Button
             v-else
-            :label="needsUninsuredWaiver ? 'Sign waiver & start' : 'Clock in'"
+            :label="needsUninsuredWaiver ? 'Sign waiver' : 'Clock in'"
             :icon="needsUninsuredWaiver ? 'pi pi-pencil' : 'pi pi-play'"
             :severity="needsUninsuredWaiver ? 'warn' : undefined"
             size="small"

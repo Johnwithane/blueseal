@@ -229,10 +229,15 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    add **travel** and **expenses**, and **scan a receipt** (receipt OCR).
 2. **Expected:** receipt OCR reads vendor/total **for free** — **no paywall** (it's
    the one free AI feature).
-3. **Change order:** propose extra work (flat or hourly). As the **client**,
+3. **Uninsured gate:** with a tradesperson who has **no insurance on file**, the
+   header clock button reads **Sign waiver** and opens the waiver dialog. Signing
+   it (**Sign waiver**) records the waiver and closes the dialog but **does NOT
+   start the timer**. The button then becomes **Clock in**, which you must tap
+   yourself to begin. Verify the clock only starts on that second, deliberate tap.
+4. **Change order:** propose extra work (flat or hourly). As the **client**,
    approve or decline it.
-4. **Expected:** approved extras fold into the final invoice.
-5. **Wrap up:** tradie submits the job → status **Awaiting client approval**.
+5. **Expected:** approved extras fold into the final invoice.
+6. **Wrap up:** tradie submits the job → status **Awaiting client approval**.
    Client **Approves** (→ Awaiting payment) or **Requests changes** (tradie
    re-submits).
 

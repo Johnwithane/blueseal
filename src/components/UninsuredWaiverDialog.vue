@@ -111,7 +111,7 @@ function onConfirm() {
         <span class="flex-1"></span>
         <Button label="Cancel" text :disabled="props.busy" @click="emit('update:visible', false)" />
         <Button
-          label="Sign &amp; start"
+          label="Sign waiver"
           icon="pi pi-check"
           severity="warn"
           :loading="props.busy"

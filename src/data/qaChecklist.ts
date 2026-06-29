@@ -423,6 +423,16 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
         items: [
           { id: "tradie-onboarding", title: "Onboarding + vetting (cert + ID → visible)" },
           { id: "tradie-browse-apply", title: "Browse + apply to a job post with a full quote" },
+          {
+            id: "tradie-uninsured-waiver-clock",
+            title: "Uninsured waiver does not auto-start the clock",
+            steps: [
+              "As a tradesperson with NO insurance on file, open an In progress job.",
+              "Tap the header Sign waiver button and sign the uninsured-work waiver.",
+            ],
+            expected:
+              "Signing records the waiver and closes the dialog but the timer stays stopped. The button becomes Clock in; the clock only starts when you tap it yourself (a deliberate second tap).",
+          },
           { id: "tradie-get-paid", title: "Get paid: invoice → card payment → Stripe payout" },
           { id: "tradie-pro", title: "Blue Seal Pro (toggle free vs Pro features)" },
           { id: "tradie-profile", title: "Profile + branding + vanity /u/<slug>" },
