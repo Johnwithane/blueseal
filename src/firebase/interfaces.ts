@@ -278,16 +278,6 @@ export interface FeaturedContractor {
   trades: string[];
 }
 
-// referralCodes/{codeLower} — uniqueness registry (mirrors profileSlugs). Maps a
-// lowercased code to the rep who owns it; resolved at signup to attribute a new
-// tradesperson + grant the free month. World-readable, server-only writes.
-export interface ReferralCodeDoc {
-  uid: string;
-  /** Uppercase display form of the code. */
-  code: string;
-  claimedAt: Timestamp;
-}
-
 // ---------------------------------------------------------------------------
 // commissions/{commissionId} — the sales-rep commission ledger. One entry per
 // revenue event (a Pro subscription payment, or a job's service fee) attributed
@@ -510,16 +500,6 @@ export interface NotificationPrefs {
 }
 
 // ---------------------------------------------------------------------------
-// users/{uid}/savedTradies/{tradieId}
-// The client's private shortlist ("saved tradespeople"). Doc id is the saved
-// tradesperson's uid; the payload is only the save time. Owner-only — a
-// tradesperson never learns who saved them.
-// ---------------------------------------------------------------------------
-export interface SavedTradieDoc {
-  createdAt: Timestamp;
-}
-
-// ---------------------------------------------------------------------------
 // rosterInvites/{inviteId}
 // A project manager's email invite to a tradesperson NOT yet on Blue Seal.
 // Server-managed (sendRosterInvite creates it; linkRosterInvitesOnSignup flips it
@@ -539,20 +519,6 @@ export interface RosterInviteDoc {
   resendCount: number;
   joinedAt: Timestamp | null;
   revokedAt?: Timestamp;
-}
-
-// ---------------------------------------------------------------------------
-// users/{uid}/devices/{token}
-// One web-push (FCM) registration per opted-in device. Doc id IS the FCM
-// token so notify()'s dead-token cleanup can delete by id after a failed
-// send. Owner-only; created by enablePush, removed by disablePush or the
-// server-side prune.
-// ---------------------------------------------------------------------------
-export interface UserDeviceDoc {
-  token: string;
-  userAgent: string;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
 }
 
 // ---------------------------------------------------------------------------
@@ -1011,45 +977,6 @@ export interface ProspectContact {
   prospectEmail: string; // plaintext, lowercased
   prospectPhone: string | null;
   website: string | null;
-}
-
-// ---------------------------------------------------------------------------
-// prospectLeads/{leadId}
-// A real client request held against an unclaimed prospect until they sign up.
-// Created by requestProspectOutreach; drained into a real job by
-// claimProspect when the prospect claims. NOT world-readable — only the
-// owning client + admin (firestore.rules).
-// ---------------------------------------------------------------------------
-export type ProspectLeadStatus =
-  | "pending_signup"
-  | "claimed"
-  | "expired"
-  | "cancelled";
-
-export interface ProspectLeadDoc {
-  clientId: string;
-  clientName: string | null;
-  clientPhotoURL: string | null;
-  prospectId: string;
-  // SHA-256 hex of the lowercased prospect email — the claim trigger drains
-  // leads by matching the new user's email hash, so the harvested address never
-  // lands on the lead either.
-  emailHash: string;
-  // Trimmed JobDoc shape so the client's request survives until claim and can
-  // be replayed into a real job verbatim.
-  trade: string;
-  title: string;
-  description: string;
-  urgency: Urgency;
-  address: JobAddress;
-  intakeFormData: Record<string, unknown>;
-  intakePhotos: string[];
-  status: ProspectLeadStatus;
-  createdAt: Timestamp;
-  // +30d. scheduledProspectExpiry flips still-pending leads to `expired`.
-  expiresAt: Timestamp;
-  claimedJobId: string | null; // set when the lead becomes a real job
-  respondedAt: Timestamp | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -2457,21 +2384,6 @@ export interface InsuranceWaiverDoc {
 }
 
 // ---------------------------------------------------------------------------
-// aiUsage/{usageId}
-// jobId is nullable now that the assistant chatbot ("chat" tool) can be
-// invoked from non-job pages — the older diagnose/quote/summary tools
-// always carry a jobId.
-// ---------------------------------------------------------------------------
-export interface AiUsageDoc {
-  userId: string;
-  jobId: string | null;
-  tool: "diagnose" | "quote" | "summary" | "chat" | "suggestReplies" | "updateJobLog";
-  tokensIn: number;
-  tokensOut: number;
-  createdAt: Timestamp;
-}
-
-// ---------------------------------------------------------------------------
 // assistantConversations/{conversationId}
 // Per-user AI-assistant threads. One thread per (userId, jobId) when the
 // tradesperson is inside a job; one "general" thread per user for advice
@@ -2554,26 +2466,6 @@ export interface PayoutDoc {
   invoiceIds: string[];
   createdAt: Timestamp;
   updatedAt: Timestamp;
-}
-
-// ---------------------------------------------------------------------------
-// webhookEvents/{stripeEventId}
-// Idempotency sentinel for the Stripe webhook dispatcher. Doc id is the
-// Stripe event id (`evt_…`). The dispatcher does `create()` first (fails if
-// already exists), then performs side-effects, then flips status to
-// `processed`. Stripe retries deliver the same event id, so the second
-// attempt sees the existing doc and exits without re-running side-effects.
-// `status: "failed"` flags an event for ops — manual replay = delete the
-// sentinel and let Stripe redeliver, or trigger from the Stripe dashboard.
-// ---------------------------------------------------------------------------
-export type WebhookEventStatus = "processing" | "processed" | "failed";
-
-export interface WebhookEventDoc {
-  type: string;
-  receivedAt: Timestamp;
-  processedAt: Timestamp | null;
-  status: WebhookEventStatus;
-  errorMessage: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -2920,25 +2812,6 @@ export interface NotificationDoc {
   // through the wrong lens. Null on legacy docs created before the field
   // existed; the click handler treats null as "don't switch."
   recipientRole: Role | null;
-}
-
-// ---------------------------------------------------------------------------
-// jobBoardCounters/{uid}
-// Drives the unread BADGE on the tradesperson's "Browse open jobs" nav button.
-// "New job in your area" is a marketplace feed, not a personal/transactional
-// event, so it lives here as an ambient counter rather than as one bell
-// notification per post (which buried the inbox). onJobPostCreated increments
-// `count` once per eligible new post (Admin SDK, bypassing rules); the client
-// may only ever reset it to 0 — which it does when the tradesperson opens the
-// board. Absent doc = count 0 (nobody's posted a matching job yet).
-export interface JobBoardCounterDoc {
-  count: number;
-  // When the most recent eligible post landed / when the tradesperson last
-  // opened the board (reset). Both nullable: a freshly-reset doc has no
-  // lastJobAt until the next post, and a never-reset doc has no lastSeenAt.
-  lastJobAt: Timestamp | null;
-  lastSeenAt: Timestamp | null;
-  updatedAt: Timestamp;
 }
 
 // ---------------------------------------------------------------------------

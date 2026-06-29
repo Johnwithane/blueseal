@@ -51,10 +51,6 @@ export function roleViewMeta(role: Role): RoleViewMeta {
   return META[role];
 }
 
-export function isViewRole(role: Role): role is ViewRole {
-  return role !== "qa";
-}
-
 /** The held roles that are switchable views, in canonical order. */
 export function viewRolesFor(roles: readonly Role[]): ViewRole[] {
   return VIEW_ROLE_ORDER.filter((r) => roles.includes(r));

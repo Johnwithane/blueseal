@@ -16,5 +16,3 @@ export const SUPPORT_TOPICS = [
   "Report a safety concern",
   "Something else",
 ] as const;
-
-export type SupportTopic = (typeof SUPPORT_TOPICS)[number];

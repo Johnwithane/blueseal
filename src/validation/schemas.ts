@@ -31,18 +31,15 @@ export const signUpSchema = z.object({
     }),
   }),
 });
-export type SignUpInput = z.infer<typeof signUpSchema>;
 
 export const signInSchema = z.object({
   email: z.string().trim().toLowerCase().email().max(200),
   password: z.string().min(1).max(128),
 });
-export type SignInInput = z.infer<typeof signInSchema>;
 
 export const forgotPasswordSchema = z.object({
   email: z.string().trim().toLowerCase().email("Enter a valid email").max(200),
 });
-export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 
 export const availabilityBlockSchema = z.object({
   start: z.string().regex(/^\d{2}:\d{2}$/),
@@ -229,7 +226,6 @@ export const siteVisitFeeSchema = z.object({
   feeCents: z.number().int().nonnegative().max(10_000_000), // 0 allowed = free
   taxRate: z.number().min(0).max(0.5).default(0),
 });
-export type SiteVisitFeeInput = z.infer<typeof siteVisitFeeSchema>;
 
 // Itemized quote attached to a marketplace application. Mirrors the submitQuote
 // callable input (functions/src/lib/quoteSchemas.ts) so client + server agree
@@ -251,7 +247,6 @@ export const applicationQuoteSchema = z.object({
   upfrontFee: quoteUpfrontFeeSchema.nullable().default(null),
   estimatedDuration: z.string().max(80).default(""),
 });
-export type ApplicationQuoteInput = z.infer<typeof applicationQuoteSchema>;
 
 // Shared across both application kinds. The cover message is a suggestion,
 // not a gate — an empty message must never block a quote (per Johnny,
@@ -319,7 +314,6 @@ export const respondSiteVisitSchema = z.object({
   accept: z.boolean(),
   declinedReason: z.string().trim().max(1000).default(""),
 });
-export type RespondSiteVisitInput = z.infer<typeof respondSiteVisitSchema>;
 
 // Pre-acceptance applicant Q&A. The thread is keyed by (postId, applicationId)
 // where applicationId == the tradesperson uid (the application doc id).
