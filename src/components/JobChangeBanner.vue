@@ -7,6 +7,7 @@
 // contained, calls the service, and emits `decided` so the parent reloads.
 import { computed, ref } from "vue";
 import Button from "primevue/button";
+import StatusBanner from "@/components/StatusBanner.vue";
 import type { JobDoc, WithId } from "@/firebase/interfaces";
 import { useFormatters } from "@/composables/useFormatters";
 import { useToast } from "@/composables/useToast";
@@ -57,105 +58,92 @@ const resume = () => run(() => resumeJob(props.job.id), "Job resumed");
 
 <template>
   <!-- Tradesperson: respond to the client's request. -->
-  <div
+  <StatusBanner
     v-if="pending && isTradie"
-    class="bs-card p-4 border-l-4 border-l-[color:var(--bs-warning)]"
+    severity="action"
+    icon="pi-pause"
+    :title="isCancel ? 'Client wants to cancel this job' : 'Client wants to put this job on hold'"
   >
-    <div class="flex items-start gap-3">
-      <i class="pi pi-pause text-[color:var(--bs-warning)] text-lg mt-0.5"></i>
-      <div class="min-w-0 flex-1">
-        <div class="font-semibold">
-          {{ isCancel ? "Client wants to cancel this job" : "Client wants to put this job on hold" }}
-        </div>
-        <p v-if="reason" class="text-sm text-[color:var(--bs-muted)] mt-1">
-          “{{ reason }}”
-        </p>
-        <p v-if="proposedResume" class="text-sm text-[color:var(--bs-muted)] mt-1">
-          Proposed resume: {{ proposedResume }}
-        </p>
-        <p class="text-sm text-[color:var(--bs-muted)] mt-1">
-          {{
-            isCancel
-              ? "Accept to cancel the job, or decline to keep it going."
-              : "Accept to pause the job (either of you can resume it later), or decline to keep it going."
-          }}
-        </p>
-        <div class="mt-3 flex flex-wrap gap-2">
-          <Button
-            :label="isCancel ? 'Accept cancellation' : 'Accept hold'"
-            icon="pi pi-check"
-            :severity="isCancel ? 'danger' : 'warn'"
-            size="small"
-            :loading="busy"
-            @click="accept"
-          />
-          <Button
-            label="Decline"
-            icon="pi pi-times"
-            severity="secondary"
-            outlined
-            size="small"
-            :disabled="busy"
-            @click="decline"
-          />
-        </div>
+    <template #body>
+      <p v-if="reason" class="text-sm text-[color:var(--bs-muted)] mt-1">
+        “{{ reason }}”
+      </p>
+      <p v-if="proposedResume" class="text-sm text-[color:var(--bs-muted)] mt-1">
+        Proposed resume: {{ proposedResume }}
+      </p>
+      <p class="text-sm text-[color:var(--bs-muted)] mt-1">
+        {{
+          isCancel
+            ? "Accept to cancel the job, or decline to keep it going."
+            : "Accept to pause the job (either of you can resume it later), or decline to keep it going."
+        }}
+      </p>
+    </template>
+    <template #actions>
+      <div class="flex flex-wrap gap-2">
+        <Button
+          :label="isCancel ? 'Accept cancellation' : 'Accept hold'"
+          icon="pi pi-check"
+          :severity="isCancel ? 'danger' : 'warn'"
+          size="small"
+          :loading="busy"
+          @click="accept"
+        />
+        <Button
+          label="Decline"
+          icon="pi pi-times"
+          severity="secondary"
+          outlined
+          size="small"
+          :disabled="busy"
+          @click="decline"
+        />
       </div>
-    </div>
-  </div>
+    </template>
+  </StatusBanner>
 
   <!-- Client: request is awaiting the tradesperson. -->
-  <div
+  <StatusBanner
     v-else-if="pending && isClient"
-    class="bs-card p-4 border-l-4 border-l-[color:var(--bs-warning)]"
+    severity="waiting"
+    icon="pi-clock"
+    :title="isCancel ? 'Cancellation requested' : 'Hold requested'"
   >
-    <div class="flex items-start gap-3">
-      <i class="pi pi-clock text-[color:var(--bs-warning)] text-lg mt-0.5"></i>
-      <div class="min-w-0 flex-1">
-        <div class="font-semibold">
-          {{ isCancel ? "Cancellation requested" : "Hold requested" }}
-        </div>
-        <p class="text-sm text-[color:var(--bs-muted)] mt-1">
-          Waiting for the tradesperson to accept your request. They've been notified.
-        </p>
-        <div class="mt-3">
-          <Button
-            label="Withdraw request"
-            icon="pi pi-undo"
-            severity="secondary"
-            outlined
-            size="small"
-            :loading="busy"
-            @click="withdraw"
-          />
-        </div>
-      </div>
-    </div>
-  </div>
+    <template #body>
+      <p class="text-sm text-[color:var(--bs-muted)] mt-1">
+        Waiting for the tradesperson to accept your request. They've been notified.
+      </p>
+    </template>
+    <template #actions>
+      <Button
+        label="Withdraw request"
+        icon="pi pi-undo"
+        severity="secondary"
+        outlined
+        size="small"
+        :loading="busy"
+        @click="withdraw"
+      />
+    </template>
+  </StatusBanner>
 
   <!-- On hold: either party can resume. -->
-  <div
-    v-else-if="isOnHold"
-    class="bs-card p-4 border-l-4 border-l-[color:var(--bs-warning)]"
-  >
-    <div class="flex items-start gap-3">
-      <i class="pi pi-pause text-[color:var(--bs-warning)] text-lg mt-0.5"></i>
-      <div class="min-w-0 flex-1">
-        <div class="font-semibold">This job is on hold</div>
-        <p class="text-sm text-[color:var(--bs-muted)] mt-1">
-          Work is paused. You or the {{ isClient ? "tradesperson" : "client" }}
-          can resume it any time.
-        </p>
-        <div class="mt-3">
-          <Button
-            label="Resume job"
-            icon="pi pi-play"
-            severity="success"
-            size="small"
-            :loading="busy"
-            @click="resume"
-          />
-        </div>
-      </div>
-    </div>
-  </div>
+  <StatusBanner v-else-if="isOnHold" severity="action" icon="pi-pause" title="This job is on hold">
+    <template #body>
+      <p class="text-sm text-[color:var(--bs-muted)] mt-1">
+        Work is paused. You or the {{ isClient ? "tradesperson" : "client" }}
+        can resume it any time.
+      </p>
+    </template>
+    <template #actions>
+      <Button
+        label="Resume job"
+        icon="pi pi-play"
+        severity="success"
+        size="small"
+        :loading="busy"
+        @click="resume"
+      />
+    </template>
+  </StatusBanner>
 </template>
