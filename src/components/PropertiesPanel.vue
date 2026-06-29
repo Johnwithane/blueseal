@@ -15,6 +15,7 @@ import {
 import { propertySchema } from "@/validation/properties";
 import { uploadPmPhoto } from "@/firebase/services/pmImages";
 import { useToast } from "@/composables/useToast";
+import { useFormErrors } from "@/composables/useFormErrors";
 import { humanizeError } from "@/utils/errors";
 import type { PropertyDoc, WithId } from "@/firebase/interfaces";
 
@@ -38,7 +39,7 @@ const editingId = ref<string | null>(null); // null = adding
 const saving = ref(false);
 const form = reactive({ label: "", addressText: "", notes: "", photoUrl: "", units: [] as string[] });
 const newUnit = ref("");
-const fieldErrors = ref<Record<string, string>>({});
+const { errors, clear: clearErrors, setFromZod } = useFormErrors();
 const uploading = ref(false);
 
 function addUnit() {
@@ -75,7 +76,7 @@ function openAdd() {
   form.photoUrl = "";
   form.units = [];
   newUnit.value = "";
-  fieldErrors.value = {};
+  clearErrors();
   formOpen.value = true;
 }
 
@@ -87,7 +88,7 @@ function openEdit(p: WithId<PropertyDoc>) {
   form.photoUrl = p.photoUrl ?? "";
   form.units = [...(p.units ?? [])];
   newUnit.value = "";
-  fieldErrors.value = {};
+  clearErrors();
   formOpen.value = true;
 }
 
@@ -107,7 +108,7 @@ async function onPickPhoto(e: Event) {
 }
 
 async function save() {
-  fieldErrors.value = {};
+  clearErrors();
   const parsed = propertySchema.safeParse({
     label: form.label,
     addressText: form.addressText,
@@ -116,9 +117,7 @@ async function save() {
     units: form.units,
   });
   if (!parsed.success) {
-    for (const issue of parsed.error.issues) {
-      fieldErrors.value[issue.path[0] as string] = issue.message;
-    }
+    setFromZod(parsed.error);
     return;
   }
   saving.value = true;
@@ -174,7 +173,7 @@ async function restore(p: WithId<PropertyDoc>) {
       <div>
         <label class="text-sm font-medium">Label</label>
         <InputText v-model="form.label" class="mt-1 w-full" placeholder="e.g. Unit 4B - 123 Main St" />
-        <small v-if="fieldErrors.label" class="text-[color:var(--bs-danger)]">{{ fieldErrors.label }}</small>
+        <small v-if="errors.label" class="text-[color:var(--bs-danger)]">{{ errors.label }}</small>
       </div>
       <div>
         <label class="text-sm font-medium">

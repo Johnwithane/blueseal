@@ -11,6 +11,7 @@ import Textarea from "primevue/textarea";
 import { clientDraftSchema } from "@/validation/clients";
 import { createClient, updateClient } from "@/firebase/services/clientsService";
 import { useGoogleMaps } from "@/composables/useGoogleMaps";
+import { useFormErrors } from "@/composables/useFormErrors";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 import type { ClientDoc, WithId } from "@/firebase/interfaces";
@@ -26,7 +27,7 @@ const emit = defineEmits<{
 
 const toast = useToast();
 const saving = ref(false);
-const errors = ref<Record<string, string>>({});
+const { errors, clear: clearErrors, setFromZod } = useFormErrors();
 const showAddress = ref(false);
 const isEdit = computed(() => !!props.client);
 
@@ -54,7 +55,7 @@ function reset() {
   form.region = c?.address?.region ?? "";
   form.postalCode = c?.address?.postalCode ?? "";
   showAddress.value = !!c?.address;
-  errors.value = {};
+  clearErrors();
 }
 
 // Re-seed each time the dialog opens so a cancelled edit discards changes.
@@ -116,7 +117,7 @@ watch(
 );
 
 async function save() {
-  errors.value = {};
+  clearErrors();
   const parsed = clientDraftSchema.safeParse({
     displayName: form.displayName,
     email: form.email,
@@ -131,10 +132,7 @@ async function save() {
     },
   });
   if (!parsed.success) {
-    for (const issue of parsed.error.issues) {
-      const key = String(issue.path[0] ?? "form");
-      if (!errors.value[key]) errors.value[key] = issue.message;
-    }
+    setFromZod(parsed.error);
     return;
   }
   saving.value = true;
