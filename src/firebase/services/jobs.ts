@@ -222,14 +222,6 @@ export function subscribeJob(
   );
 }
 
-export async function updateJobStatus(id: string, status: JobStatus): Promise<void> {
-  if (status === "complete") {
-    await updateDoc(doc(db, "jobs", id), { status, completedAt: serverTimestamp() });
-  } else {
-    await updateDoc(doc(db, "jobs", id), { status });
-  }
-}
-
 // Pre-commitment statuses where the CLIENT can cancel INSTANTLY (cancelJob,
 // allowed directly by firestore.rules). Nothing is committed yet — no accepted
 // quote, no work — so no tradesperson sign-off is needed.
@@ -321,15 +313,6 @@ export async function resumeJob(jobId: string): Promise<{ ok: true }> {
   return res.data;
 }
 
-export async function scheduleJob(id: string, start: Date, end: Date): Promise<void> {
-  // Scheduling is metadata on an active job, not a status transition.
-  // The job is already in_progress by the time this is called.
-  await updateDoc(doc(db, "jobs", id), {
-    scheduledStart: start,
-    scheduledEnd: end,
-  });
-}
-
 // Private notes live in a subdoc (jobs/{id}/private/notes) so the client —
 // who can read the parent job doc — can't read the tradie's notes. Read/write
 // is restricted to the assigned tradie + admin in firestore.rules.
@@ -344,26 +327,6 @@ export async function updatePrivateNotes(id: string, notes: string): Promise<voi
   // merge so the server-managed lastAutoUpdateAt watermark isn't clobbered by
   // a manual save, and so the first-ever save creates the subdoc.
   await setDoc(jobPrivateNotesRef(id), { notes }, { merge: true });
-}
-
-// Admin one-shot: migrate legacy `privateNotes` off the client-readable job
-// doc into the tradie-only private/notes subdoc (and strip the old field).
-// Required after the F2 deploy — see backfillJobPrivateNotes Cloud Function.
-export interface BackfillJobPrivateNotesResult {
-  scanned: number;
-  copied: number;
-  strippedOnly: number;
-  skipped: number;
-  pages: number;
-}
-
-export async function backfillJobPrivateNotes(): Promise<BackfillJobPrivateNotesResult> {
-  const callable = httpsCallable<undefined, BackfillJobPrivateNotesResult>(
-    functions,
-    "backfillJobPrivateNotes",
-  );
-  const { data } = await callable();
-  return data;
 }
 
 export async function updateJobIntakePhotos(id: string, photos: string[]): Promise<void> {

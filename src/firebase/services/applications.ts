@@ -2,7 +2,6 @@ import {
   collection,
   collectionGroup,
   doc,
-  getDoc,
   limit,
   onSnapshot,
   orderBy,
@@ -98,14 +97,6 @@ export function subscribeApplicationsForPost(
   return onSnapshot(q, (snap) =>
     cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
   );
-}
-
-export async function getMyApplicationForPost(
-  postId: string,
-  tradieId: string,
-): Promise<WithId<ApplicationDoc> | null> {
-  const snap = await getDoc(appRef(postId, tradieId));
-  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
 
 export function subscribeMyApplicationForPost(

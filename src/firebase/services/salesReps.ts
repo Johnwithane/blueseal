@@ -1,6 +1,5 @@
-import { doc, getDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { db, functions } from "@/firebase/config";
+import { functions } from "@/firebase/config";
 
 /** E-sign the current sales-rep liability agreement (a drawn signature data URL). */
 export async function signSalesAgreement(
@@ -19,22 +18,6 @@ export async function claimReferralCode(code: string): Promise<{ code: string }>
   const fn = httpsCallable<{ code: string }, { code: string }>(functions, "claimReferralCode");
   const res = await fn({ code });
   return res.data;
-}
-
-/**
- * Best-effort availability check for the code-claim UI. The registry is
- * world-readable; `false` means taken (or owned by someone else). The claim
- * callable is the authority — this just gives instant feedback while typing.
- * `currentUid` lets the rep "re-claim" the code they already own without it
- * showing as taken.
- */
-export async function isReferralCodeAvailable(
-  codeLower: string,
-  currentUid?: string,
-): Promise<boolean> {
-  const snap = await getDoc(doc(db, "referralCodes", codeLower));
-  if (!snap.exists()) return true;
-  return currentUid != null && snap.data()?.uid === currentUid;
 }
 
 export interface RepContact {

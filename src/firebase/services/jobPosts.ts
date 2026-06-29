@@ -10,7 +10,7 @@ import {
   where,
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { distanceBetween, geohashQueryBounds } from "geofire-common";
+import { geohashQueryBounds } from "geofire-common";
 import { db, functions } from "@/firebase/config";
 import type {
   JobPostDoc,
@@ -235,32 +235,4 @@ export async function returnToApplicants(postId: string): Promise<void> {
     "returnToApplicants",
   );
   await callable({ postId });
-}
-
-// Re-export distance helper for UI distance badges.
-export function distanceKmFrom(
-  center: { lat: number; lng: number },
-  postGeo: { lat: number; lng: number } | null,
-): number | null {
-  if (!postGeo) return null;
-  return distanceBetween([center.lat, center.lng], [postGeo.lat, postGeo.lng]);
-}
-
-// Admin one-shot: backfill clientName (first-name only) + clientPhotoURL
-// onto legacy job posts that pre-date the denormalization. Idempotent.
-export interface BackfillJobPostClientResult {
-  scanned: number;
-  updated: number;
-  alreadyPresent: number;
-  pages: number;
-  fallbackUsed: number;
-}
-
-export async function backfillJobPostClient(): Promise<BackfillJobPostClientResult> {
-  const callable = httpsCallable<undefined, BackfillJobPostClientResult>(
-    functions,
-    "backfillJobPostClient",
-  );
-  const { data } = await callable();
-  return data;
 }

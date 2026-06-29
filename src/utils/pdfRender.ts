@@ -13,6 +13,7 @@ import type {
   WithId,
 } from "@/firebase/interfaces";
 import type { Timestamp } from "firebase/firestore";
+import { formatCalendarDate, formatMoneyCents } from "@/utils/format";
 
 export interface PartyInfo {
   tradesperson: {
@@ -125,19 +126,12 @@ function shade(
 }
 
 function fmtMoney(cents: number, currency = "CAD"): string {
-  return new Intl.NumberFormat("en-CA", {
-    style: "currency",
-    currency,
-  }).format(cents / 100);
+  return formatMoneyCents(cents, currency);
 }
 
 function fmtDate(t: Timestamp | null | undefined): string {
   if (!t) return "—";
-  return new Intl.DateTimeFormat("en-CA", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  }).format(t.toDate());
+  return formatCalendarDate(t.toDate());
 }
 
 // Module-level cache so the lockup PNG is only fetched + base64-encoded

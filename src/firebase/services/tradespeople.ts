@@ -8,7 +8,6 @@ import {
   onSnapshot,
   orderBy,
   query,
-  serverTimestamp,
   setDoc,
   updateDoc,
   where,
@@ -232,13 +231,6 @@ export async function setContactInfo(
   await setDoc(contactRef(uid), info, { merge: true });
 }
 
-export async function submitForReview(uid: string): Promise<void> {
-  await updateDoc(doc(db, "tradespeople", uid), {
-    vettingStatus: "pending",
-    submittedAt: serverTimestamp(),
-  });
-}
-
 // Pulls a `pending` application back to `draft` so the tradesperson can edit
 // it. Rules allow pending → draft (firestore.rules § tradespeople update).
 // Use only for the explicit "Withdraw to edit" path — autosave must never
@@ -360,26 +352,6 @@ export async function searchTradespeople(
 
   out.sort((a, b) => a.distanceKm - b.distanceKm);
   return opts.limit ? out.slice(0, opts.limit) : out;
-}
-
-// Admin one-shot: migrate every tradesperson to the F1 public/private split —
-// exact location + address out of the world-readable doc and into
-// private/contact, coarse search fields onto the public doc. Required after
-// the F1 deploy (search returns nothing for un-migrated tradies). Idempotent.
-export interface BackfillTradieContactResult {
-  scanned: number;
-  migrated: number;
-  skipped: number;
-  pages: number;
-}
-
-export async function backfillTradieContact(): Promise<BackfillTradieContactResult> {
-  const callable = httpsCallable<undefined, BackfillTradieContactResult>(
-    functions,
-    "backfillTradieContact",
-  );
-  const { data } = await callable();
-  return data;
 }
 
 export async function listPendingApplications(): Promise<WithId<TradespersonDoc>[]> {

@@ -1,17 +1,8 @@
+import { formatCalendarDate, formatMoneyCents } from "@/utils/format";
+
 const currency = import.meta.env.VITE_DEFAULT_CURRENCY || "CAD";
 
 export function useFormatters() {
-  const moneyFmt = new Intl.NumberFormat("en-CA", {
-    style: "currency",
-    currency,
-  });
-
-  const dateFmt = new Intl.DateTimeFormat("en-CA", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-
   const dateTimeFmt = new Intl.DateTimeFormat("en-CA", {
     year: "numeric",
     month: "short",
@@ -21,12 +12,12 @@ export function useFormatters() {
   });
 
   function money(cents: number): string {
-    return moneyFmt.format(cents / 100);
+    return formatMoneyCents(cents, currency);
   }
 
   function date(d: Date | { toDate(): Date } | null | undefined): string {
     if (!d) return "—";
-    return dateFmt.format("toDate" in d ? d.toDate() : d);
+    return formatCalendarDate("toDate" in d ? d.toDate() : d);
   }
 
   function dateTime(d: Date | { toDate(): Date } | null | undefined): string {
@@ -45,7 +36,7 @@ export function useFormatters() {
     if (h < 24) return `${h}h ago`;
     const d2 = Math.floor(h / 24);
     if (d2 < 30) return `${d2}d ago`;
-    return dateFmt.format(date);
+    return formatCalendarDate(date);
   }
 
   return { money, date, dateTime, relativeTime };

@@ -311,10 +311,6 @@ export async function updateUserPhoto(uid: string, photoURL: string): Promise<vo
   await mirrorProfileToTradieIfExists(uid, { photoURL });
 }
 
-export async function touchUserActive(uid: string): Promise<void> {
-  await updateDoc(doc(db, "users", uid), { lastActiveAt: serverTimestamp() });
-}
-
 /**
  * Switches the user's view-mode. Pure UI preference — rules let the owner
  * write activeRole as long as it's one of the roles they already hold.

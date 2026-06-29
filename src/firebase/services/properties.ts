@@ -8,7 +8,6 @@ import {
   collection,
   doc,
   getDoc,
-  getDocs,
   onSnapshot,
   query,
   serverTimestamp,
@@ -73,11 +72,6 @@ export async function setPropertyArchived(id: string, archived: boolean): Promis
 export async function getProperty(id: string): Promise<WithId<PropertyDoc> | null> {
   const snap = await getDoc(propertyRef(id));
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
-}
-
-export async function listProperties(pmUid: string): Promise<WithId<PropertyDoc>[]> {
-  const snap = await getDocs(query(propertiesCol(), where("projectManagerId", "==", pmUid)));
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
 // Live list for the cockpit. Archived hidden by default; sorted by label

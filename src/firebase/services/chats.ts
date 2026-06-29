@@ -2,7 +2,6 @@ import {
   addDoc,
   collection,
   doc,
-  getDoc,
   getDocs,
   onSnapshot,
   orderBy,
@@ -85,11 +84,6 @@ export async function createChat(opts: {
 /** Stable id for an unsaved chat — see `createChat({ chatId })`. */
 export function newChatId(): string {
   return doc(collection(db, "chats")).id;
-}
-
-export async function getChat(id: string): Promise<WithId<ChatDoc> | null> {
-  const snap = await getDoc(chatRef(id));
-  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
 
 export async function sendMessage(opts: {
