@@ -688,9 +688,23 @@ const faqs: FaqItem[] = [
     audience: "client",
   },
   {
+    question: "My project manager added a job to my project after I accepted it. Do I have to approve it?",
+    answer:
+      "Yes, and that's the point. A project manager can add a new job to a project you've already accepted (for example an extra trade that comes up partway through), but it doesn't go anywhere until you say so. The new jobs show on your dashboard under **\"Projects set up for you\"** with an **Approve** and a **Decline** for each one. Approving lines that job up for quotes from trusted trades, exactly like the original project; declining lets your project manager know and nothing happens. You won't be asked for your address again, we use the one you gave when you first accepted the project.",
+    categoryId: "for-clients",
+    audience: "client",
+  },
+  {
     question: "I'm a project manager. How do I set up work for a client?",
     answer:
       "From your cockpit at **/manage**: add the **property** you manage (an address, with an optional photo), open it, and create a **project** there. A project is a bundle of jobs (each a trade, like \"repaint unit\" or \"fix the sink\"). Add the jobs, then invite your client by email. They get a one-tap sign-in link, review the project, and accept. On accept, each job is sent for quotes to the trades you've saved that match it, and your client compares the quotes and picks. You can watch status and quote amounts the whole way (you never see their private chat or invoice), and you earn a commission when one of your trades does the work.",
+    categoryId: "for-project-managers",
+    audience: "client",
+  },
+  {
+    question: "Can I add more jobs to a project after my client has accepted it?",
+    answer:
+      "Yes. Open the project from your cockpit at **/manage** and tap **Add jobs**. Add each job (a trade, a title, and what needs doing), or draft them with AI, then send them to your client. Because they've already accepted the project, each added job needs their **approval** before it goes out: they see the new jobs on their dashboard and approve or decline each one. The moment they approve a job, it's sent for quotes to the matching trades on your roster, just like the jobs in the original project. Before your client accepts a project you don't need this, just use **Edit project** to change the job list.",
     categoryId: "for-project-managers",
     audience: "client",
   },

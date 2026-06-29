@@ -50,6 +50,48 @@ export async function updateProject(input: UpdateProjectInput): Promise<{ ok: tr
   return res.data;
 }
 
+export interface AddProjectJobInput {
+  trade: string;
+  title: string;
+  description: string;
+}
+
+/**
+ * PM adds jobs to a project the client has ALREADY accepted. Each added job lands
+ * as a "pendingClient" spec the client must approve per-job (respondToProjectJob)
+ * before it dispatches. Use updateProject (not this) to edit the bundle pre-accept.
+ */
+export async function proposeProjectJobs(
+  projectId: string,
+  jobs: AddProjectJobInput[],
+): Promise<{ ok: true; added: number; specIds: string[] }> {
+  const fn = httpsCallable<
+    { projectId: string; jobs: AddProjectJobInput[] },
+    { ok: true; added: number; specIds: string[] }
+  >(functions, "proposeProjectJobs");
+  const res = await fn({ projectId, jobs });
+  return res.data;
+}
+
+/**
+ * Client approves or declines ONE job their PM added after they accepted the
+ * project. Approving dispatches that job to the PM's preferred contractors for
+ * quotes (the work address was captured at the original accept). Declining marks
+ * it declined and notifies the PM.
+ */
+export async function respondToProjectJob(
+  projectId: string,
+  specId: string,
+  response: "accept" | "decline",
+): Promise<{ status: "accepted"; postId: string; unmatched: boolean } | { status: "declined" }> {
+  const fn = httpsCallable<
+    { projectId: string; specId: string; response: "accept" | "decline" },
+    { status: "accepted"; postId: string; unmatched: boolean } | { status: "declined" }
+  >(functions, "respondToProjectJob");
+  const res = await fn({ projectId, specId, response });
+  return res.data;
+}
+
 /** Copy-link path: emails a fresh magic sign-in link to the invite's stored address. */
 export async function sendProjectInviteSignInLink(
   token: string,

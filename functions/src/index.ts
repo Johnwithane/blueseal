@@ -170,6 +170,11 @@ export { unsubscribeJobInvite } from "./jobs/unsubscribeJobInvite";
 // bring-your-own-client invite flow.
 export { createProject } from "./projects/createProject";
 export { updateProject } from "./projects/updateProject";
+// Add jobs to an ALREADY-accepted project: the PM proposes (proposeProjectJobs),
+// the client approves/declines each added job (respondToProjectJob) which dispatches
+// it. The per-job mirror of createProject + respondToProject.
+export { proposeProjectJobs } from "./projects/proposeProjectJobs";
+export { respondToProjectJob } from "./projects/respondToProjectJob";
 export { sendProjectInviteSignInLink } from "./projects/sendProjectInviteSignInLink";
 export { claimProjectInvite } from "./projects/claimProjectInvite";
 export { respondToProject } from "./projects/respondToProject";

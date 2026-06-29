@@ -7,6 +7,7 @@ import { useAuthStore } from "@/stores/auth";
 import {
   subscribeClientProjects,
   respondToProject,
+  respondToProjectJob,
   redispatchProject,
   type ProjectAcceptAddress,
 } from "@/firebase/services/projects";
@@ -33,6 +34,21 @@ let unsub: (() => void) | null = null;
 
 const hasPosts = (p: WithId<ProjectDoc>) => Array.isArray(p.jobPostIds) && p.jobPostIds.length > 0;
 const pending = computed(() => rows.value.filter((p) => p.status === "claimed"));
+// Jobs the PM added AFTER this client accepted the project — each needs a per-job
+// approve/decline (respondToProjectJob). Grouped by project. The work address was
+// captured at the original accept, so approving just lines up quotes.
+const jobApprovals = computed(() =>
+  rows.value
+    .filter((p) => p.status === "accepted")
+    .map((p) => ({
+      project: p,
+      specs: (p.jobSpecs ?? []).filter((s) => s.status === "pendingClient"),
+    }))
+    .filter((g) => g.specs.length > 0),
+);
+// Per-job action state, keyed by spec id (independent of the per-project `busy`).
+const busyJob = ref<string | null>(null);
+const confirmingDeclineJob = ref<string | null>(null);
 // Accepted but never dispatched (dispatch failed) — recoverable.
 const needsDispatch = computed(() =>
   rows.value.filter((p) => p.status === "accepted" && !hasPosts(p)),
@@ -109,6 +125,38 @@ async function retryDispatch(p: WithId<ProjectDoc>) {
   }
 }
 
+async function approveJob(projectId: string, specId: string) {
+  busyJob.value = specId;
+  try {
+    const res = await respondToProjectJob(projectId, specId, "accept");
+    if (res.status === "accepted" && res.unmatched) {
+      toast.success(
+        "Job approved",
+        "No preferred trade was saved for this one — open it to all trades nearby from the job.",
+      );
+    } else {
+      toast.success("Job approved", "Your trades will be lined up for quotes.");
+    }
+  } catch (e) {
+    toast.error("Couldn't approve", humanizeError(e));
+  } finally {
+    busyJob.value = null;
+  }
+}
+
+async function declineJob(projectId: string, specId: string) {
+  busyJob.value = specId;
+  try {
+    await respondToProjectJob(projectId, specId, "decline");
+    confirmingDeclineJob.value = null;
+    toast.success("Job declined", "We let your project manager know.");
+  } catch (e) {
+    toast.error("Couldn't update", humanizeError(e));
+  } finally {
+    busyJob.value = null;
+  }
+}
+
 async function decline(p: WithId<ProjectDoc>) {
   busy.value = p.id;
   try {
@@ -180,6 +228,48 @@ async function decline(p: WithId<ProjectDoc>) {
           <Button label="Accept" icon="pi pi-check" size="small" @click="startAccept(p)" />
           <Button label="Decline" text size="small" :disabled="busy === p.id" @click="confirmingDecline = p.id" />
         </div>
+      </li>
+    </ul>
+
+    <!-- Jobs your PM added after you accepted — approve each before it goes out. -->
+    <ul v-if="jobApprovals.length" class="grid grid-cols-1 gap-3 mt-2">
+      <li v-for="g in jobApprovals" :key="g.project.id" class="bs-card p-4 border-l-4 border-l-[color:var(--bs-blue)]">
+        <p class="font-semibold">{{ g.project.label }}</p>
+        <p class="text-xs text-[color:var(--bs-muted)] mt-0.5">
+          Your project manager added {{ g.specs.length === 1 ? "a new job" : "new jobs" }}. Approve to line up quotes from trusted trades.
+        </p>
+        <ul class="mt-3 space-y-3">
+          <li v-for="spec in g.specs" :key="spec.id" class="border-t border-[color:var(--bs-border)] pt-3 first:border-t-0 first:pt-0">
+            <div class="flex items-start gap-2">
+              <i class="pi pi-wrench text-[color:var(--bs-muted)] text-xs mt-1"></i>
+              <div class="min-w-0 flex-1">
+                <p class="text-sm"><strong>{{ tradeLabel(spec.trade) }}</strong> · {{ spec.title }}</p>
+                <p v-if="spec.description" class="text-xs text-[color:var(--bs-muted)] mt-0.5">{{ spec.description }}</p>
+              </div>
+            </div>
+            <div v-if="confirmingDeclineJob === spec.id" class="flex flex-wrap items-center gap-2 mt-2">
+              <span class="text-sm font-medium">Decline this job?</span>
+              <Button
+                label="Yes, decline"
+                severity="danger"
+                size="small"
+                :loading="busyJob === spec.id"
+                @click="declineJob(g.project.id, spec.id!)"
+              />
+              <Button label="Keep it" text size="small" :disabled="busyJob === spec.id" @click="confirmingDeclineJob = null" />
+            </div>
+            <div v-else class="flex gap-2 mt-2">
+              <Button
+                label="Approve"
+                icon="pi pi-check"
+                size="small"
+                :loading="busyJob === spec.id"
+                @click="approveJob(g.project.id, spec.id!)"
+              />
+              <Button label="Decline" text size="small" :disabled="busyJob === spec.id" @click="confirmingDeclineJob = spec.id ?? null" />
+            </div>
+          </li>
+        </ul>
       </li>
     </ul>
 

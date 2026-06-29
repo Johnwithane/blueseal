@@ -181,11 +181,28 @@ export interface ProjectInvite {
   tokenHash: string | null; // sha256 of the copy-link token; cleared on claim/revoke
 }
 
+// A project job spec's lifecycle. ABSENT === "dispatched" (back-compat: every spec
+// written before added-jobs existed was dispatched at the original accept).
+//  - "dispatched": a scoped posting exists for it (the original bundle + any added
+//    job the client has since approved).
+//  - "pendingClient": the PM added it AFTER the client accepted the project; it's
+//    awaiting the client's per-job approve/decline (proposeProjectJobs →
+//    respondToProjectJob). No posting exists yet.
+//  - "declined": the client declined this added job. Kept for PM feedback; never
+//    dispatched.
+export type ProjectJobSpecStatus = "dispatched" | "pendingClient" | "declined";
+
 // One trade task inside a project. `trade` is a canonical TRADES key (src/data/trades.ts).
+// `id` + `status` are only set on jobs ADDED post-accept (proposeProjectJobs); the
+// original bundle's specs have neither (treated as already-dispatched).
 export interface ProjectJobSpec {
   trade: string;
   title: string;
   description: string;
+  /** Stable id for a post-accept added job (so the client can approve a SPECIFIC one). */
+  id?: string;
+  /** Lifecycle of an added job; absent === "dispatched" (original bundle). */
+  status?: ProjectJobSpecStatus;
 }
 
 export interface ProjectDoc {
@@ -2864,7 +2881,11 @@ export type NotificationType =
   // Links to /manage/earnings (PM) or /sales/payouts (rep).
   | "commission_paid"
   // A client refund/dispute clawed back a rep/PM's already-accrued commission.
-  | "commission_reversed";
+  | "commission_reversed"
+  // A project manager added one or more jobs to a project the client already
+  // accepted; fires to the CLIENT to approve/decline each added job
+  // (proposeProjectJobs). Links to the client dashboard ("Projects set up for you").
+  | "project_jobs_added";
 
 export interface NotificationDoc {
   userId: string;

@@ -90,6 +90,7 @@ const ICON: Record<NotificationType, string> = {
   invited_to_quote: "pi pi-briefcase",
   commission_paid: "pi pi-dollar",
   commission_reversed: "pi pi-replay",
+  project_jobs_added: "pi pi-plus-circle",
 };
 
 function iconFor(type: NotificationType): string {

@@ -678,6 +678,16 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
      on the project detail + the property's project list.
    - **Edit a project.** On a pending project, **Edit project** → change label / add a
      job → **Save changes**. Offered only pre-accept (server rejects edits after accept).
+   - **Add jobs after accept (client approves each).** On an **accepted** project,
+     **Add jobs** → add a job (trade+title+desc), optionally **Draft jobs** with AI →
+     **Send to client for approval**. The job lands under "Awaiting your client's
+     approval" as **Pending client** (no posting yet) and the client is notified; it
+     does **not** dispatch until they approve. As the client (dashboard → "Projects set
+     up for you"), **Approve** dispatches that one job to the matching saved trades
+     (no address re-asked — reuses the accept address) and notifies the PM; **Decline**
+     marks it Declined on the PM detail and notifies the PM. The headline job count
+     ignores declined adds. (Requires the `proposeProjectJobs` + `respondToProjectJob`
+     function deploy.)
    - **Roster availability.** Roster cards show each contractor's available weekdays.
    - **Clients (Pro)** `/manage/clients`: all clients gathered from your projects,
      searchable, active/total counts. Non-Pro → the Pro gate.
@@ -748,6 +758,7 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 - [ ] 13.6 Properties: add / edit / archive a property in the cockpit
 - [ ] 13.7 Projects: create + invite a client → claim via magic link → accept (address form) / decline on the dashboard
 - [ ] 13.8 Dispatch: accepted project fans each job to matching preferred contractors ("Invited to quote"); client compares + accepts; won job carries projectId + drivenByProjectManagerId
+- [ ] 13.8b Add jobs after accept: PM Add jobs on an accepted project → Pending client (no posting, client notified); client Approve dispatches that one job + notifies PM; Decline marks Declined + notifies PM; count ignores declined (proposeProjectJobs + respondToProjectJob)
 - [ ] 13.9 Project seam: client can't forge status; invited posting readable/appliable only by an invited contractor; job PM fields pinned (rules + unit tests)
 - [ ] 13.10b PM commission: card-paid PM-driven fee accrues BOTH rep + PM 10% (distinct ids); refund reverses both; off-list public win accrues none
 - [ ] 13.10c PM earnings/payouts: sign agreement → Stripe Connect → monthly payout ($50 min); agreement gates payout only; PM reads only own ledger

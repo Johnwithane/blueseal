@@ -26,6 +26,7 @@ import { subscribeApplicationsForPost } from "@/firebase/services/applications";
 import { tradeLabel } from "@/data/trades";
 import { statusLabel } from "@/utils/jobStatus";
 import NewProjectForm from "@/components/manage/NewProjectForm.vue";
+import AddProjectJobsForm from "@/components/manage/AddProjectJobsForm.vue";
 import type {
   ApplicationDoc,
   JobDoc,
@@ -134,6 +135,24 @@ const newEmail = ref("");
 const confirmingCancel = ref(false);
 const newInviteLink = ref<string | null>(null);
 const editing = ref(false);
+const addingJobs = ref(false);
+
+// Jobs the PM added after the client accepted, awaiting the client's per-job
+// approve/decline (proposeProjectJobs). They have no posting yet, so they render
+// from the project's jobSpecs rather than from myPostings.
+const pendingSpecs = computed(() =>
+  (project.value?.jobSpecs ?? []).filter((s) => s.status === "pendingClient"),
+);
+const declinedSpecs = computed(() =>
+  (project.value?.jobSpecs ?? []).filter((s) => s.status === "declined"),
+);
+// Headline count excludes declined adds (they were never real work).
+const liveJobCount = computed(
+  () => (project.value?.jobSpecs ?? []).filter((s) => s.status !== "declined").length,
+);
+// The PM can only add jobs once the client has accepted; before that they edit the
+// bundle (Edit project → updateProject).
+const canAddJobs = computed(() => project.value?.status === "accepted");
 
 async function retryDispatch(): Promise<void> {
   busy.value = true;
@@ -227,7 +246,7 @@ function liveQuotes(postId: string): WithId<ApplicationDoc>[] {
       <p class="text-sm text-[color:var(--bs-muted)] mt-1">
         For {{ project.clientName }} ·
         <template v-if="project.unit">{{ project.unit }} · </template>
-        {{ project.jobSpecs.length }} {{ project.jobSpecs.length === 1 ? "job" : "jobs" }}
+        {{ liveJobCount }} {{ liveJobCount === 1 ? "job" : "jobs" }}
       </p>
 
       <!-- Edit mode: reuses the project form (prefilled), saving via updateProject. -->
@@ -240,6 +259,24 @@ function liveQuotes(postId: string): WithId<ApplicationDoc>[] {
       />
 
       <template v-else>
+      <!-- Add jobs to an accepted project — the client approves each before dispatch. -->
+      <div v-if="canAddJobs" class="mt-4">
+        <Button
+          v-if="!addingJobs"
+          label="Add jobs"
+          icon="pi pi-plus"
+          size="small"
+          outlined
+          @click="addingJobs = true"
+        />
+        <AddProjectJobsForm
+          v-else
+          :project-id="project.id"
+          @added="addingJobs = false"
+          @cancel="addingJobs = false"
+        />
+      </div>
+
       <!-- Accepted but the dispatch failed — the PM can re-send. -->
       <div v-if="myPostings.length === 0 && dispatchFailed" class="bs-card p-6 text-center mt-6 border-l-4 border-l-[color:var(--bs-warn,#d97706)]">
         <i class="pi pi-exclamation-triangle text-2xl text-[color:var(--bs-warn,#d97706)]"></i>
@@ -410,6 +447,43 @@ function liveQuotes(postId: string): WithId<ApplicationDoc>[] {
               Your client compares these and picks one. You see amounts, not the chat or invoice.
             </p>
           </div>
+        </li>
+      </ul>
+
+      <!-- Jobs you added that the client hasn't decided on yet — no posting until they approve. -->
+      <div v-if="pendingSpecs.length" class="mt-6">
+        <h2 class="font-semibold text-sm flex items-center gap-2 mb-2">
+          <i class="pi pi-clock text-[color:var(--bs-blue)]"></i> Awaiting your client's approval
+        </h2>
+        <ul class="grid grid-cols-1 gap-3">
+          <li v-for="spec in pendingSpecs" :key="spec.id" class="bs-card p-4 border-l-4 border-l-[color:var(--bs-blue)]">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <p class="font-medium truncate">{{ spec.title }}</p>
+                <p class="text-xs text-[color:var(--bs-muted)]">{{ tradeLabel(spec.trade) }}</p>
+              </div>
+              <Tag value="Pending client" severity="info" />
+            </div>
+            <p class="text-xs text-[color:var(--bs-muted)] mt-2">
+              Your client approves this before it goes out to your trades for quotes.
+            </p>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Added jobs the client declined — kept so the PM has feedback. -->
+      <ul v-if="declinedSpecs.length" class="grid grid-cols-1 gap-2 mt-3">
+        <li
+          v-for="spec in declinedSpecs"
+          :key="spec.id"
+          class="bs-card p-3 flex items-center gap-3 opacity-70"
+        >
+          <i class="pi pi-times-circle text-[color:var(--bs-muted)]"></i>
+          <div class="min-w-0 flex-1">
+            <p class="font-medium truncate">{{ spec.title }}</p>
+            <p class="text-xs text-[color:var(--bs-muted)]">{{ tradeLabel(spec.trade) }}</p>
+          </div>
+          <Tag value="Declined" severity="secondary" />
         </li>
       </ul>
       </template>

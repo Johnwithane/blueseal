@@ -277,6 +277,24 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
               "The detail updates. Editing is offered only pre-accept; an accepted project has no Edit (server rejects it too).",
           },
           {
+            id: "pm-add-jobs-accepted",
+            title: "Add jobs to a project the client already accepted",
+            steps: [
+              "Open an ACCEPTED project → tap Add jobs → add a job (trade+title+desc), optionally Draft jobs with AI → Send to client for approval.",
+            ],
+            expected:
+              "An accepted project shows Add jobs (a pending/declined project does not). The new job appears under 'Awaiting your client's approval' as Pending client with NO posting yet, and the client is notified. It does NOT dispatch to your trades until the client approves it.",
+          },
+          {
+            id: "pm-client-approve-added-job",
+            title: "Client approves (and declines) an added job",
+            steps: [
+              "As the client, open the dashboard → 'Projects set up for you' → approve one added job and decline another (no address is re-asked).",
+            ],
+            expected:
+              "Approving dispatches THAT job to the matching saved trades (a new posting appears on the PM's project detail; the PM is notified). Declining marks it Declined on the PM's detail and notifies the PM. The headline job count excludes declined adds.",
+          },
+          {
             id: "pm-roster-availability",
             title: "Roster shows contractor availability",
             steps: ["Open Roster with at least one saved trade who has set weekly availability."],

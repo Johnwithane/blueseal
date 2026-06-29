@@ -94,7 +94,11 @@ export type NotificationType =
   // A monthly commission payout settled to a rep/PM's Stripe Connect account.
   | "commission_paid"
   // A client refund/dispute clawed back a rep/PM's already-accrued commission.
-  | "commission_reversed";
+  | "commission_reversed"
+  // A project manager added jobs to a project the client already accepted; fires
+  // to the CLIENT to approve/decline each added job (proposeProjectJobs). Links to
+  // the client dashboard.
+  | "project_jobs_added";
 
 /**
  * Channel routing per notification.
