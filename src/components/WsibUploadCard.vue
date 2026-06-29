@@ -4,7 +4,6 @@ import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import Select from "primevue/select";
 import DatePicker from "primevue/datepicker";
-import Dialog from "primevue/dialog";
 import Tag from "primevue/tag";
 import Message from "primevue/message";
 import type {
@@ -13,6 +12,7 @@ import type {
   WsibVerificationDoc,
 } from "@/firebase/interfaces";
 import { submitWsib, updateWsib } from "@/firebase/services/wsibVerifications";
+import VerificationDocPreview from "@/components/VerificationDocPreview.vue";
 import { uploadFile, makeStoragePath } from "@/firebase/services/storage";
 import { compressOrPassPdf } from "@/utils/image";
 import { useToast } from "@/composables/useToast";
@@ -68,11 +68,6 @@ const hasUpload = computed(() => props.existing != null);
 const provinceLabel = computed(() => {
   const p = props.existing?.province;
   return p ? (provinceOptions.find((o) => o.value === p)?.label ?? p) : "";
-});
-
-const isPdf = computed(() => {
-  const url = props.existing?.fileUrl ?? "";
-  return url.toLowerCase().includes(".pdf");
 });
 
 const isEditingExisting = computed(() => editing.value && hasUpload.value);
@@ -286,32 +281,12 @@ async function saveEdit() {
         />
       </div>
 
-      <Dialog
+      <VerificationDocPreview
         v-model:visible="viewerOpen"
-        modal
+        :file-url="existing.fileUrl"
         header="Workers' comp clearance"
-        :style="{ width: '90vw', maxWidth: '900px' }"
-      >
-        <div class="w-full" style="height: 70vh">
-          <iframe
-            v-if="isPdf"
-            :src="existing.fileUrl"
-            class="w-full h-full rounded border"
-            title="Clearance PDF"
-          />
-          <img
-            v-else
-            :src="existing.fileUrl"
-            alt="Clearance certificate"
-            class="w-full h-full object-contain rounded border"
-          />
-        </div>
-        <template #footer>
-          <a :href="existing.fileUrl" target="_blank" rel="noopener" class="text-sm">
-            Open in new tab →
-          </a>
-        </template>
-      </Dialog>
+        label="Clearance certificate"
+      />
     </template>
 
     <!-- EMPTY STATE + EDIT MODE + REPLACE MODE -->

@@ -3,8 +3,8 @@ import { computed, ref } from "vue";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import NumberField from "@/components/NumberField.vue";
+import VerificationDocPreview from "@/components/VerificationDocPreview.vue";
 import DatePicker from "primevue/datepicker";
-import Dialog from "primevue/dialog";
 import Tag from "primevue/tag";
 import Message from "primevue/message";
 import type { InsuranceVerificationDoc, WithId } from "@/firebase/interfaces";
@@ -73,11 +73,6 @@ const coverageDollarsLabel = computed(() => {
   const c = props.existing?.coverageAmount;
   if (c == null) return "";
   return `$${(c / 100).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
-});
-
-const isPdf = computed(() => {
-  const url = props.existing?.fileUrl ?? "";
-  return url.toLowerCase().includes(".pdf");
 });
 
 const isEditingExisting = computed(() => editing.value && hasUpload.value);
@@ -376,32 +371,12 @@ async function saveEdit() {
         />
       </div>
 
-      <Dialog
+      <VerificationDocPreview
         v-model:visible="viewerOpen"
-        modal
+        :file-url="existing.fileUrl"
         header="General-liability insurance"
-        :style="{ width: '90vw', maxWidth: '900px' }"
-      >
-        <div class="w-full" style="height: 70vh">
-          <iframe
-            v-if="isPdf"
-            :src="existing.fileUrl"
-            class="w-full h-full rounded border"
-            title="Insurance PDF"
-          />
-          <img
-            v-else
-            :src="existing.fileUrl"
-            alt="Insurance certificate"
-            class="w-full h-full object-contain rounded border"
-          />
-        </div>
-        <template #footer>
-          <a :href="existing.fileUrl" target="_blank" rel="noopener" class="text-sm">
-            Open in new tab →
-          </a>
-        </template>
-      </Dialog>
+        label="Insurance certificate"
+      />
     </template>
 
     <!-- EMPTY STATE + EDIT MODE + REPLACE MODE -->
