@@ -36,7 +36,7 @@ export interface UpdateProjectInput {
   propertyId: string | null;
   unit: string | null;
   photoUrl: string | null;
-  jobs: { trade: string; title: string; description: string }[];
+  jobs: { trade: string; title: string; description: string; photos: string[] }[];
 }
 
 /**
@@ -54,6 +54,7 @@ export interface AddProjectJobInput {
   trade: string;
   title: string;
   description: string;
+  photos: string[];
 }
 
 /**

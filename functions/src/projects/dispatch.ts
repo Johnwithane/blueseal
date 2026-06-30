@@ -40,6 +40,9 @@ export interface DispatchJobSpec {
   trade: string;
   title: string;
   description: string;
+  /** Storage paths the PM attached (jobPosts/{uuid}/photos/); copied verbatim onto
+   *  the posting so contractors see them like a client-posted job. */
+  photos?: string[];
   /** Set only on post-accept added jobs; absent === an original (dispatched) spec. */
   id?: string;
   status?: "dispatched" | "pendingClient" | "declined";
@@ -122,7 +125,7 @@ function buildScopedPosting(
     title: spec.title,
     description: spec.description,
     intakeFormData: {},
-    photos: [],
+    photos: Array.isArray(spec.photos) ? spec.photos : [],
     addressPublic: {
       city: ctx.address.city,
       region: ctx.address.region,

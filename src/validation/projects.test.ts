@@ -43,7 +43,7 @@ describe("addProjectJobsSchema", () => {
     expect(r.success).toBe(false);
   });
 
-  it("trims and strips down to the canonical fields", () => {
+  it("trims and strips down to the canonical fields, defaulting photos to []", () => {
     const r = addProjectJobsSchema.safeParse({
       projectId: " p ",
       jobs: [{ trade: " painter ", title: " Repaint hallway ", description: " Two coats. " }],
@@ -55,7 +55,27 @@ describe("addProjectJobsSchema", () => {
         trade: "painter",
         title: "Repaint hallway",
         description: "Two coats.",
+        photos: [],
       });
     }
+  });
+
+  it("keeps attached photo paths (up to 8)", () => {
+    const photos = Array.from({ length: 8 }, (_, i) => `jobPosts/u/photos/${i}.webp`);
+    const r = addProjectJobsSchema.safeParse({
+      projectId: "p",
+      jobs: [{ ...validJob, photos }],
+    });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.jobs[0].photos).toEqual(photos);
+  });
+
+  it("rejects more than 8 photos on a job", () => {
+    const photos = Array.from({ length: 9 }, (_, i) => `jobPosts/u/photos/${i}.webp`);
+    const r = addProjectJobsSchema.safeParse({
+      projectId: "p",
+      jobs: [{ ...validJob, photos }],
+    });
+    expect(r.success).toBe(false);
   });
 });

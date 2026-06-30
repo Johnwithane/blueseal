@@ -14,6 +14,7 @@ import { useAuthStore } from "@/stores/auth";
 import { proposeProjectJobs } from "@/firebase/services/projects";
 import { subscribeSavedTradieIds, hydrateSavedTradies } from "@/firebase/services/savedTradies";
 import { generateProjectJobsWithAi } from "@/firebase/services/aiDrafts";
+import JobPhotosField from "@/components/manage/JobPhotosField.vue";
 import { addProjectJobsSchema } from "@/validation/projects";
 import { TRADES } from "@/data/trades";
 import { useToast } from "@/composables/useToast";
@@ -31,7 +32,7 @@ const paywall = usePaywallStore();
 const subscription = useSubscriptionStore();
 
 const tradeOptions = TRADES.map((t) => ({ label: t.label, value: t.key }));
-const form = reactive({ jobs: [{ trade: "", title: "", description: "" }] });
+const form = reactive({ jobs: [{ trade: "", title: "", description: "", photos: [] as string[] }] });
 const { errors, clear: clearErrors, setFromZod } = useFormErrors();
 const saving = ref(false);
 
@@ -53,7 +54,12 @@ async function draftWithAi() {
       text,
       TRADES.map((t) => ({ key: t.key, label: t.label })),
     );
-    const mapped = jobs.map((j) => ({ trade: j.trade, title: j.title, description: j.description }));
+    const mapped = jobs.map((j) => ({
+      trade: j.trade,
+      title: j.title,
+      description: j.description,
+      photos: [] as string[],
+    }));
     const onlyEmpty =
       form.jobs.length === 1 &&
       !form.jobs[0].trade &&
@@ -92,7 +98,7 @@ onMounted(() => {
 onUnmounted(() => unsubRoster?.());
 
 function addJob() {
-  form.jobs.push({ trade: "", title: "", description: "" });
+  form.jobs.push({ trade: "", title: "", description: "", photos: [] });
 }
 function removeJob(i: number) {
   if (form.jobs.length > 1) form.jobs.splice(i, 1);
@@ -195,6 +201,7 @@ async function save() {
         <small v-if="errors[`jobs.${i}.title`]" class="text-[color:var(--bs-danger)] block">{{ errors[`jobs.${i}.title`] }}</small>
         <Textarea v-model="job.description" class="w-full" rows="2" placeholder="What needs doing?" />
         <small v-if="errors[`jobs.${i}.description`]" class="text-[color:var(--bs-danger)] block">{{ errors[`jobs.${i}.description`] }}</small>
+        <JobPhotosField v-model="job.photos" />
       </div>
       <Button label="Add another job" icon="pi pi-plus" text size="small" @click="addJob" />
       <small v-if="errors.jobs" class="text-[color:var(--bs-danger)] block">{{ errors.jobs }}</small>

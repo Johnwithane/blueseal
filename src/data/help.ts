@@ -697,14 +697,21 @@ const faqs: FaqItem[] = [
   {
     question: "I'm a project manager. How do I set up work for a client?",
     answer:
-      "From your cockpit at **/manage**: add the **property** you manage (an address, with an optional photo), open it, and create a **project** there. A project is a bundle of jobs (each a trade, like \"repaint unit\" or \"fix the sink\"). Add the jobs, then invite your client by email. They get a one-tap sign-in link, review the project, and accept. On accept, each job is sent for quotes to the trades you've saved that match it, and your client compares the quotes and picks. You can watch status and quote amounts the whole way (you never see their private chat or invoice), and you earn a commission when one of your trades does the work.",
+      "From your cockpit at **/manage**: add the **property** you manage (an address, with an optional photo), open it, and create a **project** there. A project is a bundle of jobs (each a trade, like \"repaint unit\" or \"fix the sink\"). Add the jobs — and you can attach photos to each one, just like a client posting a job, so the trades quoting it see exactly what you mean. Then invite your client by email. They get a one-tap sign-in link, review the project, and accept. On accept, each job is sent for quotes to the trades you've saved that match it, and your client compares the quotes and picks. You can watch status and quote amounts the whole way (you never see their private chat or invoice), and you earn a commission when one of your trades does the work.",
+    categoryId: "for-project-managers",
+    audience: "client",
+  },
+  {
+    question: "Can I attach photos to the jobs I set up as a project manager?",
+    answer:
+      "Yes. When you add a job to a project — whether you're creating the project, editing it, or adding a job after your client has accepted — each job has a **Photos** picker right under the description. Add up to 8 per job (snap or pick from your gallery; they're optimised automatically on the way up). It works exactly like a client attaching photos when they post a job: the photos travel with that job to the trades you invite, so they can quote against what they can actually see. Photos are optional — leave them off for a job that doesn't need them.",
     categoryId: "for-project-managers",
     audience: "client",
   },
   {
     question: "Can I add more jobs to a project after my client has accepted it?",
     answer:
-      "Yes. Open the project from your cockpit at **/manage** and tap **Add jobs**. Add each job (a trade, a title, and what needs doing), or draft them with AI, then send them to your client. Because they've already accepted the project, each added job needs their **approval** before it goes out: they see the new jobs on their dashboard and approve or decline each one. The moment they approve a job, it's sent for quotes to the matching trades on your roster, just like the jobs in the original project. Before your client accepts a project you don't need this, just use **Edit project** to change the job list.",
+      "Yes. Open the project from your cockpit at **/manage** and tap **Add jobs**. Add each job (a trade, a title, what needs doing, and optionally photos), or draft them with AI, then send them to your client. Because they've already accepted the project, each added job needs their **approval** before it goes out: they see the new jobs on their dashboard and approve or decline each one. The moment they approve a job, it's sent for quotes to the matching trades on your roster, just like the jobs in the original project. Before your client accepts a project you don't need this, just use **Edit project** to change the job list.",
     categoryId: "for-project-managers",
     audience: "client",
   },

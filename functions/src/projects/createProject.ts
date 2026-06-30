@@ -38,6 +38,9 @@ const Input = z.object({
         trade: z.string().trim().min(1).max(50),
         title: z.string().trim().min(3).max(140),
         description: z.string().trim().min(1).max(4000),
+        // Storage paths (jobPosts/{uuid}/photos/) the PM attached; carried onto the
+        // dispatched posting so contractors see them like a client-posted job.
+        photos: z.array(z.string().trim().min(1).max(500)).max(8).default([]),
       }),
     )
     .min(1)
