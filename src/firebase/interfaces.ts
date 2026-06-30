@@ -199,6 +199,10 @@ export interface ProjectJobSpec {
   trade: string;
   title: string;
   description: string;
+  /** WebP/JPEG storage paths the PM attached (under jobPosts/{uuid}/photos/, same
+   *  shape as a client job post). Copied verbatim onto the dispatched posting so
+   *  invited contractors see them exactly like a client-posted job. Absent/[] === none. */
+  photos?: string[];
   /** Stable id for a post-accept added job (so the client can approve a SPECIFIC one). */
   id?: string;
   /** Lifecycle of an added job; absent === "dispatched" (original bundle). */

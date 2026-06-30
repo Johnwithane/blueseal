@@ -45,6 +45,24 @@ following commits). **Deploy the functions once when you pull this branch:**
 - **Verify:** Open a pending project → Edit project → change the label / add a job →
   Save changes → the detail updates. Editing an accepted project is rejected.
 
+### [ ] Deploy functions: PM can attach photos to project jobs
+
+- **Why:** A PM can now attach up to 8 photos per job when setting up work (New
+  project, Edit project, Add jobs) — the same upload pipeline + storage location a
+  client uses when posting a job (`jobPosts/{uuid}/photos/`). The photos ride the
+  job spec through accept/dispatch, so the posting the invited contractor sees
+  carries them. `createProject`, `updateProject`, `proposeProjectJobs`, and the
+  shared `dispatch` (used by `respondToProject` / `respondToProjectJob` /
+  `redispatchProject`) all changed and must ship together. Until deployed, a PM can
+  pick photos but they'd be dropped server-side.
+- **What:** `firebase deploy --only functions`. **No `firestore.rules` or
+  `storage.rules` change** — the existing `jobPosts/{postId}/photos/` storage rule
+  already allows any signed-in user to upload WebP/JPEG (it's the same rule the
+  client job-post flow relies on; the callables are the role gate).
+- **Verify:** As a PM, New project → attach 2–3 photos to a job → invite + have the
+  client accept → open the dispatched posting as the invited contractor → the same
+  photos show. A job with no photos still dispatches fine.
+
 ### [ ] Deploy functions: PM AI — "catch me up" projects digest
 
 - **Why:** New callable `aiProjectsDigest` gives a PM a plain-language status

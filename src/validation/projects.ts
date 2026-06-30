@@ -9,6 +9,10 @@ export const projectJobSpecSchema = z.object({
   trade: z.string().trim().min(1, "Pick a trade"),
   title: z.string().trim().min(3, "Add a short title").max(140),
   description: z.string().trim().min(1, "Describe the work").max(4000),
+  // Optional photos a PM attaches per job — Storage paths under
+  // jobPosts/{uuid}/photos/ (uploaded exactly like a client job post). Up to 8,
+  // mirroring the job-post cap; the eventual posting carries them through.
+  photos: z.array(z.string().trim().min(1).max(500)).max(8).default([]),
 });
 
 export const projectSchema = z.object({

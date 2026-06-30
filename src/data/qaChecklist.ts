@@ -117,6 +117,17 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
               "The project is scoped to that property (no picker), shows Invite sent, and an invite link is shown.",
           },
           {
+            id: "pm-job-photos",
+            title: "Attach multiple photos to a job (same as a client posting)",
+            steps: [
+              "New project (or Edit project / Add jobs) → on a job, use the Photos picker under the description to attach 2–3 images.",
+              "Confirm a remove (✕) works and the add button disappears at 8.",
+              "Finish dispatch (client accepts), then open the posting as the invited contractor.",
+            ],
+            expected:
+              "Photos upload + thumbnail inline exactly like the client job-post step. After dispatch the same photos show on the posting the invited contractor sees (carried via the job spec → posting). A job with no photos still dispatches fine.",
+          },
+          {
             id: "pm-coverage-preview",
             title: "Roster-coverage hint while building a project",
             steps: [

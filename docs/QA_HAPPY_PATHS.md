@@ -550,6 +550,17 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    sent** tag; an invite link is shown to copy (the email also goes out when the
    CASL mailing address is configured).
 
+   **Photos per job (same as a client posting).** Each job in the form has a
+   **Photos** picker under its description: attach up to 8 images per job (they're
+   compressed + uploaded exactly like the client job-post step — same pipeline,
+   same `jobPosts/{uuid}/photos/` storage). Photos are optional. They ride the job
+   spec through accept/dispatch, so the **posting the invited contractor sees**
+   carries the same photos a client-posted job would. Works in **New project**,
+   **Edit project** (pre-accept), and **Add jobs** (post-accept). **Expected:**
+   thumbnails appear inline with a remove (✕); after the client accepts, open the
+   posting as the invited contractor and confirm the photos show there too. Verify
+   at 375px.
+
    **Roster-coverage hint (while adding jobs).** As you pick each job's trade, the
    form tells you whether it will reach your roster: a green "**N of your trades
    will be invited**" when you have a match, or an amber "**No saved trade for this
