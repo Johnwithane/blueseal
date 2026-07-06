@@ -585,9 +585,13 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 9. **Dispatch + compare-and-choose (P3b-2).** Pre-req: the PM has at least one
    **saved trade** whose trade matches a job in the project, and that tradesperson
    is **visible/approved**. After the client accepts (path 8), sign in as that
-   tradesperson and open **Browse jobs**. **Expected:** an **"Invited to quote"**
-   section shows the scoped posting (visible even with no service area set; NOT in
-   the public radius feed). Open it, submit a full quote. Sign back in as the client,
+   tradesperson and open the **"You've been invited to quote"** notification (in-app
+   bell + the email CTA). **Expected:** it deep-links straight to that scoped posting
+   (`/jobs/posted/:id`), not the generic Browse list. (A tradie who matched more than
+   one posting in the same dispatch falls back to Browse → **"Invited to quote"**.)
+   The posting is also reachable the manual way via **Browse jobs** → an **"Invited to
+   quote"** section (visible even with no service area set; NOT in the public radius
+   feed). Open it, submit a full quote. Sign back in as the client,
    open the posting from **Posted jobs**, and **accept** the quote (sign).
    **Expected:** a real job is created carrying `projectId`, `propertyId`, and
    `drivenByProjectManagerId` (the winner was a preferred contractor — the

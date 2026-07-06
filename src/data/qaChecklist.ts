@@ -162,9 +162,11 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
             id: "pm-contractor-quote",
             title: "Invited contractor quotes",
             steps: [
-              "As the matching (non-Pro) tradesperson, Browse jobs → Invited to quote → submit a full quote.",
+              "As the matching (non-Pro) tradesperson, open the 'You've been invited to quote' notification (bell + email CTA), then submit a full quote.",
+              "Also confirm the posting is reachable the manual way: Browse jobs → Invited to quote.",
             ],
-            expected: "The posting is visible only to invited contractors (not the public radius feed).",
+            expected:
+              "The invite deep-links straight to that posting (/jobs/posted/:id), not the generic Browse list. The posting is visible only to invited contractors (not the public radius feed).",
           },
           {
             id: "pm-client-pick",

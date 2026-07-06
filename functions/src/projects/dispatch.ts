@@ -179,22 +179,33 @@ async function resolveParties(
   };
 }
 
-// Best-effort: tell each hand-picked contractor they were invited to quote. The
-// whole point of a scoped dispatch is the personal invite — without this they'd
-// only discover it by chance in Browse jobs.
-async function notifyInvited(uids: string[], pmName: string, projectId: string): Promise<void> {
+// Best-effort: tell each hand-picked contractor they were invited to quote and
+// deep-link them straight to the posting. The whole point of a scoped dispatch is
+// the personal invite — without this they'd only discover it by chance in Browse
+// jobs. Keyed by contractor uid → the posting(s) they matched; a tradie saved
+// under >1 trade can match several in one dispatch, and no single deep link fits
+// that, so they fall back to the invited feed in Browse.
+async function notifyInvited(
+  invitedPosts: Map<string, string[]>,
+  pmName: string,
+  projectId: string,
+): Promise<void> {
   await Promise.all(
-    uids.map((uid) =>
-      notify({
+    [...invitedPosts].map(([uid, postIds]) => {
+      const single = postIds.length === 1;
+      return notify({
         userId: uid,
         type: "invited_to_quote",
         title: "You've been invited to quote",
-        body: `${pmName} invited you to quote on a project. Open Browse jobs to submit a quote.`,
-        link: "/jobs/browse",
+        body: single
+          ? `${pmName} invited you to quote on a job. Open it to submit your quote.`
+          : `${pmName} invited you to quote on ${postIds.length} jobs. Open Browse jobs to submit your quotes.`,
+        link: single ? `/jobs/posted/${postIds[0]}` : "/jobs/browse",
+        ctaLabel: single ? "View the job" : "Browse jobs",
         recipientRole: "tradesperson",
         priority: "high",
-      }).catch((err) => logger.error("dispatch: notify failed", { uid, projectId, err })),
-    ),
+      }).catch((err) => logger.error("dispatch: notify failed", { uid, projectId, err }));
+    }),
   );
 }
 
@@ -235,14 +246,21 @@ export async function dispatchScopedPostings(p: DispatchParams): Promise<Dispatc
   );
 
   const postIds: string[] = [];
-  const invitedSet = new Set<string>();
+  // uid → the posting(s) that contractor was invited to. One tradie can match
+  // more than one posting (saved under multiple trades), so this drives a
+  // per-contractor deep link (or a Browse fallback when they matched several).
+  const invitedPosts = new Map<string, string[]>();
   const unmatchedTrades: string[] = [];
   const batch = db.batch();
   for (const spec of specsToDispatch) {
     const postRef = db.collection("jobPosts").doc();
     const metaRef = postRef.collection("private").doc("meta");
     const built = buildScopedPosting(spec, preferred, ctx);
-    built.matching.forEach((u) => invitedSet.add(u));
+    built.matching.forEach((u) => {
+      const posts = invitedPosts.get(u);
+      if (posts) posts.push(postRef.id);
+      else invitedPosts.set(u, [postRef.id]);
+    });
     if (built.unmatched) unmatchedTrades.push(spec.trade);
     batch.set(postRef, built.postData);
     batch.set(metaRef, built.metaData);
@@ -271,8 +289,8 @@ export async function dispatchScopedPostings(p: DispatchParams): Promise<Dispatc
     unmatched: unmatchedTrades.length,
   });
 
-  const invitedUids = [...invitedSet];
-  await notifyInvited(invitedUids, pmName, p.projectId);
+  const invitedUids = [...invitedPosts.keys()];
+  await notifyInvited(invitedPosts, pmName, p.projectId);
 
   return { postIds, invitedUids, unmatchedTrades };
 }
@@ -353,7 +371,11 @@ export async function dispatchAddedSpec(params: {
     postId: postRef.id,
     unmatched: out.unmatched,
   });
-  await notifyInvited(out.matching, pmName, params.projectId);
+  await notifyInvited(
+    new Map(out.matching.map((u): [string, string[]] => [u, [postRef.id]])),
+    pmName,
+    params.projectId,
+  );
 
   return { postId: postRef.id, invitedUids: out.matching, unmatched: out.unmatched };
 }
