@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, ref, shallowRef, watch } from "vue";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import Select from "primevue/select";
@@ -68,7 +68,13 @@ const presets = computed<CertPreset[]>(() => [
   NO_CERT_PRESET,
 ]);
 
-const selectedPreset = ref<CertPreset | null>(presets.value[0] ?? OTHER_CERT);
+// shallowRef, NOT ref: we compare the selected preset by identity against the
+// raw OTHER_CERT / NO_CERT_PRESET constants below. A deep `ref` would wrap the
+// value in a reactive proxy, so `selectedPreset.value === OTHER_CERT` would
+// always be false (proxy !== raw import) — silently breaking the "Other" and
+// "no certification" paths. The value is only ever reassigned, never mutated
+// in place, so shallowRef is both correct and safe here.
+const selectedPreset = shallowRef<CertPreset | null>(presets.value[0] ?? OTHER_CERT);
 const customCertName = ref("");
 const issuingBody = ref<string>("");
 const customIssuingBody = ref("");
