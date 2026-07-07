@@ -2,6 +2,7 @@
 import { computed, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter, RouterLink } from "vue-router";
 import Button from "primevue/button";
+import SplitButton from "primevue/splitbutton";
 import Tag from "primevue/tag";
 import Textarea from "primevue/textarea";
 import Dialog from "primevue/dialog";
@@ -46,6 +47,7 @@ import type {
   ReviewPairDoc,
   SessionDoc,
   SiteVisitDoc,
+  TimeEntryKind,
   TradespersonDoc,
   WithId,
 } from "@/firebase/interfaces";
@@ -224,7 +226,79 @@ const {
 } = useActiveClock();
 const clockBtnBusy = ref(false);
 
-async function onHeaderClockIn() {
+// What the tradie can start a session against from the header clock-in. Rates
+// come from their own profile (labour/travel) and each approved hourly change
+// order — mirrors the server-side rate resolution in clockIn.ts.
+interface ClockChoice {
+  kind: TimeEntryKind;
+  extraId?: string;
+  label: string;
+  rateCents: number | null; // null ⇒ fixed-job labour: time-only, no charge
+}
+
+const jobBilling = computed(() => jobBillingType(job.value));
+const approvedHourlyExtras = computed(() =>
+  jobExtras.value
+    .filter((e) => e.status === "approved" && e.billingType === "hourly")
+    .map((e) => ({ id: e.id, description: e.description, rateCents: e.hourlyRateCents ?? 0 })),
+);
+
+const clockChoices = computed<ClockChoice[]>(() => {
+  const fixed = jobBilling.value === "fixed";
+  const profileHourly = myTradieDoc.value?.hourlyRate ?? 0;
+  const travel = myTradieDoc.value?.travelRate ?? 0;
+  const choices: ClockChoice[] = [
+    { kind: "labour", label: "Labour", rateCents: fixed ? null : profileHourly },
+  ];
+  // Travel bills only on hourly jobs, falling back to the labour rate.
+  if (!fixed) {
+    choices.push({
+      kind: "travel",
+      label: "Travel",
+      rateCents: travel > 0 ? travel : profileHourly,
+    });
+  }
+  for (const ex of approvedHourlyExtras.value) {
+    choices.push({ kind: "extra", extraId: ex.id, label: ex.description, rateCents: ex.rateCents });
+  }
+  return choices;
+});
+
+const labourChoice = computed(() => clockChoices.value[0]);
+function rateText(rateCents: number | null): string {
+  return rateCents == null ? "Time only — no charge" : `${money(rateCents)}/hr`;
+}
+const labourRateText = computed(() => rateText(labourChoice.value.rateCents));
+
+// The non-labour options (travel + approved change orders) become the header
+// SplitButton dropdown. With none, a plain "Clock in" button is enough.
+const clockMenuItems = computed(() =>
+  clockChoices.value
+    .filter((c) => c.kind !== "labour")
+    .map((c) => ({
+      label: `${c.label} · ${rateText(c.rateCents)}`,
+      icon: c.kind === "travel" ? "pi pi-car" : "pi pi-plus-circle",
+      command: () => startClock(c),
+    })),
+);
+
+// What's currently on the clock — kind + rate for the header stop control.
+const runningKindLabel = computed(() => {
+  const e = clockEntry.value;
+  if (!e) return "";
+  if (e.kind === "travel") return "Travel";
+  if (e.kind === "extra") {
+    return approvedHourlyExtras.value.find((x) => x.id === e.extraId)?.description ?? "Change order";
+  }
+  return "Labour";
+});
+const runningRateText = computed(() => {
+  const e = clockEntry.value;
+  if (!e || e.hourlyRateSnapshot <= 0) return "";
+  return `${money(e.hourlyRateSnapshot)}/hr`;
+});
+
+async function startClock(choice: ClockChoice) {
   if (clockBtnBusy.value || !job.value) return;
   // Uninsured tradies must sign the waiver first — open it instead of clocking
   // in. The clockIn callable enforces the same gate server-side.
@@ -234,8 +308,8 @@ async function onHeaderClockIn() {
   }
   clockBtnBusy.value = true;
   try {
-    await clockIn(job.value.id);
-    toast.success("Clocked in");
+    await clockIn(job.value.id, { kind: choice.kind, extraId: choice.extraId ?? null });
+    toast.success("Clocked in", choice.kind === "labour" ? undefined : choice.label);
   } catch (e) {
     toast.error("Couldn't clock in", humanizeError(e));
   } finally {
@@ -1123,25 +1197,56 @@ function onReturnToApplicants() {
             You're not insured for this job. Sign a quick waiver to start —
             <RouterLink to="/account" class="underline font-medium">or get covered first</RouterLink>.
           </div>
+          <!-- Running: stop + what's on the clock (kind · rate). -->
+          <div v-if="clockRunningOn(job.id)" class="flex items-center gap-2 flex-wrap">
+            <Button
+              :label="`Stop · ${formatElapsed(clockElapsedMs)}`"
+              icon="pi pi-stop-circle"
+              severity="danger"
+              size="small"
+              class="font-mono tabular-nums"
+              :loading="clockBtnBusy"
+              @click="onHeaderClockOut"
+            />
+            <span v-if="runningKindLabel" class="text-xs text-[color:var(--bs-muted)]">
+              {{ runningKindLabel }}<template v-if="runningRateText"> · {{ runningRateText }}</template>
+            </span>
+          </div>
+
+          <!-- Not insured yet: the only action is to sign the waiver. -->
           <Button
-            v-if="clockRunningOn(job.id)"
-            :label="`Stop · ${formatElapsed(clockElapsedMs)}`"
-            icon="pi pi-stop-circle"
-            severity="danger"
-            size="small"
-            class="font-mono tabular-nums"
-            :loading="clockBtnBusy"
-            @click="onHeaderClockOut"
-          />
-          <Button
-            v-else
-            :label="needsUninsuredWaiver ? 'Sign waiver' : 'Clock in'"
-            :icon="needsUninsuredWaiver ? 'pi pi-pencil' : 'pi pi-play'"
-            :severity="needsUninsuredWaiver ? 'warn' : undefined"
+            v-else-if="needsUninsuredWaiver"
+            label="Sign waiver"
+            icon="pi pi-pencil"
+            severity="warn"
             size="small"
             :loading="clockBtnBusy"
-            @click="onHeaderClockIn"
+            @click="showWaiverDialog = true"
           />
+
+          <!-- Cleared to start. Labour-only → plain button; travel / approved
+               change orders add a dropdown so the tradie picks what to clock.
+               The rate is always shown alongside. -->
+          <div v-else class="flex items-center gap-2 flex-wrap">
+            <Button
+              v-if="clockMenuItems.length === 0"
+              label="Clock in"
+              icon="pi pi-play"
+              size="small"
+              :loading="clockBtnBusy"
+              @click="startClock(labourChoice)"
+            />
+            <SplitButton
+              v-else
+              label="Clock in"
+              icon="pi pi-play"
+              size="small"
+              :model="clockMenuItems"
+              :disabled="clockBtnBusy"
+              @click="startClock(labourChoice)"
+            />
+            <span class="text-xs text-[color:var(--bs-muted)]">{{ labourRateText }}</span>
+          </div>
         </div>
       </header>
 

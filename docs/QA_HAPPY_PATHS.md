@@ -227,6 +227,13 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 
 1. On an **In progress** job, as the **Tradesperson**: **clock in / clock out**,
    add **travel** and **expenses**, and **scan a receipt** (receipt OCR).
+   The header **Clock in** control is the single clock-in surface: on an hourly
+   job it's a **dropdown** (tap the main button for **Labour**; open the caret
+   for **Travel** and any **approved hourly change orders**), and the applicable
+   **rate ($/hr)** shows next to it. On a fixed-price job with no approved hourly
+   extras it's a plain **Clock in** button and labour reads **Time only**. The
+   Work Order **Time** card no longer has its own clock-in row (it shows the
+   running session + **Add time manually**).
 2. **Expected:** receipt OCR reads vendor/total **for free** — **no paywall** (it's
    the one free AI feature).
 3. **Uninsured gate:** with a tradesperson who has **no insurance on file**, the
@@ -235,7 +242,11 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    start the timer**. The button then becomes **Clock in**, which you must tap
    yourself to begin. Verify the clock only starts on that second, deliberate tap.
 4. **Change order:** propose extra work (flat or hourly). As the **client**,
-   approve or decline it.
+   approve or decline it. Once an **hourly** change order is **approved**, the
+   tradesperson sees a **Clock in** button directly on that change order (in the
+   Work Order → Change orders card) as well as in the header dropdown; both clock
+   time against it at the order's rate. The per-order button hides while a session
+   is already running on the job (stop it first).
 5. **Expected:** approved extras fold into the final invoice.
 6. **Wrap up:** tradie submits the job → status **Awaiting client approval**.
    Client **Approves** (→ Awaiting payment) or **Requests changes** (tradie

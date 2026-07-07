@@ -6,7 +6,6 @@ import Textarea from "primevue/textarea";
 import Message from "primevue/message";
 import ManualTimeEntryDialog from "@/components/ManualTimeEntryDialog.vue";
 import {
-  clockIn,
   clockOut,
   deleteTimeEntry,
   entryBillable,
@@ -14,7 +13,7 @@ import {
   subscribeJobTimeEntries,
   updateTimeEntryNotes,
 } from "@/firebase/services/timeEntries";
-import type { TimeEntryDoc, TimeEntryKind, WithId } from "@/firebase/interfaces";
+import type { TimeEntryDoc, WithId } from "@/firebase/interfaces";
 import { useFormatters } from "@/composables/useFormatters";
 import { useToast } from "@/composables/useToast";
 import { useConfirmAction } from "@/composables/useConfirmAction";
@@ -31,23 +30,6 @@ const props = defineProps<{
   // Approved HOURLY change orders the tradie can clock time against.
   approvedHourlyExtras?: { id: string; description: string; hourlyRateCents: number }[];
 }>();
-
-interface ClockOption {
-  kind: TimeEntryKind;
-  extraId?: string;
-  label: string;
-}
-
-// What the tradie can start a session against right now. Labour always; travel
-// only on hourly jobs; one option per approved hourly change order.
-const clockOptions = computed<ClockOption[]>(() => {
-  const opts: ClockOption[] = [{ kind: "labour", label: "Labour" }];
-  if (props.billingType === "hourly") opts.push({ kind: "travel", label: "Travel" });
-  for (const ex of props.approvedHourlyExtras ?? []) {
-    opts.push({ kind: "extra", extraId: ex.id, label: ex.description });
-  }
-  return opts;
-});
 
 // Money is shown per entry only when there's a rate behind it — so fixed-job
 // base labour (rate 0) reads as time-only, while travel / change-order / hourly
@@ -122,19 +104,6 @@ onBeforeUnmount(() => {
 });
 watch(() => props.jobId, attach);
 
-async function onClockIn(opt: ClockOption) {
-  if (busy.value) return;
-  busy.value = true;
-  try {
-    await clockIn(props.jobId, { kind: opt.kind, extraId: opt.extraId ?? null });
-    toast.success("Clocked in", opt.kind === "labour" ? undefined : opt.label);
-  } catch (e) {
-    toast.error("Couldn't clock in", humanizeError(e));
-  } finally {
-    busy.value = false;
-  }
-}
-
 async function onClockOut() {
   if (busy.value || !runningEntry.value) return;
   busy.value = true;
@@ -207,38 +176,12 @@ function rateLabel(e: WithId<TimeEntryDoc>): string {
       />
     </header>
 
-    <!-- Clock controls (tradie only) -->
+    <!-- Clock controls (tradie only). Clocking IN happens from the button at the
+         top of the job (labour / travel / change orders) and from each approved
+         change order; here we show the running session + a manual-entry escape
+         hatch, so there's no duplicate clock-in row. -->
     <div v-if="props.isTradie" class="mt-2">
-      <template v-if="!runningEntry">
-        <!-- Single option (fixed job, no change orders) → one full-width button.
-             Multiple → a labelled set so the tradie picks what they're clocking. -->
-        <Button
-          v-if="clockOptions.length === 1"
-          label="Clock in"
-          icon="pi pi-play"
-          class="w-full"
-          :loading="busy"
-          :disabled="busy"
-          @click="onClockIn(clockOptions[0])"
-        />
-        <div v-else>
-          <div class="text-xs text-[color:var(--bs-muted)] mb-1.5">Clock in on…</div>
-          <div class="flex flex-wrap gap-2">
-            <Button
-              v-for="opt in clockOptions"
-              :key="opt.kind + (opt.extraId ?? '')"
-              :label="opt.label"
-              :icon="opt.kind === 'travel' ? 'pi pi-car' : opt.kind === 'extra' ? 'pi pi-plus-circle' : 'pi pi-play'"
-              size="small"
-              :outlined="opt.kind !== 'labour'"
-              :loading="busy"
-              :disabled="busy"
-              @click="onClockIn(opt)"
-            />
-          </div>
-        </div>
-      </template>
-      <div v-else class="rounded-lg border border-[color:var(--bs-border)] p-3">
+      <div v-if="runningEntry" class="rounded-lg border border-[color:var(--bs-border)] p-3">
         <div class="flex items-center justify-between gap-3">
           <div class="min-w-0">
             <div class="text-xs text-[color:var(--bs-muted)]">{{ kindLabel(runningEntry) }}</div>
@@ -309,8 +252,8 @@ function rateLabel(e: WithId<TimeEntryDoc>): string {
       class="mt-3"
     >
       <template v-if="props.isTradie">
-        Hit "Clock in" when you start. The client sees the running timer too — no surprises on the
-        invoice.
+        Tap "Clock in" at the top of the job when you start. The client sees the running timer too,
+        so there are no surprises on the invoice.
       </template>
       <template v-else>
         Your tradesperson clocks in/out from their phone. You'll see hours rack up here in real

@@ -5,10 +5,12 @@ import Tag from "primevue/tag";
 import Message from "primevue/message";
 import type { JobExtraDoc, WithId } from "@/firebase/interfaces";
 import { respondExtra, cancelExtra } from "@/firebase/services/jobExtras";
+import { clockIn } from "@/firebase/services/timeEntries";
 import ChangeOrderDialog from "@/components/ChangeOrderDialog.vue";
 import { useFormatters } from "@/composables/useFormatters";
 import { useToast } from "@/composables/useToast";
 import { useConfirmAction } from "@/composables/useConfirmAction";
+import { useActiveClock } from "@/composables/useActiveClock";
 import { humanizeError } from "@/utils/errors";
 
 const props = defineProps<{
@@ -25,6 +27,11 @@ const props = defineProps<{
 const { money } = useFormatters();
 const toast = useToast();
 const { confirmDestructive } = useConfirmAction();
+// One clock runs at a time across all jobs; when a session is already running on
+// THIS job, clocking a change order would just error ("already clocked in"), so
+// the per-order clock-in button hides until the current session is stopped.
+const { isRunningOn } = useActiveClock();
+const clockRunning = computed(() => isRunningOn(props.jobId));
 
 // Hide cancelled rows — they're just noise once withdrawn.
 const visible = computed(() => props.extras.filter((e) => e.status !== "cancelled"));
@@ -61,6 +68,21 @@ async function respond(ex: WithId<JobExtraDoc>, accept: boolean) {
     toast.error("Couldn't respond", humanizeError(e));
   } finally {
     respondingId.value = null;
+  }
+}
+
+// ---- clock in against an approved hourly change order (tradie) ----
+const clockingId = ref<string | null>(null);
+async function clockInExtra(ex: WithId<JobExtraDoc>) {
+  if (clockingId.value) return;
+  clockingId.value = ex.id;
+  try {
+    await clockIn(props.jobId, { kind: "extra", extraId: ex.id });
+    toast.success("Clocked in", ex.description);
+  } catch (e) {
+    toast.error("Couldn't clock in", humanizeError(e));
+  } finally {
+    clockingId.value = null;
   }
 }
 
@@ -176,11 +198,21 @@ function withdraw(ex: WithId<JobExtraDoc>) {
           />
         </div>
 
-        <!-- Tradie: withdraw while not yet invoiced -->
+        <!-- Tradie: clock in against an approved hourly order (rate shown above)
+             + withdraw while not yet invoiced. -->
         <div
           v-else-if="isTradie && (ex.status === 'proposed' || ex.status === 'approved') && !ex.invoicedAt"
-          class="mt-3"
+          class="mt-3 flex flex-wrap items-center gap-2"
         >
+          <Button
+            v-if="ex.status === 'approved' && ex.billingType === 'hourly' && !clockRunning"
+            label="Clock in"
+            icon="pi pi-play"
+            size="small"
+            :loading="clockingId === ex.id"
+            :disabled="clockingId === ex.id"
+            @click="clockInExtra(ex)"
+          />
           <Button
             label="Withdraw"
             icon="pi pi-undo"
