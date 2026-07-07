@@ -2,11 +2,13 @@
 // Global "Report a bug" floating button — visible app-wide to anyone holding
 // the qa capability (or admin), so testers can file a structured, reproducible
 // bug from wherever they hit it. Auto-captures the current route + URL + active
-// role. Screenshots are PASTED (Ctrl/Cmd+V) — the primary capture path — or
-// picked from a file; both are converted to WebP in the bugReports service
-// before upload.
+// role. On open, the visible viewport is auto-screenshotted (html-to-image, a
+// silent DOM-to-canvas render — no permission prompt, no external call). Testers
+// can also PASTE (Ctrl/Cmd+V) or pick a file for a pixel-perfect shot; all three
+// paths are converted to WebP in the bugReports service before upload.
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute } from "vue-router";
+import { toBlob } from "html-to-image";
 import Dialog from "primevue/dialog";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
@@ -38,6 +40,7 @@ const visible = computed(() => {
 
 const open = ref(false);
 const submitting = ref(false);
+const capturing = ref(false);
 const error = ref<string | null>(null);
 
 const SEVERITIES: { label: string; value: BugSeverity }[] = [
@@ -125,6 +128,52 @@ function onPickFiles(e: Event) {
 function removeShot(i: number) {
   const [removed] = shots.value.splice(i, 1);
   if (removed) URL.revokeObjectURL(removed.previewUrl);
+}
+
+// Silently render the current viewport to a PNG File via html-to-image. Pure
+// client-side DOM-to-canvas: no getDisplayMedia permission prompt, no network
+// call, no cost. The `transform` + width/height clip the full-page body to just
+// what's on screen (what the tester was looking at); the FAB itself is filtered
+// out so it never appears in its own screenshot. Best-effort — cross-origin
+// images without CORS render blank rather than throwing, and any failure just
+// means no auto-shot (paste/file-pick remain).
+async function captureViewport(): Promise<File | null> {
+  if (typeof document === "undefined" || typeof window === "undefined") return null;
+  const blob = await toBlob(document.body, {
+    width: window.innerWidth,
+    height: window.innerHeight,
+    style: {
+      transform: `translate(${-window.scrollX}px, ${-window.scrollY}px)`,
+      transformOrigin: "top left",
+    },
+    filter: (node) =>
+      !(node instanceof HTMLElement && node.classList.contains("report-bug-fab")),
+    // Cap DPR so a 3× retina display doesn't produce a needlessly huge canvas;
+    // compressToWebp downscales to 1600px longest edge on upload anyway.
+    pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+  });
+  if (!blob) return null;
+  return new File([blob], "screenshot.png", { type: blob.type || "image/png" });
+}
+
+// Capture the page BEFORE opening the dialog (so the dialog isn't in the shot),
+// then open and seed the auto-screenshot. The await on nextTick lets the open
+// watcher run resetForm() first, so we don't push the shot only to have it wiped.
+async function openReport() {
+  if (capturing.value) return;
+  capturing.value = true;
+  let autoShot: File | null = null;
+  try {
+    autoShot = await captureViewport();
+  } catch {
+    /* best-effort — never block reporting on a failed auto-capture */
+  }
+  capturing.value = false;
+  open.value = true;
+  if (autoShot) {
+    await nextTick();
+    void addScreenshotFile(autoShot);
+  }
 }
 
 watch(open, (isOpen) => {
@@ -242,11 +291,15 @@ async function submit() {
     <button
       type="button"
       class="report-bug-fab"
-      aria-label="Report a bug"
-      @click="open = true"
+      :disabled="capturing"
+      :aria-label="capturing ? 'Capturing screenshot' : 'Report a bug'"
+      @click="openReport"
     >
-      <i class="pi pi-flag" aria-hidden="true"></i>
-      <span class="report-bug-fab__text">Report a bug</span>
+      <i
+        :class="capturing ? 'pi pi-spin pi-spinner' : 'pi pi-flag'"
+        aria-hidden="true"
+      ></i>
+      <span class="report-bug-fab__text">{{ capturing ? "Capturing…" : "Report a bug" }}</span>
     </button>
 
     <Dialog
@@ -259,9 +312,9 @@ async function submit() {
       <div class="flex flex-col gap-3">
         <p class="text-xs text-[color:var(--bs-muted)]">
           Filing from <strong>{{ route.name || route.path }}</strong> as
-          <strong>{{ auth.activeRole }}</strong>. Paste a screenshot anywhere in
-          this dialog (Ctrl/⌘ + V). Your device + page details are attached
-          automatically.
+          <strong>{{ auth.activeRole }}</strong>. We grabbed a screenshot of the
+          page automatically. Paste another (Ctrl/⌘ + V) or add a file if you
+          need a clearer one. Your device + page details are attached too.
         </p>
 
         <div>

@@ -44,9 +44,14 @@
 ### Logging bugs
 - Use the floating **Report a bug** button (bottom-right, visible to QA on every
   screen). It auto-captures the page + your active role.
-- **Screenshots: paste them** — copy a screenshot (e.g. Win **⊞+Shift+S**, Mac
-  **⌘+Shift+4**) then **Ctrl/⌘+V** inside the bug dialog. Pasted images are
-  converted to WebP automatically. (A *Choose file* fallback exists.)
+- **A screenshot of the page is attached automatically** when you open the
+  dialog (a silent client-side render of what's on screen; the button itself is
+  excluded). Delete it if it's not useful, or add a clearer one below.
+- **Want a sharper/other shot? paste it** — copy a screenshot (e.g. Win
+  **⊞+Shift+S**, Mac **⌘+Shift+4**) then **Ctrl/⌘+V** inside the bug dialog.
+  All images are converted to WebP automatically. (A *Choose file* fallback
+  exists.) Note: a few surfaces (maps, chart canvases, cross-origin images) can
+  render blank in the auto-shot, so paste a real capture for those.
 - Fill **Title, Severity, Steps, Expected, Actual**. Submit → it lands in admin
   triage (`/admin/bug-reports`). You can see your own in `/qa` → *My bug reports*.
 - **Crashes/JS errors are captured automatically** in the **Error log** (visible
