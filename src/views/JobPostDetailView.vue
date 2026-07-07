@@ -776,24 +776,63 @@ const visibleApplications = computed(() => {
 
         <div v-if="post.status === 'closed'" class="mt-4">
           <Message severity="success" :closable="false">
-            You picked a tradesperson for this post — continue the job on the
-            <RouterLink
-              v-if="post.convertedJobId"
-              :to="{ name: 'JobDetail', params: { id: post.convertedJobId } }"
-              class="underline"
-            >
-              job page
-            </RouterLink>.
+            <template v-if="post.convertedJobId">
+              You picked a tradesperson for this post. Continue the job on the
+              <RouterLink
+                :to="{ name: 'JobDetail', params: { id: post.convertedJobId } }"
+                class="underline"
+              >
+                job page </RouterLink>.
+            </template>
+            <template v-else>
+              You picked a tradesperson for this post. The job is now underway.
+            </template>
           </Message>
         </div>
 
-        <h2 class="text-lg font-semibold mt-6 flex items-center gap-2">
-          Applicants
-          <Tag v-if="meta" :value="meta.applicationCount" severity="secondary" />
-        </h2>
-        <p v-if="visibleApplications.length === 0" class="text-sm text-[color:var(--bs-muted)] mt-1">
-          No applicants yet. Verified tradespeople in your area are being notified.
-        </p>
+        <!-- Terminal, non-hireable states: give a clear "no longer open"
+             message and a next step instead of a dead page still promising
+             applicants are on the way (P1-04). -->
+        <div
+          v-if="post.status === 'cancelled' || post.status === 'expired'"
+          class="mt-4 space-y-3"
+        >
+          <Message severity="secondary" :closable="false">
+            {{
+              post.status === "cancelled"
+                ? "You cancelled this post, so it is no longer open to tradespeople."
+                : "This post expired, so it is no longer open to tradespeople."
+            }}
+          </Message>
+          <div class="flex flex-wrap gap-2">
+            <Button
+              label="Post a new job"
+              icon="pi pi-plus"
+              size="small"
+              @click="router.push({ name: 'PostJob' })"
+            />
+            <Button
+              label="Browse tradespeople"
+              icon="pi pi-search"
+              severity="secondary"
+              outlined
+              size="small"
+              @click="router.push({ name: 'Search' })"
+            />
+          </div>
+        </div>
+
+        <template v-if="acceptable || visibleApplications.length > 0">
+          <h2 class="text-lg font-semibold mt-6 flex items-center gap-2">
+            Applicants
+            <Tag v-if="meta" :value="meta.applicationCount" severity="secondary" />
+          </h2>
+          <p
+            v-if="visibleApplications.length === 0"
+            class="text-sm text-[color:var(--bs-muted)] mt-1"
+          >
+            No applicants yet. Verified tradespeople in your area are being notified.
+          </p>
 
         <div v-else class="space-y-3 mt-3">
           <ApplicantCard
@@ -810,6 +849,7 @@ const visibleApplications = computed(() => {
             @message="openThread"
           />
         </div>
+        </template>
       </template>
 
       <!-- TRADIE VIEW (open posts + scoped postings the viewer is invited to) -->
