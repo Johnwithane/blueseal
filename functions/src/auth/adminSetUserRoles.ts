@@ -6,6 +6,7 @@ import { adminAuth, db } from "../lib/admin";
 import { requireAdmin } from "../lib/auth";
 import { logAdminAction } from "../lib/audit";
 import { newTradieDocDefaults } from "../lib/tradieProfile";
+import { initialProjectManagerState } from "../lib/projectManager";
 
 const Input = z.object({
   targetUid: z.string().min(1).max(128),
@@ -66,6 +67,7 @@ export const adminSetUserRoles = onCall(CALLABLE_OPTS, async (req) => {
     activeRole?: unknown;
     displayName?: unknown;
     photoURL?: unknown;
+    projectManager?: unknown;
   };
 
   const tradieRef = db.doc(`tradespeople/${targetUid}`);
@@ -104,6 +106,16 @@ export const adminSetUserRoles = onCall(CALLABLE_OPTS, async (req) => {
       : viewRoles[0] ?? nextRoles[0];
   const legacyRole = primaryRole(nextRoles);
 
+  // Granting projectManager stamps the PM state (active immediately, no vetting)
+  // if it isn't already there — mirrors addRoleToSelf / qaProvisionSelfProjectManager.
+  // Without this, the role lands in claims + doc (so the cockpit shows "Active")
+  // but requirePmActive() rejects the PM because there's no active field, and
+  // createProject fails with "Your project manager account is not active."
+  const pmExtras =
+    nextRoles.includes("projectManager") && !userData.projectManager
+      ? { projectManager: initialProjectManagerState() }
+      : {};
+
   // Snapshot for rollback if the claim write fails after the doc write.
   const prevDocRoles = Array.isArray(userData.roles)
     ? (userData.roles as unknown[]).filter((r): r is string => typeof r === "string")
@@ -116,7 +128,7 @@ export const adminSetUserRoles = onCall(CALLABLE_OPTS, async (req) => {
 
   // Firestore first, then claims (same ordering/rationale as setAdminRole): a
   // claim without a matching doc is the worse failure mode.
-  await userRef.set({ roles: nextRoles, activeRole, role: legacyRole }, { merge: true });
+  await userRef.set({ roles: nextRoles, activeRole, role: legacyRole, ...pmExtras }, { merge: true });
   try {
     const existingClaims = (current.customClaims ?? {}) as Record<string, unknown>;
     await adminAuth.setCustomUserClaims(targetUid, {
