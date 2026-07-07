@@ -227,13 +227,15 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 
 1. On an **In progress** job, as the **Tradesperson**: **clock in / clock out**,
    add **travel** and **expenses**, and **scan a receipt** (receipt OCR).
-   The header **Clock in** control is the single clock-in surface: on an hourly
-   job it's a **dropdown** (tap the main button for **Labour**; open the caret
-   for **Travel** and any **approved hourly change orders**), and the applicable
-   **rate ($/hr)** shows next to it. On a fixed-price job with no approved hourly
-   extras it's a plain **Clock in** button and labour reads **Time only**. The
-   Work Order **Time** card no longer has its own clock-in row (it shows the
-   running session + **Add time manually**).
+   The header **Clock in** control is the single clock-in surface. When there's
+   more than one thing to clock (e.g. an hourly job has **Labour** + **Travel**,
+   or an approved hourly change order exists), the button **opens a menu** that
+   lists **every** option with its **rate ($/hr)** — there's no silent default,
+   so travel / change orders can't be missed. When there's only one option
+   (fixed-price job, no approved hourly extras) it's a plain **Clock in** button
+   with the rate beside it (labour reads **Time only**). The Work Order **Time**
+   card no longer has its own clock-in row (it shows the running session +
+   **Add time manually**).
 2. **Expected:** receipt OCR reads vendor/total **for free** — **no paywall** (it's
    the one free AI feature).
 3. **Uninsured gate:** with a tradesperson who has **no insurance on file**, the

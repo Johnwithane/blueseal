@@ -2,7 +2,7 @@
 import { computed, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter, RouterLink } from "vue-router";
 import Button from "primevue/button";
-import SplitButton from "primevue/splitbutton";
+import Menu from "primevue/menu";
 import Tag from "primevue/tag";
 import Textarea from "primevue/textarea";
 import Dialog from "primevue/dialog";
@@ -270,17 +270,23 @@ function rateText(rateCents: number | null): string {
 }
 const labourRateText = computed(() => rateText(labourChoice.value.rateCents));
 
-// The non-labour options (travel + approved change orders) become the header
-// SplitButton dropdown. With none, a plain "Clock in" button is enough.
+// Every clock option (labour + travel + approved hourly change orders) as a
+// popup-menu model. When there's more than one, the header clock-in opens this
+// menu rather than silently defaulting to labour — so travel / change-order
+// options are discoverable instead of hidden behind a caret the tradie may
+// never notice. A single option (labour only) skips the menu entirely.
 const clockMenuItems = computed(() =>
-  clockChoices.value
-    .filter((c) => c.kind !== "labour")
-    .map((c) => ({
-      label: `${c.label} · ${rateText(c.rateCents)}`,
-      icon: c.kind === "travel" ? "pi pi-car" : "pi pi-plus-circle",
-      command: () => startClock(c),
-    })),
+  clockChoices.value.map((c) => ({
+    label: `${c.label} · ${rateText(c.rateCents)}`,
+    icon:
+      c.kind === "travel" ? "pi pi-car" : c.kind === "extra" ? "pi pi-plus-circle" : "pi pi-play",
+    command: () => startClock(c),
+  })),
 );
+const clockMenu = ref<InstanceType<typeof Menu> | null>(null);
+function openClockMenu(e: Event) {
+  clockMenu.value?.toggle(e);
+}
 
 // What's currently on the clock — kind + rate for the header stop control.
 const runningKindLabel = computed(() => {
@@ -1228,24 +1234,33 @@ function onReturnToApplicants() {
                change orders add a dropdown so the tradie picks what to clock.
                The rate is always shown alongside. -->
           <div v-else class="flex items-center gap-2 flex-wrap">
-            <Button
-              v-if="clockMenuItems.length === 0"
-              label="Clock in"
-              icon="pi pi-play"
-              size="small"
-              :loading="clockBtnBusy"
-              @click="startClock(labourChoice)"
-            />
-            <SplitButton
-              v-else
-              label="Clock in"
-              icon="pi pi-play"
-              size="small"
-              :model="clockMenuItems"
-              :disabled="clockBtnBusy"
-              @click="startClock(labourChoice)"
-            />
-            <span class="text-xs text-[color:var(--bs-muted)]">{{ labourRateText }}</span>
+            <!-- Labour-only → clock in directly. More than one option → a menu
+                 the tradie opens and picks from, so travel / change orders can't
+                 be missed. -->
+            <template v-if="clockChoices.length === 1">
+              <Button
+                label="Clock in"
+                icon="pi pi-play"
+                size="small"
+                :loading="clockBtnBusy"
+                @click="startClock(labourChoice)"
+              />
+              <span class="text-xs text-[color:var(--bs-muted)]">{{ labourRateText }}</span>
+            </template>
+            <template v-else>
+              <Button
+                size="small"
+                :disabled="clockBtnBusy"
+                aria-haspopup="true"
+                aria-label="Clock in"
+                @click="openClockMenu"
+              >
+                <i class="pi pi-play text-xs" aria-hidden="true"></i>
+                <span class="mx-1.5">Clock in</span>
+                <i class="pi pi-chevron-down text-xs" aria-hidden="true"></i>
+              </Button>
+              <Menu ref="clockMenu" :model="clockMenuItems" popup />
+            </template>
           </div>
         </div>
       </header>

@@ -466,15 +466,15 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
           },
           {
             id: "tradie-clock-dropdown-change-order",
-            title: "Clock in from header dropdown + directly on a change order",
+            title: "Clock in from header menu + directly on a change order",
             steps: [
-              "On an In progress HOURLY job, check the header Clock in control is a dropdown: tapping the main button clocks Labour; the caret lists Travel and any approved hourly change orders, each showing its $/hr rate.",
-              "Confirm the labour rate ($/hr) shows next to the button (a fixed-price job with no hourly extras shows a plain Clock in button and 'Time only').",
+              "On an In progress HOURLY job, tap the header Clock in button: it OPENS A MENU listing every option (Labour, Travel, and any approved hourly change orders), each showing its $/hr rate. There is no silent default — you pick one.",
+              "Confirm a job with only one option (fixed-price, no hourly extras) shows a plain Clock in button that clocks directly, with the rate ($/hr, or 'Time only') beside it.",
               "Approve an hourly change order (as the client), then as the tradesperson open Work Order → Change orders and clock in via the Clock in button on that order.",
               "While a session is running, confirm the header shows Stop + the kind and rate, and the per-order Clock in button is hidden until you stop.",
             ],
             expected:
-              "One clock-in surface (the header). Labour/Travel/each approved hourly change order are clockable from the dropdown at the correct rate; approved hourly change orders also expose their own Clock in button. The Work Order Time card has no separate clock-in row.",
+              "One clock-in surface (the header). With 2+ options it opens a menu of all of them at the correct rate (nothing hidden behind a caret); with one option it clocks directly. Approved hourly change orders also expose their own Clock in button. The Work Order Time card has no separate clock-in row.",
           },
           { id: "tradie-get-paid", title: "Get paid: invoice → card payment → Stripe payout" },
           { id: "tradie-pro", title: "Blue Seal Pro (toggle free vs Pro features)" },
