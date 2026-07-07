@@ -18,11 +18,14 @@ const Input = z.object({
   // typed code). Resolved server-side to the owning rep; an unknown/inactive
   // code is silently ignored (never blocks signup). referralSignal records how
   // it arrived, for attribution analytics.
-  referralCode: z.string().trim().max(40).optional(),
-  referralSignal: z.enum(["link", "code", "name"]).optional(),
+  // .nullable() matters: the client always includes these keys and the
+  // callable SDK sends absent values as null, which bare .optional() rejects —
+  // that failure breaks every signup (same pattern as photoURL above).
+  referralCode: z.string().trim().max(40).nullable().optional(),
+  referralSignal: z.enum(["link", "code", "name"]).nullable().optional(),
   // Optional PM recruiting code from /join?pm=CODE. Only honored for a
   // tradesperson signup; resolved to an active project manager server-side.
-  pmCode: z.string().trim().max(40).optional(),
+  pmCode: z.string().trim().max(40).nullable().optional(),
 });
 
 /**

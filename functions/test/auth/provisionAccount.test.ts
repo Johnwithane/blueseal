@@ -79,6 +79,29 @@ describe("provisionAccount (server-side account provisioning)", () => {
     expect(setCustomUserClaims).toHaveBeenCalledWith(UID, { roles: ["client"], role: "client" });
   });
 
+  it("accepts the real client payload: optional fields sent as explicit null", async () => {
+    // Regression for the 2026-07-07 signup outage: the web client always
+    // includes these keys and the callable SDK sends absent values as null;
+    // bare .optional() (no .nullable()) rejected 100% of signups.
+    const res = await callFn<{ roles: string[]; activeRole: string; isNew: boolean }>(
+      provisionAccount,
+      req({
+        data: {
+          role: "tradesperson",
+          photoURL: null,
+          referralCode: null,
+          referralSignal: null,
+          pmCode: null,
+        },
+      }),
+    );
+    expect(res).toEqual({
+      roles: ["tradesperson", "client"],
+      activeRole: "tradesperson",
+      isNew: true,
+    });
+  });
+
   it("gives a tradesperson the implied client role", async () => {
     const res = await callFn<{ roles: string[]; activeRole: string; isNew: boolean }>(
       provisionAccount,
