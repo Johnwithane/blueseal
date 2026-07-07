@@ -78,6 +78,16 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
               "They appear under On your roster instantly; the result flips to an On-your-roster badge; Request re-hires; x removes.",
           },
           {
+            id: "pm-find-unverified-trade",
+            title: "Search finds unverified + profile-less tradespeople too",
+            steps: [
+              "Roster → Already on Blue Seal? → search the name of a tradesperson who isn't verified yet, or who has the tradesperson role but never built a profile.",
+              "Add them, then look at the On your roster list.",
+            ],
+            expected:
+              "They show up in the search results with a 'Not verified yet' note (verified-only used to hide them). After adding, they appear on the roster with the same status and NO Request button (you can only send jobs once they're live). Removing with x still works.",
+          },
+          {
             id: "pm-recruit-link",
             title: "Invite link for a tradesperson not on Blue Seal yet",
             steps: [

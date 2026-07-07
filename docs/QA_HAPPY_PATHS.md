@@ -532,6 +532,15 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    **Request** opens a fresh quote to them; the **x** removes them. The same list shows
    under **Saved trades** on the client dashboard. (Reuses the existing `savedTradies`
    shortlist.)
+5a. **Roster: search reaches unverified + profile-less tradespeople.** Search the name of
+   a tradesperson who isn't verified yet (`isVisible` false, mid-onboarding) or who has the
+   tradesperson role but never built a profile at all. **Expected:** they now appear in the
+   results with a "Not verified yet" note and can be added (the old client-side search only
+   saw publicly-visible tradies, so these were missing entirely). On the roster they render
+   with the same status and **no Request button** (you can only send a job once they're
+   live, matching the vet-before-go-live rule). Search + hydrate go through the PM-gated
+   `searchRosterCandidates` / `getRosterCards` callables (admin SDK, sanitized card) because
+   firestore.rules block a PM from reading a hidden tradie doc directly.
 6. **Roster: invite a tradesperson who isn't on Blue Seal (the acquisition link).** In
    the **Roster** page's "Or share your invite link" card, claim/copy the
    `/join?pm=CODE` invite link (tap the QR to enlarge it full-screen for scanning). Open
