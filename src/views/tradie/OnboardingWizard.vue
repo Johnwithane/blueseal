@@ -152,6 +152,20 @@ const saving = ref(false);
 const submitting = ref(false);
 const error = ref<string | null>(null);
 
+// Email-verification gate. submitForVetting rejects an unverified email
+// server-side, so the submit step surfaces the requirement inline (resend +
+// recheck) instead of letting the final Submit be the first the user hears of
+// it (P1-08). The tick forces the computed to re-read auth after a reload(),
+// since Firebase's emailVerified sits behind a getter the reactive proxy can't
+// track.
+const resendingEmail = ref(false);
+const checkingEmail = ref(false);
+const emailVerifyTick = ref(0);
+const emailVerified = computed(() => {
+  void emailVerifyTick.value;
+  return auth.isEmailVerified;
+});
+
 // Vetting state — captured from the tradesperson doc on mount and kept in
 // sync with submit / withdraw actions. Drives the top banner, the read-only
 // guard, and the autosave's status-preservation behaviour.
@@ -276,6 +290,11 @@ const canSubmit = computed(
     stepCompleted.value[3] &&
     stepCompleted.value[5],
 );
+
+// Everything the server requires to accept the application: every step done AND
+// a verified email. The submit button reads this; email has its own inline
+// treatment (below) so it isn't buried in the step-completion blocker list.
+const readyToSubmit = computed(() => canSubmit.value && emailVerified.value);
 
 // Plain-language list of what's still missing on the Documents step (a cert
 // per trade + government ID). Drives the "Next: Submit" button so a not-ready
@@ -790,6 +809,36 @@ async function onIdRemoved() {
   }
 }
 
+async function resendVerification() {
+  resendingEmail.value = true;
+  try {
+    await auth.resendVerificationEmail();
+    toast.success("Verification email sent", `Check ${auth.fbUser?.email ?? "your inbox"}.`);
+  } catch (e) {
+    toast.error("Couldn't send the email", humanizeError(e));
+  } finally {
+    resendingEmail.value = false;
+  }
+}
+
+async function recheckEmailVerified() {
+  if (!auth.fbUser) return;
+  checkingEmail.value = true;
+  try {
+    await auth.fbUser.reload();
+    emailVerifyTick.value++;
+    if (emailVerified.value) {
+      toast.success("Email verified", "You're all set to submit.");
+    } else {
+      toast.warn("Not verified yet", "Open the link in the email, then try again.");
+    }
+  } catch (e) {
+    toast.error("Couldn't check", humanizeError(e));
+  } finally {
+    checkingEmail.value = false;
+  }
+}
+
 async function submitApplication() {
   if (!canSubmit.value) {
     // Jump to the first unfinished step and surface the problem at the field
@@ -800,6 +849,12 @@ async function submitApplication() {
     validateStep(target);
     await focusFirst(STEP_FIELDS[target] ?? []);
     toast.warn("A few things still needed", submitBlockers.value.join(" · "));
+    return;
+  }
+  if (!emailVerified.value) {
+    // Steps are done but the email isn't verified — the inline block on this
+    // step explains it; don't call the server just to be 400'd.
+    toast.warn("Verify your email first", "Use the resend / recheck buttons on this step.");
     return;
   }
   submitting.value = true;
@@ -1595,6 +1650,38 @@ async function withdrawForEdits() {
               </ul>
             </Message>
 
+            <!-- Email verification is a server requirement for submit. Surface it
+                 here with resend + recheck instead of letting the final Submit
+                 be the first the user hears of it (P1-08). -->
+            <Message
+              v-if="!isReadOnly && canSubmit && !emailVerified"
+              severity="warn"
+              :closable="false"
+            >
+              <div class="font-medium">Verify your email before submitting</div>
+              <p class="text-sm mt-1">
+                We sent a verification link to {{ auth.fbUser?.email ?? "your email" }}. Open it,
+                then tap "I've verified".
+              </p>
+              <div class="flex flex-wrap gap-2 mt-2">
+                <Button
+                  label="Resend email"
+                  icon="pi pi-envelope"
+                  size="small"
+                  outlined
+                  :loading="resendingEmail"
+                  @click="resendVerification"
+                />
+                <Button
+                  label="I've verified"
+                  icon="pi pi-refresh"
+                  size="small"
+                  :loading="checkingEmail"
+                  @click="recheckEmailVerified"
+                />
+              </div>
+            </Message>
+
             <div class="bs-step-nav flex justify-between">
               <Button label="Back" outlined @click="activateCallback('6')" />
               <Button
@@ -1602,7 +1689,7 @@ async function withdrawForEdits() {
                 :label="vettingStatus === 'info_requested' ? 'Resubmit for review' : 'Submit for review'"
                 icon="pi pi-send"
                 :loading="submitting"
-                :severity="canSubmit ? undefined : 'secondary'"
+                :severity="readyToSubmit ? undefined : 'secondary'"
                 @click="submitApplication"
               />
             </div>
