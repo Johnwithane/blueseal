@@ -105,6 +105,24 @@ body {
   overflow-x: clip;
 }
 
+/* Any fixed/sticky bottom bar (the mobile BottomNav, the onboarding wizard's
+   sticky Back/Next bar) floats over the bottom band of the viewport. When a
+   control near the page bottom receives focus or is scrolled into view, reserve
+   room below it so the browser lands it ABOVE the bar rather than under it,
+   where the bar's higher z-index would eat the tap (P1-07). Applied at the true
+   scroll root — the document — so it covers both the app shell and the
+   chromeless onboarding layout in one place. 64px clears both bars at 375px;
+   the safe-area inset covers taller bars on iOS home-indicator devices. */
+html {
+  scroll-padding-bottom: calc(64px + env(safe-area-inset-bottom));
+}
+@media (min-width: 768px) {
+  /* Bottom bars are hidden from md up — no reservation needed. */
+  html {
+    scroll-padding-bottom: 0;
+  }
+}
+
 /* iOS Safari auto-zooms the viewport whenever a focused form field has a
    font-size below 16px. Force 16px on form controls at mobile widths so
    tapping an input (e.g. the Search location field, which sits above the map)
