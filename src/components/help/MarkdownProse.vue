@@ -1,14 +1,15 @@
 <script setup lang="ts">
 // Renders Markdown for Help Center articles and FAQ answers. Content is
 // admin-authored (siteContent/help, admin-only write) or our own bundled
-// baseline — not arbitrary user input — so v-html is acceptable here, the
-// same trust model as LegalDocument.vue.
+// baseline — not arbitrary user input — but we still sanitize on the way out
+// (shared renderMarkdown util) as defence in depth, the same treatment as
+// LegalDocument.vue and the assistant.
 import { computed } from "vue";
-import { marked } from "marked";
+import { renderMarkdown } from "@/utils/renderMarkdown";
 
 const props = defineProps<{ source: string }>();
 
-const html = computed(() => marked.parse(props.source, { gfm: true, async: false }) as string);
+const html = computed(() => renderMarkdown(props.source));
 </script>
 
 <template>

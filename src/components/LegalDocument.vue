@@ -1,17 +1,17 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { marked } from "marked";
+import { renderMarkdown } from "@/utils/renderMarkdown";
 
 const props = defineProps<{
   source: string;
 }>();
 
-const html = computed(() => {
-  const raw = marked.parse(props.source, { gfm: true, async: false }) as string;
-  return raw
+const html = computed(() =>
+  // Sanitize (shared util), then rewrite the repo-relative doc links to routes.
+  renderMarkdown(props.source)
     .replaceAll('href="./privacy-policy.md"', 'href="/privacy"')
-    .replaceAll('href="./terms-of-service.md"', 'href="/terms"');
-});
+    .replaceAll('href="./terms-of-service.md"', 'href="/terms"'),
+);
 </script>
 
 <template>

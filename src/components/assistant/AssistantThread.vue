@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
-import { marked } from "marked";
 import Avatar from "primevue/avatar";
+import { renderMarkdown } from "@/utils/renderMarkdown";
 import { useAssistantStore } from "@/stores/assistant";
 import { useAuthStore } from "@/stores/auth";
 
@@ -11,14 +11,12 @@ const auth = useAuthStore();
 const scroller = ref<HTMLElement | null>(null);
 
 // Assistant turns render as markdown. The model talks in bullets / numbered
-// lists / **bold** by default; rendering as plain text loses structure. GFM
-// defaults already escape `<` and `>` in non-code text — as defence in
-// depth against a prompt-injected XSS payload we additionally strip a
-// short list of script-y tags from the rendered HTML.
-const DROP_TAGS = /<\/?(?:script|style|iframe|object|embed)[^>]*>/gi;
-function renderMarkdown(text: string): string {
-  const html = marked.parse(text, { gfm: true, breaks: true, async: false }) as string;
-  return html.replace(DROP_TAGS, "");
+// lists / **bold** by default; rendering as plain text loses structure. The
+// output is untrusted (prompt injection can smuggle an XSS payload), so it is
+// sanitized with DOMPurify via the shared renderMarkdown util. `breaks: true`
+// keeps the chat feel (single newline → <br>).
+function renderTurn(text: string): string {
+  return renderMarkdown(text, { breaks: true });
 }
 
 interface DisplayMessage {
@@ -186,7 +184,7 @@ const emptyHint = computed(() => {
             <div v-if="m.role === 'user'" class="bs-ai-bubble__text">{{ m.content }}</div>
             <!-- Assistant: rendered markdown (sanitized — see renderMarkdown). -->
             <!-- eslint-disable-next-line vue/no-v-html -->
-            <div v-else class="bs-ai-bubble__md" v-html="renderMarkdown(m.content)" />
+            <div v-else class="bs-ai-bubble__md" v-html="renderTurn(m.content)" />
           </div>
           <div v-if="m.showTime" class="bs-ai-row__time">
             <template v-if="m.pending">Sending…</template>
