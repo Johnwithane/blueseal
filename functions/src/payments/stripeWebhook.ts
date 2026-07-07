@@ -65,6 +65,39 @@ import type {
   StripeSubscription,
 } from "./handlers/shared";
 
+// A sentinel left at `processing` past this window belongs to a delivery that
+// crashed mid-flight (the function timed out or the instance died before it
+// could mark processed/failed). Reprocess it; anything fresher is treated as a
+// genuinely-in-flight concurrent delivery and skipped.
+const STALE_PROCESSING_MS = 5 * 60 * 1000;
+
+export type ClaimDecision = "process" | "skip";
+
+// Decide what to do with a webhook event whose sentinel already exists
+// (`db.doc().create()` threw ALREADY_EXISTS). Only a fully `processed` event is
+// a true duplicate we can safely skip. A prior delivery that `failed` (returned
+// 500) or crashed mid-`processing` left its side effects incomplete; skipping
+// it tells Stripe to stop retrying and the payment silently never reconciles
+// (P1-01). Those must be reprocessed — every handler is individually
+// idempotent, so re-running is safe.
+export function decideReclaim(
+  data: Record<string, unknown> | undefined,
+  nowMs: number,
+): ClaimDecision {
+  const status = data?.status;
+  if (status === "failed") return "process";
+  if (status === "processing") {
+    const received = data?.receivedAt as { toMillis?: () => number } | null | undefined;
+    const receivedMs =
+      received && typeof received.toMillis === "function" ? received.toMillis() : null;
+    if (receivedMs !== null && nowMs - receivedMs > STALE_PROCESSING_MS) return "process";
+    // Fresh `processing` — another delivery is still in flight; leave it be.
+    return "skip";
+  }
+  // `processed`, missing, or unknown — nothing to redo.
+  return "skip";
+}
+
 export const stripeWebhook = onRequest(
   { secrets: [STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET] },
   async (req, res) => {
@@ -109,17 +142,33 @@ export const stripeWebhook = onRequest(
         errorMessage: null,
       });
     } catch (err) {
-      // ALREADY_EXISTS — Stripe re-delivered an event we've seen. Return
-      // 200 so Stripe stops retrying; the prior delivery already ran the
-      // side effects (or is mid-flight; collision is rare enough that
-      // best-effort is fine — full at-most-once would need a lock).
-      logger.info("stripeWebhook: duplicate event, skipping", {
+      // ALREADY_EXISTS — Stripe re-delivered an event we've claimed before.
+      // Read the sentinel: a `processed` (or in-flight) event is skipped, but a
+      // `failed` / stale-`processing` one is reclaimed and reprocessed below so
+      // a transient failure can't permanently drop the event (P1-01).
+      const prior = (await sentinelRef.get().catch(() => null))?.data();
+      const decision = decideReclaim(prior, Timestamp.now().toMillis());
+      if (decision === "skip") {
+        logger.info("stripeWebhook: duplicate event, skipping", {
+          eventId: event.id,
+          type: event.type,
+          priorStatus: prior?.status ?? null,
+          err: err instanceof Error ? err.message : String(err),
+        });
+        res.status(200).send({ received: true, duplicate: true });
+        return;
+      }
+      logger.warn("stripeWebhook: reprocessing prior failed/stale event", {
         eventId: event.id,
         type: event.type,
-        err: err instanceof Error ? err.message : String(err),
+        priorStatus: prior?.status ?? null,
       });
-      res.status(200).send({ received: true, duplicate: true });
-      return;
+      await sentinelRef.update({
+        status: "processing",
+        receivedAt: Timestamp.now(),
+        processedAt: null,
+        errorMessage: null,
+      });
     }
 
     try {
