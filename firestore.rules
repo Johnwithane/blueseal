@@ -1514,7 +1514,7 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time
         && request.resource.data.severity in ['low', 'medium', 'high', 'critical']
-        && request.resource.data.activeRole in ['client', 'tradesperson', 'admin', 'qa']
+        && request.resource.data.activeRole in ['client', 'tradesperson', 'admin', 'qa', 'sales', 'projectManager']
         && request.resource.data.title is string
            && request.resource.data.title.size() >= 3 && request.resource.data.title.size() <= 140
         && request.resource.data.stepsToReproduce is string

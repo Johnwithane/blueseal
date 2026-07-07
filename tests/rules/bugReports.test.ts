@@ -95,6 +95,37 @@ describe("bugReports — create", () => {
     await assertSucceeds(addDoc(collection(fs, "bugReports"), validBug(ADMIN_UID)));
   });
 
+  // Regression: a qa tester filing while in the projectManager (or sales) view
+  // stamps that activeRole on the report. The create rule must accept every
+  // valid view-role, or the report is silently permission-denied (the "You
+  // don't have permission to do that" bug when filing from the Properties tab).
+  it("a qa tester can file while in the projectManager view", async () => {
+    const fs = env.authenticatedContext(QA_UID, QA_CLAIMS).firestore();
+    await assertSucceeds(
+      addDoc(collection(fs, "bugReports"), {
+        ...validBug(QA_UID),
+        activeRole: "projectManager",
+      }),
+    );
+  });
+
+  it("a qa tester can file while in the sales view", async () => {
+    const fs = env.authenticatedContext(QA_UID, QA_CLAIMS).firestore();
+    await assertSucceeds(
+      addDoc(collection(fs, "bugReports"), {
+        ...validBug(QA_UID),
+        activeRole: "sales",
+      }),
+    );
+  });
+
+  it("rejects a bogus activeRole", async () => {
+    const fs = env.authenticatedContext(QA_UID, QA_CLAIMS).firestore();
+    await assertFails(
+      addDoc(collection(fs, "bugReports"), { ...validBug(QA_UID), activeRole: "superuser" }),
+    );
+  });
+
   it("a non-qa client cannot file a report (even for themselves)", async () => {
     const fs = env.authenticatedContext(CLIENT_UID, CLIENT_CLAIMS).firestore();
     await assertFails(addDoc(collection(fs, "bugReports"), validBug(CLIENT_UID)));
