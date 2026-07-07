@@ -48,6 +48,8 @@ const router = useRouter();
 const route = useRoute();
 const toast = useToast();
 const tradie = ref<WithId<TradespersonDoc> | null>(null);
+const loadError = ref<string | null>(null);
+const loading = ref(true);
 const jobs = ref<WithId<JobDoc>[]>([]);
 const insuranceDoc = ref<WithId<InsuranceVerificationDoc> | null>(null);
 // "Upload my insurance" popup (the full upload card incl. the additional-insured
@@ -201,17 +203,35 @@ const patternPreviewSummary = computed(() => {
 let unsub: (() => void) | null = null;
 let unsubBookings: (() => void) | null = null;
 
-onMounted(async () => {
+async function loadProfile() {
   if (!auth.fbUser) return;
-  tradie.value = await getTradesperson(auth.fbUser.uid);
-  if (!tradie.value || tradie.value.vettingStatus === "draft") {
+  loading.value = true;
+  loadError.value = null;
+  let doc: WithId<TradespersonDoc> | null;
+  try {
+    doc = await getTradesperson(auth.fbUser.uid);
+  } catch (e) {
+    // A transient fetch failure (flaky mobile data) must NOT bounce an
+    // approved pro back into onboarding. Show a retry instead; only a
+    // confirmed draft/missing profile means "finish onboarding" (P1-05).
+    loadError.value = humanizeError(e);
+    loading.value = false;
+    return;
+  }
+  tradie.value = doc;
+  if (!doc || doc.vettingStatus === "draft") {
     router.replace({ name: "TradieOnboarding" });
     return;
   }
+  unsub?.();
+  unsubBookings?.();
   unsub = subscribeTradieJobs(auth.fbUser.uid, (j) => (jobs.value = j));
   unsubBookings = subscribeBookings(auth.fbUser.uid, (b) => (bookings.value = b));
   await refreshInsurance();
-});
+  loading.value = false;
+}
+
+onMounted(loadProfile);
 
 onUnmounted(() => {
   unsub?.();
@@ -369,7 +389,18 @@ const awaitingVerificationMessage = computed(() => {
       </div>
     </div>
 
-    <div class="bs-container pt-4">
+    <!-- Load failed (not a draft profile — a transient fetch error). Offer a
+         retry instead of leaving the pro stranded or bouncing to onboarding. -->
+    <div v-if="loadError" class="bs-container pt-8">
+      <div class="bs-card p-6 text-center max-w-md mx-auto">
+        <i class="pi pi-exclamation-triangle text-2xl text-[color:var(--bs-muted)]" aria-hidden="true"></i>
+        <p class="mt-3 font-medium">Couldn't load your dashboard</p>
+        <p class="mt-1 text-sm text-[color:var(--bs-muted)]">{{ loadError }}</p>
+        <Button label="Try again" icon="pi pi-refresh" class="mt-4" :loading="loading" @click="loadProfile" />
+      </div>
+    </div>
+
+    <div v-else class="bs-container pt-4">
     <div
       v-if="insuranceBanner"
       class="mb-4 rounded-lg border border-[#f0d8a8] bg-[#fff5e6] px-3 py-2 text-sm font-medium text-[color:var(--bs-text)]"

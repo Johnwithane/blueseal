@@ -23,6 +23,7 @@ import JobCounterparty from "@/components/JobCounterparty.vue";
 import LoadingState from "@/components/LoadingState.vue";
 import ReferJobDialog from "@/components/jobPost/ReferJobDialog.vue";
 import { QA_TEST_CITIES } from "@/data/qaTestCities";
+import { humanizeError } from "@/utils/errors";
 
 const auth = useAuthStore();
 const notifs = useNotificationsStore();
@@ -30,6 +31,7 @@ const { relativeTime } = useFormatters();
 
 const tradie = ref<WithId<TradespersonDoc> | null>(null);
 const loadingTradie = ref(true);
+const loadError = ref<string | null>(null);
 const posts = ref<WithId<JobPostDoc>[]>([]);
 // Scoped postings a project manager invited this tradie to quote on — shown
 // regardless of service area (the invite is direct, not proximity-based).
@@ -101,7 +103,22 @@ onMounted(async () => {
       qaCity.value = saved;
     }
   }
-  tradie.value = await getTradesperson(auth.fbUser.uid);
+  await loadTradie();
+});
+
+async function loadTradie() {
+  if (!auth.fbUser) return;
+  loadError.value = null;
+  loadingTradie.value = true;
+  try {
+    tradie.value = await getTradesperson(auth.fbUser.uid);
+  } catch (e) {
+    // A transient fetch failure must surface a retry, not an infinite spinner
+    // (loadingTradie previously never cleared on throw) (P1-05).
+    loadError.value = humanizeError(e);
+    loadingTradie.value = false;
+    return;
+  }
   loadingTradie.value = false;
 
   if (!tradie.value || !tradie.value.isVisible) return;
@@ -111,15 +128,18 @@ onMounted(async () => {
 
   // Track this tradie's own applications so we can filter the feed. Independent
   // of the service area, so it runs even when only a QA override sets the centre.
+  // Guard against a double-subscribe if loadTradie() runs again via retry.
+  unsubApps?.();
   unsubApps = subscribeMyApplications(auth.fbUser.uid, (apps: WithId<ApplicationDoc>[]) => {
     appliedPostIds.value = new Set(apps.map((a) => a.postId));
   });
 
   // PM invitations to quote — independent of service area / feed centre.
+  unsubInvited?.();
   unsubInvited = subscribeInvitedJobPosts(auth.fbUser.uid, (p) => (invitedPosts.value = p));
 
   maybeStartFeed();
-});
+}
 
 // Persist the QA city override (QA only).
 watch(qaCity, (val) => {
@@ -262,7 +282,14 @@ function openRefer(post: WithId<JobPostDoc>) {
       </div>
     </div>
 
-    <LoadingState v-if="loadingTradie" class="mt-6" label="Loading your profile…" />
+    <div v-if="loadError" class="bs-card p-6 text-center max-w-md mx-auto mt-6">
+      <i class="pi pi-exclamation-triangle text-2xl text-[color:var(--bs-muted)]" aria-hidden="true"></i>
+      <p class="mt-3 font-medium">Couldn't load the job board</p>
+      <p class="mt-1 text-sm text-[color:var(--bs-muted)]">{{ loadError }}</p>
+      <Button label="Try again" icon="pi pi-refresh" class="mt-4" :loading="loadingTradie" @click="loadTradie" />
+    </div>
+
+    <LoadingState v-else-if="loadingTradie" class="mt-6" label="Loading your profile…" />
 
     <Message
       v-else-if="!tradie?.isVisible && tradie?.vettingStatus === 'approved'"
