@@ -16,7 +16,10 @@ const PROVINCE_CODES = new Set([
 const FSA_PREFIX = /^[A-Z][0-9]?[A-Z]?$/;
 
 const Input = z.object({
-  id: z.string().trim().min(1).max(128).optional(),
+  // .nullable(): the client sends id: null when creating a new region (present
+  // only on edit). The callable SDK delivers it as null, which bare .optional()
+  // rejects — that broke region creation entirely. Same fix as provisionAccount.
+  id: z.string().trim().min(1).max(128).nullable().optional(),
   name: z.string().trim().min(2).max(80),
   province: z
     .string()

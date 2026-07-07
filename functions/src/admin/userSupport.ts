@@ -217,7 +217,10 @@ export const adminSetTempPassword = onCall(CALLABLE_OPTS, async (req) => {
 const DisabledInput = z.object({
   targetUid: z.string().min(1).max(128),
   disabled: z.boolean(),
-  reason: z.string().trim().max(500).optional(),
+  // .nullable(): the admin form sends this key unconditionally and the callable
+  // SDK delivers an unset value as null, which bare .optional() rejects (would
+  // 400 a suspend/unsuspend when no reason is typed).
+  reason: z.string().trim().max(500).nullable().optional(),
 });
 
 /**
@@ -363,7 +366,9 @@ export const adminGetUserAuthState = onCall(CALLABLE_OPTS, async (req) => {
 
 const SoftDeleteInput = z.object({
   targetUid: z.string().min(1).max(128),
-  reason: z.string().trim().max(2000).optional(),
+  // .nullable(): same reason as DisabledInput above — the key is always sent,
+  // arrives as null when unset, and bare .optional() would 400 the soft-delete.
+  reason: z.string().trim().max(2000).nullable().optional(),
 });
 
 /**

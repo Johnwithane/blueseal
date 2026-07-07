@@ -159,6 +159,15 @@ describe("adminSetUserDisabled", () => {
     });
   });
 
+  it("accepts an explicit null reason (callable SDK sends unset fields as null)", async () => {
+    // Regression for the 2026-07-07 null-schema bug class: the admin form always
+    // includes `reason`, so an unset value arrives as null; the schema must not
+    // reject it. Without .nullable() this threw invalid-argument.
+    await callFn(adminSetUserDisabled, adminReq({ targetUid: UID, disabled: true, reason: null }));
+    expect(adminAuth.updateUser).toHaveBeenCalledWith(UID, { disabled: true });
+    expect(fakeDb.peek(`users/${UID}`)).toMatchObject({ disabledReason: null });
+  });
+
   it("clears the mirror on restore (enable) without revoking", async () => {
     fakeDb.seed(`users/${UID}`, { disabledAt: "__serverTimestamp__", disabledReason: "x" });
     await callFn(adminSetUserDisabled, adminReq({ targetUid: UID, disabled: false }));
@@ -233,6 +242,16 @@ describe("adminSoftDeleteUser / adminRestoreUser", () => {
     expect(fakeDb.peek(`users/${UID}`)).toMatchObject({ deletedAt: "__serverTimestamp__" });
     expect(fakeDb.peek(`tradespeople/${UID}`)).toMatchObject({ isVisible: false });
     expect(adminAuth.revokeRefreshTokens).toHaveBeenCalledWith(UID);
+  });
+
+  it("accepts an explicit null reason (callable SDK sends unset fields as null)", async () => {
+    // Regression for the same null-schema bug class as adminSetUserDisabled.
+    fakeDb.seed(`users/${UID}`, { email: "old@example.com" });
+    const res = (await callFn(adminSoftDeleteUser, adminReq({ targetUid: UID, reason: null }))) as {
+      alreadyPending: boolean;
+    };
+    expect(res.alreadyPending).toBe(false);
+    expect(fakeDb.peek(`users/${UID}`)).toMatchObject({ deletedAt: "__serverTimestamp__" });
   });
 
   it("is idempotent when already pending deletion", async () => {

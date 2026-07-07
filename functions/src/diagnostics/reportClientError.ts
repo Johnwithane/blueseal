@@ -25,12 +25,17 @@ import { db } from "../lib/admin";
  */
 const Input = z.object({
   message: z.string().trim().min(1).max(1000),
-  stack: z.string().max(4000).optional(),
+  // .nullable() throughout: the client always includes these keys and the
+  // callable SDK delivers unset values as null, which bare .optional() rejects.
+  // safeParse then returns {ok:false} and this fire-and-forget report is
+  // silently dropped — so client error telemetry never reaches the admin queue
+  // whenever a report lacks a stack/context (or appVersion is unset).
+  stack: z.string().max(4000).nullable().optional(),
   source: z.enum(["vue", "window", "unhandledrejection", "manual"]).default("manual"),
-  context: z.string().max(300).optional(),
-  route: z.string().max(500).optional(),
-  userAgent: z.string().max(500).optional(),
-  appVersion: z.string().max(80).optional(),
+  context: z.string().max(300).nullable().optional(),
+  route: z.string().max(500).nullable().optional(),
+  userAgent: z.string().max(500).nullable().optional(),
+  appVersion: z.string().max(80).nullable().optional(),
 });
 
 export const reportClientError = onCall(CALLABLE_OPTS, async (req) => {

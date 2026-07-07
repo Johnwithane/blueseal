@@ -24,8 +24,10 @@ import { enforceRateLimit } from "../lib/rateLimit";
 const Input = z.object({
   prospectId: z.string().trim().min(1).max(64),
   // Optional free-text note ("this is my business, please remove"). Stored for
-  // the good-faith audit trail; never shown publicly.
-  reason: z.string().trim().max(500).optional(),
+  // the good-faith audit trail; never shown publicly. .nullable(): the client
+  // sends this key unconditionally and the callable SDK delivers an unset value
+  // as null, which bare .optional() rejects (would 400 the takedown).
+  reason: z.string().trim().max(500).nullable().optional(),
 });
 
 // Per-IP daily cap. A real owner needs one removal; this stops a script from

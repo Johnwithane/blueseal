@@ -15,7 +15,10 @@ import { notify } from "../lib/notify";
 const Input = z.object({
   postId: z.string().min(1).max(128),
   toUserId: z.string().min(1).max(128),
-  message: z.string().trim().max(300).optional(),
+  // .nullable(): client sends this key unconditionally; the callable SDK turns
+  // an unset value into null, which bare .optional() rejects (would 400 a
+  // referral sent without a note).
+  message: z.string().trim().max(300).nullable().optional(),
 });
 
 const DAILY_REFERRAL_CAP = 20;

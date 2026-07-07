@@ -9,7 +9,9 @@ import { logAdminAction } from "../lib/audit";
 import { deliver } from "../lib/brandedMail";
 
 const Input = z.object({
-  reason: z.string().trim().max(2000).optional(),
+  // .nullable(): client sends this key unconditionally; the callable SDK turns an
+  // unset value into null, which bare .optional() rejects (would 400 deletion).
+  reason: z.string().trim().max(2000).nullable().optional(),
 });
 
 /**

@@ -26,7 +26,10 @@ const Input = z
       .max(200)
       .optional(),
     toDisplayName: z.string().trim().min(1).max(80),
-    message: z.string().trim().max(500).optional(),
+    // .nullable(): client sends this key unconditionally; the callable SDK turns
+    // an unset value into null, which bare .optional() rejects (would 400 the
+    // vouch request when sent without a personal note).
+    message: z.string().trim().max(500).nullable().optional(),
   })
   .refine((v) => (v.toUserId == null) !== (v.toEmail == null), {
     message: "Provide either toUserId or toEmail, not both",

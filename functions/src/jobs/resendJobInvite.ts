@@ -20,8 +20,11 @@ import { inviteMagicLink, isInviteEmailSuppressed, sendInviteEmail } from "./inv
 const Input = z.object({
   jobId: z.string().min(1).max(128),
   channel: z.enum(["email", "link"]),
-  newEmail: z.string().trim().toLowerCase().email().max(200).optional(),
-  newClientName: z.string().trim().min(1).max(80).optional(),
+  // .nullable(): both keys are sent unconditionally by the client and the
+  // callable SDK delivers unset values as null, which bare .optional() rejects
+  // (would 400 the fix-and-resend flow). Both are consumed null-safely below.
+  newEmail: z.string().trim().toLowerCase().email().max(200).nullable().optional(),
+  newClientName: z.string().trim().min(1).max(80).nullable().optional(),
 });
 
 const INVITE_TTL_MS = 30 * 24 * 60 * 60 * 1000;

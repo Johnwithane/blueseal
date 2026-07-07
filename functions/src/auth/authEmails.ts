@@ -161,13 +161,16 @@ const SignInLinkInput = z.object({
   email: z.string().trim().toLowerCase().email().max(200),
   // Optional post-login destination (e.g. a notification deep link). Validated
   // below to a same-origin relative path so it can't become an open redirect.
-  redirect: z.string().trim().max(512).optional(),
+  // .nullable(): the client always sends this key and the callable SDK delivers
+  // an unset value as null, which bare .optional() rejects — that 400s the
+  // passwordless sign-in link on every normal (no ?redirect=) visit.
+  redirect: z.string().trim().max(512).nullable().optional(),
 });
 
 // Only allow a relative path ("/jobs/123"), never an absolute or
 // protocol-relative URL — otherwise the link could bounce the user off-site
 // after sign-in.
-function safeRelative(path: string | undefined): string | null {
+function safeRelative(path: string | null | undefined): string | null {
   if (!path || !path.startsWith("/") || path.startsWith("//") || path.startsWith("/\\")) return null;
   return path;
 }
@@ -185,7 +188,7 @@ export const requestSignInLink = onCall(CALLABLE_OPTS, async (req) => {
   const parsed = SignInLinkInput.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", "Enter a valid email.");
   const { email } = parsed.data;
-  const redirect = safeRelative(parsed.data.redirect);
+  const redirect = safeRelative(parsed.data.redirect ?? undefined);
 
   await enforceRateLimit(
     emailHashOf(email),
