@@ -2,24 +2,23 @@
 import { ref, watch } from "vue";
 import InputText from "primevue/inputtext";
 import Button from "primevue/button";
-import { useAuthStore } from "@/stores/auth";
-import { searchVisibleTradiesByName } from "@/firebase/services/tradespeople";
+import { searchRosterCandidates, type RosterCard } from "@/firebase/services/rosterDirectory";
 import { tradeLabel } from "@/data/trades";
 import { humanizeError } from "@/utils/errors";
-import type { TradespersonDoc, WithId } from "@/firebase/interfaces";
 import InitialsAvatar from "@/components/InitialsAvatar.vue";
 
 // "Already on Blue Seal?" — the in-cockpit way a project manager adds a
 // tradesperson to their roster without leaving the page. Type a name, the
-// visible directory is searched by substring, tap Add. rosterIds (the parent's
-// live saved set) tells us who's already on the roster so the row shows a
-// "On your roster" badge instead of a duplicate Add.
+// server searches every tradesperson account by substring (verified,
+// onboarding, or role-only — not just publicly-listed tradies), tap Add.
+// rosterIds (the parent's live saved set) tells us who's already on the roster
+// so the row shows an "On your roster" badge instead of a duplicate Add. The
+// callable already excludes the caller, so no self-filtering here.
 const props = defineProps<{ rosterIds: Set<string> }>();
-const emit = defineEmits<{ add: [tradie: WithId<TradespersonDoc>] }>();
+const emit = defineEmits<{ add: [tradie: RosterCard] }>();
 
-const auth = useAuthStore();
 const query = ref("");
-const results = ref<WithId<TradespersonDoc>[]>([]);
+const results = ref<RosterCard[]>([]);
 const searching = ref(false);
 const error = ref<string | null>(null);
 
@@ -40,9 +39,7 @@ watch(query, (v) => {
   searching.value = true;
   timer = window.setTimeout(async () => {
     try {
-      const found = await searchVisibleTradiesByName(q, 8);
-      // A PM is a client account, but guard against ever listing themselves.
-      results.value = found.filter((t) => t.id !== auth.fbUser?.uid);
+      results.value = await searchRosterCandidates(q);
     } catch (e) {
       error.value = humanizeError(e);
     } finally {
@@ -51,7 +48,8 @@ watch(query, (v) => {
   }, 250);
 });
 
-function tradesText(t: WithId<TradespersonDoc>): string {
+function tradesText(t: RosterCard): string {
+  if (t.profileState === "no_profile") return "Hasn't set up their profile yet";
   const ts = (t.trades ?? []).map((k) => tradeLabel(k));
   if (!ts.length) return "Tradesperson";
   return ts.slice(0, 2).join(" · ") + (ts.length > 2 ? ` +${ts.length - 2}` : "");
@@ -73,10 +71,10 @@ function tradesText(t: WithId<TradespersonDoc>): string {
     </div>
 
     <div class="relative mt-3">
-      <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--bs-muted)] text-sm"></i>
+      <i class="pi pi-search pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[color:var(--bs-muted)]"></i>
       <InputText
         v-model="query"
-        class="w-full pl-9"
+        class="w-full !pl-11"
         placeholder="Search tradespeople by name…"
         maxlength="80"
       />
@@ -91,16 +89,22 @@ function tradesText(t: WithId<TradespersonDoc>): string {
     <ul v-else-if="results.length" class="mt-3 space-y-2">
       <li
         v-for="t in results"
-        :key="t.id"
+        :key="t.uid"
         class="flex items-center gap-3 rounded-lg border border-[color:var(--bs-border)] p-2"
       >
         <InitialsAvatar :name="t.displayName" :photo-url="t.photoURL" :size="36" tone="solid" />
         <div class="min-w-0 flex-1">
-          <p class="font-medium text-sm truncate">{{ t.displayName ?? "Tradesperson" }}</p>
+          <p class="font-medium text-sm truncate">{{ t.displayName || "Tradesperson" }}</p>
           <p class="text-xs text-[color:var(--bs-muted)] truncate">{{ tradesText(t) }}</p>
+          <p
+            v-if="t.profileState !== 'live'"
+            class="text-[11px] text-[color:var(--bs-warning-text)] truncate mt-0.5"
+          >
+            <i class="pi pi-clock text-[9px] mr-1"></i>Not verified yet
+          </p>
         </div>
         <span
-          v-if="props.rosterIds.has(t.id)"
+          v-if="props.rosterIds.has(t.uid)"
           class="inline-flex items-center gap-1 text-xs font-semibold text-[color:var(--bs-success-text)] bg-[color:var(--bs-success-tint)] rounded-md px-2.5 py-1.5"
         >
           <i class="pi pi-check"></i> On your roster

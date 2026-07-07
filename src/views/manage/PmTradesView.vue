@@ -6,18 +6,13 @@ import { useAuthStore } from "@/stores/auth";
 import { useSeo } from "@/composables/useSeo";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
-import {
-  subscribeSavedTradieIds,
-  hydrateSavedTradies,
-  saveTradie,
-  unsaveTradie,
-} from "@/firebase/services/savedTradies";
+import { subscribeSavedTradieIds, saveTradie, unsaveTradie } from "@/firebase/services/savedTradies";
+import { getRosterCards, type RosterCard } from "@/firebase/services/rosterDirectory";
 import { tradeLabel } from "@/data/trades";
 import PmRosterSearch from "@/components/manage/PmRosterSearch.vue";
 import PmEmailInviteForm from "@/components/manage/PmEmailInviteForm.vue";
 import PmInviteLinkCard from "@/components/manage/PmInviteLinkCard.vue";
 import InitialsAvatar from "@/components/InitialsAvatar.vue";
-import type { TradespersonDoc, WeeklyAvailability, WithId } from "@/firebase/interfaces";
 
 // The PM's roster: the tradespeople they work with. Two clear ways to grow it —
 // add someone already on Blue Seal (in-cockpit search), or invite someone who
@@ -30,7 +25,7 @@ const toast = useToast();
 
 const loading = ref(true);
 const rosterIds = ref<Set<string>>(new Set());
-const roster = ref<WithId<TradespersonDoc>[]>([]);
+const roster = ref<RosterCard[]>([]);
 let unsub: (() => void) | null = null;
 
 onMounted(() => {
@@ -39,36 +34,39 @@ onMounted(() => {
     loading.value = false;
     return;
   }
+  // getRosterCards reads via the admin SDK, so unverified + role-only members
+  // (invisible to the client) still render here — this is the one roster surface
+  // that shows the full crew. Dispatch/featuring stay verified-only elsewhere.
   unsub = subscribeSavedTradieIds(uid, async (ids) => {
     rosterIds.value = ids;
-    roster.value = await hydrateSavedTradies([...ids]);
+    roster.value = await getRosterCards([...ids]);
     loading.value = false;
   });
 });
 onUnmounted(() => unsub?.());
 
-async function add(t: WithId<TradespersonDoc>): Promise<void> {
+async function add(t: RosterCard): Promise<void> {
   const uid = auth.fbUser?.uid;
   if (!uid) return;
   try {
-    await saveTradie(uid, t.id);
+    await saveTradie(uid, t.uid);
     toast.success("Added to your roster", "Your matching project jobs will now go to them for a quote.");
   } catch (e) {
     toast.error(humanizeError(e));
   }
 }
 
-async function remove(t: WithId<TradespersonDoc>): Promise<void> {
+async function remove(t: RosterCard): Promise<void> {
   const uid = auth.fbUser?.uid;
   if (!uid) return;
   try {
-    await unsaveTradie(uid, t.id);
+    await unsaveTradie(uid, t.uid);
   } catch (e) {
     toast.error(humanizeError(e));
   }
 }
 
-function tradesText(t: WithId<TradespersonDoc>): string {
+function tradesText(t: RosterCard): string {
   const ts = (t.trades ?? []).map((k) => tradeLabel(k));
   if (!ts.length) return "Tradesperson";
   return ts.slice(0, 2).join(" · ") + (ts.length > 2 ? ` +${ts.length - 2}` : "");
@@ -76,14 +74,12 @@ function tradesText(t: WithId<TradespersonDoc>): string {
 
 // Which weekdays the contractor lists as available (mon→sun), for the roster
 // at-a-glance. Empty when they haven't set any availability.
-const DAY_LABELS: Array<[keyof WeeklyAvailability, string]> = [
+const DAY_LABELS: Array<[string, string]> = [
   ["mon", "Mon"], ["tue", "Tue"], ["wed", "Wed"], ["thu", "Thu"],
   ["fri", "Fri"], ["sat", "Sat"], ["sun", "Sun"],
 ];
-function availableDays(t: WithId<TradespersonDoc>): string[] {
-  const a = t.weeklyAvailability;
-  if (!a) return [];
-  return DAY_LABELS.filter(([k]) => (a[k]?.length ?? 0) > 0).map(([, l]) => l);
+function availableDays(t: RosterCard): string[] {
+  return DAY_LABELS.filter(([k]) => t.availableDayKeys.includes(k)).map(([, l]) => l);
 }
 </script>
 
@@ -131,19 +127,28 @@ function availableDays(t: WithId<TradespersonDoc>): string[] {
       </p>
     </div>
     <ul v-else class="grid grid-cols-1 gap-2">
-      <li v-for="t in roster" :key="t.id" class="bs-card p-3 flex items-center gap-3">
+      <li v-for="t in roster" :key="t.uid" class="bs-card p-3 flex items-center gap-3">
         <InitialsAvatar :name="t.displayName" :photo-url="t.photoURL" :size="40" tone="solid" />
         <div class="min-w-0 flex-1">
-          <p class="font-medium truncate">{{ t.displayName ?? "Tradesperson" }}</p>
-          <p class="text-xs text-[color:var(--bs-muted)] truncate">{{ tradesText(t) }}</p>
+          <p class="font-medium truncate">{{ t.displayName || "Tradesperson" }}</p>
+          <p class="text-xs text-[color:var(--bs-muted)] truncate">
+            {{ t.profileState === "no_profile" ? "Hasn't set up their profile yet" : tradesText(t) }}
+          </p>
           <p
-            v-if="availableDays(t).length"
+            v-if="t.profileState === 'live' && availableDays(t).length"
             class="text-[11px] text-[color:var(--bs-muted)] truncate mt-0.5"
           >
             <i class="pi pi-calendar text-[9px] mr-1"></i>Available {{ availableDays(t).join(", ") }}
           </p>
+          <p
+            v-else-if="t.profileState !== 'live'"
+            class="text-[11px] text-[color:var(--bs-warning-text)] truncate mt-0.5"
+          >
+            <i class="pi pi-clock text-[9px] mr-1"></i>Not verified yet. You can send them jobs once
+            they're live.
+          </p>
         </div>
-        <RouterLink :to="{ name: 'RequestQuote', params: { uid: t.id } }">
+        <RouterLink v-if="t.profileState === 'live'" :to="{ name: 'RequestQuote', params: { uid: t.uid } }">
           <Button label="Request" icon="pi pi-send" size="small" outlined />
         </RouterLink>
         <Button

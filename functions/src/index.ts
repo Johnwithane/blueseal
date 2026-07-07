@@ -112,6 +112,10 @@ export { claimPmProfileSlug } from "./projectManager/claimProfileSlug";
 export { signPmAgreement } from "./projectManager/signAgreement";
 // Feature preferred contractors on the public profile (P5b), with a contractor opt-out.
 export { setFeaturedContractor, setPmFeatureOptOut } from "./projectManager/featuredContractors";
+// Find + hydrate roster tradespeople the PM can't read directly (unverified /
+// role-only), sanitized server-side — the in-cockpit "Already on Blue Seal?"
+// search and the roster list are backed by these.
+export { searchRosterCandidates, getRosterCards } from "./projectManager/rosterDirectory";
 // Invite a tradesperson to the PM's roster by name + email; auto-join on signup.
 export { sendRosterInvite } from "./projectManager/sendRosterInvite";
 export { revokeRosterInvite } from "./projectManager/revokeRosterInvite";
