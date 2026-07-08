@@ -22,10 +22,13 @@ async function drivingPmId(jobId: string): Promise<string | null> {
  * Accrue the PM's 10% on a paid service fee, if the job is PM-driven AND the PM is
  * still active (mirrors the rep path, which skips a deactivated rep). Best-effort:
  * the caller guards it so a commission failure never rolls back the payment.
+ *
+ * `sourceRef` keys the ledger entry: the final invoice passes the invoiceId, the
+ * upfront fee passes `upfront_<jobId>` (P3-02), so both coexist on one job.
  */
 export async function accruePmServiceFee(args: {
   jobId: string;
-  invoiceId: string;
+  sourceRef: string;
   tradespersonId: string;
   grossCents: number;
 }): Promise<void> {
@@ -40,27 +43,30 @@ export async function accruePmServiceFee(args: {
     pmId,
     tradespersonId: args.tradespersonId,
     source: "service_fee",
-    sourceRef: args.invoiceId,
+    sourceRef: args.sourceRef,
     grossCents: args.grossCents,
   });
 }
 
 /**
- * Reverse the PM's commission on a fully-refunded / lost-dispute service fee.
+ * Reverse the PM's commission on a refunded / lost-dispute service fee.
  * Resolves the PM from the immutable job stamp (NO active check — a reversal must
  * land even if the PM was deactivated since accrual); reversePmCommission no-ops
- * when there was no PM accrual. The invoiceId == jobId for service-fee invoices,
- * but we read the invoice's jobId field defensively.
+ * when there was no PM accrual. `proportion` claws back the refunded share (P3-05,
+ * default 1 = full). `sourceRef` matches the accrual key (invoiceId or `upfront_<jobId>`).
  */
-export async function reversePmServiceFee(args: { invoiceId: string }): Promise<void> {
-  const invSnap = await db.doc(`invoices/${args.invoiceId}`).get();
-  const jobId = (invSnap.data()?.jobId as string | undefined) ?? args.invoiceId;
-  const pmId = await drivingPmId(jobId);
+export async function reversePmServiceFee(args: {
+  jobId: string;
+  sourceRef: string;
+  proportion?: number;
+}): Promise<void> {
+  const pmId = await drivingPmId(args.jobId);
   if (!pmId) return;
   const reversedCents = await reversePmCommission({
     pmId,
     source: "service_fee",
-    sourceRef: args.invoiceId,
+    sourceRef: args.sourceRef,
+    proportion: args.proportion,
   });
   // Only notify on a real clawback (a waived/Pro fee accrued nothing → no reversal).
   if (reversedCents && reversedCents > 0) {

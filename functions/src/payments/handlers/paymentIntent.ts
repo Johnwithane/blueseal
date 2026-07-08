@@ -128,12 +128,26 @@ async function applyTransition(
       return { changed: false, reason: "duplicate-event" };
     }
     if (!expectedFromStatuses.includes(data.status)) {
-      logger.warn("paymentIntent handler: wrong source status", {
-        invoiceId: invoiceRef.id,
-        paymentIntentId: pi.id,
-        currentStatus: data.status,
-        expectedFromStatuses,
-      });
+      // Offline-mark + in-flight card race (P3-01): a card payment SUCCEEDED
+      // (toStatus "paid") after the invoice was already settled offline — real
+      // money moved twice. Mirror the upfront path and log an ERROR for admin
+      // review + refund, not a bare warn that nobody sees.
+      const alreadySettled = ["paid", "refunded", "partially_refunded", "disputed", "void"];
+      if (toStatus === "paid" && alreadySettled.includes(data.status)) {
+        logger.error("paymentIntent succeeded after offline mark — double payment, admin review", {
+          invoiceId: invoiceRef.id,
+          paymentIntentId: pi.id,
+          chargeId: chargeId(pi),
+          currentStatus: data.status,
+        });
+      } else {
+        logger.warn("paymentIntent handler: wrong source status", {
+          invoiceId: invoiceRef.id,
+          paymentIntentId: pi.id,
+          currentStatus: data.status,
+          expectedFromStatuses,
+        });
+      }
       return { changed: false, reason: "wrong-status" };
     }
     tx.set(
@@ -253,7 +267,7 @@ export async function handlePaymentIntentSucceeded(
     await accruePmServiceFee({
       // Service-fee invoices are keyed by jobId; fall back to the doc id.
       jobId: inv.data.jobId ?? inv.ref.id,
-      invoiceId: inv.ref.id,
+      sourceRef: inv.ref.id,
       tradespersonId: result.tradespersonId,
       grossCents: inv.data.payment?.serviceFee?.platformPortionCents ?? 0,
     });

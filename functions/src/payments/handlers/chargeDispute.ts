@@ -246,8 +246,11 @@ export async function handleChargeDisputeClosed(
         });
       }
       // Mirror for the PM commission (P4) when the job was PM-driven. No-ops otherwise.
+      // A lost dispute is a full clawback (proportion defaults to 1).
       try {
-        await reversePmServiceFee({ invoiceId: inv.ref.id });
+        const invSnap = await inv.ref.get();
+        const jobId = (invSnap.data()?.jobId as string | undefined) ?? inv.ref.id;
+        await reversePmServiceFee({ jobId, sourceRef: inv.ref.id });
       } catch (err) {
         logger.error("disputeClosed: PM commission reversal failed", {
           invoiceId: inv.ref.id,

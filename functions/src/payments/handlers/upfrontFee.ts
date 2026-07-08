@@ -17,6 +17,8 @@ import { logger } from "firebase-functions/v2";
 import { db } from "../../lib/admin";
 import { postSystemMessage } from "../../lib/chatSystemMessage";
 import { notify } from "../../lib/notify";
+import { accrueCommission } from "../../lib/commissionAccrual";
+import { accruePmServiceFee } from "../../lib/pmCommission";
 import type { StripePaymentIntent } from "./shared";
 
 interface JobUpfrontLookup {
@@ -112,7 +114,12 @@ export async function handleUpfrontFeeSucceeded(
         },
         { merge: true },
       );
-      return { flipped: false as const };
+      // Still accrue commission — the cap was banked, real platform revenue moved.
+      return {
+        flipped: false as const,
+        tradespersonId: (data.tradespersonId as string) ?? "",
+        platformPortionCents: platform,
+      };
     }
 
     tx.update(job.ref, {
@@ -131,10 +138,50 @@ export async function handleUpfrontFeeSucceeded(
       chatId: (data.chatId as string) ?? "",
       amountCents: upfront?.amountCents ?? 0,
       chargeTotalCents: upfront?.payment?.serviceFee?.chargeTotalCents ?? upfront?.amountCents ?? 0,
+      platformPortionCents: platform,
     };
   });
 
-  if (!result || !result.flipped) return;
+  if (!result) return;
+
+  // Sales-rep + PM commission accrual on the upfront fee's platform portion
+  // (P3-02, locked in MONETIZATION.md §10b). Distinct `upfront_<jobId>` sourceRef
+  // so it coexists with the final invoice's `service_fee` entry; reversed on an
+  // upfront refund (chargeRefunded handleUpfrontRefund). Runs on BOTH the normal
+  // flip and the offline-mark race — both banked the cap, so both earned it.
+  // Best-effort + guarded + idempotent (deterministic ledger id), exactly like
+  // the invoice path, so a commission failure can never roll back the payment.
+  if (result.platformPortionCents > 0 && result.tradespersonId) {
+    const upfrontRef = `upfront_${job.ref.id}`;
+    try {
+      await accrueCommission({
+        tradespersonId: result.tradespersonId,
+        source: "service_fee",
+        sourceRef: upfrontRef,
+        grossCents: result.platformPortionCents,
+      });
+    } catch (err) {
+      logger.error("upfrontFee succeeded: rep commission accrual failed", {
+        jobId: job.ref.id,
+        err: err instanceof Error ? err.message : String(err),
+      });
+    }
+    try {
+      await accruePmServiceFee({
+        jobId: job.ref.id,
+        sourceRef: upfrontRef,
+        tradespersonId: result.tradespersonId,
+        grossCents: result.platformPortionCents,
+      });
+    } catch (err) {
+      logger.error("upfrontFee succeeded: PM commission accrual failed", {
+        jobId: job.ref.id,
+        err: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  if (!result.flipped) return;
 
   if (result.chatId) {
     await postSystemMessage(

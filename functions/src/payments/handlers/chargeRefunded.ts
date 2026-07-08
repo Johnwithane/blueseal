@@ -133,6 +133,30 @@ async function handleUpfrontRefund(charge: StripeCharge, eventId: string): Promi
   });
   if (!parties) return true;
 
+  // Reverse rep + PM commission accrued on the upfront fee's platform portion
+  // (P3-02), proportional to the refunded share of the charge (P3-05). Keyed on
+  // the same `upfront_<jobId>` sourceRef the accrual used; no-ops when nothing
+  // accrued (unowned tradie / waived fee). Guarded — a reversal failure must
+  // never roll back the recorded refund.
+  const proportion = charge.amount > 0 ? charge.amount_refunded / charge.amount : 1;
+  const upfrontRef = `upfront_${jobRef.id}`;
+  try {
+    await reverseCommission({ source: "service_fee", sourceRef: upfrontRef, proportion });
+  } catch (err) {
+    logger.error("chargeRefunded: upfront rep commission reversal failed", {
+      jobId: jobRef.id,
+      err: err instanceof Error ? err.message : String(err),
+    });
+  }
+  try {
+    await reversePmServiceFee({ jobId: jobRef.id, sourceRef: upfrontRef, proportion });
+  } catch (err) {
+    logger.error("chargeRefunded: upfront PM commission reversal failed", {
+      jobId: jobRef.id,
+      err: err instanceof Error ? err.message : String(err),
+    });
+  }
+
   const amount = fmtMoney(charge.amount_refunded, "CAD");
   await Promise.all([
     notify({
@@ -267,14 +291,16 @@ export async function handleChargeRefunded(
     );
   });
 
-  // Reverse the sales-rep commission when the invoice is FULLY refunded: Stripe
-  // auto-refunds the application fee Blue Seal kept, so the platform revenue the
-  // rep earned 10% on is gone. Partial refunds aren't clawed back (the fee is
-  // retained on partial refunds and there's no finalized proportional policy —
-  // see PROFESSIONAL_TASKS.md). Idempotent on the invoiceId + fully guarded.
-  if (isFullyRefunded(charge)) {
+  // Reverse rep + PM commission in proportion to the refunded share of the
+  // charge (P3-05, locked in MONETIZATION.md §10b). A partial refund claws back
+  // that fraction of the accrued commission; a full refund reverses 100%.
+  // Idempotent on the invoiceId (the reversal doc escalates in place toward the
+  // cumulative refunded share) + fully guarded so a reversal failure can never
+  // roll back the recorded refund.
+  {
+    const proportion = charge.amount > 0 ? charge.amount_refunded / charge.amount : 1;
     try {
-      await reverseCommission({ source: "service_fee", sourceRef: ref.id });
+      await reverseCommission({ source: "service_fee", sourceRef: ref.id, proportion });
     } catch (err) {
       logger.error("chargeRefunded: service-fee commission reversal failed", {
         invoiceId: ref.id,
@@ -283,7 +309,9 @@ export async function handleChargeRefunded(
     }
     // Mirror for the PM commission (P4) when the job was PM-driven. No-ops otherwise.
     try {
-      await reversePmServiceFee({ invoiceId: ref.id });
+      const invSnap = await ref.get();
+      const jobId = (invSnap.data()?.jobId as string | undefined) ?? ref.id;
+      await reversePmServiceFee({ jobId, sourceRef: ref.id, proportion });
     } catch (err) {
       logger.error("chargeRefunded: PM commission reversal failed", {
         invoiceId: ref.id,

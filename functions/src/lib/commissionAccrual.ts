@@ -93,15 +93,47 @@ export async function accrueCommission(
 export interface ReverseCommissionInput {
   source: CommissionSource;
   sourceRef: string;
+  /**
+   * Fraction of the accrued commission to reverse, clamped to [0,1] (P3-05).
+   * Driven by the CUMULATIVE refunded share of the charge, so a run of partial
+   * refunds on one charge escalates the same reversal doc toward the total.
+   * Defaults to 1 (a full refund reverses 100% — unchanged legacy behaviour).
+   */
+  proportion?: number;
 }
 
 /**
- * Reverse a previously accrued commission (full refund or lost chargeback) by
+ * The commission cents to reverse for a given refund proportion. Pure so the
+ * partial-refund math is unit-testable without Firestore. `proportion` is
+ * clamped to [0,1]; a full refund (1) reverses the whole commission.
+ */
+export function computeReversalCents(
+  originalCommissionCents: number,
+  proportion: number,
+): number {
+  const p = Math.max(0, Math.min(1, proportion));
+  return Math.round(originalCommissionCents * p);
+}
+
+/**
+ * Reverse a previously accrued commission (refund or lost chargeback) by
  * writing a SEPARATE offsetting entry — `status: "reversed"`, `reversalOf` =
- * the original id, mirroring the original's amounts. The original is left
- * untouched so the ledger is append-only. Idempotent via a deterministic
- * reversal id; no-ops when there was no accrual to reverse (no owner, waived
- * fee, or the event never accrued).
+ * the original id — leaving the original untouched so the ledger stays
+ * append-only. The M6 payout nets accrued minus reversed, so an offsetting
+ * entry claws it back exactly.
+ *
+ * Proportional (P3-05): `commissionCents` is `round(orig × proportion)` where
+ * `proportion` is the CUMULATIVE refunded share. The reversal doc is a single
+ * deterministic id carrying the cumulative reversed target, so it's idempotent
+ * two ways: a webhook replay recomputes the same target and overwrites in
+ * place; a later, larger partial refund overwrites it upward. A full refund
+ * (proportion 1) mirrors the whole commission, exactly as before.
+ *
+ * No-ops when there was no accrual to reverse, or when the new target doesn't
+ * exceed what's already been reversed (a shrink can't happen — refunds only
+ * grow). Never clobbers a reversal that a payout already netted: if a further
+ * refund lands after settlement, the delta is written to a separate top-up doc
+ * and flagged for admin review rather than un-netting a settled entry.
  */
 export async function reverseCommission(
   input: ReverseCommissionInput,
@@ -111,7 +143,51 @@ export async function reverseCommission(
   if (!snap.exists) return; // nothing accrued → nothing to reverse
   const orig = snap.data() ?? {};
 
+  const proportion = input.proportion ?? 1;
+  const targetCents = computeReversalCents(orig.commissionCents ?? 0, proportion);
+  if (targetCents <= 0) return; // zero-value refund → nothing to reverse
+
   const id = reversalId(input.source, input.sourceRef);
+  const existing = await db.doc(`commissions/${id}`).get();
+  const prevCents = existing.exists ? Number(existing.data()?.commissionCents ?? 0) : 0;
+  if (existing.exists && targetCents <= prevCents) return; // replay / no growth
+
+  // A further refund after the reversal was already netted into a payout: don't
+  // un-net a settled entry — write the incremental delta to a top-up doc and
+  // flag it. (Rare: needs a payout to land between two partial refunds on one
+  // charge.) The top-up id keys on the cumulative target so replays are idempotent.
+  if (existing.exists && existing.data()?.payoutBatchId != null) {
+    const delta = targetCents - prevCents;
+    const topUpId = `${id}_top_${targetCents}`;
+    await db.doc(`commissions/${topUpId}`).set(
+      {
+        repId: orig.repId,
+        regionId: orig.regionId ?? null,
+        tradespersonId: orig.tradespersonId,
+        ownerKind: orig.ownerKind,
+        source: input.source,
+        sourceRef: input.sourceRef,
+        grossRevenueCents: computeReversalCents(orig.grossRevenueCents ?? 0, proportion) - prevCents,
+        rateBps: orig.rateBps ?? COMMISSION_RATE_BPS,
+        commissionCents: delta,
+        refundProportion: proportion,
+        status: "reversed",
+        payoutBatchId: null,
+        reversalOf: originalId,
+        createdAt: FieldValue.serverTimestamp(),
+      },
+      { merge: false },
+    );
+    logger.error("commission reversal after settlement — top-up written, verify", {
+      id: topUpId,
+      reversalOf: originalId,
+      source: input.source,
+      sourceRef: input.sourceRef,
+      deltaCents: delta,
+    });
+    return;
+  }
+
   await db.doc(`commissions/${id}`).set(
     {
       repId: orig.repId,
@@ -120,11 +196,10 @@ export async function reverseCommission(
       ownerKind: orig.ownerKind,
       source: input.source,
       sourceRef: input.sourceRef,
-      grossRevenueCents: orig.grossRevenueCents ?? 0,
+      grossRevenueCents: computeReversalCents(orig.grossRevenueCents ?? 0, proportion),
       rateBps: orig.rateBps ?? COMMISSION_RATE_BPS,
-      // Mirror the original commission amount — the M6 payout nets accrued minus
-      // reversed, so an equal-and-opposite entry cancels it exactly.
-      commissionCents: orig.commissionCents ?? 0,
+      commissionCents: targetCents,
+      refundProportion: proportion,
       status: "reversed",
       payoutBatchId: null,
       reversalOf: originalId,
@@ -138,7 +213,8 @@ export async function reverseCommission(
     reversalOf: originalId,
     source: input.source,
     sourceRef: input.sourceRef,
-    commissionCents: orig.commissionCents ?? 0,
+    proportion,
+    commissionCents: targetCents,
   });
 }
 
@@ -213,12 +289,16 @@ export interface ReversePmCommissionInput {
   pmId: string;
   source: CommissionSource;
   sourceRef: string;
+  /** Cumulative refunded share to reverse, clamped to [0,1]. Defaults to 1. */
+  proportion?: number;
 }
 
 /**
- * Reverse a PM accrual (full refund / lost dispute) with an offsetting entry.
- * Returns the reversed commission amount in cents, or null when there was nothing
- * to reverse (so the caller can notify only on a real clawback).
+ * Reverse a PM accrual (refund / lost dispute) with an offsetting entry.
+ * Proportional + idempotent exactly like {@link reverseCommission}: the reversal
+ * doc carries the cumulative reversed target and escalates in place on a run of
+ * partial refunds. Returns the NEWLY-reversed cents this call added (the delta),
+ * or null when nothing changed — so the caller notifies only on a real clawback.
  */
 export async function reversePmCommission(input: ReversePmCommissionInput): Promise<number | null> {
   const originalId = pmAccrualId(input.source, input.sourceRef, input.pmId);
@@ -226,7 +306,49 @@ export async function reversePmCommission(input: ReversePmCommissionInput): Prom
   if (!snap.exists) return null; // nothing accrued → nothing to reverse
 
   const orig = snap.data() ?? {};
+  const proportion = input.proportion ?? 1;
+  const targetCents = computeReversalCents(orig.commissionCents ?? 0, proportion);
+  if (targetCents <= 0) return null;
+
   const id = pmReversalId(input.source, input.sourceRef, input.pmId);
+  const existing = await db.doc(`commissions/${id}`).get();
+  const prevCents = existing.exists ? Number(existing.data()?.commissionCents ?? 0) : 0;
+  if (existing.exists && targetCents <= prevCents) return null; // replay / no growth
+
+  // Further refund after settlement: top-up doc, never un-net (see reverseCommission).
+  if (existing.exists && existing.data()?.payoutBatchId != null) {
+    const delta = targetCents - prevCents;
+    const topUpId = `${id}_top_${targetCents}`;
+    await db.doc(`commissions/${topUpId}`).set(
+      {
+        ownerType: "pm",
+        ownerId: input.pmId,
+        repId: null,
+        regionId: null,
+        tradespersonId: orig.tradespersonId,
+        ownerKind: "pm_project",
+        source: input.source,
+        sourceRef: input.sourceRef,
+        grossRevenueCents: computeReversalCents(orig.grossRevenueCents ?? 0, proportion) - prevCents,
+        rateBps: orig.rateBps ?? COMMISSION_RATE_BPS,
+        commissionCents: delta,
+        refundProportion: proportion,
+        status: "reversed",
+        payoutBatchId: null,
+        reversalOf: originalId,
+        createdAt: FieldValue.serverTimestamp(),
+      },
+      { merge: false },
+    );
+    logger.error("pm commission reversal after settlement — top-up written, verify", {
+      id: topUpId,
+      reversalOf: originalId,
+      pmId: input.pmId,
+      deltaCents: delta,
+    });
+    return delta;
+  }
+
   await db.doc(`commissions/${id}`).set(
     {
       ownerType: "pm",
@@ -237,9 +359,10 @@ export async function reversePmCommission(input: ReversePmCommissionInput): Prom
       ownerKind: "pm_project",
       source: input.source,
       sourceRef: input.sourceRef,
-      grossRevenueCents: orig.grossRevenueCents ?? 0,
+      grossRevenueCents: computeReversalCents(orig.grossRevenueCents ?? 0, proportion),
       rateBps: orig.rateBps ?? COMMISSION_RATE_BPS,
-      commissionCents: orig.commissionCents ?? 0,
+      commissionCents: targetCents,
+      refundProportion: proportion,
       status: "reversed",
       payoutBatchId: null,
       reversalOf: originalId,
@@ -252,7 +375,8 @@ export async function reversePmCommission(input: ReversePmCommissionInput): Prom
     id,
     reversalOf: originalId,
     pmId: input.pmId,
-    commissionCents: orig.commissionCents ?? 0,
+    proportion,
+    commissionCents: targetCents,
   });
-  return Number(orig.commissionCents ?? 0);
+  return targetCents - prevCents;
 }

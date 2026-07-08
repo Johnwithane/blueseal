@@ -18,6 +18,7 @@ import { resolveCommissionOwner } from "../../src/lib/commissionOwner";
 import {
   accrueCommission,
   reverseCommission,
+  computeReversalCents,
   accruePmCommission,
   reversePmCommission,
 } from "../../src/lib/commissionAccrual";
@@ -234,6 +235,86 @@ describe("reverseCommission", () => {
     await reverseCommission({ source: "service_fee", sourceRef: "never-accrued" });
     expect(fakeDb.peekUnder("commissions")).toHaveLength(0);
   });
+
+  it("reverses PROPORTIONALLY for a partial refund (P3-05)", async () => {
+    await seedAccrual(); // commission 500
+    await reverseCommission({ source: "service_fee", sourceRef: "invoice-9", proportion: 0.3 });
+    expect(fakeDb.peek("commissions/service_fee_invoice-9_reversal")).toMatchObject({
+      commissionCents: 150, // round(500 * 0.3)
+      grossRevenueCents: 1500, // round(5000 * 0.3)
+      refundProportion: 0.3,
+      status: "reversed",
+    });
+    expect(fakeDb.peekUnder("commissions")).toHaveLength(2);
+  });
+
+  it("escalates the same reversal doc as partial refunds accumulate", async () => {
+    await seedAccrual();
+    await reverseCommission({ source: "service_fee", sourceRef: "invoice-9", proportion: 0.3 });
+    await reverseCommission({ source: "service_fee", sourceRef: "invoice-9", proportion: 0.6 });
+    // Still ONE reversal doc, now at the higher cumulative target — not double-counted.
+    expect(fakeDb.peekUnder("commissions")).toHaveLength(2);
+    expect(fakeDb.peek("commissions/service_fee_invoice-9_reversal")).toMatchObject({
+      commissionCents: 300, // round(500 * 0.6)
+    });
+  });
+
+  it("a full refund (proportion default 1) reverses 100%, unchanged", async () => {
+    await seedAccrual();
+    await reverseCommission({ source: "service_fee", sourceRef: "invoice-9" });
+    expect(fakeDb.peek("commissions/service_fee_invoice-9_reversal")).toMatchObject({
+      commissionCents: 500,
+    });
+  });
+
+  it("does not shrink an existing reversal when a smaller proportion replays", async () => {
+    await seedAccrual();
+    await reverseCommission({ source: "service_fee", sourceRef: "invoice-9", proportion: 0.6 });
+    await reverseCommission({ source: "service_fee", sourceRef: "invoice-9", proportion: 0.3 });
+    expect(fakeDb.peek("commissions/service_fee_invoice-9_reversal")).toMatchObject({
+      commissionCents: 300, // stays at the higher 0.6 target
+    });
+  });
+
+  it("writes a top-up doc instead of un-netting a reversal already claimed by a payout", async () => {
+    await seedAccrual();
+    await reverseCommission({ source: "service_fee", sourceRef: "invoice-9", proportion: 0.3 });
+    // Simulate the monthly payout having netted + stamped this reversal.
+    fakeDb.seed("commissions/service_fee_invoice-9_reversal", {
+      ...(fakeDb.peek("commissions/service_fee_invoice-9_reversal") as Record<string, unknown>),
+      payoutBatchId: "batch-1",
+    });
+    await reverseCommission({ source: "service_fee", sourceRef: "invoice-9", proportion: 0.6 });
+    // Original reversal untouched (still stamped); the incremental delta is a new doc.
+    expect(fakeDb.peek("commissions/service_fee_invoice-9_reversal")).toMatchObject({
+      commissionCents: 150,
+      payoutBatchId: "batch-1",
+    });
+    expect(fakeDb.peek("commissions/service_fee_invoice-9_reversal_top_300")).toMatchObject({
+      commissionCents: 150, // 300 target - 150 already netted
+      payoutBatchId: null,
+      status: "reversed",
+    });
+  });
+});
+
+describe("computeReversalCents (pure partial-refund math)", () => {
+  it("full refund reverses everything", () => {
+    expect(computeReversalCents(500, 1)).toBe(500);
+  });
+  it("partial refund rounds to the nearest cent", () => {
+    expect(computeReversalCents(500, 0.3)).toBe(150);
+    expect(computeReversalCents(333, 0.5)).toBe(167); // round(166.5)
+  });
+  it("clamps a proportion above 1 to a full reversal", () => {
+    expect(computeReversalCents(500, 1.4)).toBe(500);
+  });
+  it("clamps a negative proportion to zero", () => {
+    expect(computeReversalCents(500, -0.2)).toBe(0);
+  });
+  it("zero commission reverses nothing", () => {
+    expect(computeReversalCents(0, 1)).toBe(0);
+  });
 });
 
 // ── Project Manager commission (P4) — additive to the rep accrual ────────────
@@ -334,7 +415,7 @@ describe("accruePmServiceFee / reversePmServiceFee (resolve the driving PM)", ()
     fakeDb.seed(`users/${PM}`, { projectManager: { active: true } });
     await accruePmServiceFee({
       jobId: "job-1",
-      invoiceId: "job-1",
+      sourceRef: "job-1",
       tradespersonId: TID,
       grossCents: 5000,
     });
@@ -348,7 +429,7 @@ describe("accruePmServiceFee / reversePmServiceFee (resolve the driving PM)", ()
     fakeDb.seed(`jobs/job-2`, { drivenByProjectManagerId: null });
     await accruePmServiceFee({
       jobId: "job-2",
-      invoiceId: "job-2",
+      sourceRef: "job-2",
       tradespersonId: TID,
       grossCents: 5000,
     });
@@ -360,16 +441,15 @@ describe("accruePmServiceFee / reversePmServiceFee (resolve the driving PM)", ()
     fakeDb.seed(`users/${PM}`, { projectManager: { active: false } });
     await accruePmServiceFee({
       jobId: "job-3",
-      invoiceId: "job-3",
+      sourceRef: "job-3",
       tradespersonId: TID,
       grossCents: 5000,
     });
     expect(fakeDb.peekUnder("commissions")).toHaveLength(0);
   });
 
-  it("reverses via the invoice -> job lookup (no active check, so a refund always lands)", async () => {
+  it("reverses via the job stamp (no active check, so a refund always lands)", async () => {
     fakeDb.seed(`jobs/job-4`, { drivenByProjectManagerId: PM });
-    fakeDb.seed(`invoices/job-4`, { jobId: "job-4" });
     await accruePmCommission({
       pmId: PM,
       tradespersonId: TID,
@@ -377,7 +457,7 @@ describe("accruePmServiceFee / reversePmServiceFee (resolve the driving PM)", ()
       sourceRef: "job-4",
       grossCents: 5000,
     });
-    await reversePmServiceFee({ invoiceId: "job-4" });
+    await reversePmServiceFee({ jobId: "job-4", sourceRef: "job-4" });
     expect(fakeDb.peek("commissions/service_fee_job-4_pm_pm-1_reversal")).toMatchObject({
       status: "reversed",
     });
