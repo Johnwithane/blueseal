@@ -145,6 +145,11 @@ export interface NotifyInput {
   // is notifying — pass it; null is reserved for ambiguous / role-
   // agnostic notifications (rare).
   recipientRole?: Role | null;
+  // Optional id of the domain object this notification is about (e.g. a change
+  // order's extraId). Lets a later state change resolve the exact notification
+  // it made stale — e.g. cancelExtra marks the client's change_order_proposed
+  // row read so the bell stops offering a withdrawn CO as actionable (P2-18).
+  relatedId?: string | null;
 }
 
 interface UserContact {
@@ -359,6 +364,7 @@ export async function notify(input: NotifyInput): Promise<void> {
       createdAt: FieldValue.serverTimestamp(),
       jobId: input.jobId ?? null,
       chatId: input.chatId ?? null,
+      relatedId: input.relatedId ?? null,
       actorUid: input.actorUid ?? null,
       actorPhotoURL: actorSnapshot.photoURL,
       actorDisplayName: actorSnapshot.displayName,

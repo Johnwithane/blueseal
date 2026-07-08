@@ -63,6 +63,26 @@ export const cancelExtra = onCall(CALLABLE_OPTS, async (req) => {
     );
   }
 
+  // Resolve the client's now-stale "New change order — approve or decline"
+  // notification so the bell stops offering a withdrawn CO as actionable
+  // (P2-18). Keyed on relatedId (the extraId, a globally-unique auto-id), so a
+  // single-field query is enough — no composite index. Best-effort.
+  try {
+    const stale = await db
+      .collection("notifications")
+      .where("relatedId", "==", extraId)
+      .get();
+    if (!stale.empty) {
+      const batch = db.batch();
+      stale.docs.forEach((d) =>
+        batch.update(d.ref, { read: true, readAt: FieldValue.serverTimestamp() }),
+      );
+      await batch.commit();
+    }
+  } catch (err) {
+    logger.warn("cancelExtra: could not resolve stale CO notification", { jobId, extraId, err });
+  }
+
   logger.info("cancelExtra", { jobId, tradespersonId: uid, extraId });
   return { ok: true };
 });

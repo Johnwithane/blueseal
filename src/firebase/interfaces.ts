@@ -2806,6 +2806,10 @@ export interface NotificationDoc {
   createdAt: Timestamp;
   jobId: string | null;
   chatId: string | null;
+  // Id of the domain object this row is about (e.g. a change order's extraId),
+  // so a later state change can resolve the exact notification it made stale
+  // (P2-18). Null on notifications not tied to a specific sub-object.
+  relatedId?: string | null;
   actorUid: string | null;
   // Denormalized snapshot of the actor's avatar + display name at the moment
   // the notification was written. Lets the in-app inbox render a profile

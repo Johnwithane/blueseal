@@ -117,6 +117,8 @@ export const proposeExtra = onCall(CALLABLE_OPTS, async (req) => {
     jobId,
     chatId: result.chatId,
     recipientRole: "client",
+    // Link to the change order so a later withdraw can resolve this exact row.
+    relatedId: extraRef.id,
     // The tradie may be waiting to start this work — page the client.
     priority: "high",
   });
