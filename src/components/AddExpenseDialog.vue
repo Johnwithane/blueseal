@@ -73,6 +73,10 @@ const uploading = ref(false);
 const parsing = ref(false);
 const receiptExpenseId = ref<string | null>(null);
 const aiParsed = ref(false);
+// The model can respond (aiParsed) yet extract nothing off a blurry receipt.
+// Track whether any field actually came back so we don't claim "Receipt read"
+// over an empty $0 / no-vendor prefill (P2-16).
+const ocrHadData = ref(false);
 const saving = ref(false);
 let expenseUnsub: (() => void) | null = null;
 // Set while tearing down after cancel so a late OCR error doesn't toast.
@@ -95,6 +99,7 @@ watch(
       uploading.value = false;
       parsing.value = false;
       aiParsed.value = false;
+      ocrHadData.value = false;
       saving.value = false;
       abandoned = false;
     } else {
@@ -162,6 +167,13 @@ function onExpenseSnapshot(e: WithId<ExpenseDoc> | null) {
   if (!e || e.status === "parsing") return;
   parsing.value = false;
   aiParsed.value = e.aiParsed;
+  ocrHadData.value = !!(
+    e.description?.trim() ||
+    (e.totalCost ?? 0) > 0 ||
+    e.vendor?.trim() ||
+    e.category ||
+    e.spentAt
+  );
   if (!description.value.trim() && e.description) description.value = e.description;
   if ((costDollars.value ?? 0) <= 0 && (e.totalCost ?? 0) > 0) {
     costDollars.value = e.totalCost / 100;
@@ -281,14 +293,19 @@ async function onCancel() {
         Reading the receipt — fields fill in automatically in a few seconds. You
         can keep typing; we won't overwrite what you enter.
       </Message>
-      <Message v-else severity="success" :closable="false" class="text-xs">
-        <template v-if="aiParsed">
+      <Message
+        v-else
+        :severity="aiParsed && ocrHadData ? 'success' : 'warn'"
+        :closable="false"
+        class="text-xs"
+      >
+        <template v-if="aiParsed && ocrHadData">
           Receipt read<template v-if="ocrVendor"> — {{ ocrVendor }}</template>
           <template v-if="ocrSpentAt"> · {{ date(ocrSpentAt) }}</template>.
           Give the fields a once-over and save.
         </template>
         <template v-else>
-          Receipt attached, but it couldn't be auto-read — fill the fields in below.
+          We couldn't read this receipt automatically — add the details below.
         </template>
       </Message>
 

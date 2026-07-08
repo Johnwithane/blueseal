@@ -176,6 +176,16 @@ const createInvoiceLabel = computed(() =>
     </p>
 
     <p class="text-[11px] text-[color:var(--bs-muted)] mt-2">Pre-tax — tax is added on the invoice.</p>
+    <!-- Receipts are tradesperson-private (cost + image), so the client's tally
+         can't include materials. Set the expectation here so they aren't a
+         surprise line at invoice time (P2-17). Fixed jobs bundle materials into
+         the agreed price, so this only applies to hourly. -->
+    <p
+      v-if="isClient && !isFixed"
+      class="text-[11px] text-[color:var(--bs-muted)] mt-1"
+    >
+      Any materials your tradesperson logs are added when the invoice is prepared.
+    </p>
 
     <Button
       v-if="showCreateInvoice"
