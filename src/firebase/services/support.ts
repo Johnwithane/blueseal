@@ -16,7 +16,13 @@ import {
   query,
   serverTimestamp,
   updateDoc,
+  where,
 } from "firebase/firestore";
+import {
+  ADMIN_QUEUE_ACTIONABLE_LIMIT,
+  ADMIN_QUEUE_RECENT_LIMIT,
+  mergeQueueDocs,
+} from "@/utils/adminQueue";
 import { httpsCallable } from "firebase/functions";
 import { auth as fbAuth, db, functions } from "@/firebase/config";
 import type {
@@ -58,12 +64,26 @@ export async function createSupportTicket(input: SupportTicketInput): Promise<st
 }
 
 /**
- * Admin queue. Newest first; status is filtered client-side so we don't need a
- * composite index (createdAt is a single-field auto index).
+ * Admin queue. Two single-field-indexed queries merged (P3-06): every
+ * still-actionable ticket (not `closed`) so an old open ticket can never fall
+ * off the list, plus the most-recent N for closed/context. Status is still
+ * filtered client-side in the view; this just guarantees the open set is whole.
  */
 export async function listSupportTickets(): Promise<WithId<SupportTicketDoc>[]> {
-  const snap = await getDocs(query(ticketsCol(), orderBy("createdAt", "desc"), limit(200)));
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const [actionableSnap, recentSnap] = await Promise.all([
+    getDocs(
+      query(
+        ticketsCol(),
+        where("status", "in", ["open", "in_progress", "resolved"]),
+        limit(ADMIN_QUEUE_ACTIONABLE_LIMIT),
+      ),
+    ),
+    getDocs(query(ticketsCol(), orderBy("createdAt", "desc"), limit(ADMIN_QUEUE_RECENT_LIMIT))),
+  ]);
+  return mergeQueueDocs(
+    actionableSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
+    recentSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
+  );
 }
 
 /** Admin status change. The rules restrict the mutation to status/updatedAt/handledBy. */

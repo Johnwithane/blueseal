@@ -19,6 +19,11 @@ import {
 } from "firebase/firestore";
 import { auth as fbAuth, db } from "@/firebase/config";
 import { typedConverter } from "@/firebase/converters";
+import {
+  ADMIN_QUEUE_ACTIONABLE_LIMIT,
+  ADMIN_QUEUE_RECENT_LIMIT,
+  mergeQueueDocs,
+} from "@/utils/adminQueue";
 import { compressToWebp } from "@/utils/image";
 import { resolveFileUrl, uploadFileNoUrl } from "@/firebase/services/storage";
 import type { BugReportDoc, BugStatus, Role, WithId } from "@/firebase/interfaces";
@@ -87,12 +92,25 @@ export async function listMyBugReports(uid: string): Promise<WithId<BugReportDoc
 }
 
 /**
- * Admin triage queue. Newest first; status filtered client-side so no composite
- * index is needed (createdAt is a single-field auto index — same as supportTickets).
+ * Admin triage queue (P3-06). Merges every still-actionable report (not
+ * fixed/wontfix) so an old open bug can't fall off the list, plus the most-
+ * recent N for closed/context. Both are single-field-indexed queries.
  */
 export async function listAllBugReports(): Promise<WithId<BugReportDoc>[]> {
-  const snap = await getDocs(query(reportsCol(), orderBy("createdAt", "desc"), limit(200)));
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const [actionableSnap, recentSnap] = await Promise.all([
+    getDocs(
+      query(
+        reportsCol(),
+        where("status", "in", ["open", "triaged", "in_progress"]),
+        limit(ADMIN_QUEUE_ACTIONABLE_LIMIT),
+      ),
+    ),
+    getDocs(query(reportsCol(), orderBy("createdAt", "desc"), limit(ADMIN_QUEUE_RECENT_LIMIT))),
+  ]);
+  return mergeQueueDocs(
+    actionableSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
+    recentSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
+  );
 }
 
 /** Admin triage. The rules restrict the mutation to status/notes/triagedBy/updatedAt. */

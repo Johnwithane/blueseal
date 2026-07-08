@@ -15,10 +15,16 @@ import {
   orderBy,
   query,
   updateDoc,
+  where,
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/firebase/config";
 import { typedConverter } from "@/firebase/converters";
+import {
+  ADMIN_QUEUE_ACTIONABLE_LIMIT,
+  ADMIN_QUEUE_RECENT_LIMIT,
+  mergeQueueDocs,
+} from "@/utils/adminQueue";
 import type { ErrorLogDoc, ErrorLogSource, WithId } from "@/firebase/interfaces";
 
 export interface ClientErrorReport {
@@ -76,12 +82,19 @@ const col = () =>
   collection(db, "errorLogs").withConverter(typedConverter<ErrorLogDoc>());
 
 /**
- * Admin queue. Newest first; `resolved` is filtered client-side so no composite
- * index is needed (createdAt is a single-field auto index).
+ * Admin queue (P3-06). Merges every UNRESOLVED error so an old unresolved log
+ * can't fall off the list, plus the most-recent N (incl. resolved) for context.
+ * Both are single-field-indexed queries — no composite index needed.
  */
 export async function listErrorLogs(): Promise<WithId<ErrorLogDoc>[]> {
-  const snap = await getDocs(query(col(), orderBy("createdAt", "desc"), limit(200)));
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const [unresolvedSnap, recentSnap] = await Promise.all([
+    getDocs(query(col(), where("resolved", "==", false), limit(ADMIN_QUEUE_ACTIONABLE_LIMIT))),
+    getDocs(query(col(), orderBy("createdAt", "desc"), limit(ADMIN_QUEUE_RECENT_LIMIT))),
+  ]);
+  return mergeQueueDocs(
+    unresolvedSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
+    recentSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
+  );
 }
 
 /** Admin resolve toggle. Rules restrict the mutation to the `resolved` field. */
