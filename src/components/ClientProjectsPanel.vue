@@ -84,7 +84,10 @@ onUnmounted(() => unsub?.());
 
 function startAccept(p: WithId<ProjectDoc>) {
   acceptingId.value = p.id;
-  addr.line1 = "";
+  // Prefill the street line from the PM's property address so the client
+  // confirms rather than retypes; they complete/adjust city/region/postal
+  // (the property only carries free-text) (P2-21).
+  addr.line1 = p.propertyAddressText?.trim() ?? "";
   addr.city = "";
   addr.region = "";
   addr.postalCode = "";

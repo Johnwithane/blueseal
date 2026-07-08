@@ -215,6 +215,10 @@ export interface ProjectDoc {
   clientId: string | null;
   /** Optional tie to one of the PM's properties. */
   propertyId: string | null;
+  /** The tied property's free-text address, denormalized at creation so the
+   *  client's accept form can prefill it (they can't read the PM's property
+   *  doc). Null on unattached projects / ones created before this (P2-21). */
+  propertyAddressText?: string | null;
   /** Optional unit within the property this project is for (one of the property's
    *  units). Null for single-unit properties / unscoped projects. */
   unit?: string | null;

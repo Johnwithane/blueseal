@@ -80,12 +80,17 @@ export const createProject = onCall(CALLABLE_OPTS, async (req) => {
   }
 
   // If a property is named, it must be one this PM owns (don't let a project
-  // point at someone else's property book).
+  // point at someone else's property book). Grab its free-text address to
+  // denormalize onto the project so the client's accept form can prefill it
+  // (they can't read the PM's property doc) instead of retyping (P2-21).
+  let propertyAddressText: string | null = null;
   if (input.propertyId) {
     const propSnap = await db.doc(`properties/${input.propertyId}`).get();
     if (!propSnap.exists || propSnap.get("projectManagerId") !== uid) {
       throw new HttpsError("failed-precondition", "That property isn't in your book.");
     }
+    const at = propSnap.get("addressText");
+    propertyAddressText = typeof at === "string" && at.trim() ? at.trim() : null;
   }
 
   const userSnap = await db.doc(`users/${uid}`).get();
@@ -107,6 +112,7 @@ export const createProject = onCall(CALLABLE_OPTS, async (req) => {
       projectManagerId: uid,
       clientId: null,
       propertyId: input.propertyId,
+      propertyAddressText,
       unit: input.unit,
       label: input.label,
       clientName: input.clientName,
