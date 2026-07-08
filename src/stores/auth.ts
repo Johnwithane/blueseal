@@ -377,6 +377,12 @@ export const useAuthStore = defineStore("auth", {
       this.error = null;
       try {
         await signInWithEmailAndPassword(auth, email, password);
+        // Settle roles/activeRole from the user doc BEFORE resolving, so the
+        // caller's post-sign-in redirect doesn't race the async
+        // onAuthStateChanged listener and get bounced Home by the role guard
+        // (which reads auth.roles). This is the P1-03 fix; the listener will
+        // also run applyAuthState, but idempotently.
+        await this.applyAuthState(auth.currentUser);
       } catch (e) {
         this.error = (e as Error).message;
         throw e;
@@ -413,7 +419,7 @@ export const useAuthStore = defineStore("auth", {
         // that." users hit on Google sign-up (the account existed but they saw
         // an error). provisionAccount is idempotent and reports `isNew`, so the
         // server is the source of truth for new-vs-returning. Mirrors signUp.
-        const { roles, activeRole, isNew: created } = await callProvisionAccount({
+        const { isNew: created } = await callProvisionAccount({
           role: intendedRole,
           displayName: cred.user.displayName ?? "Anonymous",
           termsAcceptedVersion: LEGAL_VERSION,
@@ -426,10 +432,11 @@ export const useAuthStore = defineStore("auth", {
         // Refresh so the token carries the claims the callable just
         // set/reconciled before the router guard reads them on redirect.
         await cred.user.getIdToken(true);
-        if (created) {
-          this.roles = roles;
-          this.activeRole = activeRole;
-        }
+        // Settle roles/activeRole from the (freshly provisioned) doc before
+        // resolving so the caller's redirect doesn't race the auth listener and
+        // get bounced Home — for returning accounts too, which the old
+        // `if (created)` fast-path never populated (P1-03).
+        await this.applyAuthState(auth.currentUser);
       } catch (e) {
         this.error = (e as Error).message;
         throw e;
@@ -460,7 +467,7 @@ export const useAuthStore = defineStore("auth", {
         );
         provisioningUid = cred.user.uid;
         provisioningUids.add(provisioningUid);
-        const { roles, activeRole, isNew: created } = await callProvisionAccount({
+        const { isNew: created } = await callProvisionAccount({
           role: "client",
           displayName: cred.user.displayName ?? "Anonymous",
           termsAcceptedVersion: LEGAL_VERSION,
@@ -468,10 +475,9 @@ export const useAuthStore = defineStore("auth", {
         });
         isNew = created;
         await cred.user.getIdToken(true);
-        if (created) {
-          this.roles = roles;
-          this.activeRole = activeRole;
-        }
+        // Settle roles before resolving so the One Tap caller's redirect doesn't
+        // race the auth listener (P1-03).
+        await this.applyAuthState(auth.currentUser);
       } catch (e) {
         this.error = (e as Error).message;
         throw e;
@@ -511,20 +517,19 @@ export const useAuthStore = defineStore("auth", {
         // Provision/reconcile server-side; no racy client users/{uid} read here
         // (same Auth→Firestore handshake race as the Google path — see
         // signInWithGoogle). The callable is idempotent and reports `isNew`.
-        const { roles, activeRole, isNew } = await callProvisionAccount({
+        const { isNew } = await callProvisionAccount({
           role,
           displayName: cred.user.displayName ?? "",
           termsAcceptedVersion: LEGAL_VERSION,
           photoURL: cred.user.photoURL,
         });
-        if (isNew) {
-          this.roles = roles;
-          this.activeRole = activeRole;
-        }
         // Refresh the token so the verified-email claim is visible to the
         // claimProspect callable (which gates on email_verified) and the
         // roles claim is visible to role-gated rules + callables.
         await cred.user.getIdToken(true);
+        // Settle roles/activeRole from the doc before resolving so the caller's
+        // redirect doesn't race the auth listener and bounce Home (P1-03).
+        await this.applyAuthState(auth.currentUser);
         return { isNew };
       } catch (e) {
         this.error = (e as Error).message;
