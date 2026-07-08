@@ -6,6 +6,39 @@ Tasks are grouped by the phase that introduced them so you can see why each one 
 
 ---
 
+## Launch gates — flip before public launch (added 2026-07-07)
+
+Two safety switches ship defaulted to their pre-launch (permissive) setting so a
+no-users test deployment stays workable. Both MUST be flipped before real users
+arrive. Surfaced by the full-platform QA pass (gap item P1-09).
+
+### [ ] Turn App Check enforcement ON across every callable
+
+- **Why:** `CALLABLE_OPTS.enforceAppCheck` is driven by the `ENFORCE_APP_CHECK`
+  env var and **defaults OFF** (`functions/src/lib/callable.ts`). That means every
+  Cloud Function currently accepts calls without an App Check token — fine while
+  there are no users, but it leaves the whole API open to scripted abuse at
+  launch. CLAUDE.md's "always enforceAppCheck" rule makes this easy to misread as
+  already done; it is not.
+- **What (must be coordinated — flipping the server on before the client init is
+  live rejects every call):**
+  1. Provision a **reCAPTCHA Enterprise** key for the site in the Firebase/GCP
+     console and register it as the App Check provider for the web app.
+  2. Ship the client-side App Check init in `src/firebase/config.ts` (initialize
+     App Check with the reCAPTCHA Enterprise provider) and deploy hosting.
+  3. Only then set `ENFORCE_APP_CHECK=true` in `functions/.env.blueseal-762af`
+     and redeploy functions. Consider a staged rollout / monitoring window.
+- **Verify:** an authenticated call from the deployed site succeeds; a call
+  without a valid App Check token is rejected.
+
+### [ ] Turn the QA toolkit OFF (`QA_TOOLKIT_ENABLED`)
+
+- See the full checklist under **QA toolkit — disable before public launch**
+  below. Same launch gate: `QA_TOOLKIT_ENABLED` defaults ON pre-launch and the
+  self-provisioning callables ride behind it (`functions/src/qa/guard.ts`).
+
+---
+
 ## PM feature expansion — deploy (added 2026-06-28)
 
 A batch of project-manager features (Pro paywall enablement, plus more landing in
