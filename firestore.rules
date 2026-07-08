@@ -641,6 +641,11 @@ service cloud.firestore {
         // and invoices/{jobId} keep their party-only rules, so the financial +
         // messaging firewall holds (the PM never reads the live invoice or chat).
         || resource.data.get('drivenByProjectManagerId', null) == uid()
+        // The owning PM gets the same read-only status/schedule window onto
+        // EVERY job on their project, including off-roster board fills that
+        // earn no commission (so drivenByProjectManagerId is null). Job doc
+        // only — chats/{chatId} + invoices/{jobId} stay party-only (P1-00).
+        || resource.data.get('projectManagerId', null) == uid()
       );
       allow create: if isClient()
         && request.resource.data.clientId == uid()
@@ -648,9 +653,11 @@ service cloud.firestore {
         && request.resource.data.tradespersonId is string
         // PM linkage is server-minted by acceptApplicationQuote (admin SDK) only.
         // A direct client-created job must NOT carry it: a forged
-        // drivenByProjectManagerId would mint a PM commission AND grant that PM
-        // read access to this job (full address + clientName). Pin all three null.
+        // drivenByProjectManagerId would mint a PM commission, and a forged
+        // projectManagerId would grant that PM read access to this job (full
+        // address + clientName). Pin all four null.
         && request.resource.data.get('drivenByProjectManagerId', null) == null
+        && request.resource.data.get('projectManagerId', null) == null
         && request.resource.data.get('projectId', null) == null
         && request.resource.data.get('propertyId', null) == null;
       // Updates: identity + creation fields immutable. Status transitions are
@@ -712,8 +719,9 @@ service cloud.firestore {
         //  - upfrontFee / serviceFeeCapUsedCents: money (upfront credit + the $99
         //    cumulative platform-fee counter).
         //  - originType / clientRef / recurringPlanId: Clients book + recurring linkage.
-        //  - drivenByProjectManagerId / projectId / propertyId: PM dispatch linkage
-        //    (drivenByProjectManagerId is the commission trigger).
+        //  - drivenByProjectManagerId / projectManagerId / projectId / propertyId:
+        //    PM dispatch linkage (drivenByProjectManagerId is the commission
+        //    trigger; projectManagerId is the project-ownership / read key).
         //  - uninsuredAcknowledgedAtRequest / uninsuredDisclosureVersion: the
         //    once-written uninsured-at-request acknowledgment.
         && (isAdmin() || (
@@ -741,6 +749,8 @@ service cloud.firestore {
                 == resource.data.get('recurringPlanId', null)
             && request.resource.data.get('drivenByProjectManagerId', null)
                 == resource.data.get('drivenByProjectManagerId', null)
+            && request.resource.data.get('projectManagerId', null)
+                == resource.data.get('projectManagerId', null)
             && request.resource.data.get('projectId', null)
                 == resource.data.get('projectId', null)
             && request.resource.data.get('propertyId', null)

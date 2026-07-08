@@ -40,10 +40,11 @@ export const aiProjectsDigest = onCall(CALLABLE_OPTS, async (req) => {
   await requireAiEntitlement(uid, "pmDigest");
   await enforceRateLimit(uid, "ai", AI_DAILY_CAP);
 
-  // The PM's own projects + the jobs their trades won — both already PM-readable.
+  // The PM's own projects + every job on them (board fills included, not just
+  // commission-earning roster wins) — all PM-readable (P1-00).
   const [projSnap, jobSnap] = await Promise.all([
     db.collection("projects").where("projectManagerId", "==", uid).limit(100).get(),
-    db.collection("jobs").where("drivenByProjectManagerId", "==", uid).limit(200).get(),
+    db.collection("jobs").where("projectManagerId", "==", uid).limit(200).get(),
   ]);
 
   const projects = projSnap.docs.map((d) => {

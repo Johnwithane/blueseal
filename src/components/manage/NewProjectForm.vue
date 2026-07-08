@@ -394,7 +394,7 @@ async function copyInvite() {
             class="text-xs text-[color:var(--bs-warn,#d97706)] flex items-start gap-1"
           >
             <i class="pi pi-exclamation-triangle text-[10px] mt-0.5"></i>
-            <span>No saved trade for this — it'll go to the public board. Add one to your roster to keep it in-house.</span>
+            <span>No saved trade for this. When your client accepts, they'll be prompted to open it to all trades nearby. Add one to your roster to keep it in-house.</span>
           </p>
           <p
             v-else-if="job.trade"

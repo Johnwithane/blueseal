@@ -1419,6 +1419,12 @@ export interface JobDoc {
   // that PM's preferred contractors — the commission trigger). A public-fallback
   // win by an off-list contractor leaves this null even when projectId is set.
   drivenByProjectManagerId?: string | null;
+  // The PM who OWNS this job's project — stamped on every job on the project,
+  // including off-roster board fills (unlike drivenByProjectManagerId, which is
+  // the commission trigger and is null on board fills). This is the read /
+  // project-rollup key so /manage/jobs + the dashboard stat include board fills
+  // (P1-00). Rules pin it immutable; a client-created job must have it null.
+  projectManagerId?: string | null;
   // The project + property this job belongs to (carried from the scoped posting).
   projectId?: string | null;
   propertyId?: string | null;

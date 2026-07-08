@@ -70,6 +70,20 @@ describe("jobs — PM read-only visibility (drivenByProjectManagerId)", () => {
     await assertFails(getDoc(doc(other, "jobs", JOB_ID)));
   });
 
+  it("the OWNING PM can read a board-filled job on their project (no commission)", async () => {
+    // projectManagerId set but drivenByProjectManagerId null — the off-roster
+    // board fill the /manage/jobs + dashboard rollup must include (P1-00).
+    await seedJob({ projectManagerId: PM_UID, projectId: "proj-x", drivenByProjectManagerId: null });
+    const pm = env.authenticatedContext(PM_UID, PM_CLAIMS).firestore();
+    await assertSucceeds(getDoc(doc(pm, "jobs", JOB_ID)));
+  });
+
+  it("a PM cannot read a job on a project that isn't theirs", async () => {
+    await seedJob({ projectManagerId: "some-other-pm", projectId: "proj-y" });
+    const pm = env.authenticatedContext(PM_UID, PM_CLAIMS).firestore();
+    await assertFails(getDoc(doc(pm, "jobs", JOB_ID)));
+  });
+
   it("a client CANNOT forge PM linkage at create (commission-fraud + read leak)", async () => {
     const client = env.authenticatedContext(CLIENT_UID, CLIENT_CLAIMS).firestore();
     const base = {
@@ -84,6 +98,9 @@ describe("jobs — PM read-only visibility (drivenByProjectManagerId)", () => {
     // ...but forging the server-minted PM linkage is denied on each field.
     await assertFails(
       setDoc(doc(client, "jobs", "job_forge_pm"), { ...base, drivenByProjectManagerId: PM_UID }),
+    );
+    await assertFails(
+      setDoc(doc(client, "jobs", "job_forge_pm_owner"), { ...base, projectManagerId: PM_UID }),
     );
     await assertFails(
       setDoc(doc(client, "jobs", "job_forge_proj"), { ...base, projectId: "proj-x" }),

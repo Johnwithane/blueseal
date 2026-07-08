@@ -271,6 +271,12 @@ export const acceptApplicationQuote = onCall(CALLABLE_OPTS, async (req) => {
               originType: "pm_project",
               projectId,
               propertyId: post.propertyId ?? null,
+              // Owning PM, stamped on EVERY job on their project — including
+              // off-roster board fills. drivenByProjectManagerId (below) is only
+              // the commission trigger (preferred wins), so it can't double as
+              // the project-rollup key or board-filled jobs vanish from
+              // /manage/jobs + the dashboard stat (P1-00).
+              projectManagerId: post.createdByProjectManagerId ?? null,
               drivenByProjectManagerId,
             }
           : {}),

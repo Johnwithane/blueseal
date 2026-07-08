@@ -383,16 +383,18 @@ export function subscribeClientJobs(
   return onSnapshot(q, (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
 }
 
-// The jobs a project manager DROVE (a preferred contractor won a job they
-// originated), for the read-only project view (P3b-3). The PM-read rule authorizes
-// each doc (drivenByProjectManagerId == uid); this exposes the job doc only — its
-// chat + invoice keep their party-only rules. Sorted client-side (small set, no
-// composite index). Single-field equality is auto-indexed.
+// Every job on a project manager's projects (they OWN it), for the read-only
+// project view + /manage/jobs + dashboard stat. Keyed on projectManagerId, not
+// drivenByProjectManagerId, so off-roster board fills (no commission) are
+// included too (P1-00). The PM-read rule authorizes each doc
+// (projectManagerId == uid); this exposes the job doc only — its chat + invoice
+// keep their party-only rules. Sorted client-side (small set, no composite
+// index). Single-field equality is auto-indexed.
 export function subscribeProjectJobsForPm(
   pmUid: string,
   cb: (jobs: WithId<JobDoc>[]) => void,
 ): () => void {
-  const q = query(jobsCol(), where("drivenByProjectManagerId", "==", pmUid), limit(200));
+  const q = query(jobsCol(), where("projectManagerId", "==", pmUid), limit(200));
   return onSnapshot(q, (snap) =>
     cb(
       snap.docs
