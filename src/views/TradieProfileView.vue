@@ -472,7 +472,10 @@ const primaryCta = computed(() => {
   if (!auth.isAuthenticated) {
     return { label: "Sign up to contact", icon: "pi pi-user-plus", to: { name: "SignUp" } };
   }
-  return null;
+  // Signed in but without a client role (e.g. a PM or sales viewing a profile):
+  // don't dead-end. Point them to Account where they can add the hiring view
+  // (P2-13).
+  return { label: "Switch to hiring", icon: "pi pi-briefcase", to: { name: "Account" } };
 });
 
 async function share() {

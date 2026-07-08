@@ -58,6 +58,12 @@ const html = computed(() =>
   margin-bottom: 1rem;
   width: 100%;
   font-size: 0.9375rem;
+  /* A wide markdown table (e.g. the data-retention table) overflowed the 375px
+     viewport and scrolled the whole page sideways. Make the table its own
+     horizontal scroll container instead (P2-12); applies to /privacy + /terms. */
+  display: block;
+  overflow-x: auto;
+  max-width: 100%;
 }
 .legal-doc :deep(th),
 .legal-doc :deep(td) {

@@ -210,7 +210,15 @@ onMounted(async () => {
         addressLine1.value = [streetNumber, route].filter(Boolean).join(" ").trim()
           || place.formatted_address?.split(",")[0]
           || "";
-        city.value = comp("locality") || comp("sublocality") || "";
+        // Google returns the municipality under different component types by
+        // region; mirror LocationPicker's fallback so City fills for addresses
+        // where it isn't a plain `locality` (P2-14).
+        city.value =
+          comp("locality") ||
+          comp("postal_town") ||
+          comp("sublocality") ||
+          comp("administrative_area_level_2") ||
+          "";
         region.value = short("administrative_area_level_1") || "";
         postalCode.value = comp("postal_code") || "";
         if (place.geometry?.location) {

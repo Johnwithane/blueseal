@@ -563,6 +563,20 @@ const awaitingVerificationMessage = computed(() => {
         <Button label="Continue onboarding" icon="pi pi-arrow-right" />
       </RouterLink>
     </div>
+    <!-- Application submitted, awaiting review: the isVisible-gated views
+         (list/board/calendar) render nothing, so give the same reassuring
+         placeholder the browse view uses instead of blank space (P2-02). -->
+    <div
+      v-else-if="
+        vetting === 'pending' &&
+        !tradie?.isVisible &&
+        (view === 'list' || view === 'board' || view === 'calendar')
+      "
+      class="bs-empty mt-4"
+    >
+      <i class="pi pi-hourglass text-3xl mb-2 block"></i>
+      <p>You'll see jobs here once your application is approved (typically 1 to 2 business days). We'll notify you the moment you're live.</p>
+    </div>
 
     <Dialog
       v-model:visible="availabilityOpen"

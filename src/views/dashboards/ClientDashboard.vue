@@ -216,7 +216,7 @@ function formatBudget(min: number, max: number): string {
     </template>
 
     <!-- POSTED JOBS -->
-    <template v-else>
+    <template v-else-if="view === 'posts'">
       <div v-if="posts.length === 0" class="bs-empty">
         <i class="pi pi-megaphone text-3xl mb-2 block"></i>
         <p>You haven't posted any jobs yet.</p>

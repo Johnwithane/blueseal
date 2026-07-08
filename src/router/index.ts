@@ -777,7 +777,10 @@ router.beforeEach(async (to) => {
     // flip the active role automatically so the page they navigated to renders
     // in the right context (Airbnb-style auto-switch).
     if (!auth.roles.includes(requiredRole as Role)) {
-      return { name: "Home" };
+      // They're signed in but lack this role. Land them on their OWN dashboard
+      // with a flag so DashboardEntry can explain, instead of silently dumping
+      // them on the marketing homepage (P2-05).
+      return { name: "Dashboard", query: { roleUnavailable: "1" } };
     }
     // qa is a capability claim, not a view-mode — gate on holding it (above) but
     // never flip the active view into qa (there is no qa dashboard to render).

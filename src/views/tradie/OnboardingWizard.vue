@@ -1010,8 +1010,8 @@ async function withdrawForEdits() {
           <p v-if="vettingNotes" class="text-sm mt-1 mb-0 whitespace-pre-wrap">
             {{ vettingNotes }}
           </p>
-          <p v-else class="text-sm mt-1 mb-0">
-            Your application wasn't approved. Reply to the email we sent for next steps.
+          <p class="text-sm mt-1 mb-0">
+            You can update your details below and resubmit for another review.
           </p>
         </div>
       </div>
@@ -1686,7 +1686,7 @@ async function withdrawForEdits() {
               <Button label="Back" outlined @click="activateCallback('6')" />
               <Button
                 v-if="!isReadOnly"
-                :label="vettingStatus === 'info_requested' ? 'Resubmit for review' : 'Submit for review'"
+                :label="vettingStatus === 'info_requested' || vettingStatus === 'rejected' ? 'Resubmit for review' : 'Submit for review'"
                 icon="pi pi-send"
                 :loading="submitting"
                 :severity="readyToSubmit ? undefined : 'secondary'"

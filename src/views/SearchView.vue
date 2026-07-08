@@ -230,7 +230,7 @@ async function search() {
     prospectResults.value = prospects;
     visibleCount.value = PAGE_SIZE; // reset paging for the new result set
   } catch (e) {
-    error.value = (e as Error).message;
+    error.value = humanizeError(e);
   } finally {
     loading.value = false;
   }
