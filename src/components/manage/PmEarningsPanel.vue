@@ -105,6 +105,25 @@ function payoutStatusLabel(p: WithId<CommissionPayoutDoc>) {
       </div>
     </div>
 
+    <!-- Explain a shrunk balance: a client refund/chargeback claws back the
+         commission it earned. Without this the unpaid balance just drops (P2-07). -->
+    <div
+      v-if="!loading && summary.reversedUnnettedCents > 0"
+      class="bs-card p-3 border-l-4 border-l-[color:var(--bs-warn,#d97706)]"
+    >
+      <div class="flex items-center justify-between gap-2">
+        <span class="text-sm flex items-center gap-1.5">
+          <i class="pi pi-replay text-[color:var(--bs-warn,#d97706)]"></i>
+          Refunds netted from your balance
+        </span>
+        <span class="text-sm font-semibold tabular-nums">-{{ money(summary.reversedUnnettedCents) }}</span>
+      </div>
+      <p class="text-[11px] text-[color:var(--bs-muted)] mt-1">
+        When a client is refunded or charges back, the commission it earned is
+        reversed and netted out of your unpaid balance.
+      </p>
+    </div>
+
     <!-- Payout setup: agreement gate, then Stripe Connect -->
     <div v-if="!signed" class="bs-card p-5">
       <h3 class="font-semibold">Get set up to be paid</h3>

@@ -20,6 +20,10 @@ export interface RepEarningsSummary {
   unpaidCents: number;
   /** Lifetime paid out, from settled payout batches. */
   lifetimePaidCents: number;
+  /** Reversed commission (refund/chargeback clawback) not yet netted by a
+   *  payout batch — already subtracted from unpaidCents. Surfaced so the
+   *  earnings UI can explain a shrunk balance rather than silently drop it. */
+  reversedUnnettedCents: number;
   /** Payout batches still pending/failed (a transfer in flight or needing attention). */
   pendingBatchCount: number;
   /** Distinct tradespeople who have generated commission for this rep. */
@@ -62,6 +66,7 @@ export function summarizeRepEarnings(
   return {
     unpaidCents,
     lifetimePaidCents,
+    reversedUnnettedCents: reversedUnnetted,
     pendingBatchCount,
     earnerCount: byTradie.size,
     byTradie: earners,
