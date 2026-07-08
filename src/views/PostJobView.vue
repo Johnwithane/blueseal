@@ -590,15 +590,17 @@ async function submit() {
 
   submitting.value = true;
   const tempUuid = crypto.randomUUID();
+  const uploaderUid = auth.fbUser.uid;
 
   try {
-    // Upload photos to a temp path under jobPosts/{tempUuid}/photos/. The
-    // server keeps these paths verbatim on the post doc; the path uuid does
-    // NOT have to match the final postId.
+    // Upload photos to a temp path under jobPosts/{uid}/{tempUuid}/photos/. The
+    // uid prefix scopes writes to the uploader (storage rule, P3-10); the server
+    // keeps these paths verbatim on the post doc, so the uuid does NOT have to
+    // match the final postId.
     const photoPaths = await Promise.all(
       photos.value.map(async (p, idx) => {
         const safe = p.file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-        const path = `jobPosts/${tempUuid}/photos/${Date.now()}_${idx}_${safe}`;
+        const path = `jobPosts/${uploaderUid}/${tempUuid}/photos/${Date.now()}_${idx}_${safe}`;
         await uploadFile(path, p.file);
         return path;
       }),

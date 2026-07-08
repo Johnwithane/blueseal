@@ -11,11 +11,13 @@ import { compressToWebp } from "@/utils/image";
 import { uploadFile, resolveFileUrl } from "@/firebase/services/storage";
 import { humanizeError } from "@/utils/errors";
 import { useToast } from "@/composables/useToast";
+import { useAuthStore } from "@/stores/auth";
 
 const props = withDefaults(defineProps<{ modelValue: string[]; max?: number }>(), { max: 8 });
 const emit = defineEmits<{ "update:modelValue": [string[]] }>();
 
 const toast = useToast();
+const auth = useAuthStore();
 const fileInput = ref<HTMLInputElement | null>(null);
 const urls = ref<Map<string, string>>(new Map());
 const busy = ref(false);
@@ -54,7 +56,8 @@ async function onPick(e: Event) {
     for (let i = 0; i < incoming.length; i++) {
       const file = await compressToWebp(incoming[i]);
       const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const path = `jobPosts/${uuid}/photos/${Date.now()}_${i}_${safe}`;
+      // uid prefix scopes the write to this uploader (storage rule, P3-10).
+      const path = `jobPosts/${auth.fbUser?.uid}/${uuid}/photos/${Date.now()}_${i}_${safe}`;
       const url = await uploadFile(path, file);
       urls.value.set(path, url);
       added.push(path);
