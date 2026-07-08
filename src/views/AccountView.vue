@@ -94,6 +94,7 @@ const submittingEmailChange = ref(false);
 const emailChangeSentTo = ref<string | null>(null);
 const addingTradie = ref(false);
 const addingClient = ref(false);
+const addingPm = ref(false);
 const grantingAdminAllRoles = ref(false);
 const grantingAllTrades = ref(false);
 const error = ref<string | null>(null);
@@ -187,6 +188,9 @@ const exportUrl = ref<string | null>(null);
 // missing-field behavior so legacy users aren't silently opted out.
 const emailEnabled = ref(true);
 const whatsappEnabled = ref(true);
+// Tradesperson-only: "new job in your area" broadcasts. Server already honors
+// newJobPostingEnabled; this exposes the toggle (P2-09).
+const jobAlertsEnabled = ref(true);
 const savingPrefs = ref(false);
 
 // Web push is per-device (token registration), so it applies immediately on
@@ -403,6 +407,7 @@ onMounted(async () => {
   // we don't silently change their notification behavior.
   emailEnabled.value = u.notificationPrefs?.emailEnabled ?? true;
   whatsappEnabled.value = u.notificationPrefs?.whatsappEnabled ?? true;
+  jobAlertsEnabled.value = u.notificationPrefs?.newJobPostingEnabled ?? true;
   // Pull the tradesperson doc to seed the tradie-only trade fields
   // (companyName / languages). The vetting-status banner is rendered
   // globally by TradieStatusBanner.vue so we don't recompute it here.
@@ -777,6 +782,20 @@ async function addClientView() {
   }
 }
 
+async function becomeProjectManager() {
+  addingPm.value = true;
+  error.value = null;
+  try {
+    await auth.addRole("projectManager");
+    toast.success("Project manager view enabled.");
+    await router.push("/manage");
+  } catch (e) {
+    error.value = humanizeError(e);
+  } finally {
+    addingPm.value = false;
+  }
+}
+
 async function switchView(role: ViewRole) {
   try {
     await auth.switchActiveRole(role);
@@ -792,15 +811,15 @@ async function savePrefs() {
   savingPrefs.value = true;
   error.value = null;
   try {
-    await updateNotificationPrefs(auth.fbUser.uid, {
+    const prefs = {
       emailEnabled: emailEnabled.value,
       whatsappEnabled: whatsappEnabled.value,
-    });
+      // Only meaningful for tradespeople; harmless if stored on a client.
+      ...(auth.hasTradieRole ? { newJobPostingEnabled: jobAlertsEnabled.value } : {}),
+    };
+    await updateNotificationPrefs(auth.fbUser.uid, prefs);
     if (auth.user) {
-      auth.user.notificationPrefs = {
-        emailEnabled: emailEnabled.value,
-        whatsappEnabled: whatsappEnabled.value,
-      };
+      auth.user.notificationPrefs = prefs;
     }
     toast.success("Notification preferences saved");
   } catch (e) {
@@ -1546,6 +1565,32 @@ async function grantAllTrades() {
         </div>
 
         <div
+          v-if="!auth.hasProjectManagerRole"
+          class="mt-4 rounded-lg bg-[color:var(--bs-surface-alt)] p-4"
+        >
+          <div class="flex items-start gap-3">
+            <i class="pi pi-briefcase text-2xl text-[color:var(--bs-blue)]"></i>
+            <div class="flex-1">
+              <h3 class="font-semibold">Become a project manager</h3>
+              <p class="mt-1 text-sm text-[color:var(--bs-muted)]">
+                Manage properties and bundle trade jobs for your clients. Invite
+                a client, dispatch jobs to your trusted trades or the public
+                board, and track everything in one place.
+              </p>
+              <div class="mt-3">
+                <Button
+                  label="Enable project manager view"
+                  icon="pi pi-plus"
+                  outlined
+                  :loading="addingPm"
+                  @click="becomeProjectManager"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div
           v-if="auth.hasAdminRole"
           class="mt-4 rounded-lg border border-dashed border-[color:var(--bs-border)] p-4"
         >
@@ -1678,6 +1723,22 @@ async function grantAllTrades() {
               </p>
             </div>
             <ToggleSwitch v-model="emailEnabled" />
+          </div>
+
+          <!-- Tradesperson-only: opt out of area job-alert broadcasts without
+               turning off all email (P2-09). -->
+          <div
+            v-if="auth.hasTradieRole"
+            class="flex items-start justify-between gap-3 rounded-lg border border-[color:var(--bs-border)] p-3"
+          >
+            <div>
+              <div class="font-medium">Job alerts</div>
+              <p class="text-xs text-[color:var(--bs-muted)] mt-0.5">
+                "New job in your area" broadcasts for your trades. Turn off to
+                stop these without muting job requests, quotes, or messages.
+              </p>
+            </div>
+            <ToggleSwitch v-model="jobAlertsEnabled" />
           </div>
 
           <!-- WhatsApp toggle hidden until the WhatsApp Cloud API is set up
