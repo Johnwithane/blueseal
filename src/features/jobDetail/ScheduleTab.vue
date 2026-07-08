@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import Button from "primevue/button";
 import DatePicker from "primevue/datepicker";
 import Dialog from "primevue/dialog";
 import Textarea from "primevue/textarea";
 import type { JobDoc, SessionDoc, WithId } from "@/firebase/interfaces";
+import { getQuoteByJobId } from "@/firebase/services/quotes";
 import JobScheduleCalendar from "@/features/jobDetail/JobScheduleCalendar.vue";
 
 const props = defineProps<{
@@ -35,6 +36,40 @@ const emit = defineEmits<{
 const showChangeCard = computed(
   () => props.canInstantCancel || props.canRequestCancel || props.canRequestPostpone,
 );
+
+// The projected start date the quote agreed on (proposedStartDate). It never
+// reached the Schedule tab, so the tradesperson re-found it manually and the
+// client had no reminder (P2-19). Fetch it off the accepted quote and surface
+// it. Stored at UTC midnight (a calendar date), so read + format in UTC.
+const agreedStart = ref<Date | null>(null);
+onMounted(async () => {
+  try {
+    const q = await getQuoteByJobId(props.job.id);
+    agreedStart.value = q?.proposedStartDate ? q.proposedStartDate.toDate() : null;
+  } catch {
+    agreedStart.value = null;
+  }
+});
+const agreedStartLabel = computed(() =>
+  agreedStart.value
+    ? agreedStart.value.toLocaleDateString("en-CA", {
+        timeZone: "UTC",
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+      })
+    : "",
+);
+
+// Open the add-session dialog defaulted to the agreed start date so the
+// tradesperson can book it in one tap. Uses the UTC calendar-date parts as a
+// local date (the picker works in local time).
+function bookAgreedStart() {
+  const d = agreedStart.value;
+  if (!d) return;
+  const local = new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  openAdd(local);
+}
 
 // --- Add / edit session dialog -------------------------------------------
 const showDialog = ref(false);
@@ -120,10 +155,21 @@ function removeSession() {
         <i class="pi pi-calendar-plus text-[color:var(--bs-success)]"></i>
         Book your first visit (optional)
       </h3>
+      <p v-if="agreedStart" class="text-xs mb-1">
+        Your quote proposed a start of <strong>{{ agreedStartLabel }}</strong>.
+      </p>
       <p class="text-xs text-[color:var(--bs-muted)]">
         Tap a day on the calendar below to book when you'll be on site — add as
         many visits as the job needs. Time tracking still works without a date.
       </p>
+      <Button
+        v-if="agreedStart"
+        label="Book the agreed start"
+        icon="pi pi-calendar-plus"
+        size="small"
+        class="mt-2"
+        @click="bookAgreedStart"
+      />
     </div>
 
     <div
@@ -134,6 +180,9 @@ function removeSession() {
         <i class="pi pi-check text-[color:var(--bs-success)]"></i>
         Quote accepted — job is active
       </h3>
+      <p v-if="agreedStart" class="text-xs mb-1">
+        Projected start from your quote: <strong>{{ agreedStartLabel }}</strong>.
+      </p>
       <p class="text-xs text-[color:var(--bs-muted)]">
         The tradesperson will reach out to confirm visit dates. You'll see every
         booked visit here once they're set.
