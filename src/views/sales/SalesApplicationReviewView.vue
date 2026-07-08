@@ -17,6 +17,7 @@ import { tradeLabel } from "@/data/trades";
 import { NO_CERT_SENTINEL } from "@/firebase/services/certifications";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
+import { registryForIssuingBody } from "@/utils/certRegistries";
 import LoadingState from "@/components/LoadingState.vue";
 
 // Rep-facing review of one owned application: tradesperson summary, their
@@ -60,6 +61,23 @@ async function load() {
 
 function statusSeverity(s: string): "success" | "danger" | "warn" {
   return s === "approved" ? "success" : s === "rejected" ? "danger" : "warn";
+}
+
+function fmtDate(ms: number | null): string {
+  return ms ? new Date(ms).toLocaleDateString("en-CA", { year: "numeric", month: "short", day: "numeric" }) : "—";
+}
+function fmtMoney(cents: number): string {
+  return `$${(cents / 100).toLocaleString("en-CA")}`;
+}
+
+// Inline watermarked document viewer — same tooling admin has, so a full vetter
+// reviews docs in place instead of raw new-tab links (P3-08). `watermark` overlays
+// "REP VIEW ONLY" on sensitive docs (ID + the liability-release signature).
+const viewer = ref<{ url: string; title: string; watermark: boolean } | null>(null);
+const viewerIsPdf = computed(() => viewer.value?.url.toLowerCase().includes(".pdf") ?? false);
+function openViewer(url: string | null | undefined, title: string, watermark = false) {
+  if (!url) return;
+  viewer.value = { url, title, watermark };
 }
 
 async function doApprove() {
@@ -139,15 +157,46 @@ async function doReject() {
             </div>
             <Tag :value="c.status" :severity="statusSeverity(c.status)" />
           </div>
-          <a
-            v-if="c.documentUrl"
-            :href="c.documentUrl"
-            target="_blank"
-            rel="noopener"
-            class="text-xs text-[color:var(--bs-blue)] underline mt-1 inline-block"
+
+          <!-- Verify-on-registry helper (AB/BC/ON public lookups; Red Seal hub);
+               hidden when there's no known registry for the issuing body. -->
+          <div
+            v-if="registryForIssuingBody(c.issuingBody)"
+            class="mt-2 rounded border border-slate-200 bg-slate-50 p-2 text-xs"
           >
-            View document
-          </a>
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0">
+                <div class="font-medium text-slate-700">
+                  Verify with {{ registryForIssuingBody(c.issuingBody)?.province }}
+                </div>
+                <div class="text-slate-600">{{ registryForIssuingBody(c.issuingBody)?.registryName }}</div>
+                <div
+                  v-if="registryForIssuingBody(c.issuingBody)?.notes"
+                  class="mt-1 text-[11px] text-slate-500"
+                >
+                  {{ registryForIssuingBody(c.issuingBody)?.notes }}
+                </div>
+              </div>
+              <a
+                :href="registryForIssuingBody(c.issuingBody)?.url"
+                target="_blank"
+                rel="noopener"
+                class="shrink-0 text-[color:var(--bs-info)] underline"
+              >
+                Open ↗
+              </a>
+            </div>
+          </div>
+
+          <Button
+            v-if="c.documentUrl"
+            icon="pi pi-eye"
+            label="View document"
+            outlined
+            size="small"
+            class="mt-2"
+            @click="openViewer(c.documentUrl, 'Certification — ' + (tradeLabel(c.trade) || c.trade))"
+          />
         </div>
       </div>
 
@@ -163,15 +212,109 @@ async function doReject() {
           </div>
           <Tag :value="detail.idVerification.status" :severity="statusSeverity(detail.idVerification.status)" />
         </div>
-        <a
+        <Button
           v-if="detail.idVerification.documentUrl"
-          :href="detail.idVerification.documentUrl"
-          target="_blank"
-          rel="noopener"
-          class="text-xs text-[color:var(--bs-blue)] underline mt-1 inline-block"
-        >
-          View ID document
-        </a>
+          icon="pi pi-eye"
+          label="View ID document"
+          outlined
+          size="small"
+          class="mt-2"
+          @click="openViewer(detail.idVerification.documentUrl, 'Government ID', true)"
+        />
+      </div>
+
+      <!-- Trust badges (insurance + WSIB): read-only visibility for reps. These
+           are optional badges, not gates for approving the application. -->
+      <div class="grid sm:grid-cols-2 gap-3 mb-5">
+        <div class="bs-card p-3">
+          <div class="flex items-center justify-between mb-1">
+            <h2 class="text-sm font-semibold">Insurance</h2>
+            <Tag
+              v-if="detail.insurance"
+              :value="detail.insurance.status"
+              :severity="statusSeverity(detail.insurance.status)"
+            />
+          </div>
+          <div v-if="!detail.insurance" class="text-xs text-[color:var(--bs-muted)]">
+            Not submitted (optional).
+          </div>
+          <template v-else>
+            <dl class="text-xs space-y-0.5">
+              <div><dt class="font-medium inline">Insurer:</dt> {{ detail.insurance.insurer }}</div>
+              <div><dt class="font-medium inline">Policy:</dt> #{{ detail.insurance.policyNumber }}</div>
+              <div><dt class="font-medium inline">Coverage:</dt> {{ fmtMoney(detail.insurance.coverageAmount) }}</div>
+              <div><dt class="font-medium inline">Expires:</dt> {{ fmtDate(detail.insurance.expiresAtMs) }}</div>
+            </dl>
+            <div class="mt-1.5 text-xs">
+              <dt class="font-medium inline">Blue Seal on policy:</dt>
+              <template v-if="detail.insurance.blueSealAdditionalInsured === null">
+                — (not tracked)
+              </template>
+              <template v-else-if="detail.insurance.blueSealAdditionalInsured">
+                declared additional insured<span
+                  v-if="detail.insurance.additionalInsuredConfirmedAtMs"
+                  class="text-[color:var(--bs-success-text)]"
+                > · verified</span>
+              </template>
+              <template v-else>
+                not named — liability release
+                <span :class="detail.insurance.liabilityReleaseSignedAtMs ? '' : 'text-[color:var(--bs-danger)]'">
+                  {{ detail.insurance.liabilityReleaseSignedAtMs ? "signed" : "NOT signed yet" }}
+                </span>
+              </template>
+            </div>
+            <div class="flex flex-wrap gap-2 mt-2">
+              <Button
+                v-if="detail.insurance.documentUrl"
+                icon="pi pi-eye"
+                label="View document"
+                outlined
+                size="small"
+                @click="openViewer(detail.insurance.documentUrl, 'Insurance — ' + detail.insurance.insurer)"
+              />
+              <Button
+                v-if="detail.insurance.releaseSignatureUrl"
+                icon="pi pi-eye"
+                label="Release signature"
+                outlined
+                size="small"
+                @click="openViewer(detail.insurance.releaseSignatureUrl, 'Liability release signature', true)"
+              />
+            </div>
+            <div v-if="detail.insurance.rejectionReason" class="text-xs text-[color:var(--bs-danger)] mt-1">
+              {{ detail.insurance.rejectionReason }}
+            </div>
+          </template>
+        </div>
+
+        <div class="bs-card p-3">
+          <div class="flex items-center justify-between mb-1">
+            <h2 class="text-sm font-semibold">WSIB / workers' comp</h2>
+            <Tag v-if="detail.wsib" :value="detail.wsib.status" :severity="statusSeverity(detail.wsib.status)" />
+          </div>
+          <div v-if="!detail.wsib" class="text-xs text-[color:var(--bs-muted)]">
+            Not submitted (optional).
+          </div>
+          <template v-else>
+            <dl class="text-xs space-y-0.5">
+              <div><dt class="font-medium inline">Province:</dt> {{ detail.wsib.province }}</div>
+              <div><dt class="font-medium inline">Clearance #:</dt> {{ detail.wsib.clearanceNumber }}</div>
+              <div><dt class="font-medium inline">Expires:</dt> {{ fmtDate(detail.wsib.expiresAtMs) }}</div>
+            </dl>
+            <Button
+              v-if="detail.wsib.documentUrl"
+              icon="pi pi-eye"
+              label="View document"
+              outlined
+              size="small"
+              class="mt-2"
+              @click="openViewer(detail.wsib.documentUrl, 'WSIB — ' + detail.wsib.province)"
+            />
+            <div v-if="detail.wsib.rejectionReason" class="text-xs text-[color:var(--bs-danger)] mt-1">
+              {{ detail.wsib.rejectionReason }}
+            </div>
+          </template>
+        </div>
       </div>
 
       <Message severity="info" :closable="false" class="mb-4">
@@ -220,6 +363,32 @@ async function doReject() {
       <template #footer>
         <Button label="Cancel" text :disabled="busy" @click="showApproveConfirm = false" />
         <Button label="Approve" icon="pi pi-check" :loading="busy" @click="doApprove" />
+      </template>
+    </Dialog>
+
+    <!-- Inline document viewer (PDF iframe / image) with an optional watermark. -->
+    <Dialog
+      :visible="viewer !== null"
+      modal
+      :header="viewer?.title ?? ''"
+      :style="{ width: '90vw', maxWidth: '900px' }"
+      @update:visible="(v: boolean) => { if (!v) viewer = null; }"
+    >
+      <div v-if="viewer" class="relative w-full" style="height: 70vh">
+        <iframe v-if="viewerIsPdf" :src="viewer.url" class="w-full h-full rounded border" title="Document" />
+        <img v-else :src="viewer.url" alt="Document" class="w-full h-full object-contain rounded border" />
+        <div
+          v-if="viewer.watermark"
+          class="absolute inset-0 flex items-center justify-center pointer-events-none text-white/80 text-3xl font-bold rotate-[-20deg]"
+          style="text-shadow: 0 0 8px rgba(0,0,0,0.6);"
+        >
+          REP VIEW ONLY
+        </div>
+      </div>
+      <template #footer>
+        <a v-if="viewer" :href="viewer.url" target="_blank" rel="noopener" class="text-sm">
+          Open in new tab →
+        </a>
       </template>
     </Dialog>
   </section>

@@ -46,6 +46,28 @@ export interface RepApplicationDetail {
     documentUrl: string | null;
   } | null;
   certifications: RepCertification[];
+  // Insurance + WSIB trust docs (read-only for reps). Null when not submitted.
+  insurance: {
+    insurer: string;
+    policyNumber: string;
+    coverageAmount: number;
+    expiresAtMs: number | null;
+    status: string;
+    rejectionReason: string | null;
+    blueSealAdditionalInsured: boolean | null;
+    additionalInsuredConfirmedAtMs: number | null;
+    liabilityReleaseSignedAtMs: number | null;
+    documentUrl: string | null;
+    releaseSignatureUrl: string | null;
+  } | null;
+  wsib: {
+    province: string;
+    clearanceNumber: string;
+    expiresAtMs: number | null;
+    status: string;
+    rejectionReason: string | null;
+    documentUrl: string | null;
+  } | null;
 }
 
 /** The pending applications this rep owns (referral or region), newest gate. */

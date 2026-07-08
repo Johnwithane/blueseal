@@ -45,10 +45,12 @@ export const getApplicationDetails = onCall(CALLABLE_OPTS, async (req) => {
   const { tradieUid } = parsed.data;
   await assertRepOwnsTradie(uid, tradieUid);
 
-  const [tradieSnap, idSnap, certsSnap] = await Promise.all([
+  const [tradieSnap, idSnap, certsSnap, insSnap, wsibSnap] = await Promise.all([
     db.doc(`tradespeople/${tradieUid}`).get(),
     db.doc(`idVerifications/${tradieUid}`).get(),
     db.collection("certifications").where("tradespersonId", "==", tradieUid).get(),
+    db.doc(`insuranceVerifications/${tradieUid}`).get(),
+    db.doc(`wsibVerifications/${tradieUid}`).get(),
   ]);
   if (!tradieSnap.exists) throw new HttpsError("not-found", "Tradesperson not found.");
   const t = (tradieSnap.data() ?? {}) as Record<string, unknown>;
@@ -78,6 +80,39 @@ export const getApplicationDetails = onCall(CALLABLE_OPTS, async (req) => {
       }
     : null;
 
+  // Insurance + WSIB trust docs — read-only for reps (they can't read these via
+  // rules), so a full vetter sees everything admin sees. Approve/reject of these
+  // optional badges stays with admin; the rep's approveApplication gates go-live.
+  const insData = insSnap.exists ? ((insSnap.data() ?? {}) as Record<string, unknown>) : null;
+  const release = (insData?.liabilityRelease ?? null) as { signatureStoragePath?: string } | null;
+  const insurance = insData
+    ? {
+        insurer: (insData.insurer as string) ?? "",
+        policyNumber: (insData.policyNumber as string) ?? "",
+        coverageAmount: (insData.coverageAmount as number) ?? 0,
+        expiresAtMs: ms(insData.expiresAt),
+        status: (insData.status as string) ?? "pending",
+        rejectionReason: (insData.rejectionReason as string | null) ?? null,
+        blueSealAdditionalInsured: (insData.blueSealAdditionalInsured as boolean | undefined) ?? null,
+        additionalInsuredConfirmedAtMs: ms(insData.additionalInsuredConfirmedAt),
+        liabilityReleaseSignedAtMs: release ? ms((insData.liabilityRelease as Record<string, unknown>).signedAt) : null,
+        documentUrl: await signFileRef(insData.fileUrl),
+        releaseSignatureUrl: await signFileRef(release?.signatureStoragePath),
+      }
+    : null;
+
+  const wsibData = wsibSnap.exists ? ((wsibSnap.data() ?? {}) as Record<string, unknown>) : null;
+  const wsib = wsibData
+    ? {
+        province: (wsibData.province as string) ?? "",
+        clearanceNumber: (wsibData.clearanceNumber as string) ?? "",
+        expiresAtMs: ms(wsibData.expiresAt),
+        status: (wsibData.status as string) ?? "pending",
+        rejectionReason: (wsibData.rejectionReason as string | null) ?? null,
+        documentUrl: await signFileRef(wsibData.fileUrl),
+      }
+    : null;
+
   return {
     tradie: {
       id: tradieUid,
@@ -95,5 +130,7 @@ export const getApplicationDetails = onCall(CALLABLE_OPTS, async (req) => {
     },
     idVerification,
     certifications,
+    insurance,
+    wsib,
   };
 });
