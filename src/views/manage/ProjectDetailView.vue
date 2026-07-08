@@ -44,6 +44,7 @@ useSeo({ title: "Project", noindex: true });
 const projectId = String(route.params.projectId ?? "");
 const project = ref<WithId<ProjectDoc> | null>(null);
 const loaded = ref(false);
+const loadError = ref<string | null>(null);
 const busy = ref(false);
 const postings = ref<WithId<JobPostDoc>[]>([]);
 const jobs = ref<WithId<JobDoc>[]>([]);
@@ -87,16 +88,31 @@ function syncQuoteSubs(current: WithId<JobPostDoc>[]): void {
   }
 }
 
-onMounted(() => {
+function start() {
   const uid = auth.fbUser?.uid;
   if (!projectId || !uid) return;
-  unsubProject = subscribeProject(projectId, (p) => {
-    project.value = p;
+  loadError.value = null;
+  // A failed subscription must clear the spinner and offer a retry rather than
+  // hang on "Loading…" forever (P2-06). The project sub is the view's gate.
+  const onErr = (e: Error) => {
+    loadError.value = humanizeError(e);
     loaded.value = true;
-  });
-  unsubPostings = subscribeProjectPostingsForPm(uid, (p) => (postings.value = p));
-  unsubJobs = subscribeProjectJobsForPm(uid, (j) => (jobs.value = j));
-});
+  };
+  unsubProject?.();
+  unsubPostings?.();
+  unsubJobs?.();
+  unsubProject = subscribeProject(
+    projectId,
+    (p) => {
+      project.value = p;
+      loaded.value = true;
+    },
+    onErr,
+  );
+  unsubPostings = subscribeProjectPostingsForPm(uid, (p) => (postings.value = p), onErr);
+  unsubJobs = subscribeProjectJobsForPm(uid, (j) => (jobs.value = j), onErr);
+}
+onMounted(start);
 watch(myPostings, (p) => syncQuoteSubs(p));
 onUnmounted(() => {
   unsubProject?.();
@@ -226,6 +242,13 @@ function liveQuotes(postId: string): WithId<ApplicationDoc>[] {
     </RouterLink>
 
     <div v-if="!loaded" class="text-sm text-[color:var(--bs-muted)] py-8 text-center">Loading…</div>
+
+    <div v-else-if="loadError" class="bs-card p-6 text-center mt-6">
+      <i class="pi pi-exclamation-triangle text-2xl text-[color:var(--bs-muted)]"></i>
+      <p class="mt-2 font-medium">Couldn't load this project</p>
+      <p class="text-sm text-[color:var(--bs-muted)]">{{ loadError }}</p>
+      <Button label="Try again" icon="pi pi-refresh" size="small" class="mt-3" @click="start" />
+    </div>
 
     <div v-else-if="!project" class="bs-card p-6 text-center mt-6">
       <i class="pi pi-folder-open text-2xl text-[color:var(--bs-muted)]"></i>

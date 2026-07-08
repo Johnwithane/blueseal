@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import Tag from "primevue/tag";
+import Button from "primevue/button";
 import { useAuthStore } from "@/stores/auth";
 import { useSeo } from "@/composables/useSeo";
 import { useFormatters } from "@/composables";
+import { humanizeError } from "@/utils/errors";
 import { subscribeProjectJobsForPm } from "@/firebase/services/jobs";
 import { statusLabel, STATUS_SEVERITY } from "@/utils/jobStatus";
 import { tradeLabel } from "@/data/trades";
@@ -18,19 +20,33 @@ useSeo({ title: "Jobs", noindex: true });
 
 const jobs = ref<WithId<JobDoc>[]>([]);
 const loading = ref(true);
+const loadError = ref<string | null>(null);
 let unsub: (() => void) | null = null;
 
-onMounted(() => {
+function start() {
   const uid = auth.fbUser?.uid;
   if (!uid) {
     loading.value = false;
     return;
   }
-  unsub = subscribeProjectJobsForPm(uid, (j) => {
-    jobs.value = j;
-    loading.value = false;
-  });
-});
+  loading.value = true;
+  loadError.value = null;
+  unsub?.();
+  unsub = subscribeProjectJobsForPm(
+    uid,
+    (j) => {
+      jobs.value = j;
+      loading.value = false;
+    },
+    // Clear the spinner and offer a retry instead of hanging on "Loading…"
+    // forever if the subscription errors (P2-06).
+    (e) => {
+      loadError.value = humanizeError(e);
+      loading.value = false;
+    },
+  );
+}
+onMounted(start);
 onUnmounted(() => unsub?.());
 
 const hasJobs = computed(() => jobs.value.length > 0);
@@ -45,6 +61,12 @@ const hasJobs = computed(() => jobs.value.length > 0);
     </p>
 
     <div v-if="loading" class="text-sm text-[color:var(--bs-muted)] py-6 text-center">Loading…</div>
+    <div v-else-if="loadError" class="bs-card p-6 text-center">
+      <i class="pi pi-exclamation-triangle text-2xl text-[color:var(--bs-muted)]"></i>
+      <p class="mt-2 font-medium">Couldn't load your jobs</p>
+      <p class="text-sm text-[color:var(--bs-muted)]">{{ loadError }}</p>
+      <Button label="Try again" icon="pi pi-refresh" size="small" class="mt-3" @click="start" />
+    </div>
     <div v-else-if="!hasJobs" class="bs-card p-6 text-center">
       <i class="pi pi-briefcase text-2xl text-[color:var(--bs-muted)]"></i>
       <p class="mt-2 font-medium">No jobs yet</p>

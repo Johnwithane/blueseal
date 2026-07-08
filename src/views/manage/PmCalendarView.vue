@@ -12,6 +12,7 @@ import { storeToRefs } from "pinia";
 import { useAuthStore } from "@/stores/auth";
 import { useSubscriptionStore } from "@/stores/subscription";
 import { useSeo } from "@/composables/useSeo";
+import { humanizeError } from "@/utils/errors";
 import { subscribeProjectJobsForPm } from "@/firebase/services/jobs";
 import { emptyAvailability } from "@/firebase/services/tradespeople";
 import CalendarView from "@/components/CalendarView.vue";
@@ -26,13 +27,20 @@ const isAdmin = computed(() => (auth.roles ?? []).includes("admin"));
 const gated = computed(() => subLoaded.value && !isPro.value && !isAdmin.value);
 
 const jobs = ref<WithId<JobDoc>[]>([]);
+const loadError = ref<string | null>(null);
 const noAvailability = emptyAvailability();
 let unsub: (() => void) | null = null;
 
 function start() {
   if (!auth.fbUser || gated.value) return;
+  loadError.value = null;
   unsub?.();
-  unsub = subscribeProjectJobsForPm(auth.fbUser.uid, (j) => (jobs.value = j));
+  unsub = subscribeProjectJobsForPm(
+    auth.fbUser.uid,
+    (j) => (jobs.value = j),
+    // Surface a retry instead of a silently-empty calendar on failure (P2-06).
+    (e) => (loadError.value = humanizeError(e)),
+  );
 }
 onMounted(start);
 onUnmounted(() => unsub?.());
@@ -60,10 +68,18 @@ const scheduledCount = computed(() => jobs.value.filter((j) => j.scheduledStart)
     </div>
 
     <template v-else>
-      <p v-if="scheduledCount === 0" class="bs-card p-6 text-center text-sm text-[color:var(--bs-muted)]">
-        No scheduled jobs yet. Once a trade schedules a job on one of your projects, it shows here.
-      </p>
-      <CalendarView :jobs="jobs" :availability="noAvailability" :is-editable="false" />
+      <div v-if="loadError" class="bs-card p-6 text-center">
+        <i class="pi pi-exclamation-triangle text-2xl text-[color:var(--bs-muted)]"></i>
+        <p class="mt-2 font-medium">Couldn't load the calendar</p>
+        <p class="text-sm text-[color:var(--bs-muted)]">{{ loadError }}</p>
+        <Button label="Try again" icon="pi pi-refresh" size="small" class="mt-3" @click="start" />
+      </div>
+      <template v-else>
+        <p v-if="scheduledCount === 0" class="bs-card p-6 text-center text-sm text-[color:var(--bs-muted)]">
+          No scheduled jobs yet. Once a trade schedules a job on one of your projects, it shows here.
+        </p>
+        <CalendarView :jobs="jobs" :availability="noAvailability" :is-editable="false" />
+      </template>
     </template>
   </section>
 </template>

@@ -213,14 +213,19 @@ export async function resendProjectInvite(
 export function subscribeProjectsForPm(
   pmUid: string,
   cb: (rows: WithId<ProjectDoc>[]) => void,
+  onError?: (e: Error) => void,
 ): () => void {
   const q = query(projectsCol(), where("projectManagerId", "==", pmUid));
-  return onSnapshot(q, (snap) => {
-    const rows = snap.docs
-      .map((d) => ({ id: d.id, ...d.data() }) as WithId<ProjectDoc>)
-      .sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0));
-    cb(rows);
-  });
+  return onSnapshot(
+    q,
+    (snap) => {
+      const rows = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() }) as WithId<ProjectDoc>)
+        .sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0));
+      cb(rows);
+    },
+    (err) => onError?.(err),
+  );
 }
 
 // A single project (live), for the PM's read-only detail view. The owning PM or
@@ -228,9 +233,12 @@ export function subscribeProjectsForPm(
 export function subscribeProject(
   projectId: string,
   cb: (project: WithId<ProjectDoc> | null) => void,
+  onError?: (e: Error) => void,
 ): () => void {
-  return onSnapshot(projectDocRef(projectId), (snap) =>
-    cb(snap.exists() ? { id: snap.id, ...snap.data() } : null),
+  return onSnapshot(
+    projectDocRef(projectId),
+    (snap) => cb(snap.exists() ? { id: snap.id, ...snap.data() } : null),
+    (err) => onError?.(err),
   );
 }
 

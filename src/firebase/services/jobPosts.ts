@@ -122,13 +122,18 @@ export function subscribeJobPostMeta(
 export function subscribeProjectPostingsForPm(
   pmUid: string,
   cb: (posts: WithId<JobPostDoc>[]) => void,
+  onError?: (e: Error) => void,
 ): () => void {
   const q = query(
     postsCol(),
     where("createdByProjectManagerId", "==", pmUid),
     limit(200),
   );
-  return onSnapshot(q, (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
+  return onSnapshot(
+    q,
+    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+    (err) => onError?.(err),
+  );
 }
 
 // The scoped ("invited") postings a tradesperson has been invited to quote on

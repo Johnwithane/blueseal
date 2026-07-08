@@ -393,14 +393,18 @@ export function subscribeClientJobs(
 export function subscribeProjectJobsForPm(
   pmUid: string,
   cb: (jobs: WithId<JobDoc>[]) => void,
+  onError?: (e: Error) => void,
 ): () => void {
   const q = query(jobsCol(), where("projectManagerId", "==", pmUid), limit(200));
-  return onSnapshot(q, (snap) =>
-    cb(
-      snap.docs
-        .map((d) => ({ id: d.id, ...d.data() }) as WithId<JobDoc>)
-        .sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0)),
-    ),
+  return onSnapshot(
+    q,
+    (snap) =>
+      cb(
+        snap.docs
+          .map((d) => ({ id: d.id, ...d.data() }) as WithId<JobDoc>)
+          .sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0)),
+      ),
+    (err) => onError?.(err),
   );
 }
 

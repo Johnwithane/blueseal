@@ -12,6 +12,7 @@ import { storeToRefs } from "pinia";
 import { useAuthStore } from "@/stores/auth";
 import { useSubscriptionStore } from "@/stores/subscription";
 import { useSeo } from "@/composables/useSeo";
+import { humanizeError } from "@/utils/errors";
 import { subscribeProjectsForPm } from "@/firebase/services/projects";
 import type { ProjectDoc, WithId } from "@/firebase/interfaces";
 import InitialsAvatar from "@/components/InitialsAvatar.vue";
@@ -26,12 +27,19 @@ const gated = computed(() => subLoaded.value && !isPro.value && !isAdmin.value);
 
 const projects = ref<WithId<ProjectDoc>[]>([]);
 const search = ref("");
+const loadError = ref<string | null>(null);
 let unsub: (() => void) | null = null;
 
 function start() {
   if (!auth.fbUser || gated.value) return;
+  loadError.value = null;
   unsub?.();
-  unsub = subscribeProjectsForPm(auth.fbUser.uid, (p) => (projects.value = p));
+  unsub = subscribeProjectsForPm(
+    auth.fbUser.uid,
+    (p) => (projects.value = p),
+    // Surface a retry instead of a silently-empty client list on failure (P2-06).
+    (e) => (loadError.value = humanizeError(e)),
+  );
 }
 onMounted(start);
 onUnmounted(() => unsub?.());
@@ -95,6 +103,13 @@ const filtered = computed(() => {
       <RouterLink to="/pricing" class="inline-block mt-5">
         <Button label="Start 30-day free trial" icon="pi pi-star" />
       </RouterLink>
+    </div>
+
+    <div v-else-if="loadError" class="bs-card p-6 text-center">
+      <i class="pi pi-exclamation-triangle text-2xl text-[color:var(--bs-muted)]"></i>
+      <p class="mt-2 font-medium">Couldn't load your clients</p>
+      <p class="text-sm text-[color:var(--bs-muted)]">{{ loadError }}</p>
+      <Button label="Try again" icon="pi pi-refresh" size="small" class="mt-3" @click="start" />
     </div>
 
     <template v-else>
