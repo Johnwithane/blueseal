@@ -1,34 +1,71 @@
 <script setup lang="ts">
-// Landing page for a COPIED/texted job-invite link (/invite/:token). The
-// token can't sign anyone in — the only thing this page can do is ask the
-// server to email a fresh magic sign-in link to the address the tradesperson
-// stored on the invite. Requiring the visitor to type that email (and press
-// a button — nothing runs on mount, so link-preview scanners get nothing)
-// keeps inbox control as the credential even if the text was forwarded.
-import { ref } from "vue";
-import { useRoute } from "vue-router";
+// Landing page for a COPIED/texted job-invite link (/invite/:token). One tap on
+// "View my job" trades the token for a signed-in client session (redeemJobInvite)
+// and drops the client straight into their job — no email typing, no inbox
+// detour. Whoever holds the link can open the job; that's the deliberate
+// tradeoff for a shareable link (the emailed magic link already behaves this
+// way). The account-takeover guard lives server-side: if the invited email
+// already has a Blue Seal account, redeemJobInvite refuses to mint a session and
+// emails that inbox the magic link instead, and we show "check your inbox".
+//
+// Nothing runs on mount (a link-preview scanner executes JS but won't tap a
+// button), so a prefetching bot can never consume the invite.
+import { onMounted, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import Button from "primevue/button";
-import InputText from "primevue/inputtext";
 import Message from "primevue/message";
-import { sendJobInviteSignInLink } from "@/firebase/services/jobs";
+import { useAuthStore } from "@/stores/auth";
+import { claimJobInvite, redeemJobInvite } from "@/firebase/services/jobs";
 import { humanizeError } from "@/utils/errors";
 
 const route = useRoute();
+const router = useRouter();
+const auth = useAuthStore();
 const token = String(route.params.token ?? "");
 
-const email = ref("");
-const status = ref<"form" | "sending" | "sent" | "error">("form");
+const status = ref<"idle" | "working" | "emailed" | "error">("idle");
 const error = ref<string | null>(null);
 
-async function submit() {
-  if (status.value === "sending") return;
-  const addr = email.value.trim().toLowerCase();
-  if (!addr) return;
-  status.value = "sending";
+// Settle persisted auth up front (no sign-in triggered) so an already-signed-in
+// client who taps through can claim with their current session.
+onMounted(() => {
+  void auth.init();
+});
+
+// Attach every invite matching the signed-in email and navigate to the job.
+// Returns false when the current session has no matching invite (wrong/no
+// account) so the caller can fall back to token redemption.
+async function claimAndGo(): Promise<boolean> {
+  const res = await claimJobInvite(true);
+  if (res.status === "claimed" && res.jobIds.length > 0) {
+    await router.push(`/jobs/${res.jobIds[0]}`);
+    return true;
+  }
+  return false;
+}
+
+async function openJob() {
+  if (status.value === "working") return;
+  status.value = "working";
   error.value = null;
   try {
-    await sendJobInviteSignInLink(token, addr);
-    status.value = "sent";
+    await auth.init();
+
+    // Already signed in as the invited client? Claim directly — no new session.
+    if (auth.isAuthenticated && (await claimAndGo())) return;
+
+    const res = await redeemJobInvite(token);
+    if (res.mode === "emailed") {
+      // Email already has an account — the magic link was sent to that inbox.
+      status.value = "emailed";
+      return;
+    }
+
+    // Brand-new client: sign in with the minted token, then claim + open.
+    await auth.completeInviteTokenSignIn(res.customToken);
+    if (await claimAndGo()) return;
+    // Signed in, but nothing left to claim (already claimed / revoked mid-flight).
+    await router.push("/dashboard");
   } catch (e) {
     error.value = humanizeError(e);
     status.value = "error";
@@ -40,42 +77,30 @@ async function submit() {
   <section class="bs-container py-10 max-w-md">
     <h1 class="text-2xl font-bold text-center">Your job on Blue Seal</h1>
 
-    <template v-if="status === 'form' || status === 'error' || status === 'sending'">
+    <template v-if="status !== 'emailed'">
       <p class="text-sm text-[color:var(--bs-muted)] mt-3 text-center">
         Your tradesperson set up your job on Blue Seal — quotes, schedule and
-        invoices in one place. Confirm your email and we'll send you a sign-in
-        link. No password, no account setup.
+        invoices in one place. One tap opens it. No password, no account setup.
       </p>
       <div class="mt-6 space-y-3">
-        <InputText
-          v-model="email"
-          type="email"
-          placeholder="you@example.com"
-          class="w-full"
-          autocomplete="email"
-          @keydown.enter="submit"
-        />
         <Button
-          label="Email me a sign-in link"
-          icon="pi pi-envelope"
+          label="View my job"
+          icon="pi pi-arrow-right"
           class="w-full"
-          :loading="status === 'sending'"
-          :disabled="!email.trim()"
-          @click="submit"
+          size="large"
+          :loading="status === 'working'"
+          @click="openJob"
         />
         <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
-        <p class="text-xs text-[color:var(--bs-muted)] text-center">
-          It must be the email your tradesperson used to invite you.
-        </p>
       </div>
     </template>
 
-    <div v-else-if="status === 'sent'" class="bs-empty mt-6 text-center">
+    <div v-else class="bs-empty mt-6 text-center">
       <i class="pi pi-envelope text-4xl mb-2 block text-[color:var(--bs-blue)]"></i>
       <p class="font-semibold">Check your inbox</p>
       <p class="text-sm text-[color:var(--bs-muted)] mt-1">
-        We've emailed a sign-in link to <strong>{{ email.trim().toLowerCase() }}</strong
-        >. One tap and you're in.
+        You already have a Blue Seal account for this email, so we've sent a
+        one-tap sign-in link there. Open it to view your job.
       </p>
     </div>
   </section>

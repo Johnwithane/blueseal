@@ -167,6 +167,7 @@ export { recordOfflineQuoteAcceptance } from "./jobs/recordOfflineQuoteAcceptanc
 export { resendJobInvite } from "./jobs/resendJobInvite";
 export { revokeJobInvite } from "./jobs/revokeJobInvite";
 export { sendJobInviteSignInLink } from "./jobs/sendJobInviteSignInLink";
+export { redeemJobInvite } from "./jobs/redeemJobInvite";
 export { claimJobInvite } from "./jobs/claimJobInvite";
 export { unsubscribeJobInvite } from "./jobs/unsubscribeJobInvite";
 // Projects (Project Manager dispatch): a PM bundles trade jobs for a client and

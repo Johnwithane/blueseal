@@ -6,6 +6,7 @@ import InputText from "primevue/inputtext";
 import Textarea from "primevue/textarea";
 import Select from "primevue/select";
 import DatePicker from "primevue/datepicker";
+import ToggleSwitch from "primevue/toggleswitch";
 import Dialog from "primevue/dialog";
 import Message from "primevue/message";
 import { createInviteJob, updateJobIntakePhotos } from "@/firebase/services/jobs";
@@ -109,6 +110,9 @@ const region = ref("");
 const postalCode = ref("");
 const urgency = ref<Urgency>("flexible");
 const preferredStart = ref<Date | null>(null);
+// "Quote already agreed": open the job straight in progress, skipping the
+// quote/accept step. Off by default — the standard flow is to send a quote.
+const skipQuote = ref(false);
 
 // Optional job photos (up to 8). Held in memory as compressed files with a
 // stable preview URL, then uploaded under the real job path after the callable
@@ -201,6 +205,7 @@ async function submit() {
       postalCode: postalCode.value.toUpperCase(),
     },
     preferredStart: toDateString(preferredStart.value),
+    skipQuote: skipQuote.value,
   });
   if (!parsed.success) {
     setFromZod(parsed.error);
@@ -401,6 +406,21 @@ function openJob() {
             </label>
             <DatePicker v-model="preferredStart" date-format="yy-mm-dd" show-icon class="mt-1 w-full" />
           </div>
+        </div>
+      </fieldset>
+
+      <!-- Quoting: skip straight to the work when the price is already agreed. -->
+      <fieldset class="border-t border-[color:var(--bs-border)] pt-6">
+        <legend class="text-xs font-semibold uppercase tracking-wide text-[color:var(--bs-muted)] mb-3">Quoting</legend>
+        <div class="flex items-start gap-3">
+          <ToggleSwitch v-model="skipQuote" input-id="skipQuote" class="mt-0.5" />
+          <label for="skipQuote" class="text-sm cursor-pointer">
+            <span class="font-medium">Quote already agreed — skip straight to the work</span>
+            <span class="block text-xs text-[color:var(--bs-muted)] mt-0.5">
+              The job opens as in&nbsp;progress. No quote is sent — you'll invoice from
+              the time and materials you log. Leave off to send a quote first.
+            </span>
+          </label>
         </div>
       </fieldset>
 

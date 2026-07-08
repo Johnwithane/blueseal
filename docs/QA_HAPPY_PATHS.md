@@ -169,11 +169,27 @@ Tradesperson verification has three independent documents — **ID**, **certific
    to your primary trade, changeable.
 3. **Photos (optional):** tap **Add photo** and attach 1-8 images. They compress
    client-side, preview as thumbnails, and each can be removed with the ×.
-4. Submit.
+4. **Quoting (optional):** leave **"Quote already agreed — skip straight to the
+   work"** OFF for the standard flow. Submit.
 5. **Expected:** returns a copyable **invite link** + emails a magic sign-in link
-   to the client. Job appears in your kanban (client not yet attached), and any
-   photos you attached show as the job's intake photos. This flow is **free** (no
-   Pro needed). Mobile (375px): the photo grid is 3-up and the form is single-column.
+   to the client. Job appears in your kanban at **Quote needed** (client not yet
+   attached), and any photos you attached show as the job's intake photos. This
+   flow is **free** (no Pro needed). Mobile (375px): the photo grid is 3-up and the
+   form is single-column.
+5a. **Skip the quote (price already agreed).** Create another job with **"Quote
+   already agreed — skip straight to the work"** turned ON. **Expected:** the job
+   opens directly at **In progress** with no quote step (server stamps fixed
+   billing + 0% job-line tax; no `quotes/{jobId}` doc). You invoice from logged
+   time + materials, exactly like a solo job — there's nothing to quote or accept.
+5b. **One-tap invite link → the job.** Copy the invite link and open it
+   signed-out (incognito) as the client, then tap **View my job**. **Expected:**
+   for a **brand-new** client email, one tap signs them straight in (no email
+   typing, no inbox detour) and lands them on `/jobs/:id` with the job claimed
+   (`clientId` attaches; the copy link then dies). For an email that **already has
+   a Blue Seal account**, it instead shows **"Check your inbox"** and emails that
+   inbox a one-tap magic link — the account-takeover guard, so only the inbox
+   owner can get in. A revoked/expired/used link shows a uniform "invalid,
+   expired, or already used" error. (Server: `redeemJobInvite`.)
 6. **Send a quote / invoice before the client has joined.** Without claiming the
    invite, send the client a quote (and later an invoice) on that job.
 7. **Expected:** the client (whose `clientInvite.emailLower` is still unclaimed)

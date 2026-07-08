@@ -511,10 +511,31 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
             steps: [
               "Open /jobs/new. Confirm the Trade field: with one trade on your profile it's a read-only line (no dropdown); with two-plus it's a dropdown defaulted to your primary, changeable.",
               "Enter client name + email, address, and tap Add photo to attach 1-8 images (they compress + preview as thumbnails; × removes one).",
-              "Submit.",
+              "Leave 'Quote already agreed — skip straight to the work' OFF for this run. Submit.",
             ],
             expected:
-              "A copyable invite link is shown and a branded magic sign-in link is emailed to the client. The job lands in your kanban (client not yet attached) with your attached photos as its intake photos. Flow is free (no Pro). Mobile 375px: single-column form, 3-up photo grid.",
+              "A copyable invite link is shown and a branded magic sign-in link is emailed to the client. The job lands in your kanban at 'Quote needed' (client not yet attached) with your attached photos as its intake photos. Flow is free (no Pro). Mobile 375px: single-column form, 3-up photo grid.",
+          },
+          {
+            id: "tradie-invite-job-skip-quote",
+            title: "Create a job with 'Quote already agreed' (skip straight to the work)",
+            steps: [
+              "Open /jobs/new, fill in the job, and turn ON 'Quote already agreed — skip straight to the work'. Submit.",
+              "Open the created job and check its status; try the money path (log time / add an expense, then finalize the invoice).",
+            ],
+            expected:
+              "The job opens directly at 'In progress' with NO quote step (billing is fixed, job-line tax 0%). There's nothing to quote or accept; you invoice from logged time + materials, same as a solo job whose acceptance was recorded offline. Leaving the toggle off still enters at 'Quote needed'.",
+          },
+          {
+            id: "tradie-invite-job-onetap-link",
+            title: "Copied invite link opens the job in one tap (new email vs existing account)",
+            steps: [
+              "On a created invite job, copy the shown invite link. Open it in a signed-out browser (or incognito) as the client.",
+              "Tap 'View my job'.",
+              "Repeat with an invite whose email ALREADY has a Blue Seal account (use a verify-* address you've signed up before).",
+            ],
+            expected:
+              "For a brand-new client email: one tap signs them straight in (no email typing, no inbox detour) and lands them on /jobs/:id with the job claimed (clientId attaches; the copy link then dies). For an email that already has an account: instead of signing in, it shows 'Check your inbox' and emails that inbox a one-tap magic link (account-takeover guard). Revoked/expired links show a uniform 'invalid, expired, or already used' error. Mobile 375px: single centered button. (Requires the redeemJobInvite function deploy.)",
           },
           {
             id: "tradie-invite-job-quote-invoice-email",

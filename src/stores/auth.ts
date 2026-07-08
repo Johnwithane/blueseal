@@ -5,6 +5,7 @@ import {
   isSignInWithEmailLink,
   onAuthStateChanged,
   signInWithCredential,
+  signInWithCustomToken,
   signInWithEmailAndPassword,
   signInWithEmailLink,
   signInWithPopup,
@@ -536,6 +537,29 @@ export const useAuthStore = defineStore("auth", {
         throw e;
       } finally {
         if (provisioningUid) provisioningUids.delete(provisioningUid);
+        this.pending = false;
+      }
+    },
+
+    /**
+     * Signs in from the custom token minted by the redeemJobInvite callable —
+     * the one-tap path for a copied/texted invite link on a brand-new client
+     * account. The account already carries the `client` role claim and a
+     * verified email (set server-side), so applyAuthState settles roles and
+     * self-heals the users/{uid} doc; the caller then runs claimJobInvite to
+     * attach the job. Distinct from completeEmailLinkSignIn (magic-link inbox
+     * path) — here the link itself is the credential.
+     */
+    async completeInviteTokenSignIn(customToken: string) {
+      this.pending = true;
+      this.error = null;
+      try {
+        await signInWithCustomToken(auth, customToken);
+        await this.applyAuthState(auth.currentUser);
+      } catch (e) {
+        this.error = (e as Error).message;
+        throw e;
+      } finally {
         this.pending = false;
       }
     },
