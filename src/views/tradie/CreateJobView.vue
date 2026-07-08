@@ -158,7 +158,9 @@ const submitting = ref(false);
 // flattened into one banner showing a raw Zod message.
 const error = ref<string | null>(null);
 const { errors, clear: clearErrors, setFromZod, focusFirst } = useFormErrors();
-const FIELD_ORDER = ["trade", "title", "description", "clientName", "clientEmail", "address"];
+// Matches the on-screen section order (client → job → address) so a validation
+// failure focuses the topmost errored field, not one buried mid-form.
+const FIELD_ORDER = ["clientName", "clientEmail", "trade", "title", "description", "address"];
 
 // Success state: the invite link is returned exactly once by the callable
 // (only its hash is stored server-side), so it's surfaced here for copying.
@@ -254,82 +256,17 @@ function openJob() {
 
 <template>
   <section class="bs-container max-w-lg py-6">
-    <h1 class="text-xl font-semibold">New job</h1>
-    <p class="text-sm text-[color:var(--bs-muted)] mt-1 mb-5">
-      Track a job for your own client. They don't need Blue Seal — you'll get an
-      invite link they can use to follow along, approve your quote and pay, or
-      you can run the whole job yourself.
+    <p class="text-sm text-[color:var(--bs-muted)] -mt-1 mb-6">
+      Set up a job for your own client. They don't need a Blue Seal account. You'll
+      get a link to invite them so they can follow along, approve your quote, and pay.
+      Or run the whole job yourself.
     </p>
 
-    <form class="space-y-4" @submit.prevent="submit">
-      <div data-field="trade">
-        <label class="text-sm font-medium">Trade</label>
-        <div
-          v-if="soleTrade"
-          class="mt-1 w-full p-inputtext p-component bg-[color:var(--bs-surface)] text-[color:var(--bs-muted)] cursor-default"
-        >
-          {{ tradeLabel(soleTrade) }}
-        </div>
-        <Select
-          v-else
-          v-model="trade"
-          :options="tradeOptions"
-          option-label="label"
-          option-value="value"
-          :filter="myTrades.length === 0"
-          placeholder="Select a trade"
-          class="mt-1 w-full"
-          :invalid="!!errors.trade"
-        />
-        <FieldError :message="errors.trade" />
-      </div>
-
-      <div data-field="title">
-        <label class="text-sm font-medium">Title</label>
-        <InputText v-model="title" placeholder="Short summary of the job" maxlength="140" class="mt-1 w-full" :invalid="!!errors.title" />
-        <FieldError :message="errors.title" />
-      </div>
-
-      <div data-field="description">
-        <label class="text-sm font-medium">Description</label>
-        <Textarea v-model="description" rows="4" maxlength="4000" class="w-full" placeholder="Scope of work, as you'd write it on a quote" :invalid="!!errors.description" />
-        <FieldError :message="errors.description" />
-      </div>
-
-      <div>
-        <label class="text-sm font-medium">Photos (optional)</label>
-        <p class="text-xs text-[color:var(--bs-muted)] mt-0.5 mb-2">Add up to 8 photos of the job.</p>
-        <div class="grid grid-cols-3 sm:grid-cols-4 gap-2">
-          <div
-            v-for="(p, idx) in photos"
-            :key="p.previewUrl"
-            class="relative aspect-square bg-gray-100 rounded overflow-hidden"
-          >
-            <img :src="p.previewUrl" :alt="p.file.name" class="w-full h-full object-cover" />
-            <button
-              type="button"
-              class="absolute top-1 right-1 bg-black/60 text-white rounded-full w-6 h-6 text-xs"
-              aria-label="Remove photo"
-              @click="removePhoto(idx)"
-            >
-              ×
-            </button>
-          </div>
-          <button
-            v-if="photos.length < 8"
-            type="button"
-            class="aspect-square border-2 border-dashed border-[color:var(--bs-border)] rounded text-[color:var(--bs-muted)] flex flex-col items-center justify-center"
-            @click="photoInput?.click()"
-          >
-            <i class="pi pi-plus"></i>
-            <span class="text-xs mt-1">Add photo</span>
-          </button>
-        </div>
-        <input ref="photoInput" type="file" accept="image/*" multiple class="hidden" @change="onPhotos" />
-      </div>
-
-      <fieldset>
-        <legend class="text-sm font-medium mb-2">Your client</legend>
+    <form class="space-y-8" @submit.prevent="submit">
+      <!-- Who it's for. Client-first: you're setting the job up FOR someone,
+           so anchor on them before the work details. -->
+      <fieldset class="space-y-2">
+        <legend class="text-xs font-semibold uppercase tracking-wide text-[color:var(--bs-muted)] mb-3">Your client</legend>
         <div class="grid sm:grid-cols-2 gap-2">
           <div data-field="clientName">
             <InputText v-model="clientName" placeholder="Client name" maxlength="80" autocomplete="off" class="w-full" :invalid="!!errors.clientName" />
@@ -340,13 +277,89 @@ function openJob() {
             <FieldError :message="errors.clientEmail" />
           </div>
         </div>
-        <p class="text-xs text-[color:var(--bs-muted)] mt-1">
-          They'll get a link to follow the job — no account or password needed.
+        <p class="text-xs text-[color:var(--bs-muted)]">
+          They'll get a link to follow the job. No account or password needed.
         </p>
       </fieldset>
 
-      <fieldset data-field="address">
-        <legend class="text-sm font-medium mb-2">Job address</legend>
+      <!-- What the job is: trade, title, scope, photos. -->
+      <fieldset class="space-y-4 border-t border-[color:var(--bs-border)] pt-6">
+        <legend class="text-xs font-semibold uppercase tracking-wide text-[color:var(--bs-muted)] mb-3">The job</legend>
+
+        <div data-field="trade">
+          <label class="text-sm font-medium">Trade</label>
+          <!-- One trade on file: nothing to choose, so show it read-only.
+               Two-plus: dropdown defaulted to the primary. -->
+          <div
+            v-if="soleTrade"
+            class="mt-1 w-full p-inputtext p-component bg-[color:var(--bs-surface)] text-[color:var(--bs-muted)] cursor-default"
+          >
+            {{ tradeLabel(soleTrade) }}
+          </div>
+          <Select
+            v-else
+            v-model="trade"
+            :options="tradeOptions"
+            option-label="label"
+            option-value="value"
+            :filter="myTrades.length === 0"
+            placeholder="Select a trade"
+            class="mt-1 w-full"
+            :invalid="!!errors.trade"
+          />
+          <FieldError :message="errors.trade" />
+        </div>
+
+        <div data-field="title">
+          <label class="text-sm font-medium">Title</label>
+          <InputText v-model="title" placeholder="e.g. Kitchen tap replacement" maxlength="140" class="mt-1 w-full" :invalid="!!errors.title" />
+          <FieldError :message="errors.title" />
+        </div>
+
+        <div data-field="description">
+          <label class="text-sm font-medium">Description</label>
+          <Textarea v-model="description" rows="4" maxlength="4000" class="mt-1 w-full" placeholder="Scope of work, as you'd write it on a quote" :invalid="!!errors.description" />
+          <FieldError :message="errors.description" />
+        </div>
+
+        <div>
+          <label class="text-sm font-medium">
+            Photos <span class="font-normal text-[color:var(--bs-muted)]">(optional)</span>
+          </label>
+          <p class="text-xs text-[color:var(--bs-muted)] mt-0.5 mb-2">Add up to 8 photos of the job.</p>
+          <div class="flex flex-wrap gap-2">
+            <div
+              v-for="(p, idx) in photos"
+              :key="p.previewUrl"
+              class="relative h-24 w-24 bg-gray-100 rounded overflow-hidden"
+            >
+              <img :src="p.previewUrl" :alt="p.file.name" class="w-full h-full object-cover" />
+              <button
+                type="button"
+                class="absolute top-1 right-1 bg-black/60 text-white rounded-full w-6 h-6 text-xs leading-none"
+                aria-label="Remove photo"
+                @click="removePhoto(idx)"
+              >
+                ×
+              </button>
+            </div>
+            <button
+              v-if="photos.length < 8"
+              type="button"
+              class="h-24 w-24 border-2 border-dashed border-[color:var(--bs-border)] rounded text-[color:var(--bs-muted)] flex flex-col items-center justify-center hover:border-[color:var(--bs-blue)] hover:text-[color:var(--bs-blue)] transition-colors"
+              @click="photoInput?.click()"
+            >
+              <i class="pi pi-plus"></i>
+              <span class="text-xs mt-1">Add photo</span>
+            </button>
+          </div>
+          <input ref="photoInput" type="file" accept="image/*" multiple class="hidden" @change="onPhotos" />
+        </div>
+      </fieldset>
+
+      <!-- Where the work is. -->
+      <fieldset data-field="address" class="space-y-2 border-t border-[color:var(--bs-border)] pt-6">
+        <legend class="text-xs font-semibold uppercase tracking-wide text-[color:var(--bs-muted)] mb-3">Job address</legend>
         <!-- Raw input (not InputText) so the Places autocomplete in onMounted
              can attach to a real HTMLInputElement. autocomplete="off" keeps the
              browser from autofilling the tradesperson's own address over the
@@ -360,7 +373,7 @@ function openJob() {
           maxlength="200"
           autocomplete="off"
         />
-        <div class="grid sm:grid-cols-2 gap-2 mt-2">
+        <div class="grid sm:grid-cols-2 gap-2">
           <InputText v-model="city" placeholder="City" maxlength="100" :invalid="!!errors.address" />
           <InputText v-model="region" placeholder="Province" maxlength="100" :invalid="!!errors.address" />
           <InputText v-model="postalCode" placeholder="Postal code (A1A 1A1)" maxlength="7" :invalid="!!errors.address" />
@@ -368,22 +381,28 @@ function openJob() {
         <FieldError :message="errors.address" />
       </fieldset>
 
-      <div class="grid sm:grid-cols-2 gap-2">
-        <div>
-          <label class="text-sm font-medium">Urgency</label>
-          <Select
-            v-model="urgency"
-            :options="urgencyOptions"
-            option-label="label"
-            option-value="value"
-            class="mt-1 w-full"
-          />
+      <!-- When it happens. -->
+      <fieldset class="border-t border-[color:var(--bs-border)] pt-6">
+        <legend class="text-xs font-semibold uppercase tracking-wide text-[color:var(--bs-muted)] mb-3">Timing</legend>
+        <div class="grid sm:grid-cols-2 gap-2">
+          <div>
+            <label class="text-sm font-medium">Urgency</label>
+            <Select
+              v-model="urgency"
+              :options="urgencyOptions"
+              option-label="label"
+              option-value="value"
+              class="mt-1 w-full"
+            />
+          </div>
+          <div>
+            <label class="text-sm font-medium">
+              Planned start <span class="font-normal text-[color:var(--bs-muted)]">(optional)</span>
+            </label>
+            <DatePicker v-model="preferredStart" date-format="yy-mm-dd" show-icon class="mt-1 w-full" />
+          </div>
         </div>
-        <div>
-          <label class="text-sm font-medium">Planned start (optional)</label>
-          <DatePicker v-model="preferredStart" date-format="yy-mm-dd" show-icon class="mt-1 w-full" />
-        </div>
-      </div>
+      </fieldset>
 
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
 
@@ -410,8 +429,8 @@ function openJob() {
           also share it yourself:
         </template>
         <template v-else>
-          Share this invite link with <strong>{{ clientName || "your client" }}</strong> —
-          one tap signs them in, no password needed. Or just run the job yourself.
+          Share this invite link with <strong>{{ clientName || "your client" }}</strong>.
+          One tap signs them in, no password needed. Or just run the job yourself.
         </template>
       </p>
       <div
