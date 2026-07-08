@@ -174,6 +174,16 @@ Tradesperson verification has three independent documents — **ID**, **certific
    to the client. Job appears in your kanban (client not yet attached), and any
    photos you attached show as the job's intake photos. This flow is **free** (no
    Pro needed). Mobile (375px): the photo grid is 3-up and the form is single-column.
+6. **Send a quote / invoice before the client has joined.** Without claiming the
+   invite, send the client a quote (and later an invoice) on that job.
+7. **Expected:** the client (whose `clientInvite.emailLower` is still unclaimed)
+   gets a **branded email with the full breakdown and a one-tap magic-link CTA**
+   ("Review & approve" for the quote, "View & pay" for the invoice). Clicking it
+   signs them in, claims the job (`clientId` backfills on job/quote/invoice), and
+   lands them on it. The email is gated exactly like the initial invite
+   (suppression list / CASL address / email-link enabled) and respects the
+   invite unsubscribe. If it can't send, the tradesperson can still record
+   acceptance / mark paid offline.
 
 ---
 

@@ -112,3 +112,71 @@ export async function sendInviteEmail(args: {
   });
   return true;
 }
+
+/**
+ * Post-invite EVENT email to an UNCLAIMED invite client (job.clientId still
+ * null) — a quote was sent, an invoice is ready. `notify()` is uid-only and
+ * skips a null clientId, so a solo/invite job's client would otherwise hear
+ * nothing after the first invite. This reaches them at clientInvite.emailLower
+ * with the same machinery as the initial invite: a magic sign-in link as the
+ * CTA (one tap signs them in AND claimJobInvite attaches them, after which
+ * normal uid notifications take over), the suppression check, and the CASL
+ * footer. The event detail (itemized quote/invoice) rides in `contentHtml` so
+ * the client can read it in their inbox before deciding to click through.
+ *
+ * Returns false (not sent) when the recipient is suppressed, the magic link
+ * couldn't be minted (email-link sign-in disabled), or the CASL mailing address
+ * isn't configured — same degrade-to-nothing contract as sendInviteEmail. The
+ * tradesperson can still record acceptance / mark paid offline either way.
+ */
+export async function sendInviteClientJobEmail(args: {
+  toEmail: string;
+  clientName: string;
+  tradieName: string;
+  jobId: string;
+  subject: string;
+  // Complete opening sentence (already includes the "Hi <name>," greeting).
+  bodyLine: string;
+  // Pre-built, pre-escaped itemized breakdown (lib/emailBreakdown.ts).
+  contentHtml: string;
+  ctaLabel: string;
+}): Promise<boolean> {
+  if (await isInviteEmailSuppressed(args.toEmail)) return false;
+  const signinLink = await inviteMagicLink(args.toEmail);
+  if (!signinLink) return false;
+
+  const address = caslMailingAddress();
+  if (!address) return false;
+  const unsubToken = unsubTokenFor(`invite_${args.jobId}`);
+  if (!unsubToken) return false;
+
+  const sender = SENDER_NAME();
+  const unsubUrl = `${appBaseUrl()}/jobs-invite-unsub?j=${encodeURIComponent(args.jobId)}&t=${unsubToken}`;
+  const basis =
+    `You're receiving this because ${args.tradieName} set up a job for you on ` +
+    `Blue Seal and asked us to keep you posted on it.`;
+  const footerHtml =
+    `<p style="margin:0;font-size:12px;line-height:1.5;color:#6B6862;">` +
+    `${escapeHtml(sender)}<br/>${escapeHtml(address)}<br/>` +
+    `${escapeHtml(basis)} <a href="${escapeHtml(unsubUrl)}" style="color:#374C76;text-decoration:underline;">Unsubscribe</a>.</p>`;
+
+  await enqueueMail({
+    to: args.toEmail,
+    subject: args.subject,
+    text:
+      `${args.bodyLine}\n\n` +
+      `One click signs you in (no password needed):\n${signinLink}\n\n` +
+      `${sender}\n${address}\n` +
+      `${basis} Unsubscribe: ${unsubUrl}\n`,
+    html: brandedEmailHtml({
+      title: args.subject,
+      bodyLines: [args.bodyLine],
+      contentHtml: args.contentHtml,
+      ctaLabel: args.ctaLabel,
+      ctaUrl: signinLink,
+      preheader: args.bodyLine,
+      footerHtml,
+    }),
+  });
+  return true;
+}

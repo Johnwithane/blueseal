@@ -11,6 +11,7 @@ import { notify } from "../lib/notify";
 import { breakdownHtml } from "../lib/emailBreakdown";
 import { LineItemSchema, DiscountSchema, UpfrontFeeSchema } from "../lib/quoteSchemas";
 import { computeTotals, resolveUpfrontFee } from "../lib/quoteTotals";
+import { sendInviteClientJobEmail } from "./inviteHelpers";
 
 const Input = z.object({
   jobId: z.string().min(1).max(128),
@@ -31,10 +32,17 @@ const Input = z.object({
 
 interface JobData {
   tradespersonId: string;
-  clientId: string;
+  // null on an unclaimed bring-your-own-client job — the client hasn't taken
+  // the magic-link invite yet, so there is no user account to notify.
+  clientId: string | null;
   title: string;
   status: string;
   chatId: string;
+  clientInvite?: {
+    emailLower?: string;
+    clientName?: string;
+    status?: string;
+  } | null;
 }
 
 /**
@@ -293,6 +301,31 @@ export const submitQuote = onCall(CALLABLE_OPTS, async (req) => {
     emailContentHtml: quoteBreakdown,
     ctaLabel: "Review & approve",
   });
+
+  // Unclaimed bring-your-own-client job: notify() above no-ops on the null
+  // clientId (there's no account), so reach the off-platform client directly
+  // at their invited email with a magic-link CTA — one tap signs them in,
+  // claims the job, and lands them on it to review + approve. Best-effort and
+  // gated (suppression / CASL / email-link) exactly like the initial invite;
+  // the tradesperson can still record acceptance offline if it doesn't send.
+  const invite = job.clientInvite;
+  if (!job.clientId && invite?.status === "invited" && invite.emailLower) {
+    try {
+      const clientName = invite.clientName?.trim() || "there";
+      await sendInviteClientJobEmail({
+        toEmail: invite.emailLower,
+        clientName,
+        tradieName,
+        jobId,
+        subject: `${tradieName} sent you a quote on Blue Seal`,
+        bodyLine: `Hi ${clientName}, ${tradieName} sent you a quote — the full breakdown is below. Tap through to review and approve it (no password needed).`,
+        contentHtml: quoteBreakdown,
+        ctaLabel: "Review & approve",
+      });
+    } catch (err) {
+      logger.warn("submitQuote: invite-client email skipped", { jobId, err });
+    }
+  }
 
   logger.info("submitQuote", {
     jobId,

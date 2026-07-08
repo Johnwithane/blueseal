@@ -21,6 +21,7 @@
 //   - tradesperson has payouts.payoutsEnabled === true (and not restricted)
 
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { logger } from "firebase-functions/v2";
 import { CALLABLE_OPTS } from "../lib/callable";
 import { FieldValue } from "firebase-admin/firestore";
 import { z } from "zod";
@@ -31,6 +32,7 @@ import { enqueueMail } from "../lib/mail";
 import { brandedEmailHtml } from "../lib/emailTemplate";
 import { breakdownHtml } from "../lib/emailBreakdown";
 import { notify } from "../lib/notify";
+import { sendInviteClientJobEmail } from "../jobs/inviteHelpers";
 
 const Input = z.object({ invoiceId: z.string().min(1) });
 
@@ -251,6 +253,25 @@ export const sendInvoice = onCall(CALLABLE_OPTS, async (req) => {
     { merge: true },
   );
 
+  // Itemized breakdown shared by both delivery paths below (the claimed-client
+  // transactional email and the unclaimed-invite magic-link email).
+  const invoiceBreakdown = breakdownHtml({
+    kind: "invoice",
+    number: inv.invoiceNumber,
+    currency: inv.currency,
+    lineItems: inv.lineItems.map((li) => ({
+      description: li.description,
+      quantity: li.quantity,
+      unitPrice: li.unitPrice,
+    })),
+    subtotal: inv.subtotal,
+    discountAmount: inv.discountAmount ?? 0,
+    taxTotal: inv.taxTotal,
+    total: inv.total,
+    paymentInstructions: inv.paymentInstructions,
+    pdfUrl: downloadUrl,
+  });
+
   if (clientEmail) {
     // Transactional: the invoice email always sends (it's a bill, not a
     // marketing notification), so it goes direct via enqueueMail rather than
@@ -262,22 +283,6 @@ export const sendInvoice = onCall(CALLABLE_OPTS, async (req) => {
     // disclosure lives on the pay page (and PDF), shown at the actual point of
     // payment — no need to lead with it in the email.
     const readyLine = `Hi ${clientName}, your invoice is ready.`;
-    const invoiceBreakdown = breakdownHtml({
-      kind: "invoice",
-      number: inv.invoiceNumber,
-      currency: inv.currency,
-      lineItems: inv.lineItems.map((li) => ({
-        description: li.description,
-        quantity: li.quantity,
-        unitPrice: li.unitPrice,
-      })),
-      subtotal: inv.subtotal,
-      discountAmount: inv.discountAmount ?? 0,
-      taxTotal: inv.taxTotal,
-      total: inv.total,
-      paymentInstructions: inv.paymentInstructions,
-      pdfUrl: downloadUrl,
-    });
     await enqueueMail({
       to: clientEmail,
       subject: `Invoice ${inv.invoiceNumber} from ${tradieName}`,
@@ -299,6 +304,40 @@ export const sendInvoice = onCall(CALLABLE_OPTS, async (req) => {
         preheader: `Your invoice for ${fmtMoney(inv.total, inv.currency)} is ready.`,
       }),
     });
+  } else {
+    // Unclaimed bring-your-own-client job: inv.clientId is still null, so there
+    // was no user account to resolve an email from. Reach the off-platform
+    // client at their invited address with a magic-link CTA (mirrors the quote
+    // path in submitQuote). One tap signs them in and claimJobInvite backfills
+    // the invoice's clientId, so the pay page + receipt then work normally.
+    // Best-effort — the tradesperson can still mark the invoice paid offline.
+    try {
+      const jobSnap = await db.doc(`jobs/${inv.jobId}`).get();
+      const invite = (
+        jobSnap.data() as
+          | { clientInvite?: { emailLower?: string; clientName?: string; status?: string } }
+          | undefined
+      )?.clientInvite;
+      if (invite?.status === "invited" && invite.emailLower) {
+        const inviteClientName = invite.clientName?.trim() || "there";
+        await sendInviteClientJobEmail({
+          toEmail: invite.emailLower,
+          clientName: inviteClientName,
+          tradieName,
+          jobId: inv.jobId,
+          subject: `Invoice ${inv.invoiceNumber} from ${tradieName}`,
+          bodyLine: `Hi ${inviteClientName}, your invoice from ${tradieName} is ready — the full breakdown is below. Tap through to view and pay it (no password needed).`,
+          contentHtml: invoiceBreakdown,
+          ctaLabel: "View & pay",
+        });
+      }
+    } catch (err) {
+      logger.warn("sendInvoice: invite-client email skipped", {
+        invoiceId,
+        jobId: inv.jobId,
+        err,
+      });
+    }
   }
 
   await notify({

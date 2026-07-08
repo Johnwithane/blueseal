@@ -443,6 +443,8 @@ You can return to the **Payouts** screen any time to finish setup or open your p
 
 **Inviting your client.** We email your client a sign-in link when we can, and you can always **copy the link** and text it yourself. One tap signs them in, with **no password, no signup form**. Once they join, they see the job like any Blue Seal client: they can chat with you, accept your quote with a signature, approve change orders, and review and pay the invoice. From the job page you can **resend** the invite, **fix a typo'd email**, or **revoke** it (revoking kills the link immediately).
 
+**They don't have to join first.** Even if your client hasn't clicked the original invite, when you **send a quote** or **send an invoice** we email it straight to them, with the full breakdown and a one-tap link. That link signs them in and drops them on the job, so they can review and approve the quote, or view and pay the invoice, without ever filling out a signup form. The whole job can run this way, driven entirely from the emails we send them.
+
 **Running it solo.** If your client never joins, nothing is blocked:
 
 - Send your quote, then tap **Record client acceptance** once they've agreed outside the app (verbally, by text). It's logged as recorded **by you**, and no signature is created on their behalf.

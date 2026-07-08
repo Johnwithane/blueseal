@@ -497,6 +497,17 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
             expected:
               "A copyable invite link is shown and a branded magic sign-in link is emailed to the client. The job lands in your kanban (client not yet attached) with your attached photos as its intake photos. Flow is free (no Pro). Mobile 375px: single-column form, 3-up photo grid.",
           },
+          {
+            id: "tradie-invite-job-quote-invoice-email",
+            title: "Unclaimed invite client is emailed the quote + invoice (no account needed)",
+            steps: [
+              "On an invite/solo job the client has NOT claimed yet, send a quote.",
+              "Later, send an invoice on that same unclaimed job.",
+              "Check the recipient inbox (use a verify-* address you control).",
+            ],
+            expected:
+              "Each send emails the unclaimed client a branded message with the full itemized breakdown and a one-tap magic-link CTA (Review & approve for the quote, View & pay for the invoice). Clicking signs them in, claims the job (clientId backfills on job/quote/invoice), and lands them on it. Gated like the initial invite (suppression / CASL address / email-link enabled) and honours the invite unsubscribe; if it can't send, offline record-acceptance / mark-paid still works. The whole job is runnable from the emails alone, no signup form.",
+          },
           { id: "tradie-get-paid", title: "Get paid: invoice → card payment → Stripe payout" },
           { id: "tradie-pro", title: "Blue Seal Pro (toggle free vs Pro features)" },
           { id: "tradie-profile", title: "Profile + branding + vanity /u/<slug>" },
