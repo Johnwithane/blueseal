@@ -427,6 +427,16 @@ polish. Nothing found contradicts the architecture; nearly everything is additiv
 
 ## Phase 3: Money-path robustness and ops (server-side edges)
 
+> **Status (2026-07-08): 3 shipped + deployed.** P3-11 quote-status pin +
+> P3-12 roster-remove confirm `74086b7`; P3-04 upfront-refund cap give-back
+> `d738e6f`. **Open — concrete:** P3-01 (double-charge race), P3-03 (refund
+> after payout netting), P3-06 (admin queue truncation), P3-07 (admin rep-vetting
+> audit), P3-09 (rep earnings breakdown), P3-10 (storage jobPosts path).
+> **Open — need Johnny's decision (money policy):** P3-02 (upfront-fee
+> rep/PM commission), P3-05 (partial-refund commission), P3-08 (rep vetting
+> depth). Note: a concurrent session is actively editing functions/jobs +
+> invoicing — coordinate before money-path functions changes there.
+
 ### [ ] P3-01 · Medium · Offline-mark + in-flight card race double-charges with only a bare log
 - If a card PaymentIntent succeeds after the tradesperson marks the invoice paid offline, the
   webhook no-ops with a `warn`, money moved twice, nobody is flagged. The upfront path already
@@ -445,7 +455,7 @@ polish. Nothing found contradicts the architecture; nearly everything is additiv
   stopped earning never applies (`scheduledRepCommissionPayouts.ts:105-116`). Fix: include owners
   with unapplied reversed entries in the netting loop. Effort: M.
 
-### [ ] P3-04 · Low · Upfront refund keeps consuming the $99 service-fee cap
+### [x] P3-04 · Low · Upfront refund keeps consuming the $99 service-fee cap
 - `handleUpfrontRefund` records the refund but never decrements `serviceFeeCapUsedCents`, so the
   final invoice under-charges the platform (`chargeRefunded.ts:44-83`). Effort: S.
 
@@ -478,11 +488,11 @@ polish. Nothing found contradicts the architecture; nearly everything is additiv
 - `storage.rules:211-214` (pre-doc temp-uuid tradeoff, acknowledged in a comment). Mitigate with a
   tighter prefix or finalize-time cleanup. Effort: M.
 
-### [ ] P3-11 · Low · Quotes rule lets a tradesperson direct-write status: accepted
+### [x] P3-11 · Low · Quotes rule lets a tradesperson direct-write status: accepted
 - Canonical accept path is unaffected; still pin `status` server-side
   (`firestore.rules:1343-1349`). Effort: S.
 
-### [ ] P3-12 · Low · Roster remove is instant; add notifies nobody
+### [x] P3-12 · Low · Roster remove is instant; add notifies nobody
 - `PmTradesView.vue:50,61`, confirm on remove (fat-finger at 375px), notify the tradesperson on
   add. Effort: S.
 
