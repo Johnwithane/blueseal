@@ -427,16 +427,14 @@ polish. Nothing found contradicts the architecture; nearly everything is additiv
 
 ## Phase 3: Money-path robustness and ops (server-side edges)
 
-> **Status (2026-07-08): 6 shipped + deployed.** P3-11 quote-status pin +
-> P3-12 roster-remove confirm `74086b7`; P3-04 upfront-refund cap give-back
-> `d738e6f`; P3-02 upfront-fee commission + P3-05 proportional reversal +
-> P3-01 double-charge log `03a76ad` (money policy from MONETIZATION.md §10b).
-> **Open — concrete:** P3-03 (refund after payout netting), P3-06 (admin queue
-> truncation), P3-07 (admin rep-vetting audit), P3-09 (rep earnings breakdown),
-> P3-10 (storage jobPosts path). **Open — vetting depth:** P3-08 (rep vetting
-> tooling, locked FULL vetters in §10b). Note: a concurrent session is actively
-> editing functions/jobs + invoicing — coordinate before money-path functions
-> changes there.
+> **Status (2026-07-08): ALL 12 shipped + deployed. Phase 3 complete.**
+> P3-11 quote-status pin + P3-12 roster-remove confirm `74086b7`; P3-04
+> upfront-refund cap give-back `d738e6f`; P3-02 upfront-fee commission + P3-05
+> proportional reversal + P3-01 double-charge log `03a76ad`; P3-03 reverse-only
+> owner netting `df8b9bb`; P3-09 rep earnings breakdown `095644b`; P3-07 admin
+> vetting attribution `2f85d77`; P3-08 rep trust-doc tooling `98a678f`; P3-06
+> admin queue truncation `c023a45`; P3-10 storage jobPosts path `3002d03`. Money
+> policy (P3-02/05/08) implemented to MONETIZATION.md §10b.
 
 ### [x] P3-01 · Medium · Offline-mark + in-flight card race double-charges with only a bare log
 - If a card PaymentIntent succeeds after the tradesperson marks the invoice paid offline, the
@@ -459,10 +457,13 @@ polish. Nothing found contradicts the architecture; nearly everything is additiv
   proportionally on an upfront refund. accruePmServiceFee/reversePmServiceFee generalized to an
   arbitrary sourceRef. Deployed with stripeWebhook.
 
-### [ ] P3-03 · Medium · Refund after payout strands the negative balance forever
+### [x] P3-03 · Medium · Refund after payout strands the negative balance forever
 - Monthly netting iterates owners with current accruals only; a reversed entry for an owner who
   stopped earning never applies (`scheduledRepCommissionPayouts.ts:105-116`). Fix: include owners
   with unapplied reversed entries in the netting loop. Effort: M.
+- **Done `df8b9bb`:** the payout loop now iterates the UNION of accrued + unapplied-reversed
+  owners, so a reverse-only owner is netted (rolls over, reversals stay unapplied to offset a
+  future accrual) and logged with accrued/reversed counts instead of silently dropped.
 
 ### [x] P3-04 · Low · Upfront refund keeps consuming the $99 service-fee cap
 - `handleUpfrontRefund` records the refund but never decrements `serviceFeeCapUsedCents`, so the
@@ -476,30 +477,46 @@ polish. Nothing found contradicts the architecture; nearly everything is additiv
   place and stays idempotent. chargeRefunded now reverses on every refund (not just full) at
   `amount_refunded / amount`. Pure computeReversalCents helper, unit-tested. Deployed with stripeWebhook.
 
-### [ ] P3-06 · Medium · Admin support queue silently truncates at 200 and can drop OPEN tickets
+### [x] P3-06 · Medium · Admin support queue silently truncates at 200 and can drop OPEN tickets
 - `listSupportTickets` caps at the 200 most recent regardless of status; open tickets older than
   the cap vanish with no notice (`src/firebase/services/support.ts:64` +
   `AdminSupportView.vue:41-42`). Fix: status-scoped query or pagination. Same cap-with-no-notice on
   bug reports and error queues (`bugReports.ts:94`, `errorReporting.ts:83`), AdminJobs already has
   the right "showing most recent 300" pattern to copy. Effort: M.
+- **Done `c023a45`:** each of the three queues now merges a status-scoped pull of every ACTIONABLE
+  item (support: not closed; bugs: not fixed/wontfix; errors: unresolved) with the most-recent 300,
+  via a shared mergeQueueDocs helper. Open items can no longer fall off the list. No composite index.
 
-### [ ] P3-07 · Medium · Admin cannot see or audit rep vetting work
+### [x] P3-07 · Medium · Admin cannot see or audit rep vetting work
 - Vetting queue rows carry no region/assigned-rep attribution and the review header never shows
   `approvedBy` (`VettingQueueView.vue:52`, `ApplicationReviewView.vue:326`). A rep approval just
   makes the row vanish. Fix: surface region + rep on rows, approvedBy on the header. Effort: S-M.
+- **Done `2f85d77`:** approveApplication now stamps approvedBy + approvedByRole; a shared
+  useVettingAttribution composable resolves region/rep/approver ids to names, surfaced on the queue
+  rows (pending + approved-not-live) and the review header.
 
-### [ ] P3-08 · Low-Medium · Rep application review lacks the trust-doc tooling admin has
+### [x] P3-08 · Low-Medium · Rep application review lacks the trust-doc tooling admin has
 - No insurance/WSIB cards, no registry-verify helper, raw new-tab links instead of the inline
   watermarked viewer (`SalesApplicationReviewView.vue:115-164` vs admin `:447-601`). If reps are
   meant to vet fully, port the components; if not, document the split. Effort: M.
+- **Done `98a678f` (reps are FULL vetters, §10b):** getApplicationDetails now returns the
+  insurance + WSIB docs (signed URLs + release signature) reps can't read via rules; the rep view
+  gained the insurance/WSIB cards, the registry-verify helper, and the inline watermarked viewer.
+  Read-only — approve/reject of these optional badges stays with admin (rep approveApplication
+  gates go-live).
 
-### [ ] P3-09 · Low · Rep earnings: per-tradesperson breakdown computed but never rendered
+### [x] P3-09 · Low · Rep earnings: per-tradesperson breakdown computed but never rendered
 - `summary.byTradie` exists (`repEarnings.ts:58`); the view shows only a count
   (`SalesRepPayoutsView.vue:82`). Effort: S.
+- **Done `095644b`:** an "Earnings by tradesperson" card lists each tradesperson's lifetime net
+  (refunds netted, negatives flagged), names resolved from the public profile with a uid fallback.
 
-### [ ] P3-10 · Low · Storage: jobPosts photo path writable by any signed-in user
+### [x] P3-10 · Low · Storage: jobPosts photo path writable by any signed-in user
 - `storage.rules:211-214` (pre-doc temp-uuid tradeoff, acknowledged in a comment). Mitigate with a
   tighter prefix or finalize-time cleanup. Effort: M.
+- **Done `3002d03`:** photos now upload to `jobPosts/{uid}/{tempId}/photos/...` and the storage
+  write is gated on `request.auth.uid == ownerId`, so a user can only write under their own prefix.
+  Paths are stored verbatim + copied from on accept, so the shape change is transparent.
 
 ### [x] P3-11 · Low · Quotes rule lets a tradesperson direct-write status: accepted
 - Canonical accept path is unaffected; still pin `status` server-side
