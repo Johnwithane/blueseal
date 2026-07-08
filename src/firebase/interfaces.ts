@@ -1370,6 +1370,12 @@ export interface JobDoc {
   // lazily from the quote and treat unknown as "fixed". Server-managed: the
   // rules pin it immutable so a party can't flip their own billing basis.
   billingType?: "hourly" | "fixed" | null;
+  // Default tax rate (fraction, e.g. 0.13) for job-accrued invoice lines (time,
+  // expenses, approved change orders), stamped server-side at quote-acceptance
+  // from the accepted quote so those lines inherit the quote's rate instead of
+  // defaulting to 0% (P1-11). Optional/null on legacy jobs that predate the
+  // field — pull-billables treats unknown as 0. Server-managed.
+  defaultTaxRate?: number | null;
   // Present only on tradesperson-created jobs — see ClientInvite above.
   // Server-managed; rules pin it against direct party writes.
   clientInvite?: ClientInvite | null;

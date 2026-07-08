@@ -73,6 +73,12 @@ export interface TimeRollupOptions {
   billingType?: "hourly" | "fixed" | null;
   /** extraId → description, for labelling hourly change-order lines. */
   extraDescriptions: Map<string, string>;
+  /**
+   * Tax rate (fraction) to stamp on generated lines, inherited from the
+   * accepted quote (JobDoc.defaultTaxRate) so job-accrued labour/travel isn't
+   * silently billed at 0% (P1-11). Defaults to 0 for legacy jobs.
+   */
+  taxRate?: number;
 }
 
 export function rollUpTimeEntries(
@@ -125,7 +131,7 @@ export function rollUpTimeEntries(
       description: `${label}: ${qty}h${rateTail}`,
       quantity: qty,
       unitPrice: g.rate,
-      taxRate: 0,
+      taxRate: opts.taxRate ?? 0,
     });
     for (const id of g.ids) stampIds.push(id);
     if (g.kind === "extra" && g.extraId) billedExtraIds.push(g.extraId);
@@ -191,6 +197,7 @@ export function consolidateHourlyLines(items: RollupLine[]): RollupLine[] {
 export function rollUpApprovedExtras(
   docs: FirebaseFirestore.QueryDocumentSnapshot[],
   existingIds: Set<string>,
+  taxRate = 0,
 ): { lines: RollupLine[]; stampIds: string[] } {
   const lines: RollupLine[] = [];
   const stampIds: string[] = [];
@@ -207,7 +214,7 @@ export function rollUpApprovedExtras(
       description: x.description?.trim() || "Change order",
       quantity: 1,
       unitPrice: amount,
-      taxRate: 0,
+      taxRate,
     });
     stampIds.push(doc.id);
   }
@@ -227,7 +234,11 @@ export function rollUpApprovedExtras(
  */
 export function rollUpExpenses(
   docs: FirebaseFirestore.QueryDocumentSnapshot[],
-  opts: { existingIds: Set<string>; billingType?: "hourly" | "fixed" | null },
+  opts: {
+    existingIds: Set<string>;
+    billingType?: "hourly" | "fixed" | null;
+    taxRate?: number;
+  },
 ): { lines: RollupLine[]; stampIds: string[] } {
   const lines: RollupLine[] = [];
   const stampIds: string[] = [];
@@ -242,7 +253,7 @@ export function rollUpExpenses(
       description: x.description?.trim() || "Materials",
       quantity: 1,
       unitPrice: x.billedAmount,
-      taxRate: 0,
+      taxRate: opts.taxRate ?? 0,
     });
     stampIds.push(doc.id);
   }

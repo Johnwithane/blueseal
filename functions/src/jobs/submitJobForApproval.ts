@@ -49,6 +49,7 @@ interface JobData {
   chatId: string;
   upfrontFee?: UpfrontFeeOnJob | null;
   billingType?: "hourly" | "fixed" | null;
+  defaultTaxRate?: number | null;
 }
 
 interface TimeEntryData {
@@ -214,12 +215,15 @@ export const submitJobForApproval = onCall(CALLABLE_OPTS, async (req) => {
   // ---------- roll up time entries by (kind, change order, rate) ----------
   // includeOpen: this is the "I'm done" path, so still-running timers are
   // billed up to now (they're auto-closed in the batch below).
+  // Inherit the accepted quote's tax rate onto job-accrued lines (P1-11).
+  const jobTaxRate = Math.max(0, job.defaultTaxRate ?? 0);
   const timeRoll = rollUpTimeEntries(entriesSnap.docs, {
     nowMs,
     includeOpen: true,
     tradespersonId: uid,
     existingIds,
     billingType: job.billingType ?? null,
+    taxRate: jobTaxRate,
     extraDescriptions: extraDescriptionMap(extrasSnap.docs),
   });
   const pulledLines: LineItem[] = [...timeRoll.lines];
@@ -231,12 +235,13 @@ export const submitJobForApproval = onCall(CALLABLE_OPTS, async (req) => {
   const expensesRoll = rollUpExpenses(expensesSnap.docs, {
     existingIds,
     billingType: job.billingType ?? null,
+    taxRate: jobTaxRate,
   });
   pulledLines.push(...expensesRoll.lines);
   const expenseStamps: string[] = [...expensesRoll.stampIds];
 
   // ---------- approved flat change orders → one line each ----------
-  const extrasRoll = rollUpApprovedExtras(extrasSnap.docs, existingIds);
+  const extrasRoll = rollUpApprovedExtras(extrasSnap.docs, existingIds, jobTaxRate);
   pulledLines.push(...extrasRoll.lines);
   // Flat extras pulled as lines + hourly extras whose time was just billed.
   const extraStamps = [...extrasRoll.stampIds, ...timeRoll.billedExtraIds];

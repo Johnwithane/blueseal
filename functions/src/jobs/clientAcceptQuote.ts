@@ -7,7 +7,7 @@ import { db } from "../lib/admin";
 import { requireRole } from "../lib/auth";
 import { postSystemMessage } from "../lib/chatSystemMessage";
 import { notify } from "../lib/notify";
-import { resolveBillingType, type QuoteLineKindLike } from "../lib/billing";
+import { resolveBillingType, resolveDefaultTaxRate, type QuoteLineKindLike } from "../lib/billing";
 import { SignatureDataUrl, writeQuoteSignature } from "../lib/signature";
 import {
   isTradieInsured,
@@ -139,11 +139,14 @@ export const clientAcceptQuote = onCall(CALLABLE_OPTS, async (req) => {
     // Lock in how this job is billed from the quote the client just agreed to.
     // Drives clock-in (fixed jobs track time at $0) for the rest of the job.
     const billingType = resolveBillingType(quote.lineItems);
+    // ...and the tax rate to inherit onto job-accrued invoice lines (P1-11).
+    const defaultTaxRate = resolveDefaultTaxRate(quote.lineItems);
 
     if (requiresUpfrontPayment) {
       tx.update(jobRef, {
         status: "awaiting_upfront_payment",
         billingType,
+        defaultTaxRate,
         upfrontFee: {
           amountCents: upfront!.amountCents,
           source: upfront!.type,
@@ -157,7 +160,7 @@ export const clientAcceptQuote = onCall(CALLABLE_OPTS, async (req) => {
         },
       });
     } else {
-      tx.update(jobRef, { status: "in_progress", billingType });
+      tx.update(jobRef, { status: "in_progress", billingType, defaultTaxRate });
     }
     tx.update(quoteRef, {
       status: "accepted",

@@ -8,7 +8,7 @@ import { requireRoleOrAdmin } from "../lib/auth";
 import { logAdminAction } from "../lib/audit";
 import { postSystemMessage } from "../lib/chatSystemMessage";
 import { notify } from "../lib/notify";
-import { resolveBillingType, type QuoteLineKindLike } from "../lib/billing";
+import { resolveBillingType, resolveDefaultTaxRate, type QuoteLineKindLike } from "../lib/billing";
 import { SignatureDataUrl, writeQuoteSignature } from "../lib/signature";
 import { isTradieInsured, UNINSURED_DISCLOSURE_VERSION } from "../lib/insurance";
 import { copyApplicationThreadToChat } from "./applicationThread";
@@ -213,6 +213,8 @@ export const acceptApplicationQuote = onCall(CALLABLE_OPTS, async (req) => {
       const jobStatus = requiresUpfront ? "awaiting_upfront_payment" : "in_progress";
       // Lock in hourly vs fixed from the accepted quote's line items.
       const billingType = resolveBillingType(quote.lineItems as QuoteLineKindLike[]);
+      // ...and the tax rate to inherit onto job-accrued invoice lines (P1-11).
+      const defaultTaxRate = resolveDefaultTaxRate(quote.lineItems as QuoteLineKindLike[]);
 
       // PM dispatch (P3b): the job carries its project/property; it's PM-DRIVEN
       // (the commission trigger) only when the winning contractor is one of the
@@ -235,6 +237,7 @@ export const acceptApplicationQuote = onCall(CALLABLE_OPTS, async (req) => {
           (tradie.companyName ?? "").trim() ||
           "Tradesperson",
         tradespersonPhotoURL: tradie.photoURL ?? null,
+        defaultTaxRate,
         status: jobStatus,
         billingType,
         trade: post.trade,

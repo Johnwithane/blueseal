@@ -74,9 +74,13 @@ export const pullBillablesFromJob = onCall(CALLABLE_OPTS, async (req) => {
     jobRef.collection("expenses").get(),
     jobRef.collection("extras").get(),
   ]);
-  const jobBillingType =
-    (jobSnap.data() as { billingType?: "hourly" | "fixed" | null } | undefined)?.billingType ??
-    null;
+  const jobData = jobSnap.data() as
+    | { billingType?: "hourly" | "fixed" | null; defaultTaxRate?: number | null }
+    | undefined;
+  const jobBillingType = jobData?.billingType ?? null;
+  // Inherit the accepted quote's tax rate onto pulled labour/expense/change-order
+  // lines so they aren't silently billed at 0% (P1-11). Legacy jobs (no stamp) → 0.
+  const jobTaxRate = Math.max(0, jobData?.defaultTaxRate ?? 0);
 
   // Existing ids on the invoice — skip these on the pull side too, so an
   // accidental partial-write race doesn't double-add when retried.
@@ -91,6 +95,7 @@ export const pullBillablesFromJob = onCall(CALLABLE_OPTS, async (req) => {
     tradespersonId: invoice.tradespersonId,
     existingIds,
     billingType: jobBillingType,
+    taxRate: jobTaxRate,
     extraDescriptions: extraDescriptionMap(extrasSnap.docs),
   });
   const newLines: LineItem[] = [...timeRoll.lines];
@@ -102,12 +107,13 @@ export const pullBillablesFromJob = onCall(CALLABLE_OPTS, async (req) => {
   const expensesRoll = rollUpExpenses(expensesSnap.docs, {
     existingIds,
     billingType: jobBillingType,
+    taxRate: jobTaxRate,
   });
   newLines.push(...expensesRoll.lines);
   const expenseStamps: string[] = [...expensesRoll.stampIds];
 
   // ---------- approved flat change orders: one line each ----------
-  const extrasRoll = rollUpApprovedExtras(extrasSnap.docs, existingIds);
+  const extrasRoll = rollUpApprovedExtras(extrasSnap.docs, existingIds, jobTaxRate);
   newLines.push(...extrasRoll.lines);
   // Stamp the flat extras pulled here + the hourly extras whose time was billed.
   const extraStampIds = [...extrasRoll.stampIds, ...timeRoll.billedExtraIds];

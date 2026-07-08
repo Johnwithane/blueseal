@@ -16,7 +16,7 @@ import { z } from "zod";
 import { db } from "../lib/admin";
 import { requireRole } from "../lib/auth";
 import { postSystemMessage } from "../lib/chatSystemMessage";
-import { resolveBillingType, type QuoteLineKindLike } from "../lib/billing";
+import { resolveBillingType, resolveDefaultTaxRate, type QuoteLineKindLike } from "../lib/billing";
 
 const Input = z.object({
   jobId: z.string().min(1).max(128),
@@ -83,11 +83,13 @@ export const recordOfflineQuoteAcceptance = onCall(CALLABLE_OPTS, async (req) =>
     const upfront = quote.upfrontFee ?? null;
     const requiresUpfrontPayment = upfront != null && upfront.amountCents > 0;
     const billingType = resolveBillingType(quote.lineItems);
+    const defaultTaxRate = resolveDefaultTaxRate(quote.lineItems);
 
     if (requiresUpfrontPayment) {
       tx.update(jobRef, {
         status: "awaiting_upfront_payment",
         billingType,
+        defaultTaxRate,
         acceptedOffline: true,
         upfrontFee: {
           amountCents: upfront!.amountCents,
@@ -99,7 +101,7 @@ export const recordOfflineQuoteAcceptance = onCall(CALLABLE_OPTS, async (req) =>
         },
       });
     } else {
-      tx.update(jobRef, { status: "in_progress", billingType, acceptedOffline: true });
+      tx.update(jobRef, { status: "in_progress", billingType, defaultTaxRate, acceptedOffline: true });
     }
     tx.update(quoteRef, {
       status: "accepted",
