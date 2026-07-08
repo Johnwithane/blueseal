@@ -40,11 +40,32 @@ function fmtMoney(cents: number, currency: string): string {
   );
 }
 
+// The platform-fee portion of the per-job $99 cap to give back when an upfront
+// fee is refunded (P3-04). Only the NEWLY-refunded slice (delta vs what we'd
+// already recorded) so repeated partial-refund webhook events stay idempotent,
+// prorated by the platform's share of the upfront, clamped to the cap actually
+// used. Pure so it's unit-testable without the webhook's Firestore queries.
+export function computeUpfrontCapGiveBack(input: {
+  platformPortionCents: number;
+  totalUpfrontCents: number;
+  prevRefundedCents: number;
+  amountRefundedCents: number;
+  capUsedCents: number;
+}): number {
+  const { platformPortionCents, totalUpfrontCents, prevRefundedCents, amountRefundedCents, capUsedCents } =
+    input;
+  if (platformPortionCents <= 0 || totalUpfrontCents <= 0) return 0;
+  const refundDelta = Math.max(0, amountRefundedCents - prevRefundedCents);
+  const giveBack = Math.round((platformPortionCents * refundDelta) / totalUpfrontCents);
+  return Math.max(0, Math.min(capUsedCents, giveBack));
+}
+
 // Upfront-fee refund fallback: an upfront fee paid by card lives on the job's
-// upfrontFee.payment, not an invoice. Record the refunded amount + notify; the
-// service fee isn't auto-decremented from the per-job cap (admins adjust the
-// application fee in the dashboard if they refund it). Returns true if it
-// matched a job, so the invoice path knows to stop.
+// upfrontFee.payment, not an invoice. Record the refunded amount, give back the
+// platform-fee portion of the per-job $99 cap it consumed (so the final invoice
+// can still charge the full remaining cap instead of under-collecting, P3-04),
+// and notify. Returns true if it matched a job, so the invoice path knows to
+// stop.
 async function handleUpfrontRefund(charge: StripeCharge, eventId: string): Promise<boolean> {
   let ref: FirebaseFirestore.DocumentReference | null = null;
   if (charge.payment_intent) {
@@ -70,11 +91,35 @@ async function handleUpfrontRefund(charge: StripeCharge, eventId: string): Promi
     const snap = await tx.get(jobRef);
     if (!snap.exists) return null;
     const data = snap.data() ?? {};
-    const payment = (data.upfrontFee?.payment ?? {}) as { lastWebhookEventId?: string | null };
+    const upfront = (data.upfrontFee ?? {}) as {
+      amountCents?: number;
+      payment?: {
+        lastWebhookEventId?: string | null;
+        refundedAmount?: number;
+        serviceFee?: { platformPortionCents?: number };
+      };
+    };
+    const payment = upfront.payment ?? {};
     if (payment.lastWebhookEventId === eventId) return null;
+
+    // Give back the platform-fee portion of the cap for the NEWLY-refunded
+    // amount (delta vs what we'd already recorded, so repeated partial-refund
+    // events stay idempotent). serviceFeeCapUsedCents was incremented by the
+    // platform portion when the upfront settled (handleUpfrontFeeSucceeded).
+    const capGiveBack = computeUpfrontCapGiveBack({
+      platformPortionCents: payment.serviceFee?.platformPortionCents ?? 0,
+      totalUpfrontCents: upfront.amountCents ?? 0,
+      prevRefundedCents: payment.refundedAmount ?? 0,
+      amountRefundedCents: charge.amount_refunded,
+      capUsedCents: (data.serviceFeeCapUsedCents as number | undefined) ?? 0,
+    });
+
     tx.set(
       jobRef,
       {
+        ...(capGiveBack > 0
+          ? { serviceFeeCapUsedCents: FieldValue.increment(-capGiveBack) }
+          : {}),
         upfrontFee: {
           payment: { refundedAmount: charge.amount_refunded, lastWebhookEventId: eventId },
         },
