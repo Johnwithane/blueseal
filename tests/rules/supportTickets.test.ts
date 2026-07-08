@@ -131,6 +131,26 @@ describe("supportTickets — create", () => {
       }),
     );
   });
+
+  it("accepts an optional jobId (job-detail 'report a problem' path)", async () => {
+    const fs = env.authenticatedContext(CLIENT_UID, CLIENT_CLAIMS).firestore();
+    await assertSucceeds(
+      addDoc(collection(fs, "supportTickets"), {
+        ...validTicket(CLIENT_UID),
+        jobId: "job_123",
+      }),
+    );
+  });
+
+  it("rejects a non-string jobId", async () => {
+    const fs = env.authenticatedContext(CLIENT_UID, CLIENT_CLAIMS).firestore();
+    await assertFails(
+      addDoc(collection(fs, "supportTickets"), {
+        ...validTicket(CLIENT_UID),
+        jobId: 123,
+      }),
+    );
+  });
 });
 
 describe("supportTickets — read", () => {

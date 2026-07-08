@@ -48,6 +48,7 @@ export async function createSupportTicket(input: SupportTicketInput): Promise<st
     email: data.email,
     topic: data.topic,
     message: data.message,
+    jobId: data.jobId ?? null,
     status: "open",
     handledBy: null,
     createdAt: serverTimestamp() as never,

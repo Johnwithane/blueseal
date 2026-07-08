@@ -67,6 +67,7 @@ import JobStatusTimeline from "@/components/JobStatusTimeline.vue";
 import ProposedChangeOrderBanner from "@/components/ProposedChangeOrderBanner.vue";
 import ProposedSiteVisitBanner from "@/components/ProposedSiteVisitBanner.vue";
 import UninsuredWaiverDialog from "@/components/UninsuredWaiverDialog.vue";
+import ReportJobProblemDialog from "@/components/jobDetail/ReportJobProblemDialog.vue";
 import { SEED_INTAKE_SCHEMAS } from "@/data/intakeSchemas";
 import { firstMissingRequired } from "@/utils/intake";
 import { getIntakeSchema } from "@/firebase/services/intakeFormSchemas";
@@ -794,6 +795,16 @@ onUnmounted(() => {
 const isJobInReviewPhase = computed(
   () => job.value?.status === "complete" || job.value?.status === "reviewed",
 );
+
+// "Report a problem with this job" (P2-15): available to either party once the
+// job is committed (a quote was accepted), so a client on a paid/completed job
+// has a real route to raise an issue instead of only the generic Help link.
+const showReportProblem = ref(false);
+const canReportProblem = computed(() => {
+  const s = job.value?.status;
+  if (!s || !(isClient.value || isTradie.value)) return false;
+  return ["in_progress", "awaiting_payment", "complete", "reviewed", "paid"].includes(s);
+});
 
 const mySubmittedAt = computed(() => {
   const p = reviewPair.value;
@@ -1585,6 +1596,19 @@ function onReturnToApplicants() {
         :job="job"
         :is-tradie="isTradie"
       />
+
+      <!-- Trust escape hatch: a real route to raise an issue on a committed /
+           paid job, routed to the support queue with job context (P2-15). -->
+      <div v-if="canReportProblem" class="bs-container mt-8 mb-2 text-center">
+        <button
+          type="button"
+          class="text-xs text-[color:var(--bs-muted)] underline inline-flex items-center gap-1"
+          @click="showReportProblem = true"
+        >
+          <i class="pi pi-flag text-[10px]" aria-hidden="true"></i>
+          Report a problem with this job
+        </button>
+      </div>
     </template>
 
     <!-- Sticky bottom CTA: the tradie's primary action for this status.
@@ -1816,6 +1840,13 @@ function onReturnToApplicants() {
         />
       </template>
     </Dialog>
+
+    <ReportJobProblemDialog
+      v-if="job"
+      v-model:visible="showReportProblem"
+      :job-id="job.id"
+      :job-title="job.title"
+    />
   </section>
 </template>
 

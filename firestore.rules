@@ -1473,7 +1473,7 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow create: if isSignedIn()
         && request.resource.data.keys().hasOnly(
-             ['userId', 'name', 'email', 'topic', 'message', 'status', 'handledBy', 'createdAt', 'updatedAt'])
+             ['userId', 'name', 'email', 'topic', 'message', 'jobId', 'status', 'handledBy', 'createdAt', 'updatedAt'])
         && request.resource.data.userId == uid()
         && request.resource.data.status == 'open'
         && request.resource.data.handledBy == null
@@ -1484,7 +1484,11 @@ service cloud.firestore {
         && request.resource.data.email is string && request.resource.data.email.size() <= 200
         && request.resource.data.topic is string && request.resource.data.topic.size() <= 80
         && request.resource.data.message is string
-        && request.resource.data.message.size() >= 5 && request.resource.data.message.size() <= 2000;
+        && request.resource.data.message.size() >= 5 && request.resource.data.message.size() <= 2000
+        // Optional job reference (P2-15): absent/null, or the id string (<=128).
+        && (request.resource.data.get('jobId', null) == null
+            || (request.resource.data.get('jobId', null) is string
+                && request.resource.data.get('jobId', null).size() <= 128));
       allow update: if isAdmin()
         && request.resource.data.diff(resource.data).affectedKeys()
              .hasOnly(['status', 'updatedAt', 'handledBy', 'internalNotes', 'lastReplyAt', 'lastReplyBy']);

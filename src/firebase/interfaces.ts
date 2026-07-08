@@ -2632,6 +2632,9 @@ export interface SupportTicketDoc {
   email: string; // reply-to (prefilled from the account, editable)
   topic: string; // one of SUPPORT_TOPICS (src/data/support.ts)
   message: string;
+  // Optional job this ticket is about (job-detail "Report a problem" action) so
+  // admin can jump straight to it. Null on general contact-form tickets (P2-15).
+  jobId?: string | null;
   status: SupportTicketStatus;
   handledBy: string | null; // admin uid who last changed the status
   createdAt: Timestamp;

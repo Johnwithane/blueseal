@@ -4,6 +4,7 @@
 // no-reply), the history of replies already sent, and private triage notes.
 // Encapsulated per-ticket so the queue view doesn't juggle per-row state.
 import { onMounted, ref } from "vue";
+import { RouterLink } from "vue-router";
 import { Timestamp } from "firebase/firestore";
 import Button from "primevue/button";
 import Tag from "primevue/tag";
@@ -159,6 +160,13 @@ onMounted(loadReplies);
           <span class="font-semibold text-[color:var(--bs-blue-dark)]">{{ ticket.name }}</span>
           <Tag :severity="statusSeverity(ticket.status)" :value="statusLabel(ticket.status)" />
           <span class="bs-pill text-[11px]">{{ ticket.topic }}</span>
+          <RouterLink
+            v-if="ticket.jobId"
+            :to="{ name: 'JobDetail', params: { id: ticket.jobId } }"
+            class="bs-pill text-[11px] underline"
+          >
+            <i class="pi pi-wrench text-[9px]" aria-hidden="true"></i> View job
+          </RouterLink>
         </div>
         <div class="mt-0.5 text-xs text-[color:var(--bs-muted)]">
           {{ ticket.email }} · {{ relativeTime(ticket.createdAt) }}

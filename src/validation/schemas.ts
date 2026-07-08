@@ -500,6 +500,9 @@ export const supportTicketSchema = z.object({
   email: z.string().trim().toLowerCase().email("Enter a valid email").max(200),
   topic: supportTopicEnum,
   message: z.string().trim().min(5, "Add a short message").max(2000),
+  // Optional job this ticket is about — set by the job-detail "Report a
+  // problem" action so admin can route it straight to the job (P2-15).
+  jobId: z.string().trim().max(128).nullable().optional(),
 });
 export type SupportTicketInput = z.infer<typeof supportTicketSchema>;
 
