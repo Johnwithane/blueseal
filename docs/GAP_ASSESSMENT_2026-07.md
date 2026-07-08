@@ -273,11 +273,26 @@ polish. Nothing found contradicts the architecture; nearly everything is additiv
 
 ## Phase 2: High-value UX friction (the journeys people feel)
 
-### [ ] P2-01 · Medium · Client dashboard tabs stack instead of switching
+> **Status (2026-07-08): 20 of 22 shipped to `main`, functions/rules deployed.**
+> Commits: client/tradie UX batch `a7f5b3c` (P2-01,02,04,05,11,12,13,14);
+> `aca1e69` (P2-16,17); `343eba5` (P2-18); `1424ee9` (P2-09,10); `5c62df7`
+> (P2-22); `8e6a4f6` (P2-21); `2860098` (P2-19); `fc6f655` (P2-07); `cadffb8`
+> (P2-06); `4654982` (P2-15); `16fdc84` (P2-08).
+>
+> **Deferred (2):** P2-03 (service-area radius cap — a concurrent session owns
+> LocationPicker/profile pickers; hand off to that session). P2-20 (auth chrome
+> flash — fixing the app-root layout gate blind risks an SSG/hydration
+> regression on public pages; needs a 375px browser-verified pass, and it pairs
+> with P1-03's acceptance run).
+>
+> **Browser re-verify still pending** for the UX items (per this doc's rule);
+> gates (lint/build/tests/rules) + targeted deploys are green for all 20.
+
+### [x] P2-01 · Medium · Client dashboard tabs stack instead of switching
 - Posted Jobs → Saved Trades leaves both panels rendered and visible (verified via computed style,
   run A MED-2). Fix: audit the tab panels' `v-if`/`v-show`/`:key` wiring. Effort: S.
 
-### [ ] P2-02 · Medium · Pending-vetting dashboard List tab is blank white space
+### [x] P2-02 · Medium · Pending-vetting dashboard List tab is blank white space
 - The status banner is good, but below it the List tab renders nothing at all while pending;
   /jobs/browse and /account handle the same state well (run B, M3). Fix: pending-state placeholder
   ("You'll see jobs here once you're approved") consistent with the browse view. Effort: S.
@@ -287,30 +302,30 @@ polish. Nothing found contradicts the architecture; nearly everything is additiv
   pending TODO, confirmed live in run B (slider aria-valuemax=200). Fix: pass the larger max into
   onboarding/profile pickers; decide the real product cap once. Effort: S.
 
-### [ ] P2-04 · Medium · Rejected application state sends mixed messages
+### [x] P2-04 · Medium · Rejected application state sends mixed messages
 - Banner says "reply to the email for next steps" (and no email may exist, Resend is a launch
   dependency) while the form stays editable with a live "Submit for review" button
   (`OnboardingWizard.vue:167,958-962,1601-1607`). Decide: lock on rejected, or make self-service
   resubmit explicit. Effort: S once decided.
 
-### [ ] P2-05 · Medium · Wrong-role deep link silently bounces to Home
+### [x] P2-05 · Medium · Wrong-role deep link silently bounces to Home
 - Signed-in user hitting a route their role lacks lands on `/` with zero explanation
   (`src/router/index.ts:780`); signed-out users correctly get `/sign-in?redirect=`. Fix: route to
   their dashboard with a "that page isn't available on this account" toast, or offer the role
   switch when they hold the role. Effort: S. (Verify alongside P1-03, same guard.)
 
-### [ ] P2-06 · Medium · PM realtime views spin forever on a failed subscription
+### [x] P2-06 · Medium · PM realtime views spin forever on a failed subscription
 - `PmJobsView.vue:29`, `PmCalendarView.vue:35`, `ProjectDetailView.vue:93`, `PmClientsView.vue:34`
   clear loading only in the success callback; no onError → infinite "Loading...". Fix: error
   callback + retry state on the four subscribe* call sites (and add onError plumbing to the
   services if absent). Effort: M.
 
-### [ ] P2-07 · Medium · PM earnings hides refund reversals entirely
+### [x] P2-07 · Medium · PM earnings hides refund reversals entirely
 - `PmEarningsPanel.vue:93-106` shows Unpaid/Paid only; a client refund silently shrinks the
   balance with no explanation (the rep view at least carries a netting note,
   `SalesRepPayoutsView.vue:96`). Fix: add the netting note + show reversal line items. Effort: S-M.
 
-### [ ] P2-08 · Low-Medium · Notification types overloaded internally (visible copy is fine)
+### [x] P2-08 · Low-Medium · Notification types overloaded internally (visible copy is fine)
 - The code scan flagged `invoice_sent` reused for 8 non-invoice events and payout events reusing
   `invoice_paid`/`invoice_payment_failed`. Run C then verified live that user-visible copy is
   CORRECT: every call site passes an event-specific title/body and a ctaLabel override ("QA Tradie
@@ -324,34 +339,34 @@ polish. Nothing found contradicts the architecture; nearly everything is additiv
   `payout_failed` types when convenient; delete or wire the dead `review_received` type. Effort: M,
   low urgency.
 
-### [ ] P2-09 · Medium · Job-alert broadcasts have no opt-out UI
+### [x] P2-09 · Medium · Job-alert broadcasts have no opt-out UI
 - Server honors `newJobPostingEnabled` but Account view exposes no toggle for it, tradespeople
   get every area-match email with no way off except all-email-off. Evidence: `lib/notify.ts:337`
   vs `AccountView.vue:1680-1719`. Fix: "Job alerts" toggle in notification prefs. Effort: S.
 
-### [ ] P2-10 · Medium · No in-app path for an existing user to become a project manager
+### [x] P2-10 · Medium · No in-app path for an existing user to become a project manager
 - `/welcome` offers PM only to brand-new accounts; AccountView offers "Become a tradesperson" and
   "Add client view" but not PM, though `addRoleToSelf` fully supports it
   (`AccountView.vue:1503,1526`, `functions/src/auth/addRoleToSelf.ts:111`). Fix: add the
   Become-a-PM card. Effort: S.
 
-### [ ] P2-11 · Low-Medium · Search error shows raw technical text
+### [x] P2-11 · Low-Medium · Search error shows raw technical text
 - `SearchView.vue:233` assigns `(e as Error).message` straight into the banner, the only view
   skipping `humanizeError` (already imported). Fix: one line. Effort: S.
 
-### [ ] P2-12 · Medium · /privacy table busts the 375px viewport
+### [x] P2-12 · Medium · /privacy table busts the 375px viewport
 - ~31px of real horizontal scroll at the primary breakpoint (run A, MED-3). Fix: overflow-x
   wrapper per the existing main.css pattern. Effort: S. Sweep /terms for the same shape.
 
-### [ ] P2-13 · Low-Medium · Tradesperson profile shows no CTA to signed-in non-clients
+### [x] P2-13 · Low-Medium · Tradesperson profile shows no CTA to signed-in non-clients
 - `primaryCta` returns null for e.g. a tradesperson viewing a peer (`TradieProfileView.vue:464-475`)
  , silent dead end where "Switch to hiring" belongs. Effort: S.
 
-### [ ] P2-14 · Low · Job-post wizard: address autocomplete fills province+postal but not City
+### [x] P2-14 · Low · Job-post wizard: address autocomplete fills province+postal but not City
 - Confusing validation stop after picking a complete-looking suggestion (run A, LOW-1). Fix: map
   `locality` into City. Effort: S.
 
-### [ ] P2-15 · Medium-High · No client-side entry point to open a dispute
+### [x] P2-15 · Medium-High · No client-side entry point to open a dispute
 - A full disputes system exists (admin queue, detail view, notification type), but a client on a
   paid job has no "report a problem / dispute" affordance anywhere, only the generic Help link.
   The trust promise implied by "disputes" is unreachable by the people it protects.
@@ -360,7 +375,7 @@ polish. Nothing found contradicts the architecture; nearly everything is additiv
   minimum) that opens a dispute or a support ticket routed to the disputes queue. Decide the
   intake shape first (dispute doc vs support ticket with jobId). Effort: M.
 
-### [ ] P2-16 · Medium · Receipt OCR fakes success when it extracts nothing
+### [x] P2-16 · Medium · Receipt OCR fakes success when it extracts nothing
 - `parseReceipt` returns 200 with every field null and the UI toasts "Receipt read. Give the
   fields a once-over and save.", pre-filling a $0.00 "Unknown vendor" expense. This is the free
   flagship AI feature; on a real blurry photo it will quietly do nothing and claim it worked.
@@ -370,7 +385,7 @@ polish. Nothing found contradicts the architecture; nearly everything is additiv
   details manually") and skip the success toast; server-side, distinguish "no key/model error"
   from "model returned nothing". Effort: S-M.
 
-### [ ] P2-17 · Medium · Client's live "Charges so far" omits expense lines
+### [x] P2-17 · Medium · Client's live "Charges so far" omits expense lines
 - Mid-job, the client's running total showed $165 while the tradesperson's showed $211; the $46
   marked-up materials expense was invisible client-side until the invoice arrived (where it bills
   correctly). Surprise line items at invoice time is exactly the trust moment to avoid.
@@ -378,7 +393,7 @@ polish. Nothing found contradicts the architecture; nearly everything is additiv
 - Fix: include billable expenses in the client's charges-so-far rollup (marked-up price), or label
   the rollup "Labour so far" if the omission is intentional. Effort: S-M.
 
-### [ ] P2-18 · Low-Medium · Withdrawn change order leaves a live "approve or decline" notification
+### [x] P2-18 · Low-Medium · Withdrawn change order leaves a live "approve or decline" notification
 - Tradesperson withdrew an $808 change order; the client's bell still offered it as actionable.
   Evidence: run C finding #5. Fix: on withdraw/cancel, mark the related notification resolved (a
   `relatedId` cleanup on the notify doc), or have the job view reconcile stale CO notifications on
@@ -391,17 +406,17 @@ polish. Nothing found contradicts the architecture; nearly everything is additiv
   window as P1-03. Fix: gate the shell on auth-ready with a proper loading skeleton, and ensure the
   layout picker doesn't default to public chrome while auth resolves. Effort: M. Verify with P1-03.
 
-### [ ] P2-21 · Medium · Client project-accept address form not pre-filled from the PM's property
+### [x] P2-21 · Medium · Client project-accept address form not pre-filled from the PM's property
 - The PM already entered the property address; the client's accept form makes them retype it
   (`project.property.address` is on file). Evidence: run D, M2. Fix: pre-fill, keep editable.
   Effort: S.
 
-### [ ] P2-22 · Low-Medium · No notification when a PM adds a tradesperson to their roster
+### [x] P2-22 · Low-Medium · No notification when a PM adds a tradesperson to their roster
 - Roster add is a silent direct write; the tradesperson never learns future matching projects will
   route to them (run D, L2). Fix: notify on roster add (pairs with the P2-09 notification-gap
   theme). Effort: S.
 
-### [ ] P2-19 · Low-Medium · Accepted quote's projected start date never reaches the Schedule tab
+### [x] P2-19 · Low-Medium · Accepted quote's projected start date never reaches the Schedule tab
 - The quote agreed "Projected start: Jul 14" but the job's Schedule tab opens on the current week
   with nothing booked and no mention of the agreed date; the tradesperson re-finds it manually.
   The data is already structured (quotes carry proposedStartDate). Evidence: run C, L1. Fix:
