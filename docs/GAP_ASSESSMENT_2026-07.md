@@ -118,7 +118,26 @@ polish. Nothing found contradicts the architecture; nearly everything is additiv
 
 ## Phase 1: Correctness and trust (do these before real users)
 
-### [ ] P1-00 · High · UX · PM's own filled job vanishes from /manage/jobs and the dashboard stat
+> **Status (2026-07-07): all Phase 1 items shipped to `main`, functions/rules
+> deployed.** Commits: P1-01 `1cd0358`, P1-02 `397dbea`, P1-04 `e87092a`,
+> P1-05 `ac7a32c`, P1-07 `3f287c1`, P1-08 `bd4ace4`, P1-06 `74bec5d`,
+> P1-11 `dd5ec25`, P1-10 `66db5b2`, P1-09 `ffd181e`, P1-00/P1-0A `8367310`,
+> P1-03 `b30f3de`.
+>
+> **Verified by gates + deploy:** P1-01 (unit test + deploy), P1-02 (jsdom
+> sanitization test), P1-10 (643 rules tests), P1-11 (8 unit tests + deploy),
+> P1-00 (rules tests + deploy), P1-09 (docs).
+> **Code-complete, browser re-verify still pending** (needs seeded roles per the
+> runbook): P1-03 (sign-in redirect acceptance list), P1-04/P1-05/P1-06/P1-07/
+> P1-08 (UX screens at 375px), P1-0A (copy). P1-07's shared scroll-padding fix
+> and its two flagged screens especially want an eyeball at 375px.
+>
+> **Decision surfaced (P1-0A):** auto-opening an unmatched PM job to the public
+> board (the better UX) needs geocoding at dispatch AND removes the client's
+> confirmation gate, so the copy was made honest instead — confirm whether to
+> build the auto-open.
+
+### [x] P1-00 · High · UX · PM's own filled job vanishes from /manage/jobs and the dashboard stat
 - Once a PM project's job is filled via the public job board (rather than a direct roster match),
   it stops appearing in `/manage/jobs` ("every trade job across your projects, read-only") and the
   dashboard "Jobs in progress" tile stays 0, while the same job shows correctly under Properties →
@@ -128,7 +147,7 @@ polish. Nothing found contradicts the architecture; nearly everything is additiv
 - Fix: broaden the `/manage/jobs` + dashboard-stat query to include board-filled jobs belonging to
   the PM's projects (or document the scoping in the empty-state copy if intentional). Effort: M.
 
-### [ ] P1-0A · High · Trust · PM "goes to the public board" copy doesn't match actual dispatch
+### [x] P1-0A · High · Trust · PM "goes to the public board" copy doesn't match actual dispatch
 - The New Project form promises an off-roster job "will go to the public board", but the job is
   created `invited` with zero recipients and sits inert (client sees the false "tradespeople are
   being notified" line) until the CLIENT separately notices a prompt and clicks "Open to all trades
@@ -138,7 +157,7 @@ polish. Nothing found contradicts the architecture; nearly everything is additiv
   which; the auto-open is the better UX. Effort: M. (Related to P1-04's false "being notified"
   copy, same line, different trigger.)
 
-### [ ] P1-01 · High · Money · Stripe webhook: a transient failure permanently drops the event
+### [x] P1-01 · High · Money · Stripe webhook: a transient failure permanently drops the event
 - A failed dispatch marks the sentinel `failed` and returns 500, but Stripe's retry then hits the
   `ALREADY_EXISTS` sentinel and gets a 200 "duplicate", so it stops retrying. The payment
   succeeded in Stripe but the invoice never marks paid, the job sticks at awaiting_payment, and
@@ -149,7 +168,7 @@ polish. Nothing found contradicts the architecture; nearly everything is additiv
   reprocess `failed`/stale-`processing` events (handlers are already individually idempotent, so
   reprocessing is safe). Effort: S-M. Add a unit test for the retry-after-failure path.
 
-### [ ] P1-02 · High · Security · AI assistant renders model output through a regex blocklist, not a sanitizer
+### [x] P1-02 · High · Security · AI assistant renders model output through a regex blocklist, not a sanitizer
 - `renderMarkdown` = `marked.parse` + strip `<script|style|iframe|object|embed>`. Misses event
   handlers (`<img onerror>`), `<svg onload>`, and `javascript:` hrefs. Reachable via prompt
   injection (e.g. OCR'd receipt text or another party's job description flowing through the
@@ -159,7 +178,7 @@ polish. Nothing found contradicts the architecture; nearly everything is additiv
   belt-and-braces if you like. Audit the two sibling `v-html` users (`MarkdownProse.vue`,
   `LegalDocument.vue`), trusted content today, same helper recommended. Effort: S-M.
 
-### [ ] P1-03 · High (hits every sign-in) · UX · Post-sign-in redirect always lands on the marketing homepage
+### [x] P1-03 · High (hits every sign-in) · UX · Post-sign-in redirect always lands on the marketing homepage
 - Both `/sign-in?redirect=...` and plain sign-in drop the user on `/` instead of the dashboard or
   deep link. Root cause traced: `auth.ready` is a one-shot latch set during the signed-out initial
   load; `SignInView` redirects immediately after `signInWithEmailAndPassword` resolves, racing the
@@ -171,7 +190,7 @@ polish. Nothing found contradicts the architecture; nearly everything is additiv
   checklist (deep-link round trip lands on the deep link; plain sign-in lands on /dashboard).
   Effort: M, touch carefully, this guard also handles role auto-switching.
 
-### [ ] P1-04 · High · UX · Cancelled/expired job post is a dead end with actively false copy
+### [x] P1-04 · High · UX · Cancelled/expired job post is a dead end with actively false copy
 - After Cancel, the post page still says "No applicants yet. Verified tradespeople in your area
   are being notified." with no next-step CTA. The `closed` status two blocks above has a proper
   terminal treatment; `cancelled`/`expired` have none.
@@ -181,7 +200,7 @@ polish. Nothing found contradicts the architecture; nearly everything is additiv
   Also fix the dangling sentence in the `closed` branch when `convertedJobId` is missing
   (`:777-788`). Effort: S.
 
-### [ ] P1-05 · High · UX · Approved tradesperson bounced into onboarding on a transient fetch error
+### [x] P1-05 · High · UX · Approved tradesperson bounced into onboarding on a transient fetch error
 - `TradieDashboard.onMounted` awaits `getTradesperson` with no try/catch; a null result redirects
   to onboarding, and a thrown fetch strands the view with no retry. An approved pro on flaky
   mobile data gets told to redo onboarding.
@@ -191,7 +210,7 @@ polish. Nothing found contradicts the architecture; nearly everything is additiv
 - Fix: try/catch + retryable error state; never redirect on a failed fetch (only on a confirmed
   `draft` status). Effort: S-M for both views.
 
-### [ ] P1-06 · High · Trust · One-click "Approve everything" with zero confirmation (admin AND rep)
+### [x] P1-06 · High · Trust · One-click "Approve everything" with zero confirmation (admin AND rep)
 - Admin: `/admin/applications/:uid`, one click approves every pending cert + ID and sets the
   profile publicly live, confirmed live in run B even for a self-declared no-certification
   application (run B, H1). Rep: same gap on `/sales/applications/:uid`
@@ -202,7 +221,7 @@ polish. Nothing found contradicts the architecture; nearly everything is additiv
 - Related copy fix while in there: the approval notification says "Your electrician certification
   was verified" even when the tradesperson declared no certification (run B, L3).
 
-### [ ] P1-07 · High at 375px · UX · Fixed bottom nav intercepts taps (confirmed in TWO features)
+### [x] P1-07 · High at 375px · UX · Fixed bottom nav intercepts taps (confirmed in TWO features)
 - The fixed bottom bar sits over interactive elements at 375x667 and eats the first tap. Confirmed
   in two unrelated, separately-shipped features: the onboarding wizard's "Mark as no certification"
   button (run B, M1, with getBoundingClientRect proof) AND the PM New Project form's Property
@@ -212,14 +231,14 @@ polish. Nothing found contradicts the architecture; nearly everything is additiv
   padding equal to the fixed nav height) should resolve both at once; then sweep other long forms.
   Effort: S-M (one shared fix + verification across both screens).
 
-### [ ] P1-08 · Medium (blocks every first submit) · UX · Email-verify requirement unsignposted until the final Submit fails
+### [x] P1-08 · Medium (blocks every first submit) · UX · Email-verify requirement unsignposted until the final Submit fails
 - All 7 wizard steps complete, then `submitForVetting` 400s with "Verify your email before
   submitting." The banner exists at the top of the page but nothing ties the requirement to the
   Submit action until after the failure.
 - Evidence: run B, M2/Top-3. Fix: on the review/submit step, show the requirement inline (disabled
   submit + "verify your email first" helper, with the resend button right there). Effort: S.
 
-### [ ] P1-09 · Launch gate · Security · App Check is off for every callable (deliberate, but must flip before launch)
+### [x] P1-09 · Launch gate · Security · App Check is off for every callable (deliberate, but must flip before launch)
 - `CALLABLE_OPTS.enforceAppCheck` is env-driven and defaults off; the code comment documents the
   coordination plan (provision reCAPTCHA Enterprise key, ship client App Check init, then set
   `ENFORCE_APP_CHECK=true`). Not a bug, an unticked launch-gate item that CLAUDE.md's "always
@@ -230,7 +249,7 @@ polish. Nothing found contradicts the architecture; nearly everything is additiv
 - Action: add both to HUMANTASKS.md as launch blockers with their coordination steps. Effort: S to
   track, M to execute (key provisioning + client init + staged rollout).
 
-### [ ] P1-10 · Medium · Security hygiene · Rules tests missing for the vetting-PII collections
+### [x] P1-10 · Medium · Security hygiene · Rules tests missing for the vetting-PII collections
 - `idVerifications` (ID documents, the most sensitive data in the product) has no allow+deny rules
   test pair; same for `certifications`, `insuranceVerifications`, `wsibVerifications`, `bookings`,
   `aiUsage`, `assistantConversations`, `auditLog`.
@@ -238,7 +257,7 @@ polish. Nothing found contradicts the architecture; nearly everything is additiv
   is regression protection so they stay correct.
 - Fix: add allow+deny pairs starting with the PII collections. Effort: M (test-writer agent work).
 
-### [ ] P1-11 · High · Money · Invoice defaults every job-accrued line to 0% tax
+### [x] P1-11 · High · Money · Invoice defaults every job-accrued line to 0% tax
 - Time entries, expenses, and approved change orders all land on the invoice at 0.0% tax, so the
   sent invoice shows Tax $0.00 against the accepted quote's 13% ($41.60 on the run C job). None of
   the entry dialogs (clock-out, add-expense, propose-extra) offers a tax field, and the invoice
