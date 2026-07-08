@@ -164,10 +164,16 @@ Tradesperson verification has three independent documents — **ID**, **certific
 
 ### 2.3 Tradesperson creates a job for their own client (invite / solo)
 1. As **Tradesperson**, `/jobs/new`. Enter client name + email, trade, address.
-2. Submit.
-3. **Expected:** returns a copyable **invite link** + emails a magic sign-in link
-   to the client. Job appears in your kanban (client not yet attached). This flow
-   is **free** (no Pro needed).
+2. **Trade field:** if your profile has a single trade, it shows as a read-only
+   line (no dropdown to change). With two-plus trades it's a dropdown defaulted
+   to your primary trade, changeable.
+3. **Photos (optional):** tap **Add photo** and attach 1-8 images. They compress
+   client-side, preview as thumbnails, and each can be removed with the ×.
+4. Submit.
+5. **Expected:** returns a copyable **invite link** + emails a magic sign-in link
+   to the client. Job appears in your kanban (client not yet attached), and any
+   photos you attached show as the job's intake photos. This flow is **free** (no
+   Pro needed). Mobile (375px): the photo grid is 3-up and the form is single-column.
 
 ---
 
@@ -759,7 +765,7 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 - [ ] 1.5 Tradie onboarding — all docs incl. insurance (Insured badge)
 - [ ] 2.1 Client posts a job to the board
 - [ ] 2.2 Client direct-requests a quote
-- [ ] 2.3 Tradie creates an invite/solo job
+- [ ] 2.3 Tradie creates an invite/solo job (single-trade auto-selected; optional 1-8 photos; magic-link email to client)
 - [ ] 3.1 Apply with full itemized quote
 - [ ] 3.2 Apply — site visit first
 - [ ] 3.3 Apply — chat first → revise with quote

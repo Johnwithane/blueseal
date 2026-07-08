@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
@@ -8,8 +8,10 @@ import Select from "primevue/select";
 import DatePicker from "primevue/datepicker";
 import Dialog from "primevue/dialog";
 import Message from "primevue/message";
-import { createInviteJob } from "@/firebase/services/jobs";
+import { createInviteJob, updateJobIntakePhotos } from "@/firebase/services/jobs";
 import { getTradesperson } from "@/firebase/services/tradespeople";
+import { makeStoragePath, uploadFile } from "@/firebase/services/storage";
+import { compressToWebp } from "@/utils/image";
 import { inviteJobSchema } from "@/validation/schemas";
 import { TRADES, tradeLabel } from "@/data/trades";
 import type { Urgency } from "@/firebase/interfaces";
@@ -41,6 +43,13 @@ const tradeOptions = computed(() =>
     ? myTrades.value.map((key) => ({ value: key, label: tradeLabel(key) }))
     : TRADES.map((t) => ({ value: t.key, label: t.label })),
 );
+
+// A tradesperson set up for exactly one trade has nothing to choose — the job
+// is for that trade, full stop. Show it as a read-only line (still submitted
+// via `trade`) instead of a one-option dropdown. Two-plus trades keep the
+// dropdown (defaulted to the primary, changeable). Zero loaded trades falls
+// through to the dropdown's full-TRADES fallback.
+const soleTrade = computed(() => (myTrades.value.length === 1 ? myTrades.value[0] : null));
 
 onMounted(async () => {
   // Default the trade dropdown to the tradesperson's own trades.
@@ -101,6 +110,45 @@ const postalCode = ref("");
 const urgency = ref<Urgency>("flexible");
 const preferredStart = ref<Date | null>(null);
 
+// Optional job photos (up to 8). Held in memory as compressed files with a
+// stable preview URL, then uploaded under the real job path after the callable
+// mints the jobId (see submit) — same two-phase pattern as RequestQuoteView.
+// Unlike the marketplace request flow, photos are optional here: the
+// tradesperson may just be logging a job they already scoped in person.
+interface PendingPhoto {
+  file: File;
+  previewUrl: string;
+}
+const photos = ref<PendingPhoto[]>([]);
+const photoInput = ref<HTMLInputElement | null>(null);
+
+async function onPhotos(e: Event) {
+  const target = e.target as HTMLInputElement;
+  if (!target.files) return;
+  const incoming = Array.from(target.files).slice(0, 8 - photos.value.length);
+  try {
+    const compressed = await Promise.all(incoming.map((f) => compressToWebp(f)));
+    photos.value = [
+      ...photos.value,
+      ...compressed.map((file) => ({ file, previewUrl: URL.createObjectURL(file) })),
+    ];
+  } catch (e) {
+    toast.error("Couldn't add photo", humanizeError(e));
+  } finally {
+    target.value = "";
+  }
+}
+
+function removePhoto(idx: number) {
+  const [removed] = photos.value.splice(idx, 1);
+  if (removed) URL.revokeObjectURL(removed.previewUrl);
+  photos.value = [...photos.value];
+}
+
+onBeforeUnmount(() => {
+  for (const p of photos.value) URL.revokeObjectURL(p.previewUrl);
+});
+
 // Backs the Places autocomplete on the street-address line (see onMounted).
 const addressAutocompleteEl = ref<HTMLInputElement | null>(null);
 
@@ -160,6 +208,25 @@ async function submit() {
   submitting.value = true;
   try {
     const res = await createInviteJob(parsed.data);
+    // Now that the real jobId exists, upload any attached photos under the
+    // job's intake path and patch the doc. Best-effort: the job + invite email
+    // are already committed, so a photo failure warns rather than blocking the
+    // success dialog — the tradesperson can add photos from the job page.
+    if (photos.value.length) {
+      try {
+        const urls = await Promise.all(
+          photos.value.map((p) =>
+            uploadFile(
+              makeStoragePath({ scope: "jobs", id: res.jobId, bucket: "intake", filename: p.file.name }),
+              p.file,
+            ),
+          ),
+        );
+        await updateJobIntakePhotos(res.jobId, urls);
+      } catch {
+        toast.error("Photos didn't upload", "The job was created — add them from the job page.");
+      }
+    }
     createdJobId.value = res.jobId;
     inviteLink.value = res.inviteLink;
     emailed.value = res.emailed;
@@ -197,7 +264,14 @@ function openJob() {
     <form class="space-y-4" @submit.prevent="submit">
       <div data-field="trade">
         <label class="text-sm font-medium">Trade</label>
+        <div
+          v-if="soleTrade"
+          class="mt-1 w-full p-inputtext p-component bg-[color:var(--bs-surface)] text-[color:var(--bs-muted)] cursor-default"
+        >
+          {{ tradeLabel(soleTrade) }}
+        </div>
         <Select
+          v-else
           v-model="trade"
           :options="tradeOptions"
           option-label="label"
@@ -220,6 +294,38 @@ function openJob() {
         <label class="text-sm font-medium">Description</label>
         <Textarea v-model="description" rows="4" maxlength="4000" class="w-full" placeholder="Scope of work, as you'd write it on a quote" :invalid="!!errors.description" />
         <FieldError :message="errors.description" />
+      </div>
+
+      <div>
+        <label class="text-sm font-medium">Photos (optional)</label>
+        <p class="text-xs text-[color:var(--bs-muted)] mt-0.5 mb-2">Add up to 8 photos of the job.</p>
+        <div class="grid grid-cols-3 sm:grid-cols-4 gap-2">
+          <div
+            v-for="(p, idx) in photos"
+            :key="p.previewUrl"
+            class="relative aspect-square bg-gray-100 rounded overflow-hidden"
+          >
+            <img :src="p.previewUrl" :alt="p.file.name" class="w-full h-full object-cover" />
+            <button
+              type="button"
+              class="absolute top-1 right-1 bg-black/60 text-white rounded-full w-6 h-6 text-xs"
+              aria-label="Remove photo"
+              @click="removePhoto(idx)"
+            >
+              ×
+            </button>
+          </div>
+          <button
+            v-if="photos.length < 8"
+            type="button"
+            class="aspect-square border-2 border-dashed border-[color:var(--bs-border)] rounded text-[color:var(--bs-muted)] flex flex-col items-center justify-center"
+            @click="photoInput?.click()"
+          >
+            <i class="pi pi-plus"></i>
+            <span class="text-xs mt-1">Add photo</span>
+          </button>
+        </div>
+        <input ref="photoInput" type="file" accept="image/*" multiple class="hidden" @change="onPhotos" />
       </div>
 
       <fieldset>

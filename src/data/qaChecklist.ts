@@ -486,6 +486,17 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
             expected:
               "One clock-in surface (the header). With 2+ options it opens a menu of all of them at the correct rate (nothing hidden behind a caret); with one option it clocks directly. Approved hourly change orders also expose their own Clock in button. The Work Order Time card has no separate clock-in row.",
           },
+          {
+            id: "tradie-invite-job",
+            title: "Create a job for your own client (invite / solo, with photos)",
+            steps: [
+              "Open /jobs/new. Confirm the Trade field: with one trade on your profile it's a read-only line (no dropdown); with two-plus it's a dropdown defaulted to your primary, changeable.",
+              "Enter client name + email, address, and tap Add photo to attach 1-8 images (they compress + preview as thumbnails; × removes one).",
+              "Submit.",
+            ],
+            expected:
+              "A copyable invite link is shown and a branded magic sign-in link is emailed to the client. The job lands in your kanban (client not yet attached) with your attached photos as its intake photos. Flow is free (no Pro). Mobile 375px: single-column form, 3-up photo grid.",
+          },
           { id: "tradie-get-paid", title: "Get paid: invoice → card payment → Stripe payout" },
           { id: "tradie-pro", title: "Blue Seal Pro (toggle free vs Pro features)" },
           { id: "tradie-profile", title: "Profile + branding + vanity /u/<slug>" },

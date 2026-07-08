@@ -439,7 +439,7 @@ You can return to the **Payouts** screen any time to finish setup or open your p
     ],
     body: `Most of your customers aren't on Blue Seal, and they don't need to be. **New job** (on your dashboard) lets you set up a job for your own client, so you get the full toolkit (quote, schedule, time tracking, receipts, invoice) for every job you do, not just the ones that come through the platform.
 
-**Creating the job.** Tap **New job**, describe the work, and enter your client's name and email. The job lands in your pipeline like any other, and you get an **invite link** for your client.
+**Creating the job.** Tap **New job**, describe the work, and enter your client's name and email. You can attach up to **8 photos** of the job while you're at it. The job lands in your pipeline like any other, and you get an **invite link** for your client.
 
 **Inviting your client.** We email your client a sign-in link when we can, and you can always **copy the link** and text it yourself. One tap signs them in, with **no password, no signup form**. Once they join, they see the job like any Blue Seal client: they can chat with you, accept your quote with a signature, approve change orders, and review and pay the invoice. From the job page you can **resend** the invite, **fix a typo'd email**, or **revoke** it (revoking kills the link immediately).
 
