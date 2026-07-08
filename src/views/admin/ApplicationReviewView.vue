@@ -5,9 +5,10 @@ import Button from "primevue/button";
 import Tag from "primevue/tag";
 import Textarea from "primevue/textarea";
 import Dialog from "primevue/dialog";
+import Message from "primevue/message";
 import Checkbox from "primevue/checkbox";
 import { getTradesperson, getTradespersonContact } from "@/firebase/services/tradespeople";
-import { listCertsFor, approveCertification, rejectCertification } from "@/firebase/services/certifications";
+import { listCertsFor, approveCertification, rejectCertification, NO_CERT_SENTINEL } from "@/firebase/services/certifications";
 import { getIdVerification, approveId, rejectId } from "@/firebase/services/idVerifications";
 import { resolveFileUrl } from "@/firebase/services/storage";
 import {
@@ -84,6 +85,10 @@ const canApproveInsurance = computed(() => {
 
 const showRequestInfo = ref(false);
 const showReject = ref(false);
+// Manual vetting is the product's whole trust proposition, and "Approve
+// everything" flips every credential AND sets the profile publicly live in one
+// irreversible-feeling click. Gate it behind a confirm dialog (P1-06).
+const showApproveConfirm = ref(false);
 const notesInput = ref("");
 // Guards "Approve everything" against the impatient multi-click that fired ~20
 // welcome emails: the button spins and is disabled until the callable resolves
@@ -259,6 +264,7 @@ async function approveAll() {
   } catch (e) {
     toast.error("Couldn't approve", (e as Error).message);
     approvingAll.value = false;
+    showApproveConfirm.value = false;
   }
 }
 
@@ -315,6 +321,15 @@ const approveBlockerHint = computed(() => {
   if (certs.value.length === 0) return "No certifications on file yet.";
   return "";
 });
+
+// Any credential the tradesperson declared without a document (self-declared
+// "no formal certification"). Approving these vouches for an unverified claim,
+// so the confirm dialog gets an extra-explicit warning (P1-06).
+const hasSelfDeclaredCredential = computed(() =>
+  certs.value.some(
+    (c) => c.issuingBody === "Self-declared" || c.certNumber === NO_CERT_SENTINEL,
+  ),
+);
 </script>
 
 <template>
@@ -621,7 +636,7 @@ const approveBlockerHint = computed(() => {
             :loading="approvingAll"
             :disabled="!canApproveApplication || approvingAll"
             class="col-span-2 w-full sm:col-span-1 sm:w-auto"
-            @click="approveAll"
+            @click="showApproveConfirm = true"
           />
         </div>
       </footer>
@@ -652,6 +667,38 @@ const approveBlockerHint = computed(() => {
           :loading="rejectingApp"
           :disabled="!notesInput.trim() || rejectingApp"
           @click="submitReject"
+        />
+      </template>
+    </Dialog>
+
+    <Dialog
+      v-model:visible="showApproveConfirm"
+      modal
+      header="Approve this application?"
+      :style="{ width: '32rem', maxWidth: '92vw' }"
+    >
+      <p class="text-sm">
+        This approves every pending certification and ID and sets the
+        tradesperson's profile <strong>live</strong> to clients right away.
+      </p>
+      <Message
+        v-if="hasSelfDeclaredCredential"
+        severity="warn"
+        :closable="false"
+        class="mt-3"
+      >
+        Heads up: this application includes a <strong>self-declared</strong>
+        credential with no document on file. Approving vouches for an unverified
+        claim. Make sure you've reviewed their references or work history first.
+      </Message>
+      <template #footer>
+        <Button label="Cancel" text :disabled="approvingAll" @click="showApproveConfirm = false" />
+        <Button
+          label="Approve everything"
+          icon="pi pi-check"
+          severity="success"
+          :loading="approvingAll"
+          @click="approveAll"
         />
       </template>
     </Dialog>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { onMounted, ref, computed } from "vue";
 import { useRoute, useRouter, RouterLink } from "vue-router";
 import Button from "primevue/button";
 import Textarea from "primevue/textarea";
@@ -14,6 +14,7 @@ import {
   type RepApplicationDetail,
 } from "@/firebase/services/repVetting";
 import { tradeLabel } from "@/data/trades";
+import { NO_CERT_SENTINEL } from "@/firebase/services/certifications";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
 import LoadingState from "@/components/LoadingState.vue";
@@ -35,6 +36,15 @@ const showInfo = ref(false);
 const infoNotes = ref("");
 const showReject = ref(false);
 const rejectReason = ref("");
+// Approve is the one irreversible-feeling action (takes the tradesperson live);
+// reject/request-info already confirm via dialog, approve did not (P1-06).
+const showApproveConfirm = ref(false);
+
+const hasSelfDeclaredCredential = computed(() =>
+  (detail.value?.certifications ?? []).some(
+    (c) => c.issuingBody === "Self-declared" || c.certNumber === NO_CERT_SENTINEL,
+  ),
+);
 
 onMounted(load);
 async function load() {
@@ -62,6 +72,7 @@ async function doApprove() {
     toast.error("Couldn't approve", humanizeError(e));
   } finally {
     busy.value = false;
+    showApproveConfirm.value = false;
   }
 }
 async function doRequestInfo() {
@@ -170,7 +181,7 @@ async function doReject() {
 
       <!-- Decisions -->
       <div class="flex flex-wrap gap-2">
-        <Button label="Approve" icon="pi pi-check" :loading="busy" @click="doApprove" />
+        <Button label="Approve" icon="pi pi-check" :loading="busy" @click="showApproveConfirm = true" />
         <Button label="Request info" icon="pi pi-info-circle" outlined :disabled="busy" @click="showInfo = true" />
         <Button label="Reject" icon="pi pi-times" severity="danger" outlined :disabled="busy" @click="showReject = true" />
       </div>
@@ -193,6 +204,22 @@ async function doReject() {
       <template #footer>
         <Button label="Cancel" text :disabled="busy" @click="showReject = false" />
         <Button label="Reject" severity="danger" :loading="busy" :disabled="!rejectReason.trim()" @click="doReject" />
+      </template>
+    </Dialog>
+
+    <Dialog v-model:visible="showApproveConfirm" modal header="Approve this application?" class="w-[min(28rem,92vw)]">
+      <p class="text-sm">
+        This approves every certification and ID and takes the tradesperson
+        <strong>live</strong> to clients right away.
+      </p>
+      <Message v-if="hasSelfDeclaredCredential" severity="warn" :closable="false" class="mt-3">
+        Heads up: this application includes a <strong>self-declared</strong>
+        credential with no document on file. Approving vouches for an unverified
+        claim. Make sure you've reviewed their references or work history first.
+      </Message>
+      <template #footer>
+        <Button label="Cancel" text :disabled="busy" @click="showApproveConfirm = false" />
+        <Button label="Approve" icon="pi pi-check" :loading="busy" @click="doApprove" />
       </template>
     </Dialog>
   </section>

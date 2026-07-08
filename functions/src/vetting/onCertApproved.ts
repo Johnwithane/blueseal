@@ -9,8 +9,17 @@ interface CertData {
   trade?: string;
   tradespersonId?: string;
   issuingBody?: string;
+  certNumber?: string;
   expiresAt?: Timestamp | null;
 }
+
+// Mirror of the client's NO_CERT_SENTINEL (src/firebase/services/certifications.ts):
+// a "no formal certification" self-declaration has issuingBody "Self-declared".
+// We must NOT tell such a tradesperson their certification "was verified" —
+// there is no certification, only an accepted declaration (P1-06).
+const isSelfDeclared = (c: { issuingBody?: string; certNumber?: string }) =>
+  c.issuingBody === "Self-declared" ||
+  c.certNumber === "No formal certification — self-declared";
 
 // Mirror of the client's isRedSealIssuer (src/utils/credentials.ts). The seed
 // presets always set "Red Seal Program", but admins can type a free issuer, so
@@ -67,11 +76,14 @@ export const onCertApproved = onDocumentUpdated("certifications/{certId}", async
   });
   await maybeMarkVisible(tradespersonId);
 
+  const selfDeclared = isSelfDeclared(after);
   await notify({
     userId: tradespersonId,
     type: "cert_approved",
-    title: "Certification approved",
-    body: `Your ${after.trade} certification was verified. It's now showing on your public profile.`,
+    title: selfDeclared ? "Application approved" : "Certification approved",
+    body: selfDeclared
+      ? `Your ${after.trade} application was approved. Your profile is now showing on Blue Seal.`
+      : `Your ${after.trade} certification was verified. It's now showing on your public profile.`,
     link: "/dashboard/tradie",
     recipientRole: "tradesperson",
   });
