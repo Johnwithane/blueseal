@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { watch } from "vue";
+import { ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import { useToast } from "@/composables/useToast";
 import { useFormatters } from "@/composables/useFormatters";
 import RepPayoutsPanel from "@/components/sales/RepPayoutsPanel.vue";
 import { useRepEarnings } from "@/composables/useRepEarnings";
 import { MIN_PAYOUT_CENTS } from "@/utils/repEarnings";
+import { getTradesperson } from "@/firebase/services/tradespeople";
 
 // /sales/payouts — Stripe Connect onboarding + the rep's earnings + payout
 // history. /return + /refresh mirror Stripe's hosted-form redirect targets
@@ -35,6 +36,32 @@ watch(
 function fmtMoney(cents: number): string {
   return new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD" }).format(cents / 100);
 }
+
+// Resolve tradesperson display names for the per-tradesperson breakdown (P3-09).
+// The ledger only carries tradespersonIds; names come from the public profile
+// doc (readable while the tradie is visible). Cached; falls back to a short id.
+const tradieNames = ref<Record<string, string>>({});
+function tradieLabel(uid: string): string {
+  return tradieNames.value[uid] ?? `Tradesperson ${uid.slice(0, 6)}`;
+}
+watch(
+  () => summary.value.byTradie.map((t) => t.tradespersonId),
+  async (ids) => {
+    const missing = ids.filter((id) => !(id in tradieNames.value));
+    if (missing.length === 0) return;
+    await Promise.all(
+      missing.map(async (id) => {
+        try {
+          const doc = await getTradesperson(id);
+          if (doc?.displayName) tradieNames.value[id] = doc.displayName;
+        } catch {
+          /* not readable (unvisible tradie) — keep the id fallback */
+        }
+      }),
+    );
+  },
+  { immediate: true },
+);
 
 function batchStatus(s: string): { label: string; cls: string } {
   switch (s) {
@@ -94,6 +121,29 @@ const sortedPayouts = () =>
         <li>You earn <strong>10%</strong> of the Blue Seal revenue your tradespeople generate (their Pro subscription plus the platform portion of each job's service fee).</li>
         <li>On the 1st of each month, your balance pays out to your connected bank account, as long as it has reached {{ fmtMoney(MIN_PAYOUT_CENTS) }}. A smaller balance rolls over.</li>
         <li>Refunds and chargebacks are netted out of your balance.</li>
+      </ul>
+    </div>
+
+    <!-- Per-tradesperson earnings breakdown (P3-09) -->
+    <div v-if="!loading && summary.byTradie.length > 0" class="bs-card p-5 mb-4">
+      <h3 class="text-base font-semibold">Earnings by tradesperson</h3>
+      <p class="text-xs text-[color:var(--bs-muted)] mt-0.5">
+        Lifetime net commission per tradesperson (refunds netted out).
+      </p>
+      <ul class="mt-3 divide-y divide-[color:var(--bs-border)]">
+        <li
+          v-for="t in summary.byTradie"
+          :key="t.tradespersonId"
+          class="flex items-center justify-between gap-3 py-2.5"
+        >
+          <span class="min-w-0 flex-1 truncate text-sm">{{ tradieLabel(t.tradespersonId) }}</span>
+          <span
+            class="text-sm font-medium tabular-nums"
+            :class="t.netCents < 0 ? 'text-[color:var(--bs-danger-text)]' : ''"
+          >
+            {{ fmtMoney(t.netCents) }}
+          </span>
+        </li>
       </ul>
     </div>
 
