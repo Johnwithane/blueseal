@@ -44,6 +44,12 @@ const Input = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .nullable()
     .default(null),
+  // "Quote already agreed" — the tradesperson scoped and priced this job offline
+  // and just wants to run it, so skip the quote/accept dance and open the job
+  // straight in "in_progress". No quote doc is created; the final invoice is
+  // built from job-accrued line items (time/expenses/change orders), same as any
+  // solo job the tradie runs without a client-accepted quote.
+  skipQuote: z.boolean().default(false),
 });
 
 const INVITE_JOB_DAILY_CAP = 20;
@@ -113,7 +119,14 @@ export const createInviteJob = onCall(CALLABLE_OPTS, async (req) => {
       clientPhotoURL: null,
       tradespersonName: tradieName,
       tradespersonPhotoURL: tradiePhoto,
-      status: "requested",
+      // "Quote already agreed" jumps straight to the work; otherwise the job
+      // enters at "requested" and the tradesperson sends a quote as usual.
+      status: input.skipQuote ? "in_progress" : "requested",
+      // No quote will stamp these when skipping, so set the same defaults
+      // quote-acceptance would have: fixed billing, 0% job-line tax. Readers
+      // already treat null as "fixed"/0, but stamping them keeps the job's
+      // billing basis explicit and immutable from creation.
+      ...(input.skipQuote ? { billingType: "fixed", defaultTaxRate: 0 } : {}),
       trade: input.trade,
       title: input.title,
       description: input.description,

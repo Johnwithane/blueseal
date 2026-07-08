@@ -441,7 +441,9 @@ You can return to the **Payouts** screen any time to finish setup or open your p
 
 **Creating the job.** Tap **New job**, describe the work, and enter your client's name and email. You can attach up to **8 photos** of the job while you're at it. The job lands in your pipeline like any other, and you get an **invite link** for your client.
 
-**Inviting your client.** We email your client a sign-in link when we can, and you can always **copy the link** and text it yourself. One tap signs them in, with **no password, no signup form**. Once they join, they see the job like any Blue Seal client: they can chat with you, accept your quote with a signature, approve change orders, and review and pay the invoice. From the job page you can **resend** the invite, **fix a typo'd email**, or **revoke** it (revoking kills the link immediately).
+**Already agreed the price?** Flip on **"Quote already agreed — skip straight to the work"** and the job opens as **in progress** with no quote step. Use it when you've scoped and priced the job in person and just want to run it; you'll invoice from the time and materials you log. Leave it off to send a quote first, the standard way.
+
+**Inviting your client.** We email your client a sign-in link when we can, and you can always **copy the link** and text it yourself. Tapping it signs them straight into the job, with **no password, no signup form, nothing to type**. Once they're in, they see the job like any Blue Seal client: they can chat with you, accept your quote with a signature, approve change orders, and review and pay the invoice. From the job page you can **resend** the invite, **fix a typo'd email**, or **revoke** it (revoking kills the link immediately).
 
 **They don't have to join first.** Even if your client hasn't clicked the original invite, when you **send a quote** or **send an invoice** we email it straight to them, with the full breakdown and a one-tap link. That link signs them in and drops them on the job, so they can review and approve the quote, or view and pay the invoice, without ever filling out a signup form. The whole job can run this way, driven entirely from the emails we send them.
 
@@ -832,7 +834,7 @@ const faqs: FaqItem[] = [
   {
     question: "My tradesperson sent me a Blue Seal invite link, what is it?",
     answer:
-      "Your tradesperson set up your job on Blue Seal so you can both track it in one place: the quote, schedule, messages, and invoice. The link signs you in with just your email (**no password, nothing to install**), and it only works for the email address they invited. Once you're in, you can chat, accept the quote, and review and pay the invoice. If you weren't expecting it, check with your tradesperson before tapping, and nothing is linked to you until you confirm it's your job.",
+      "Your tradesperson set up your job on Blue Seal so you can both track it in one place: the quote, schedule, messages, and invoice. Tapping it signs you straight into your job (**no password, no signup form, nothing to install**). Once you're in, you can chat, accept the quote, and review and pay the invoice. If you weren't expecting it, check with your tradesperson before tapping, since the link opens the job for whoever taps it. If you already have a Blue Seal account under that email, we email you a one-tap sign-in link instead, so only you can get in.",
     categoryId: "getting-started",
     audience: "client",
   },

@@ -105,6 +105,9 @@ export const inviteJobSchema = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .nullable(),
+  // "Quote already agreed" — skip the quote/accept step and open the job straight
+  // in progress. Defaults false, so the standard quote-first flow is unchanged.
+  skipQuote: z.boolean().default(false),
 });
 
 export const reviewSchema = z.object({

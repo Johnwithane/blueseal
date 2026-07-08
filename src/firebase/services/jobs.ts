@@ -123,6 +123,9 @@ export interface InviteJobInput {
   address: Omit<JobAddress, "geo">;
   urgency: Urgency;
   preferredStart: string | null; // YYYY-MM-DD or null
+  // "Quote already agreed" — open the job straight in "in_progress", skipping
+  // the quote/accept step (the server sets fixed billing + 0% job-line tax).
+  skipQuote?: boolean;
 }
 
 export async function createInviteJob(
@@ -159,17 +162,20 @@ export async function revokeJobInvite(jobId: string): Promise<{ ok: true }> {
   return res.data;
 }
 
-// Unauthenticated by design: the copied invite link can only trigger sending
-// a magic sign-in link to the email the tradesperson stored on the invite.
-export async function sendJobInviteSignInLink(
-  token: string,
-  email: string,
-): Promise<{ ok: true }> {
-  const fn = httpsCallable<{ token: string; email: string }, { ok: true }>(
+// One-tap redemption of the copied/texted invite link. For a brand-new email it
+// returns a custom token the client signs in with (then claims the job); for an
+// email that already has an account it emails the magic link instead (takeover
+// guard) and returns { mode: "emailed" }. Unauthenticated by design.
+export type RedeemJobInviteResult =
+  | { mode: "signin"; customToken: string }
+  | { mode: "emailed" };
+
+export async function redeemJobInvite(token: string): Promise<RedeemJobInviteResult> {
+  const fn = httpsCallable<{ token: string }, RedeemJobInviteResult>(
     functions,
-    "sendJobInviteSignInLink",
+    "redeemJobInvite",
   );
-  const res = await fn({ token, email });
+  const res = await fn({ token });
   return res.data;
 }
 
