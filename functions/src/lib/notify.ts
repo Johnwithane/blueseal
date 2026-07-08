@@ -101,7 +101,14 @@ export type NotificationType =
   // A project manager added jobs to a project the client already accepted; fires
   // to the CLIENT to approve/decline each added job (proposeProjectJobs). Links to
   // the client dashboard.
-  | "project_jobs_added";
+  | "project_jobs_added"
+  // Dedicated types replacing earlier overloads (P2-08): a tradesperson sent the
+  // client a quote (was invoice_sent); a Stripe Connect payout settled / failed
+  // (were invoice_paid / invoice_payment_failed). Kept in sync with
+  // src/firebase/interfaces.ts.
+  | "quote_received"
+  | "payout_paid"
+  | "payout_failed";
 
 /**
  * Channel routing per notification.
@@ -242,6 +249,7 @@ function absoluteUrl(link: string | null | undefined): string | null {
 // src/utils/notifications.ts → INVOICE_TAB_TYPES.
 const INVOICE_TAB_TYPES = new Set<NotificationType>([
   "invoice_sent",
+  "quote_received", // reviewed on the Invoice tab (same as a sent invoice)
   "invoice_paid",
   "invoice_payment_failed",
   "invoice_refunded",

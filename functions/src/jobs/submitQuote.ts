@@ -279,10 +279,9 @@ export const submitQuote = onCall(CALLABLE_OPTS, async (req) => {
 
   await notify({
     userId: job.clientId,
-    // Reuses the "invoice_sent" type (no dedicated quote type in the shared
-    // NotificationType union); ctaLabel overrides its "View the invoice"
-    // default so the button reads correctly for a quote.
-    type: "invoice_sent",
+    // Dedicated quote type (P2-08); still lands on the Invoice tab (where a
+    // quote is reviewed) via INVOICE_TAB_TYPES, and ctaLabel sets the button.
+    type: "quote_received",
     title: `${tradieName} sent you a quote`,
     body: `$${(totals.total / 100).toFixed(2)} — review and approve.`,
     link: `/jobs/${jobId}`,

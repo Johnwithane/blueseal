@@ -147,7 +147,7 @@ export async function handlePayoutPaid(
   if (!res) return;
   await notify({
     userId: res.tradespersonId,
-    type: "invoice_paid", // closest existing type until a payout-specific one lands
+    type: "payout_paid", // dedicated payout type (P2-08)
     title: "Payout sent",
     body: `${fmtMoney(payout.amount, payout.currency.toUpperCase())} is on its way to your bank account.`,
     link: "/payouts",
@@ -166,7 +166,7 @@ export async function handlePayoutFailed(
   if (!res) return;
   await notify({
     userId: res.tradespersonId,
-    type: "invoice_payment_failed", // closest existing type
+    type: "payout_failed", // dedicated payout type (P2-08)
     title: "Payout failed",
     body:
       payout.failure_message ??

@@ -5,6 +5,7 @@ import type { NotificationDoc, Role } from "@/firebase/interfaces";
 // wrong default — the bell ringing implies "act on this now."
 const INVOICE_TAB_TYPES = new Set<NotificationDoc["type"]>([
   "invoice_sent",
+  "quote_received", // reviewed on the Invoice tab (same as a sent invoice)
   "invoice_paid",
   "invoice_payment_failed",
   "invoice_refunded",

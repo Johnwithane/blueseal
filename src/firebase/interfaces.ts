@@ -2803,7 +2803,13 @@ export type NotificationType =
   // A project manager added one or more jobs to a project the client already
   // accepted; fires to the CLIENT to approve/decline each added job
   // (proposeProjectJobs). Links to the client dashboard ("Projects set up for you").
-  | "project_jobs_added";
+  | "project_jobs_added"
+  // Dedicated types replacing earlier overloads (P2-08): a tradesperson sent the
+  // client a quote (was invoice_sent); a Stripe Connect payout settled / failed
+  // (were invoice_paid / invoice_payment_failed).
+  | "quote_received"
+  | "payout_paid"
+  | "payout_failed";
 
 export interface NotificationDoc {
   userId: string;
