@@ -789,6 +789,11 @@ export interface TradespersonDoc {
   coverUrl?: string | null;
   submittedAt: Timestamp | null;
   approvedAt: Timestamp | null;
+  // Who approved the application (uid) and in what role — stamped by
+  // approveApplication so admin can audit rep vetting after the row leaves the
+  // queue (P3-07). Absent on profiles approved before this shipped.
+  approvedBy?: string | null;
+  approvedByRole?: "admin" | "sales" | null;
   // Admin outreach to a tradesperson who started onboarding but never
   // submitted (still "draft"). Written server-side by the `nudgeOnboarding`
   // callable so the /admin/onboarding view can show "nudged X ago" and avoid

@@ -8,12 +8,17 @@ import {
 } from "@/firebase/services/tradespeople";
 import type { TradespersonDoc, WithId } from "@/firebase/interfaces";
 import { useFormatters } from "@/composables/useFormatters";
+import { useVettingAttribution } from "@/composables/useVettingAttribution";
 import { tradeLabel } from "@/data/trades";
 import LoadingState from "@/components/LoadingState.vue";
 
 function tradesLabel(t: WithId<TradespersonDoc>): string {
   return t.trades.map((k) => tradeLabel(k)).join(", ") || "—";
 }
+
+// Region + assigned-rep attribution so admin can see who's responsible for each
+// queued application (P3-07).
+const { regionName, repName, approverLabel } = useVettingAttribution();
 
 const pending = ref<WithId<TradespersonDoc>[]>([]);
 // Apps where the application is approved but the profile isn't live yet
@@ -61,6 +66,14 @@ onMounted(refresh);
             Submitted {{ relativeTime(t.submittedAt) }} ·
             <code>{{ t.id.slice(0, 10) }}…</code>
           </div>
+          <div
+            v-if="regionName(t.regionId) || repName(t.referredByRepId)"
+            class="text-xs text-[color:var(--bs-muted)] mt-0.5"
+          >
+            <span v-if="regionName(t.regionId)">Region: {{ regionName(t.regionId) }}</span>
+            <span v-if="regionName(t.regionId) && repName(t.referredByRepId)"> · </span>
+            <span v-if="repName(t.referredByRepId)">Rep: {{ repName(t.referredByRepId) }}</span>
+          </div>
         </div>
         <div class="flex gap-2">
           <RouterLink :to="{ name: 'AdminUserDetail', params: { uid: t.id } }">
@@ -100,6 +113,16 @@ onMounted(refresh);
                 <template v-else>cert</template>
               </span>
               · <code>{{ t.id.slice(0, 10) }}…</code>
+            </div>
+            <div
+              v-if="regionName(t.regionId) || repName(t.referredByRepId) || approverLabel(t.approvedBy, t.approvedByRole)"
+              class="text-xs text-[color:var(--bs-muted)] mt-0.5"
+            >
+              <span v-if="regionName(t.regionId)">Region: {{ regionName(t.regionId) }} · </span>
+              <span v-if="repName(t.referredByRepId)">Rep: {{ repName(t.referredByRepId) }} · </span>
+              <span v-if="approverLabel(t.approvedBy, t.approvedByRole)">
+                Approved by {{ approverLabel(t.approvedBy, t.approvedByRole) }}
+              </span>
             </div>
           </div>
           <div class="flex gap-2">

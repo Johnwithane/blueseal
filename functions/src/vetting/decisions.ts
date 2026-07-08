@@ -119,6 +119,10 @@ export const approveApplication = onCall(CALLABLE_OPTS, async (req) => {
     vettingNotes: "",
     idVerified: true,
     verifiedTrades: FieldValue.arrayUnion(...Array.from(verifiedTrades)),
+    // Record WHO approved so admin can audit rep vetting after the row leaves the
+    // queue (P3-07). approvedByRole distinguishes a rep approval from an admin one.
+    approvedBy: actor,
+    approvedByRole: actorRole,
   });
   // maybeMarkVisible owns the single "you're live" welcome email — it fires
   // exactly once, transactionally, when the profile actually transitions to

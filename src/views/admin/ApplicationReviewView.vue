@@ -38,6 +38,7 @@ import { useAuthStore } from "@/stores/auth";
 import { useToast } from "@/composables/useToast";
 import { tradeLabel } from "@/data/trades";
 import { useFormatters } from "@/composables/useFormatters";
+import { useVettingAttribution } from "@/composables/useVettingAttribution";
 import { registryForIssuingBody } from "@/utils/certRegistries";
 import { VERIFICATION_SEVERITY, VERIFICATION_LABEL } from "@/utils/verificationStatus";
 import LoadingState from "@/components/LoadingState.vue";
@@ -330,6 +331,9 @@ const hasSelfDeclaredCredential = computed(() =>
     (c) => c.issuingBody === "Self-declared" || c.certNumber === NO_CERT_SENTINEL,
   ),
 );
+
+// Region + assigned-rep + approver attribution for the header (P3-07).
+const { regionName, repName, approverLabel } = useVettingAttribution();
 </script>
 
 <template>
@@ -341,6 +345,16 @@ const hasSelfDeclaredCredential = computed(() =>
       <header class="mt-2 mb-4 flex flex-wrap items-center justify-between gap-2">
         <div class="text-sm text-[color:var(--bs-muted)]">
           <code>{{ uid }}</code>
+          <div
+            v-if="regionName(tradie.regionId) || repName(tradie.referredByRepId) || approverLabel(tradie.approvedBy, tradie.approvedByRole)"
+            class="mt-0.5 text-xs"
+          >
+            <span v-if="regionName(tradie.regionId)">Region: {{ regionName(tradie.regionId) }} · </span>
+            <span v-if="repName(tradie.referredByRepId)">Rep: {{ repName(tradie.referredByRepId) }} · </span>
+            <span v-if="approverLabel(tradie.approvedBy, tradie.approvedByRole)">
+              Approved by {{ approverLabel(tradie.approvedBy, tradie.approvedByRole) }}
+            </span>
+          </div>
         </div>
         <RouterLink :to="{ name: 'AdminUserDetail', params: { uid } }" class="text-sm text-[color:var(--bs-blue)] hover:underline">
           View full account →
