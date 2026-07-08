@@ -2785,6 +2785,9 @@ export type NotificationType =
   // (project accept → dispatchScopedPostings). Links to /jobs/browse, the
   // "Invited to quote" section.
   | "invited_to_quote"
+  // A project manager added this tradesperson to their preferred-trades roster,
+  // so future matching project jobs route to them first (P2-22).
+  | "roster_added"
   // A monthly commission payout settled to a rep/PM's Stripe Connect account.
   // Links to /manage/earnings (PM) or /sales/payouts (rep).
   | "commission_paid"

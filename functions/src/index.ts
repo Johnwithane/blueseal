@@ -120,6 +120,7 @@ export { searchRosterCandidates, getRosterCards } from "./projectManager/rosterD
 export { sendRosterInvite } from "./projectManager/sendRosterInvite";
 export { revokeRosterInvite } from "./projectManager/revokeRosterInvite";
 export { linkRosterInvitesOnSignup } from "./projectManager/linkRosterInvitesOnSignup";
+export { onRosterAdd } from "./projectManager/onRosterAdd";
 export { unsubscribeRosterInvite } from "./projectManager/unsubscribeRosterInvite";
 export { createPmConnectAccount } from "./payments/createPmConnectAccount";
 export { createPmConnectOnboardingLink } from "./payments/createPmConnectOnboardingLink";

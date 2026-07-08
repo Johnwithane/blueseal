@@ -88,6 +88,7 @@ const ICON: Record<NotificationType, string> = {
   insurance_expiry_reminder: "pi pi-shield",
   pm_featured: "pi pi-star",
   invited_to_quote: "pi pi-briefcase",
+  roster_added: "pi pi-users",
   commission_paid: "pi pi-dollar",
   commission_reversed: "pi pi-replay",
   project_jobs_added: "pi pi-plus-circle",

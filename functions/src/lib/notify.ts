@@ -91,6 +91,9 @@ export type NotificationType =
   // A project manager dispatched a scoped job to this hand-picked contractor
   // (project accept → dispatchScopedPostings). Links to /jobs/browse.
   | "invited_to_quote"
+  // A project manager added this tradesperson to their preferred-trades roster
+  // (onRosterAdd trigger). Kept in sync with src/firebase/interfaces.ts.
+  | "roster_added"
   // A monthly commission payout settled to a rep/PM's Stripe Connect account.
   | "commission_paid"
   // A client refund/dispute clawed back a rep/PM's already-accrued commission.
