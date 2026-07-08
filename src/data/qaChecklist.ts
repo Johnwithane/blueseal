@@ -215,9 +215,23 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
           },
           {
             id: "pm-money-reversal",
-            title: "Refund reverses both commission entries",
-            steps: ["Refund the invoice (Stripe test dashboard or in-app)."],
-            expected: "A matching _reversal entry appears for both the rep and PM commissions.",
+            title: "Refund reverses both commission entries (proportionally)",
+            steps: [
+              "Fully refund the invoice: a _reversal entry appears for both rep and PM at 100%.",
+              "On a separate paid job, do a PARTIAL refund (e.g. 30% of the charge).",
+            ],
+            expected:
+              "Full refund reverses 100%. A partial refund reverses that same fraction (round(commission × amount_refunded/amount)) for BOTH the rep and PM; a second, larger partial refund escalates the same _reversal doc upward (never double-counts).",
+          },
+          {
+            id: "pm-money-upfront",
+            title: "Upfront fee accrues + reverses rep/PM commission",
+            steps: [
+              "Take a PM-driven job with an upfront fee; pay the upfront by card (test 4242).",
+              "Then refund the upfront (Stripe test dashboard).",
+            ],
+            expected:
+              "Paying the upfront accrues rep + PM commission keyed service_fee_upfront_<jobId> (distinct from the final invoice's entry, each 10% of the upfront's platform portion). Refunding it writes the matching _reversal for both, proportional to the refund.",
           },
           {
             id: "pm-payout-setup",
@@ -412,9 +426,13 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
           },
           {
             id: "sales-review-application",
-            title: "Review an owned application",
+            title: "Review an owned application (full vetter tooling)",
+            steps: [
+              "Open an owned application at /sales/applications/<uid>.",
+              "Open each cert / ID / insurance / WSIB document.",
+            ],
             expected:
-              "You can see + act on applications in your territory (docs visible) and the tradie goes live; you can't act outside your territory.",
+              "You see the SAME trust tooling admin has: insurance + WSIB cards, the verify-on-registry helper on certs, and the inline watermarked viewer (REP VIEW ONLY on ID + release signature) instead of raw new-tab links. You can act only in your territory; approving takes the tradie live. (Admin's queue shows the region + rep + 'Approved by' attribution after you approve.)",
           },
         ],
       },
@@ -430,7 +448,8 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
           {
             id: "sales-payouts",
             title: "Earnings + Stripe Connect payout onboarding",
-            expected: "/sales/payouts shows earnings; Connect onboarding enables monthly payout ($50 min).",
+            expected:
+              "/sales/payouts shows earnings, an 'Earnings by tradesperson' breakdown (lifetime net per tradesperson, refunds netted), and Connect onboarding enables monthly payout ($50 min).",
           },
         ],
       },

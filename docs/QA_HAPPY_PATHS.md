@@ -422,16 +422,21 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 6. **Direct signup unchanged.** Sign up as a tradesperson WITHOUT a code.
    **Expected:** no free-month banner, and the normal 30-day card trial path
    applies (no auto-comp).
-7. **Rep reviews + approves an owned application.** As a signed-in rep (with a
-   region or a referral), open **/sales → Applications to review**.
-   **Expected:** you see the pending tradespeople in your region, or who used
-   your code. Open one → **Expected:** their certifications + ID render with
-   "View document" links that open the file. Tap **Approve** → **Expected:** the
-   tradesperson goes live and the application leaves your queue.
+7. **Rep reviews + approves an owned application (full vetter tooling).** As a
+   signed-in rep (with a region or a referral), open **/sales → Applications to
+   review**. **Expected:** you see the pending tradespeople in your region, or
+   who used your code. Open one → **Expected:** you get the SAME trust tooling
+   admin has: certifications with a **verify-on-registry** helper, **insurance**
+   and **WSIB** cards, and an **inline document viewer** (with a "REP VIEW ONLY"
+   watermark on the ID + the liability-release signature) instead of raw new-tab
+   links. Tap **Approve** → **Expected:** the tradesperson goes live and the
+   application leaves your queue.
 8. **Rep can't touch others' applications.** A pending tradesperson in a
    DIFFERENT region (and not your referral) does NOT appear in your list, and the
    server denies a decision call on them. Admin still sees + vets everyone from
-   **/admin/vetting**.
+   **/admin/vetting** — and each queue row now shows the **region + assigned rep**
+   attribution, with **"Approved by"** on the approved-not-live rows + the review
+   header, so admin can audit who vetted whom.
 9. **Commission accrues on a referred tradie's revenue (money seam).** This is
    server-side: commissions are written by the Stripe webhook and there is no
    the rep now sees their running balance at **/sales/payouts** (path 11.11), but
@@ -454,14 +459,23 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
     `status` "reversed", `reversalOf` the original id, mirroring the original
     amount; the original accrual is left untouched (the ledger is append-only and
     payouts net accrued minus reversed). A refund retry never adds a second
-    reversal. **Negative checks:** a **partial** refund writes **no** reversal (not
-    clawed back yet), and a dispute that closes **won** (or without loss) leaves
-    the commission intact. Only a **lost** chargeback reverses it.
+    reversal. **Partial refund is now PROPORTIONAL:** a 30% refund reverses 30%
+    of the commission (`round(commission × amount_refunded/amount)`) on the same
+    `_reversal` doc, and a later larger partial refund escalates it upward (never
+    double-counts). A dispute that closes **won** (or without loss) leaves the
+    commission intact; only a **lost** chargeback reverses it (fully).
+10b. **Upfront-fee commission (money seam).** On a PM-driven job with an upfront
+    fee, pay the upfront by card (6.1). **Expected:** rep + PM commission accrue
+    keyed `service_fee_upfront_<jobId>` (distinct from the final invoice entry),
+    each 10% of the upfront's platform portion. Refund the upfront → matching
+    `_reversal` docs, proportional to the refund.
 11. **Rep dashboard + payout onboarding.** As a signed-in rep, open **/sales**.
     **Expected:** an "Earnings & payouts" card shows your **unpaid balance** and
     **paid to date**, plus cards for Applications and your referral code. Open it
     (or the **Earnings** nav item) to reach **/sales/payouts**. **Expected:** the
-    unpaid balance matches your accrued commission (net of any reversals), and a
+    unpaid balance matches your accrued commission (net of any reversals), an
+    **"Earnings by tradesperson"** card breaks down the lifetime net per
+    tradesperson (refunds netted, negatives flagged), and a
     Stripe Connect onboarding panel invites you to connect a bank. Click **Start
     Stripe setup** → you land on Stripe's hosted form (test mode). Complete it →
     you return to /sales/payouts and, once Stripe confirms, the panel flips to
