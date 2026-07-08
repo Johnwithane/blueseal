@@ -427,28 +427,37 @@ polish. Nothing found contradicts the architecture; nearly everything is additiv
 
 ## Phase 3: Money-path robustness and ops (server-side edges)
 
-> **Status (2026-07-08): 3 shipped + deployed.** P3-11 quote-status pin +
+> **Status (2026-07-08): 6 shipped + deployed.** P3-11 quote-status pin +
 > P3-12 roster-remove confirm `74086b7`; P3-04 upfront-refund cap give-back
-> `d738e6f`. **Open — concrete:** P3-01 (double-charge race), P3-03 (refund
-> after payout netting), P3-06 (admin queue truncation), P3-07 (admin rep-vetting
-> audit), P3-09 (rep earnings breakdown), P3-10 (storage jobPosts path).
-> **Open — need Johnny's decision (money policy):** P3-02 (upfront-fee
-> rep/PM commission), P3-05 (partial-refund commission), P3-08 (rep vetting
-> depth). Note: a concurrent session is actively editing functions/jobs +
-> invoicing — coordinate before money-path functions changes there.
+> `d738e6f`; P3-02 upfront-fee commission + P3-05 proportional reversal +
+> P3-01 double-charge log `03a76ad` (money policy from MONETIZATION.md §10b).
+> **Open — concrete:** P3-03 (refund after payout netting), P3-06 (admin queue
+> truncation), P3-07 (admin rep-vetting audit), P3-09 (rep earnings breakdown),
+> P3-10 (storage jobPosts path). **Open — vetting depth:** P3-08 (rep vetting
+> tooling, locked FULL vetters in §10b). Note: a concurrent session is actively
+> editing functions/jobs + invoicing — coordinate before money-path functions
+> changes there.
 
-### [ ] P3-01 · Medium · Offline-mark + in-flight card race double-charges with only a bare log
+### [x] P3-01 · Medium · Offline-mark + in-flight card race double-charges with only a bare log
 - If a card PaymentIntent succeeds after the tradesperson marks the invoice paid offline, the
   webhook no-ops with a `warn`, money moved twice, nobody is flagged. The upfront path already
   detects this exact race and logs for admin review; mirror it.
 - Evidence: `functions/src/payments/handlers/paymentIntent.ts:130-138` vs `upfrontFee.ts:102-116`.
   Effort: S-M. Longer term: an admin "payment anomalies" surface (pairs with P3-06).
+- **Done `03a76ad`:** a `succeeded` transition landing on an already-settled invoice
+  (paid/refunded/disputed/void) now `logger.error`s "double payment, admin review" with the
+  chargeId, instead of the bare warn. Deployed with the stripeWebhook bundle.
 
-### [ ] P3-02 · Decision + fix · Medium · Upfront-fee platform revenue accrues no rep/PM commission
+### [x] P3-02 · Decision + fix · Medium · Upfront-fee platform revenue accrues no rep/PM commission
 - The invoice path accrues both; the upfront path banks the platform portion and accrues neither
   (`handlers/upfrontFee.ts:82-135` vs `paymentIntent.ts:231-265`). On upfront-heavy jobs the rep/PM
   are shorted. Confirm intent (maybe upfront fees are deliberately house money) and either add the
   accrual or document the policy in MONETIZATION.md. Effort: S-M once decided.
+- **Decided FULL accrual (MONETIZATION.md §10b); done `03a76ad`:** `handleUpfrontFeeSucceeded`
+  accrues rep + PM commission on the upfront's `platformPortionCents`, keyed `upfront_<jobId>` so it
+  coexists with the invoice entry, on both the flip and the offline-mark race; reversed
+  proportionally on an upfront refund. accruePmServiceFee/reversePmServiceFee generalized to an
+  arbitrary sourceRef. Deployed with stripeWebhook.
 
 ### [ ] P3-03 · Medium · Refund after payout strands the negative balance forever
 - Monthly netting iterates owners with current accruals only; a reversed entry for an owner who
@@ -459,9 +468,13 @@ polish. Nothing found contradicts the architecture; nearly everything is additiv
 - `handleUpfrontRefund` records the refund but never decrements `serviceFeeCapUsedCents`, so the
   final invoice under-charges the platform (`chargeRefunded.ts:44-83`). Effort: S.
 
-### [ ] P3-05 · Policy decision · Low · Partial refunds retain full rep+PM commission
+### [x] P3-05 · Policy decision · Low · Partial refunds retain full rep+PM commission
 - Documented in code (`chargeRefunded.ts:230`) but no proportional policy. Decide and write it
   down (MONETIZATION.md), implement only if the decision says so.
+- **Decided PROPORTIONAL (MONETIZATION.md §10b); done `03a76ad`:** reverseCommission /
+  reversePmCommission take a `proportion` (cumulative refunded share); the reversal doc escalates in
+  place and stays idempotent. chargeRefunded now reverses on every refund (not just full) at
+  `amount_refunded / amount`. Pure computeReversalCents helper, unit-tested. Deployed with stripeWebhook.
 
 ### [ ] P3-06 · Medium · Admin support queue silently truncates at 200 and can drop OPEN tickets
 - `listSupportTickets` caps at the 200 most recent regardless of status; open tickets older than
