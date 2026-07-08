@@ -185,6 +185,33 @@ When this model is built, update in the same feature commits:
 - Blue Seal Pro: **$29 CAD/mo**, AI assistant + service-fee waiver, 14-day card-required trial. ✅
 - Core app (profile, kanban, invoicing, chat) stays free; AI gated behind Pro/trial. ✅
 
+## 10b. Commission + vetting policy (locked 2026-07-08, from the gap-assessment decisions)
+
+These resolve the money-policy items the 2026-07 audit surfaced (P3-02, P3-05,
+P3-08). **Locked; implementation tracked in `docs/GAP_ASSESSMENT_2026-07.md`.**
+
+- **Upfront-fee commission (P3-02): rep/PM DO earn commission on the upfront
+  fee's platform portion**, exactly as they do on the final invoice's platform
+  fee. The invoice path accrues both a rep (`accrueCommission`, source
+  `service_fee`) and a PM (`accruePmServiceFee`) entry on
+  `serviceFee.platformPortionCents`; the upfront path must accrue the same on
+  its own `platformPortionCents`, with a distinct `sourceRef` (e.g.
+  `upfront_<jobId>`) so it coexists with the invoice entry, and REVERSE it if
+  the upfront is refunded. (Today the upfront path banks the platform portion
+  and accrues neither — shorting reps/PMs on upfront-heavy jobs.)
+- **Partial-refund commission (P3-05): reverse PROPORTIONALLY.** A partial
+  client refund claws back the rep/PM commission in proportion to the refunded
+  share of the fee (e.g. a 30% refund reverses 30% of the accrued commission),
+  not all-or-nothing. Requires generalizing `reverseCommission` /
+  `reversePmCommission` to reverse a fraction (mirror
+  `round(commissionCents × proportion)`), keyed so repeated partial refunds
+  stay idempotent. A full refund reverses 100% (current behaviour, unchanged).
+- **Rep vetting depth (P3-08): reps are FULL vetters.** Port the admin trust
+  tooling (insurance/WSIB cards, registry-verify helper, the inline watermarked
+  document viewer) to the rep application-review screen so a rep has everything
+  admin has. Also surface region + assigned-rep attribution and `approvedBy` in
+  the admin vetting queue/header (P3-07) so admin can audit rep vetting.
+
 ## 11. Open questions (revisit post-launch)
 
 - Should Pro waive the fee *entirely*, or just reduce it (keeping a small uncapped sliver of upside on huge jobs)? Currently: full waive, for pitch simplicity.
