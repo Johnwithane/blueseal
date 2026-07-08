@@ -113,10 +113,17 @@ export const scheduledRepCommissionPayouts = onSchedule(
     let skipped = 0;
     let failed = 0;
 
-    for (const [key, accrued] of accruedByOwner) {
-      const { ownerType, ownerId } = accrued[0];
+    // Iterate the UNION of owners (P3-03): an owner with unapplied reversals but
+    // no current accruals — a refund landed after they stopped earning — was
+    // invisible to the accrued-only loop, so their negative balance was stranded.
+    // Now they're visited; the reversals stay unapplied (payoutBatchId null) to
+    // offset a future accrual, and are at least logged rather than silently lost.
+    const ownerKeys = new Set<string>([...accruedByOwner.keys(), ...reversedByOwner.keys()]);
+    for (const key of ownerKeys) {
+      const accrued = accruedByOwner.get(key) ?? [];
+      const reversed = reversedByOwner.get(key) ?? [];
+      const { ownerType, ownerId } = accrued[0] ?? reversed[0];
       try {
-        const reversed = reversedByOwner.get(key) ?? [];
         const plan = planRepPayout(
           accrued.map((r) => ({ id: r.id, commissionCents: r.commissionCents, createdAtMs: r.createdAt?.toMillis() ?? null })),
           reversed.map((r) => ({ id: r.id, commissionCents: r.commissionCents, createdAtMs: r.createdAt?.toMillis() ?? null })),
@@ -125,7 +132,13 @@ export const scheduledRepCommissionPayouts = onSchedule(
         const net = plan.netCents;
         if (!plan.shouldPay) {
           rolled += 1;
-          logger.info("scheduledRepCommissionPayouts: below minimum, rolling over", { ownerType, ownerId, net });
+          logger.info("scheduledRepCommissionPayouts: below minimum, rolling over", {
+            ownerType,
+            ownerId,
+            net,
+            accruedCount: accrued.length,
+            reversedCount: reversed.length,
+          });
           continue;
         }
 
@@ -260,7 +273,7 @@ export const scheduledRepCommissionPayouts = onSchedule(
     }
 
     logger.info("scheduledRepCommissionPayouts: done", {
-      owners: accruedByOwner.size,
+      owners: new Set<string>([...accruedByOwner.keys(), ...reversedByOwner.keys()]).size,
       paid,
       rolled,
       skipped,
