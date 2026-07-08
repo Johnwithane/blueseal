@@ -5,6 +5,7 @@ import Button from "primevue/button";
 import { useAuthStore } from "@/stores/auth";
 import { useSeo } from "@/composables/useSeo";
 import { useToast } from "@/composables/useToast";
+import { useConfirmAction } from "@/composables/useConfirmAction";
 import { humanizeError } from "@/utils/errors";
 import { subscribeSavedTradieIds, saveTradie, unsaveTradie } from "@/firebase/services/savedTradies";
 import { getRosterCards, type RosterCard } from "@/firebase/services/rosterDirectory";
@@ -22,6 +23,7 @@ useSeo({ title: "Roster", noindex: true });
 
 const auth = useAuthStore();
 const toast = useToast();
+const { confirmDestructive } = useConfirmAction();
 
 const loading = ref(true);
 const rosterIds = ref<Set<string>>(new Set());
@@ -56,14 +58,24 @@ async function add(t: RosterCard): Promise<void> {
   }
 }
 
-async function remove(t: RosterCard): Promise<void> {
+function remove(t: RosterCard): void {
   const uid = auth.fbUser?.uid;
   if (!uid) return;
-  try {
-    await unsaveTradie(uid, t.uid);
-  } catch (e) {
-    toast.error(humanizeError(e));
-  }
+  // Confirm — an instant remove is a fat-finger risk at 375px, and it silently
+  // stops future project jobs routing to this tradesperson (P3-12).
+  confirmDestructive(
+    {
+      header: "Remove from roster?",
+      message: `Remove ${t.displayName || "this tradesperson"}? Your project jobs will stop routing to them. You can add them back anytime.`,
+    },
+    async () => {
+      try {
+        await unsaveTradie(uid, t.uid);
+      } catch (e) {
+        toast.error(humanizeError(e));
+      }
+    },
+  );
 }
 
 function tradesText(t: RosterCard): string {

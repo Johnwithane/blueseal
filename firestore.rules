@@ -1344,18 +1344,19 @@ service cloud.firestore {
       // Creates always via submitQuote (admin SDK bypasses rules).
       allow create: if false;
       // Tradesperson can edit their own quote (line items, discount, terms,
-      // etc.) — identity fields locked. Status transitions to accepted /
-      // declined / sent (re-send) go through callables, but a tradesperson
-      // could still flip status via direct write; we don't block that here
-      // because the canonical paths (callables) are unaffected and rule
-      // exhaustiveness on every field would balloon. resource.data.status
-      // != 'accepted' freezes the quote once accepted.
+      // etc.) — identity fields locked, and `status` is pinned to its current
+      // value: every status transition (sent / accepted / declined) goes through
+      // a callable (admin SDK, bypasses rules), so a direct edit must NOT flip
+      // status — otherwise a tradesperson could self-accept their own quote
+      // (P3-11). resource.data.status != 'accepted' additionally freezes an
+      // already-accepted quote against edits.
       allow update: if isSignedIn()
         && resource.data.tradespersonId == uid()
         && request.resource.data.quoteNumber == resource.data.quoteNumber
         && request.resource.data.tradespersonId == resource.data.tradespersonId
         && request.resource.data.clientId == resource.data.clientId
         && request.resource.data.jobId == resource.data.jobId
+        && request.resource.data.status == resource.data.status
         && resource.data.status != 'accepted';
       // Client may flip sent → viewed for the read-receipt signal — all
       // money + identity fields pinned to their prior value so the client

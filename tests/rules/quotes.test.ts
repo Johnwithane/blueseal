@@ -234,6 +234,13 @@ describe("quotes — tradesperson edits", () => {
       updateDoc(doc(asTradie(), "quotes", QUOTE_ID), { clientId: OTHER_CLIENT_UID }),
     );
   });
+
+  it("tradesperson CANNOT self-accept their own quote by direct write (P3-11)", async () => {
+    await seedQuote({ status: "sent" });
+    await assertFails(
+      updateDoc(doc(asTradie(), "quotes", QUOTE_ID), { status: "accepted" }),
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
