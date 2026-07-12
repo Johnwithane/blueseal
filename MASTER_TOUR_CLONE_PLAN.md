@@ -124,13 +124,18 @@ A Day (esp. `show`) holds 1..n **Events** (festival = multiple stages/sets). Eve
 ### 5.3 Schedule
 Per-Day schedule items: title, start/end, details, **visibility**, **reminder**, `confirmed`. The heart of the day sheet. Mobile-editable by `manager`+.
 
-### 5.4 Travel & Logistics
-Per-Day travel items: **air** (airline + flight no. → live status via a flight API), **ground** (origin+dest → auto drive-time/distance/TZ), **hotels** (check-in/out, rooming, party). Per-traveller. Visibility-aware.
+### 5.4 Travel & Logistics — Flights & Accommodations (deep integration)
+Per-Day travel items, per-traveller, visibility-aware. Three kinds, each with a real data integration behind it (see §16 for the provider/infra detail):
+- **Flights (`air`)** — enter airline + flight number (or **Places-autocomplete the airport**); a Cloud Function calls the **flight-data provider (FlightAware AeroAPI, recommended — Master Tour's own choice)** to pull schedule, terminal/gate, and **live status** (delays/cancellations) starting ~48h out. Status is cached to Firestore so it renders **offline** and fans out a push on change. Assign travellers to a flight; auto-build a per-tour **flight grid** (Daysheets' signature view — match it).
+- **Accommodations (`hotel`)** — **Google Places autocomplete + Place Details** to find the hotel and auto-fill address, phone, geo, photos, rating, website (no manual typing). Holds check-in/out, confirmation #, room block, nightly rate, and a **rooming list** (who's in which room). Rooming list exports to the day sheet + PDF.
+- **Ground (`ground`)** — origin + destination via **Places**; a function calls the **Google Directions/Routes API** for auto drive-time, distance, and start/end **time zones**; flags "overdrive" gaps between load-out and next load-in.
 
-### 5.5 Contacts, Personnel & Venue DB (the three shared databases)
+Design note: flights/hotels/ground all satisfy the offline-first requirement by **caching the provider response into the travel-item doc** — the phone never calls Google/FlightAware directly (keeps keys server-side, works in a dead-signal venue, and controls API cost). See §16.
+
+### 5.5 Contacts, Personnel & Venue DB (the three shared databases, Places-enriched)
 Top-level, cross-tour collections referenced by FK (never embedded):
-- **Venues** — name, address, geo, type, capacity, key contacts, production specs. Type-ahead + auto-fill on show creation. This is a **network-effect moat** — the more venues in the DB, the faster every tour builds.
-- **Contacts/Companies** — people & orgs; `.vcf` import (drag-in) like Master Tour.
+- **Venues** — the network-effect moat, now **Google-Places-backed**. On show creation, **Places Autocomplete** finds the venue; **Place Details** auto-fills address, geo (lat/lng + geohash), phone, website, opening hours, photos, and Google rating; we store the `placeId` for stable re-fetch. Touring-specific fields Places *doesn't* have — **capacity, production specs, key contacts, load-in notes** — are layered on top and become the proprietary data (this is where our own moat compounds, parallel to Master Tour's Venue Tech Packs). A venue can be **"claimed"** by its own team via the **Google Business Profile API** to sync verified hours/contact + let them maintain their production pack (a v1.1+ venue-side play).
+- **Contacts/Companies** — people & orgs; `.vcf` import (drag-in) like Master Tour; **Places-enrich** company addresses.
 - **Personnel** — tour-scoped join of a user/contact + per-tour role + per-diem/bus/radio detail.
 
 ### 5.6 Guest Lists
@@ -142,8 +147,13 @@ Per-show customizable checklist/template (production, hospitality, schedule, con
 ### 5.8 Day Sheets & Reports
 Template-driven dailies + multi-day tour books → **PDF** (reuse Blue Seal's `jspdf`/`jspdf-autotable` + `pdfRender` util). Template gallery. Export tour details/personnel/settlement to CSV.
 
-### 5.9 Settlements & Tour Finance
-Per-Event revenue + expense settlement → P/L. Per-diem tracking. Gated to `accountant`/`owner`. **QuickBooks/Xero CSV export** = the finance wedge that wins switchers off spreadsheets.
+### 5.9 Budget, Settlements & Tour Finance
+The money layer, gated to `accountant`/`owner`. **Two connected surfaces:**
+- **Tour Budget (new — whole-tour, forward-looking).** A budget for the entire tour: **projected income** (guarantees, ticket %, merch, sponsorship) vs **projected expenses** (crew wages, per-diems, bus/ground, hotels, flights, production, visas, insurance) organised by category and rolled up per **day / leg / whole tour**. As real numbers land, actuals populate **beside** projections → live **budget-vs-actual variance**. Expenses flow in automatically from other modules: a hotel travel item's nightly rate × room-nights, a flight's cost, per-diems × personnel × days — so the budget is **derived, not re-keyed** (a Cloud Function recomputes rollups on any source change; §8). This is a genuine step past Master Tour, which is thin on forward budgeting.
+- **Per-show Settlement (as before).** Per-Event revenue + expense settlement → P/L on the night; comps/ticket counts feed in from the guest list. Settlement actuals post back up into the tour budget.
+- **Exports.** Per-diem sheets, budget summary, and settlements export to PDF + **QuickBooks/Xero-friendly CSV** = the finance wedge that wins switchers off spreadsheets.
+
+Firebase leverage: budget line items are a Firestore subcollection with a **Cloud Function aggregation** maintaining denormalized rollup totals (so the mobile budget screen reads one summary doc, works offline, and never runs a heavy client-side sum).
 
 ### 5.10 Set Lists
 Per-Event. Songs → { guest performers, tech notes, set-specific notes }. Optional integration with **setlist.fm API** to auto-populate played-history (note: commercial API license by negotiation; free tier is non-commercial only).
@@ -154,15 +164,25 @@ Per-Day/Event attachments (contracts, riders, stage plots) with **visibility**. 
 ### 5.12 Notifications & Real-time Sync
 Custom TM→crew push; per-item reminders; change fan-out. Reuse Blue Seal's notifications store + FCM SW; add tour-scoped notification types.
 
-### 5.13 AI Assistant (the differentiation lane — Master Tour has none)
-A grounded assistant (reuse Blue Seal's `aiChat` callable + floating-panel pattern):
-- **Advance intake** — parse a venue's emailed advance PDF into structured fields.
-- **Day-sheet drafting** — "draft tomorrow's day sheet" from the tour data.
-- **Routing sanity** — "is this drive doable between load-out and next load-in?"
-- **Ask-the-tour** — "what's the wifi password at tonight's venue?" over the tour's data.
-Gate behind the paid builder tier (mirror Blue Seal's paid-AI pattern).
+### 5.13 AI Assistant & AI Ingestion (Firebase-native AI)
+Two AI surfaces, both server-side via Cloud Functions (reuse Blue Seal's `aiChat` callable + floating-panel pattern). **Stack: Firebase AI Logic (Vertex AI in Firebase) with Gemini**, optionally orchestrated with **Genkit** — keeps the model call inside the Firebase project (App Check-protected, no separate backend, billing on the same GCP project). See §16.
+- **AI ingestion (now table-stakes — every 2024-26 competitor has it):** forward a booking/hotel/flight confirmation email or drop a rider/advance PDF → Gemini (multimodal, reads the PDF/image) parses it into **structured schedule / travel / advance line items** the TM confirms with one tap. This is the single most-copied new feature in the category — ship it, don't skip it.
+- **Grounded assistant (the frontier, where the incumbent has nothing):**
+  - **Day-sheet drafting** — "draft tomorrow's day sheet" from the tour data.
+  - **Routing sanity** — "is this drive doable between load-out and next load-in?" (grounded in the Directions/Routes data).
+  - **Budget Q&A** — "how far over per-diem are we this leg?" over the budget rollups.
+  - **Ask-the-tour** — "what's the wifi password / load-in time at tonight's venue?" over the tour's own data (RAG over Firestore).
+Gate behind the paid builder tier (mirror Blue Seal's paid-AI pattern). Ground every answer in the tour's Firestore data — never free-generate logistics.
 
-### 5.14 Offline-first (a real engineering investment — bigger than Blue Seal's PWA)
+### 5.14 Crew Chat (per-tour messaging — promoted from open question to a feature)
+Real-time crew chat, **scoped to a tour** (like Blue Seal's job-bounded chat — lift that engine, don't rebuild a messenger):
+- **Tour channel** (everyone) + **role/group channels** (e.g. "Production", "Bus 1" via Group Tags) + optional 1:1 DMs.
+- Realtime via Firestore listeners; **FCM push** on new message (reuse Blue Seal's chat + notifications infra); **offline** send queues and syncs.
+- **SMS fallback** (copy GroupMe) via Blue Seal's existing SMS util, so a non-app crew member still gets the "lobby call in 10" ping.
+- Messages respect tour **visibility**; attachments reuse the Files storage-scoping.
+This resolves old open-question #7 in favour of building chat in — the research showed no purpose-built crew-comms winner exists, and owning the *official* channel (vs. the informal WhatsApp group) is the connective tissue.
+
+### 5.15 Offline-first (a real engineering investment — bigger than Blue Seal's PWA)
 Blue Seal's PWA is shell-cache only. Loadout needs **offline read of the active tour's data** (Firestore `persistentLocalCache` / IndexedDB persistence + offline-aware UI states + a "last synced" indicator + queued writes for `manager`+ edits). This is a Phase-in-its-own-right, not a polish step.
 
 ---
@@ -184,7 +204,10 @@ tours/{tourId}
   tours/{tourId}/days/{dayId}
      - date, dayType, city, country, timezone, venueId?, notes, confirmed
      tours/{tourId}/days/{dayId}/scheduleItems/{itemId}   { title, start, end, details, visibility, reminder, confirmed }
-     tours/{tourId}/days/{dayId}/travelItems/{itemId}     { kind: air|ground|hotel, ...kindFields, travellerUids[], visibility, confirmed }
+     tours/{tourId}/days/{dayId}/travelItems/{itemId}     { kind: air|ground|hotel, travellerUids[], visibility, confirmed,
+                                                            air:    { airline, flightNo, dep, arr, gate, status, providerRef, lastSyncedAt },
+                                                            hotel:  { placeId, name, address, geo, checkIn, checkOut, confirmationNo, nightlyRate, rooming[] },
+                                                            ground: { fromPlaceId, toPlaceId, driveMins, distanceKm, depTz, arrTz } }
      tours/{tourId}/days/{dayId}/events/{eventId}
         - venueId, promoterId, production{}, laborCall, visibility
         tours/.../events/{eventId}/guestList/{entryId}    { name, affiliation, passType, count, status, requestedBy }
@@ -196,9 +219,18 @@ tours/{tourId}
   tours/{tourId}/files/{fileId}         { name, storagePath, visibility, uploadedBy }
   tours/{tourId}/notifications/...      [reuse Blue Seal notifications, tour-scoped]
 
+  // Budget (§5.9) — accountant-gated:
+  tours/{tourId}/budget/summary                    { byCategory{}, byLeg{}, projectedTotal, actualTotal, variance }  ← denormalized rollup, Fn-maintained
+  tours/{tourId}/budget/lines/{lineId}             { category, label, projected, actual, source: manual|hotel|flight|perdiem|settlement, sourceRef }
+
+  // Crew chat (§5.14) — reuse Blue Seal chats/messages, tour-scoped:
+  tours/{tourId}/channels/{channelId}              { name, kind: tour|group|dm, memberUids[], visibility }
+  tours/{tourId}/channels/{channelId}/messages/{messageId}  { authorUid, body, attachments[], createdAt }
+
 // Cross-tour shared databases (top-level, FK-referenced, NOT embedded):
-venues/{venueId}       { name, address, geo(geohash), type, capacity, keyContacts[], productionSpecs }
-contacts/{contactId}   { name, company, phone, email, ownerUid | orgId, vcardImport? }
+venues/{venueId}   { name, placeId, address, geo(geohash), phone, website, hours, photos[], googleRating,   // ← Places-sourced
+                     capacity, keyContacts[], productionSpecs, claimedByUid?, businessProfileLinked? }        // ← our proprietary layer
+contacts/{contactId}  { name, company, phone, email, placeId?, ownerUid | orgId, vcardImport? }
 ```
 
 ### 6.2 Denormalization rules
@@ -245,10 +277,13 @@ Reuse Blue Seal's callable pattern **verbatim** (App Check enforced, Zod input, 
 - `functions/src/tours/` — `createTour`, `addTourMember` (+ maintains `memberUids`/`tourIds` denorm), `removeTourMember`, `setMemberRole`, `cascadeDayDateChange` (marks items unconfirmed).
 - `functions/src/invites/` — `createInviteLink`, `acceptInvite` (lift Blue Seal's roster-invite/one-tap-invite functions).
 - `functions/src/notify/` — `pushTourUpdate` (fan-out to member FCM tokens), reminder scheduler. Reuse Blue Seal `notify`/`messaging`.
-- `functions/src/travel/` — `refreshFlightStatus` (flight API), `computeGroundRoute` (maps drive-time). Reuse Blue Seal `google` helpers + Maps.
-- `functions/src/settlement/` — `exportSettlement` (PDF/CSV), `recomputePnl`.
+- `functions/src/travel/` — `refreshFlightStatus` (FlightAware AeroAPI; scheduled + on-demand), `computeGroundRoute` (Directions/Routes API). All provider calls are **server-side only** — keys never reach the client; responses cached into the travel-item doc for offline.
+- `functions/src/places/` — `placesAutocomplete` + `placeDetails` (thin server proxy to **Places API (New)**; keeps the key server-side, lets us cache + rate-limit + dedupe into the `venues`/`contacts` collections). `linkBusinessProfile` (venue-claim via **Google Business Profile API**, v1.1+).
+- `functions/src/budget/` — `recomputeBudgetRollup` (Firestore trigger on budget line / hotel / flight / per-diem / settlement change → updates `budget/summary`), `exportBudget` (PDF/CSV).
+- `functions/src/settlement/` — `exportSettlement` (PDF/CSV), `recomputePnl` (posts actuals up into the budget).
+- `functions/src/chat/` — reuse Blue Seal chat: `onMessageCreate` (FCM fan-out + SMS fallback), channel provisioning. (§5.14)
 - `functions/src/daysheets/` — `generateDaySheetPdf` (reuse `jspdf` server or client).
-- `functions/src/ai/` — `aiChat` grounded in tour data (lift Blue Seal's AI callable), `parseAdvancePdf`.
+- `functions/src/ai/` — `aiChat` grounded in tour data (RAG over Firestore), `ingestDocument` (parse forwarded confirmation / rider PDF → structured line items). **Stack: Firebase AI Logic / Vertex AI (Gemini), optionally via Genkit** — App Check-protected, billed on the same GCP project (§16).
 - **KEEP verbatim:** `functions/src/{auth,lib,admin,diagnostics,stats,support,qa,seed}` (seed rewritten for tour demo data).
 - **DROP:** `functions/src/{vetting,insurance,invoicing,jobs,jobPosts,reviews,vouches,prospects,projectManager,projects,sales,billing,payments}` (payments returns only if/when you add Stripe billing in §12).
 
@@ -275,34 +310,34 @@ The new-vs-Blue-Seal core. Membership model (`tours/{id}/members`), the two-laye
 **Phase 2 — Tour spine: Days + Schedule (2–3 days)**
 Tour → Days (bulk-create from range, day types, TZ), per-Day schedule items with visibility/reminders/confirmed. Mobile-first day dashboard (crew read) + manager edit. 375px is the design target — a crew member's phone.
 
-**Phase 3 — Venues, Contacts, Personnel (2 days)**
-The three shared DBs. Venue type-ahead + auto-fill, `.vcf` contact import, tour personnel with per-diem/bus/radio + roles. Reuse Blue Seal geohash/Maps for venue geo.
+**Phase 3 — Venues, Contacts, Personnel + Google Places (2–3 days)**
+The three shared DBs, **Places-backed**. Stand up the `places/` server proxy (Autocomplete + Details), venue lookup → auto-fill (address/geo/phone/hours/photos/rating + `placeId`) with the touring-specific fields (capacity/production/contacts) layered on; `.vcf` contact import; tour personnel with per-diem/bus/radio + roles. Reuse Blue Seal geohash/Maps. Add Places/Maps hosts to the CSP (§16).
 
 **Phase 4 — Events, Guest Lists, Set Lists (2–3 days)**
 Multi-event days, per-event guest list (allotments + enforced cap + request/approve + cutoff/lock), set lists with notes.
 
-**Phase 5 — Travel & Logistics (2 days)**
-Air (flight-status API), ground (auto drive-time via Maps), hotels/rooming. Per-traveller, visibility-aware.
+**Phase 5 — Travel & Logistics: Flights + Accommodations (3 days)**
+Flights via **FlightAware AeroAPI** (`refreshFlightStatus`, scheduled + on-demand, cached for offline) + the flight-grid view; **hotels via Places** (auto-fill + rooming list); **ground via Directions/Routes** (auto drive-time/distance/TZ, overdrive flag). Per-traveller, visibility-aware.
 
 **Phase 6 — Advancing + Day Sheets (2–3 days)**
 Advance checklist/templates + status pipeline; day-sheet template gallery → PDF (reuse jsPDF); multi-day tour book; CSV exports.
 
 **Phase 7 — Offline-first (2–3 days, its own phase)**
-Firestore persistent cache, offline UI states, "last synced", queued writes, offline day-sheet render. Test in airplane mode on a real device.
+Firestore persistent cache, offline UI states, "last synced", queued writes, offline day-sheet render. Test in airplane mode on a real device. (All Places/flight data already cached server-side into docs, so it survives offline.)
 
-**Phase 8 — Settlements & Tour Finance (2–3 days)**
-Per-event revenue/expense → P/L, per-diem, accountant gate, QuickBooks/Xero CSV export. Money seams get QA happy-paths (like Blue Seal's money-path QA).
+**Phase 8 — Budget, Settlements & Tour Finance (3 days)**
+Tour **budget** (projected vs actual, category/leg rollups via `recomputeBudgetRollup`, auto-fed from hotels/flights/per-diems), per-event settlement → P/L, accountant gate, QuickBooks/Xero CSV export. Money seams get QA happy-paths (like Blue Seal's money-path QA).
 
-**Phase 9 — Notifications + real-time polish (1–2 days)**
-TM broadcast push, per-item reminders, change fan-out, unconfirmed-cascade. Reuse Blue Seal notifications infra.
+**Phase 9 — Crew Chat + Notifications + real-time (2–3 days)**
+Per-tour **chat** channels (tour/group/DM) on Blue Seal's chat engine, FCM fan-out + SMS fallback; TM broadcast push, per-item reminders, change fan-out, unconfirmed-cascade.
 
-**Phase 10 — AI Assistant (2 days)**
-Grounded `aiChat` over tour data, advance-PDF parse, day-sheet drafting. Paid-tier gated.
+**Phase 10 — AI: ingestion + grounded assistant (2–3 days)**
+**Firebase AI Logic / Vertex (Gemini)** via Cloud Functions: `ingestDocument` (forward-a-PDF → structured line items — the table-stakes feature), then the grounded `aiChat` (day-sheet drafting, routing/budget Q&A, ask-the-tour). Paid-tier gated, App Check-protected.
 
 **Phase 11 — Launch readiness (1–2 days)**
 Sentry, analytics, Master Tour **CSV importer** (the acquisition wedge — competitors lead with "import your Master Tour data"), e2e smoke across roles, install-prompt polish.
 
-**Rough total: ~4–5 weeks** of focused build (vs. Blue Seal's ~3 weeks — the multi-tenant model + real offline are the added cost).
+**Rough total: ~5–6 weeks** of focused build (vs. Blue Seal's ~3 weeks — the multi-tenant model, real offline, and the flights/Places/budget/chat/AI integrations are the added cost).
 
 ---
 
@@ -368,8 +403,9 @@ Songkick/Tourbook      Prism.fm       Roadbook/RoadOps        setlist.fm
 - **Charge builder seats; crew ride free forever.** (`owner`/`manager`/`accountant` are paid; `crew` free.) This is *the* adoption mechanic.
 - **Tiers (proposal — validate before shipping):**
   - **Indie** — 1 builder seat, 1 active tour, free crew, core features, no AI. Cheap or freemium. *(The segment Master Tour ignores.)*
-  - **Pro** — multiple builder seats, unlimited tours, AI assistant, settlement + exports, flight/route integrations. Anchor near/under Master Tour's ~$65–75/mo/builder.
+  - **Pro** — multiple builder seats, unlimited tours, **AI assistant + AI ingestion**, **tour budget**, **crew chat**, settlement + exports, **flights/hotels/route integrations**. Anchor near/under Master Tour's ~$65–75/mo/builder.
   - **Agency/Enterprise** — many tours/artists, roster view, API, SSO, priced per-seat or per-agency (benchmark: Stagent €99–799/mo, J.SHOW €499/yr/agency).
+- **Watch the COGS.** The Google (Places/Directions/Maps), FlightAware, and Vertex-AI calls are **per-request costs** that scale with usage — real gross-margin pressure the pure-SaaS competitors without AI don't carry. Mitigations are already in the design: server-side proxy + **Firestore caching** (repeat lookups are free), App Check + rate limits, and **gating AI/flights behind the Pro tier** so heavy usage correlates with revenue. Track per-tour API spend from day one.
 - **Billing infra:** Blue Seal already has Stripe SDK + a payments-handler pattern — reuse when you turn billing on (Phase 12+, out of MVP scope).
 - **Do NOT** take a cut of settlements or ticketing — that's not the business; keep it a SaaS subscription.
 
@@ -416,7 +452,54 @@ If you find yourself building any of the above, stop and ask.
 4. **Flight/route data provider** — FlightAware (Master Tour's choice) vs. alternatives; Google Maps for drive-time (already in the stack). *Needs an API-key/cost decision (→ HUMANTASKS).*
 5. **setlist.fm integration** — nice-to-have; requires a **commercial license negotiation** (free tier is non-commercial). Defer past MVP.
 6. **Pricing specifics** — the exact indie-tier price and the Master Tour anchor need a browser check + a monetization pass before any help copy commits to numbers.
-7. **Crew chat** — reuse Blue Seal's bounded job-chat as per-tour crew chat, or leave crew comms to WhatsApp and just do broadcast push? *(Lean: broadcast push for MVP, bounded chat later.)*
+7. ~~**Crew chat**~~ — **Resolved: in scope.** Building per-tour chat on Blue Seal's chat engine (§5.14, Phase 9).
+8. **Google API budget & billing** — Places (New), Directions/Routes, Maps, and (v1.1) Business Profile all bill per-request on GCP. Need the API key(s), billing enabled, and a monthly cap/quota decision (→ HUMANTASKS). Server-side proxy + Firestore caching (§16) is designed to keep this cheap.
+9. **AI provider** — plan assumes **Firebase AI Logic / Vertex AI (Gemini)** to stay in-project. If you'd rather use Anthropic/OpenAI, it's the same callable pattern with a different SDK — but Vertex-in-Firebase is the lowest-friction, best-infra-leverage default. *Your call; recommend Gemini via Firebase for v1.*
+
+---
+
+## 16. Platform Integrations & Firebase Infrastructure
+
+> This section answers "leverage all of Firebase + Google's integration." It maps every capability to the specific Firebase service or Google API, and states the **server-side-proxy + cache** discipline that keeps keys safe, costs down, and everything offline-capable.
+
+### 16.1 Firebase infrastructure — what each service does for us
+| Need | Firebase service | Notes |
+| --- | --- | --- |
+| Auth + multi-tenant identity | **Firebase Auth** (+ custom claims for `admin`/`qa`) | Reuse Blue Seal's store verbatim (§13). |
+| Realtime tour data + **offline** | **Firestore** with `persistentLocalCache` (IndexedDB) | The offline-first spine (§5.15). Realtime listeners drive live schedule/chat/flight updates. |
+| Files (riders, contracts, day-sheet PDFs, venue photos) | **Cloud Storage** | Uploader-uid-scoped paths (§6.4). |
+| Server logic / integrations | **Cloud Functions v2** (callable + triggers + scheduled) | All third-party API calls live here — never client-side. App Check enforced. |
+| Push | **FCM** | Schedule/travel/guest-list/chat/broadcast (§9). Reuse Blue Seal SW. |
+| **AI** | **Firebase AI Logic / Vertex AI (Gemini)**, optionally **Genkit** | In-project, App Check-gated, one GCP bill (§16.4). |
+| Scheduled work | **Cloud Scheduler** (via scheduled functions) | Flight-status refresh, overdue-advance nudges, reminder fan-out. |
+| Abuse/quota protection | **App Check** + Blue Seal's `rateLimit` | Protects the paid Google/flight/AI calls from being drained. |
+| Config/rollout | **Remote Config** (optional) | Feature-flag AI, chat, budget per tier without a deploy. |
+| Hosting + CSP | **Firebase Hosting** | Add Google Maps/Places hosts to the CSP (§16.5). |
+
+Optional/consider: **Realtime Database** for chat *presence/typing* (cheaper than Firestore for high-churn ephemeral state); **Firebase Extensions** (e.g. the Gemini/"Multimodal Tasks" extension) to shortcut the AI ingestion function.
+
+### 16.2 Google Places & Maps — "the same integration Google has"
+The correct API for **pulling** rich place data is the **Places API (New)** + Maps/Directions — not the Business Profile API. Used across the app via a **server-side proxy** (`functions/src/places/`) so the key stays private, results are cached into our own `venues`/`contacts` docs, and repeat lookups are free:
+- **Autocomplete** — venue, hotel, airport, restaurant, hospital/pharmacy search as you type.
+- **Place Details** — address, lat/lng (+ our geohash), phone, website, opening hours, **photos**, Google rating; store `placeId` for stable re-fetch.
+- **Directions / Routes API** — ground drive-time, distance, and time zones between stops; "overdrive" detection (§5.4).
+- **Maps JS + Static Maps** — venue/hotel pins, the tour-route map, day-sheet static map thumbnails. Blue Seal already ships `@googlemaps/js-api-loader` + `useGoogleMaps`.
+- **Where it plugs in:** venue creation, hotel lookup, airport pickers, "nearest hospital/pharmacy/parking" on the day sheet, the tour overview map.
+
+### 16.3 Google Business Profile API — the venue-side play (v1.1+, not the primary data source)
+Distinct from Places: the **Business Profile API** lets a *business manage its own* Google listing. For us that's the **"claim your venue"** feature — a venue's production team connects their Business Profile to sync verified hours/contact and then maintains their **production pack** in Loadout. That's the parallel to Master Tour's **Venue Tech Packs** moat, and a genuine reason venues opt in. Defer to v1.1; the Places-sourced venue data covers v1.
+
+### 16.4 AI stack (Firebase-native)
+- **Runtime:** Cloud Function → **Vertex AI (Gemini)** through **Firebase AI Logic**; keeps auth/billing/App Check in one project, no separate backend. Consider **Genkit** for the multi-step flows (ingestion → structured output; RAG assistant).
+- **Ingestion:** Gemini multimodal reads forwarded confirmation emails / rider PDFs / photos → structured schedule/travel/advance line items (table-stakes; §5.13).
+- **Assistant:** RAG grounded in the tour's Firestore data; never free-generates logistics. Paid-tier gated.
+- **Guardrails:** App Check + rate limits (paid tokens), Zod-validate the model's structured output before writing, log every call.
+
+### 16.5 Cross-cutting: keys, cost, CSP, offline
+- **Keys server-side only.** The client never holds the FlightAware / Places / Vertex keys — every call is a Cloud Function. (Exception: the Maps JS browser key, which is domain-restricted.)
+- **Cache everything into Firestore.** A flight status, a place detail, a route calc is written onto the owning doc — so it renders **offline** and a repeat view costs zero API calls.
+- **CSP additions** (Blue Seal ships a strict CSP in `firebase.json`): allow `*.googleapis.com`, `maps.googleapis.com`, `*.gstatic.com`, `maps.google.com` in `connect-src`/`img-src`/`script-src` as needed. Keep it tight.
+- **HUMANTASKS (new key/billing items to append at fork):** GCP billing enabled; **Places API (New)** + **Directions/Routes** + **Maps JS** enabled with a key + monthly quota cap; **FlightAware AeroAPI** account + key; **Vertex AI** enabled in the project; (v1.1) **Business Profile API** access. Each with a spend cap.
 
 ---
 
