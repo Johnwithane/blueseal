@@ -254,11 +254,22 @@ firebase deploy --only hosting
 - First `functions` deploy may prompt to enable APIs / create service accounts — accept.
 - If a function fails to build, the agent fixes it and you re-run. **Success = `✔ Deploy complete!`** and a live URL printed (`https://<PROJECT>.web.app`).
 
-> Want the agent to run these for you? See **Appendix A**.
+> Want the agent to run these for you? See **Appendix A** — or better, set up CI/CD (Stage 7c) so **every merge to `main` deploys itself** and you never run this by hand again.
 
 ---
 
-## 9. Stage 8 — Make yourself admin (one-time bootstrap) `YOU`
+## 8b. Stage 7c — GitHub Actions (CI/CD) `YOU` + `AGENT`
+
+The two workflows (`ci.yml` + `deploy.yml`) **come with the fork** (plan §20). Result: **every PR runs lint/build/tests; every merge to `main` auto-deploys.**
+
+**`AGENT`** (Phase 0): retargets the workflows — project ID, app name, the inlined public Firebase config, and adds the rules-test + happy-path-E2E jobs to CI.
+
+**`YOU`** — one secret + branch protection (5 minutes, one-time):
+1. **Create the deploy service account** (if you didn't in Appendix A): Cloud console → IAM → Service Accounts → Create → roles **Firebase Admin**, **Cloud Functions Admin**, **Service Account User**, **Cloud Datastore User** → create a **JSON key** → download.
+2. **Add it as a repo secret:** GitHub → your repo → **Settings → Secrets and variables → Actions → New repository secret** → name **`FIREBASE_SERVICE_ACCOUNT`**, value = paste the entire JSON. (Optional: `VITE_SENTRY_DSN`.)
+3. **Protect `main`:** Settings → **Branches → Add branch ruleset** (or rule) → require the **CI** status check to pass before merging. Now nothing red reaches `main`, and green merges deploy automatically.
+
+> Keep deploys on Stripe/Firebase **Test/Blaze** as you build; the workflow deploys hosting + only the changed rules/functions each time, so it's fast and quota-safe.
 
 Blue Seal's `setAdminRole` callable is **admin-only**, so the *first* admin (you) is set once via the Admin SDK; after that you manage everyone **inside the app** at `/admin` (user search → user detail → role editor / verify email / suspend — it calls `setAdminRole` / `adminSetUserRoles`).
 
@@ -339,6 +350,7 @@ Blue Seal's `setAdminRole` callable is **admin-only**, so the *first* admin (you
 - [ ] 6. Trigger Email extension installed
 - [ ] 6b. Stripe keys + product/price + webhook set (Test mode)
 - [ ] 7. CSP widened + first deploy succeeded (live URL)
+- [ ] 7c. GitHub Actions: `FIREBASE_SERVICE_ACCOUNT` secret set + `main` protected (CI green → auto-deploy)
 - [ ] 8. **You are admin**
 - [ ] 9. End-to-end verify passed
 

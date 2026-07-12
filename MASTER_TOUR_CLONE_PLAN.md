@@ -700,6 +700,25 @@ Every feature must check and, if needed, update **all three**:
 
 ---
 
+## 20. CI/CD — GitHub Actions (mirror Blue Seal)
+
+Blue Seal ships two workflows in `.github/workflows/` — **they come with the fork**; the agent just retargets them (project ID, app name, env values) in Phase 0.
+
+**`ci.yml` — every pull request (the merge gate):**
+- **App job:** `npm ci` → **lint → build (type-check) → unit tests (`test:run`)** → install Chromium → **Playwright smoke** → upload the report artifact. Uses placeholder env, so no secrets required.
+- **Functions job:** build functions (`tsc`).
+- **Add for this project (improvement over Blue Seal's CI):** a **rules-tests** job (`npm run test:rules`) and the **per-phase happy-path specs** (`test:e2e:happy` against the emulators) so the §18 QA gate runs in CI, not just locally. **No PR merges red.**
+
+**`deploy.yml` — push to `main` (auto-deploy):**
+- Auths to Google Cloud with **one GitHub secret, `FIREBASE_SERVICE_ACCOUNT`** (the service-account JSON — same one as SETUP Appendix A), then **targeted deploy** via `dorny/paths-filter`: rules/indexes/storage only if those changed, functions only if `functions/**` changed (`--force`), hosting always. Targeting avoids the Functions per-minute mutation quota — **keep it**.
+- Firebase **web config is public and inlined** in the workflow (not a GitHub secret) — deliberate, mirrors Blue Seal (an empty secret once caused a prod outage). Secret scanners flagging the `AIzaSy…` client keys are an **expected false positive** (public, provider-restricted keys).
+
+**Branch protection:** require `ci.yml` green before merge to `main`. The agent works on feature branches → PR → CI → merge → auto-deploy. This also **reconciles CLAUDE.md's "deploy-before-commit"**: on merge, rules + functions + hosting deploy **together**, so the live contract never lags the code.
+
+**Net for you:** merge to `main` → it builds, tests, and deploys itself. Once the one secret is set, **no manual `firebase deploy`** (this is the hands-off deploy). Setup steps: `SETUP.md` Stage 7c.
+
+---
+
 ## Appendix — First actions when you say "go"
 
 1. Confirm the product name (Q1) and tenancy decision (Q2) — these two gate everything.
