@@ -309,7 +309,7 @@ reports/{reportId}     { targetType, targetId, byUid, reason, status }   // mode
 - Day carries a denormalized `venueName`/`city` snapshot for offline day-sheet render even if the venue doc isn't cached.
 
 ### 6.3 KEEP-as-is collections (lift from Blue Seal generic infra)
-`users`, `notifications`, `chats`/`messages` (repurpose as per-tour crew chat — bounded like Blue Seal's job chat), `auditLog`, `errorLogs`, `qaChecklist`, `mail`/`sms`, `rateLimits`, `webhookEvents`, `platformStats`.
+`users`, `notifications`, `chats`/`messages` (repurpose as per-tour crew chat — bounded like Blue Seal's job chat), `auditLog`, `errorLogs`, `qaChecklist`, `mail`/`sms`, `rateLimits`, `webhookEvents`, `platformStats`, **`subscriptions`/entitlements** (Stripe billing — reuse Blue Seal's `payments` webhook + Pro-flag pattern; §12). Premium features check the entitlement server-side.
 
 ### 6.4 Storage paths (reuse Blue Seal's scoping discipline)
 ```
@@ -418,7 +418,10 @@ The **Map tab** (Google Maps): city/category-filtered pins for venues + restaura
 **Phase 14 — Community feed + opt-in presence (2–3 days)**
 Geo-tagged **posts feed** (tips/reviews/shouts), filter by city/venue, and **opt-in, city-level** band presence ("who's played here / is in town"). Reporting + moderation end-to-end. Spec `14-feed`.
 
-**Rough total: ~5–6 weeks** for the private tour-ops MVP, **+ ~1.5–2 weeks** for the community/map layer (Phases 12–14). The community domain is deliberately separable so it never blocks the ops MVP.
+**Phase 15 — Stripe subscriptions + freemium paywall (2–3 days)**
+Wire monetization (§12): reuse Blue Seal's Stripe **Checkout + webhook + entitlement** pattern → write a subscription entitlement → **premium features check it server-side** (AI tools, community post/read, privacy/gatekeeping controls). Free tier stays fully usable. Spec `15-paywall` (free user is blocked from premium; subscriber is allowed; entitlement can't be bypassed client-side).
+
+**Rough total: ~5–6 weeks** for the private tour-ops MVP, **+ ~1.5–2 weeks** community/map (12–14), **+ ~2–3 days** Stripe/paywall (15). All three later blocks are separable and never block the ops MVP.
 
 ---
 
@@ -478,18 +481,24 @@ Songkick/Tourbook      Prism.fm       Roadbook/RoadOps        setlist.fm
 
 ---
 
-## 12. Monetization
+## 12. Monetization — freemium, Stripe-powered
 
-**Copy the proven core, add the missing tier.** (Full model belongs in a `MONETIZATION.md`, like Blue Seal — keep help copy qualitative until pricing is live.)
+**Model: free to use, pay to unlock power features.** The **core tour-management tool is free** so adoption is frictionless and the network fills up; a **Premium subscription (Stripe)** unlocks the high-value features. **Crew are always free** (they only consume a tour they're invited to). (Full pricing belongs in a `MONETIZATION.md` like Blue Seal — keep help copy qualitative until numbers are live.)
 
-- **Charge builder seats; crew ride free forever.** (`owner`/`manager`/`accountant` are paid; `crew` free.) This is *the* adoption mechanic.
-- **Tiers (proposal — validate before shipping):**
-  - **Indie** — 1 builder seat, 1 active tour, free crew, core features, no AI. Cheap or freemium. *(The segment Master Tour ignores.)*
-  - **Pro** — multiple builder seats, unlimited tours, **AI assistant + AI ingestion**, **tour budget**, **crew chat**, settlement + exports, **flights/hotels/route integrations**. Anchor near/under Master Tour's ~$65–75/mo/builder.
-  - **Agency/Enterprise** — many tours/artists, roster view, API, SSO, priced per-seat or per-agency (benchmark: Stagent €99–799/mo, J.SHOW €499/yr/agency).
-- **Watch the COGS.** The Google (Places/Directions/Maps), FlightAware, and Vertex-AI calls are **per-request costs** that scale with usage — real gross-margin pressure the pure-SaaS competitors without AI don't carry. Mitigations are already in the design: server-side proxy + **Firestore caching** (repeat lookups are free), App Check + rate limits, and **gating AI/flights behind the Pro tier** so heavy usage correlates with revenue. Track per-tour API spend from day one.
-- **Billing infra:** Blue Seal already has Stripe SDK + a payments-handler pattern — reuse when you turn billing on (Phase 12+, out of MVP scope).
-- **Do NOT** take a cut of settlements or ticketing — that's not the business; keep it a SaaS subscription.
+**Free (basic — everyone):**
+- Core ops: tours, days, schedule, personnel, venues, guest lists, day sheets, basic travel; being invited as crew; viewing shared tours.
+
+**Premium (paywalled via Stripe):**
+- **All AI tools** — assistant, document ingestion, drafting, routing/budget Q&A. (These carry real per-call COGS, so gating them **aligns cost with revenue** — the Google/FlightAware/Vertex spend only happens for paying users.)
+- **The band community + map network** — posting and reading shared notes/recommendations, seeing other bands, the gear board / who's-in-town (§5.16).
+- **Privacy & gatekeeping controls** — private/undiscoverable band profile, invite-only visibility, "control who can find you." Bands who don't want to be found pay to lock down.
+- Likely also: advanced settlement/exports, unlimited tours, flight auto-tracking, larger teams — tune later.
+
+**Decision to make (flagged):** paywalling the community can throttle the very network effect that makes it valuable. Options: **(a)** free to *read*, Premium to *post*; **(b)** community free at launch to seed it, then gate power features; **(c)** gate fully as described. *Recommend (a) or (b) — the entitlement system supports any split, so this is a switch, not a rebuild.*
+
+**Stripe (in-plan — mirrors Blue Seal, Phase 15):** Blue Seal already ships `@stripe/stripe-js` + a Cloud Functions **payments** domain doing **Stripe Checkout + webhook + entitlement** (its tradesperson Pro subscription). Reuse it: Checkout session → webhook writes an **entitlement** (`subscriptions/{accountId}` + a Premium flag on the band/account) → premium features check it. **Enforce server-side:** every premium callable (AI, community write) verifies the entitlement; rules gate premium collections — **never trust the client** (same discipline as Blue Seal's Pro gating + the `/qa` `setSelfPro` test hook).
+
+- **Do NOT** take a cut of settlements or ticketing — subscription only.
 
 ---
 
@@ -541,6 +550,8 @@ If you find yourself building any of the above, stop and ask.
 11. **Community privacy defaults** — plan assumes: band map presence **opt-in + city-level only** (never live GPS); private tour ops **never** exposed to the community; contributions attributed + reportable. *Confirm these defaults with the TM — artists are cautious here.*
 12. **Community timing** — build it as **Phases 12–14 fast-follow** after the ops MVP, or pull it earlier as the adoption hook? *Recommend: ops MVP first (it's the foundation), community immediately after — but it's separable, so it can flex.*
 13. **Community moderation policy** — attribution + report-and-remove + admin queue is in; do we also need pre-moderation, blocklists, or verified-band gating before posting? *Needs a light policy call.*
+14. **Freemium split for the community** — full paywall vs read-free/post-paid vs free-at-launch-then-gate (§12). *Recommend read-free/post-paid or free-at-launch so the network effect isn't throttled — your call; it's a config switch.*
+15. **Free vs Premium feature line** — confirm exactly what's free vs paid (plan assumes: core ops free; AI + community + privacy controls paid). Adjust the split anytime — the entitlement check is one gate.
 
 ---
 
@@ -651,6 +662,7 @@ Each phase adds its spec; **`00-smoke` (auth + roles) re-runs every phase** so t
 | 12 Community foundation | `12-community` | create public band profile; add a place; **private tour data is NOT readable via community rules** (the wall) |
 | 13 Map + notes | `13-map` | map pins by category/city; add + read a band note/recommendation on a place |
 | 14 Feed + presence | `14-feed` | post a geo-tagged tip; opt-in presence shows city-level only; report → moderation removes it |
+| 15 Stripe paywall | `15-paywall` | free user **blocked** from AI/community (server-side); subscriber allowed; entitlement can't be faked client-side |
 
 ### 18.4 The per-phase loop (what "build it while testing it" means)
 Every phase runs this before it's allowed to close:
@@ -669,6 +681,22 @@ A red spec **blocks the phase** — fix forward, don't advance. This is the "alw
 ### 18.5 Reused vs new
 - **Reuse verbatim:** the `e2e/happy-paths/` harness shape (config, `helpers/{env,auth,provision,walk}.ts`), `npm run test:e2e:happy*` scripts, the `/qa` toolkit + shared-progress collection, `docs/QA_PLAYWRIGHT.md`, and (per CLAUDE.md) the `qa-runner` subagent to drive it off the main context.
 - **New (per phase):** the numbered tour specs above, tour provisioning callables (`provisionTour`, `seedDemoTour` in `functions/src/qa/` — mirror Blue Seal's `grantAllRolesForAdminTesting`/`seedIntakeSchemas`), the `QA_MODE` fixture branch in each integration function, and rewritten `qaChecklist.ts` items for the touring flows.
+
+---
+
+## 19. Per-feature upkeep gate — Help Center, QA, and Legal (always current)
+
+> Mirror Blue Seal's discipline (already in the kept `CLAUDE.md`) and **extend it with legal**. This is a **gate, not a suggestion** — part of every feature's definition of done, checked on **every** feature commit.
+
+Every feature must check and, if needed, update **all three**:
+
+1. **Help Center / FAQ** (`src/data/help.ts`) — the always-on "health centre." Ask: *would a user now have a question this doesn't answer, or read an answer that's now wrong?* Add/edit the FAQ or article. **Built in from Phase 0** (kept from Blue Seal) so it grows feature-by-feature, never as a catch-up at the end. Its integrity test fails the build if content is malformed.
+2. **QA toolkit** (`src/data/qaChecklist.ts` + `docs/QA_HAPPY_PATHS.md`) — add/adjust the trackable, step-by-step path exercising what you built (plus its §18 Playwright spec). Role-scoped, with an expected result.
+3. **Terms of Use + Privacy Policy** (`src/legal/*` + the legal views + `legal/version.ts`) — ask: *did this feature change what data we collect, share, or process?* If yes, **update Terms/Privacy and bump the legal version.** High-trigger features: the **community** (public posts, band profiles, presence), **payments** (Stripe/subscriptions), **AI** (processing uploaded docs/emails), **location** (map/presence), **travel docs** (visa/passport — sensitive personal data).
+
+**Stand up early (Phase 0/1):** the Help Center **and** the Terms/Privacy legal scaffolding are lifted from Blue Seal in the fork, so both exist from day one and are maintained continuously — not bolted on before launch.
+
+**One-line `CLAUDE.md` addition (in the new repo only):** add a Legal bullet to the "After every change" checklist next to the existing Help + QA bullets, so the discipline is enforced by the same doc that already governs the build. (We keep `CLAUDE.md` otherwise unchanged.)
 
 ---
 

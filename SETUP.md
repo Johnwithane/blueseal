@@ -34,6 +34,8 @@ The agent doesn't just write code — **at every phase it writes and runs a Play
 - `qaChecklist.ts` + `QA_HAPPY_PATHS.md` are updated so you can re-run the same checks yourself at `/qa`.
 
 If a spec goes red, the agent fixes forward before moving on — so the suite is always green when you come back. (Full spec-per-phase map: plan §18.3.)
+
+**Every feature also updates the three always-current docs (plan §19):** the **Help Center** (`help.ts`), the **QA toolkit** (`qaChecklist.ts` + `QA_HAPPY_PATHS.md`), and — when data collection/sharing/processing changes — **Terms of Use + Privacy Policy**. The Help Center and legal docs are stood up in Phase 0 (kept from Blue Seal) and maintained feature-by-feature, never bolted on at the end.
 5. **Come back**, do the guided Firebase/GitHub clicks in the stages below, and **paste the requested values back into the session**. It resumes.
 
 ### 0.3 Checkpoint discipline (why the agent commits often)
@@ -221,6 +223,21 @@ Blue Seal sends **all** email by writing to the **`mail` collection**, drained b
    When prompted: **Email documents collection = `mail`**, **SMTP connection URI** = the one above, **Default FROM** = e.g. `Loadout <noreply@yourdomain>`. (Verify your sending domain in the provider first, or use their onboarding/sandbox sender.)
 3. Until installed, `enqueueMail` just accumulates docs in `mail/` — nothing breaks; they flush once it's live.
 
+## Stage 6b — Stripe (subscriptions / paywall) `YOU` + `AGENT`
+
+Powers the freemium model (plan §12) — free core, Premium unlocks AI + community + privacy controls. Reuses Blue Seal's Stripe Checkout + webhook + entitlement pattern.
+
+**`YOU`** in the [Stripe dashboard](https://dashboard.stripe.com):
+1. Create the account (Test mode first). Copy the **Publishable key** (`pk_...`) and **Secret key** (`sk_...`).
+2. **Products → Add product** → your **Premium** plan → add a recurring **Price** (monthly/annual) → copy the **Price ID** (`price_...`).
+3. **Webhooks → Add endpoint** → URL = your deployed Stripe webhook function (the agent gives you the exact URL after first deploy) → select `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted` → copy the **Signing secret** (`whsec_...`).
+
+**`AGENT`/`YOU`** — set the values:
+- `.env` (client): `VITE_STRIPE_PUBLISHABLE_KEY` = `pk_...`.
+- secrets (server): `firebase functions:secrets:set STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET`; price IDs in config.
+
+`AGENT`: builds the paywall in **Phase 15** — Checkout → webhook writes the entitlement → premium callables/rules check it server-side. Start in Stripe **Test mode**; flip to live keys when you're ready to charge.
+
 ---
 
 ## 8. Stage 7 — CSP + deploy
@@ -320,6 +337,7 @@ Blue Seal's `setAdminRole` callable is **admin-only**, so the *first* admin (you
 - [ ] 4. Google APIs enabled + 2 keys created + Vertex SA role + FlightAware + App Check
 - [ ] 5. Client env + server secrets set
 - [ ] 6. Trigger Email extension installed
+- [ ] 6b. Stripe keys + product/price + webhook set (Test mode)
 - [ ] 7. CSP widened + first deploy succeeded (live URL)
 - [ ] 8. **You are admin**
 - [ ] 9. End-to-end verify passed
