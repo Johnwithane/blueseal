@@ -216,6 +216,34 @@ Mirror Master Tour's tab/IA so it feels identical, then add the new surfaces:
 - **Familiar tabs:** Itinerary/Days, Schedule, Travel, Contacts/Personnel, Guest List, Settlement, Reports/Day Sheets, Advance.
 - **New tabs:** **Map/Community**, and the **AI assistant** surfaced throughout (floating panel like Blue Seal + an entry point). Keep the addition minimal so the app still reads as "Master Tour, but faster + with a map."
 
+### 5.18 Accepted feature enhancements (stakeholder review)
+Confirmed with the touring manager — build these into the phases noted.
+
+**A. Stage plots, tech packs & shareable venue links — "the things every venue needs."** *(High value.)*
+- Per-tour **stage plot** (upload image/PDF now; a lite drag-drop builder later), **input/channel list**, **tech rider**, and backline/hospitality requirements — the standard pack every venue asks for.
+- **Public shareable link:** generate a **read-only, tokenized public URL** (no login) to send a venue/promoter the current stage plot + tech pack — like sharing a doc link. **Revocable + versioned.** Rendered by a `chromeless` public route; the token is hash-only and unguessable (reuse Blue Seal's magic-link firewall pattern) and exposes **only** that shared pack — nothing else on the tour.
+- Lives in **Advancing** (§5.7), attached to the event/venue advance; the venue-claim flow (§16.3) can later let venues receive/confirm it.
+
+**B. Auto-reroute alerts (travel).** When a tracked flight is delayed/cancelled (FlightAware poll/webhook), push an alert to affected travellers + the TM and flag the knock-on (missed connection, late load-in). Extends §5.4; scheduled + event-driven.
+
+**C. Merch counts & settlement (money).** Per-show merch inventory in/out + sales, feeding the settlement P/L and the tour budget. Extends §5.9.
+
+**D. Weather + traffic on the day sheet.** Show-city forecast + live drive-time/traffic on the day's ground legs, surfaced on the day sheet and day dashboard (weather API + the Routes traffic model). Extends §5.4/§5.8.
+
+**E. Visa / carnet / border-doc tracker.** Per-person + per-tour travel documents (visas, work permits, ATA carnet, passport expiry) with status + **expiry reminders** (push + email via the existing notify pipeline). Sensitive → accountant/manager-gated + visibility-aware.
+
+**F. Gear/backline sharing + "who's in town" (community).** In the community layer (§5.16): a per-city **backline/gear board** (offer/request amps, cabs, kits) and opt-in **"who's in town"** so bands connect or share gear. Community-domain, opt-in, moderated.
+
+**Data-model additions:**
+```
+tours/{tourId}/stagePlots/{id}   { storagePath, version, publicToken?, revoked }   // public route /p/plot/{token}
+tours/{tourId}/techPacks/{id}    { storagePath, version, publicToken?, revoked }
+tours/{tourId}/travelDocs/{id}   { personId, type: visa|carnet|permit|passport, number?, expiresAt, status, visibility }  // gated
+settlement.merch                 { unitsIn, unitsOut, sales }
+gearListings/{id}                { bandId, city, kind: offer|request, item, contact, createdAt }   // community domain
+```
+**Phases/QA:** A → Phase 6 (spec `06-stageplots`: public link renders read-only; **revoke kills it**). B → Phase 5. C → Phase 8. D → Phase 5/6. E → Phase 5 (spec `05-visa`: expiry reminder fires). F → Phases 13–14 (community).
+
 ---
 
 ## 6. Data Model (Firestore)
