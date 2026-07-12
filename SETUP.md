@@ -23,8 +23,17 @@ Every step below is tagged **`YOU`** or **`AGENT`**. Anything tagged `YOU` is a 
 1. **Create the new repo first** (Stage 1 — needs a name; a throwaway slug is fine).
 2. **Start a remote Claude Code session on that repo** (code.claude.com/… → new session → pick the repo).
 3. **Give it this one-line kickoff:**
-   > "Read `SETUP.md` and `MASTER_TOUR_CLONE_PLAN.md`. Execute Stage 1c (strip Blue Seal domain + rename roles + stand up the §17 design tokens + rebrand) and get `npm run lint && npm run build && npm run test:run` green. Commit and push after each working sub-step. Then **pause and list exactly what you need from me** (Firebase values, keys) before any step that needs my account. Keep `CLAUDE.md` unchanged."
-4. **Walk away.** The agent works, commits/pushes, and stops when it hits a `YOU` step, leaving you a short list of what to provide.
+   > "Read `SETUP.md` and `MASTER_TOUR_CLONE_PLAN.md`. Execute Stage 1c (strip Blue Seal domain + rename roles + stand up the §17 design tokens + rebrand) and get `npm run lint && build && test:run` green. Then build the phases in `MASTER_TOUR_CLONE_PLAN.md §10` in order, and **for every phase follow the §18 QA gate: write its numbered `e2e/happy-paths/NN-*.spec.ts`, run `npm run test:e2e:happy` green against the emulators, and update `qaChecklist.ts` + `QA_HAPPY_PATHS.md` before advancing.** Commit and push after each working sub-step. **Pause and list what you need from me** before any step that needs my account. Keep `CLAUDE.md` unchanged."
+4. **Walk away.** The agent builds each phase *with its Playwright test*, keeps the spec suite green, commits/pushes, and stops when it hits a `YOU` step — leaving you a short list of what to provide.
+
+### 0.2a The per-phase QA gate (why you can trust the walk-away)
+
+The agent doesn't just write code — **at every phase it writes and runs a Playwright happy-path spec that proves the phase works**, against the local Firebase emulators (no deploy, no paid APIs — external calls return test fixtures, plan §18.2). A phase only closes when:
+- `npm run lint && build && test:run && test:rules` pass (unit + security rules, incl. "crew is denied money/hidden items"), **and**
+- `QA_BASE_URL=http://localhost:5173 npm run test:e2e:happy` is **green** (the numbered spec for that phase + `00-smoke`), **and**
+- `qaChecklist.ts` + `QA_HAPPY_PATHS.md` are updated so you can re-run the same checks yourself at `/qa`.
+
+If a spec goes red, the agent fixes forward before moving on — so the suite is always green when you come back. (Full spec-per-phase map: plan §18.3.)
 5. **Come back**, do the guided Firebase/GitHub clicks in the stages below, and **paste the requested values back into the session**. It resumes.
 
 ### 0.3 Checkpoint discipline (why the agent commits often)
@@ -45,6 +54,8 @@ When the agent pauses with a question, here are the defaults (say the **bold** w
 | Flight data provider? | **FlightAware AeroAPI** | Master Tour's own choice. |
 | Ship a real brand now or placeholder? | **Placeholder** | Neutral tokens now; drop real brand into §17's two files later. |
 | Keep Stripe/billing in MVP? | **No** | Turn on later; out of MVP scope. |
+| Run the per-phase Playwright gate against emulators or the deployed site? | **Emulators** | Local, free, hermetic — no deploy per phase (§18). |
+| Mock Places/flight/Vertex in tests? | **Yes (fixtures)** | Keeps the QA gate free + deterministic (§18.2). |
 
 If a question isn't here, the agent should propose a recommended default and proceed unless you object.
 
@@ -303,6 +314,7 @@ Blue Seal's `setAdminRole` callable is **admin-only**, so the *first* admin (you
 
 - [ ] 1. Repo created + scaffolding pushed
 - [ ] 1c. **AGENT**: domain stripped, roles renamed, design tokens up, rebranded, green build
+- [ ] Build phases (plan §10) — each closes with its green Playwright spec (§18): `01-auth-roles` → `11-import`
 - [ ] 2. Firebase project + Blaze + Auth/Firestore/Storage/Hosting + web app registered
 - [ ] 3. `firebase use` wired + `.env` filled
 - [ ] 4. Google APIs enabled + 2 keys created + Vertex SA role + FlightAware + App Check

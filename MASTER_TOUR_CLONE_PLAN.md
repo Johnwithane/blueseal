@@ -307,7 +307,7 @@ Reuse Blue Seal's callable pattern **verbatim** (App Check enforced, Zod input, 
 
 ## 10. Build Phases
 
-> Dependency-ordered, mirroring `design.md §10`. Each ends with the CLAUDE.md verify gates + Help/QA upkeep + deploy-before-commit discipline. Estimates assume Claude Code carrying implementation.
+> Dependency-ordered, mirroring `design.md §10`. **Each phase closes only when its numbered Playwright happy-path spec is green (§18) — build and test move together** — plus the CLAUDE.md verify gates (lint/build/test:run/test:rules), Help/QA upkeep, and deploy-before-commit. Estimates assume Claude Code carrying implementation.
 
 **Phase 0 — Fork & rebrand the scaffolding (1 day)**
 Clone the Blue Seal repo into a new project; strip the Blue Seal domain (see §13 map); stand up the **modular design-system token layer** (`theme/preset.ts` + `main.css` with neutral placeholder brand — §17); rebrand manifest/naming; wire a fresh Firebase project; confirm `lint && build && test:run` green on the emptied shell. Auth, router-guard system, app shell, PWA, admin, Help Center, QA toolkit, notifications all survive.
@@ -536,6 +536,56 @@ Distinct from Places: the **Business Profile API** lets a *business manage its o
 
 ### 17.3 Where it sits in the build
 Phase 0 (fork/rebrand) stands up `theme/preset.ts` + `main.css` with the neutral placeholder tokens and confirms PrimeVue renders through them; every later phase consumes tokens + PrimeVue components only. Accessibility bar: WCAG AA contrast on the placeholder palette (validate when the real brand lands too), 375px-first.
+
+---
+
+## 18. QA & Test Strategy — a Playwright gate at every phase
+
+> **The rule: no phase is "done" until its own numbered Playwright happy-path spec runs green.** Building and testing move together — each phase ships the feature *and* the test that proves it, so regressions in earlier phases surface the moment a later phase breaks them. This reuses Blue Seal's exact QA machinery (`e2e/happy-paths/`, the `/qa` toolkit, `docs/QA_PLAYWRIGHT.md`); we only add tour specs.
+
+### 18.1 The four test layers (all already in Blue Seal)
+1. **Unit** — `npm run test:run` (Vitest, colocated `*.test.ts`): services, utils, validation, rollup math.
+2. **Rules** — `npm run test:rules` (Vitest vs the Firestore emulator): **every collection gets an allow AND a deny test** (CLAUDE.md). Money + visibility seams especially (crew must be *denied* settlement/budget).
+3. **Codified happy-path E2E (the phase gate)** — headless Playwright specs in `e2e/happy-paths/`, numbered, ordered, seeded via the `/qa` provisioning callables, artifacts (trace/video/screenshot) on failure. Run with `npm run test:e2e:happy`.
+4. **Exploratory QA sweep** — the `docs/QA_PLAYWRIGHT.md` runbook driven by Playwright **MCP** against emulators at **375px**: per-route console-error / failed-callable / permission-denied check. Best-effort (needs the MCP server); the layer-3 specs are the hard gate.
+
+### 18.2 Hermetic + free: mock the paid APIs in test mode
+So the per-phase gate is **fast, free, and offline-runnable**, each integration Cloud Function (Places, Routes, FlightAware, Vertex) returns **deterministic fixtures** when a `QA_MODE`/`FUNCTIONS_EMULATOR` flag is set — no paid API calls in tests. The specs assert on the fixture data. (Real keys are exercised only in the manual Stage-9 verify against the deployed site.)
+
+### 18.3 One numbered spec per phase (the exit gate)
+Each phase adds its spec; **`00-smoke` (auth + roles) re-runs every phase** so the foundation can't silently break.
+
+| Phase | Spec | Proves (happy path + the key deny) |
+| --- | --- | --- |
+| 1 Bands/Tours/roles | `00-smoke` + `01-auth-roles` | sign up → provision `tourManager` → create Band+Tour → invite crew; **crew is denied editing**; admin area loads |
+| 2 Spine + schedule | `02-tour-spine` | build days from a range, add schedule item, crew reads day dashboard **at 375px**; hidden item not visible to crew |
+| 3 Venues/contacts/personnel | `03-venues` | venue autocomplete (fixture) → auto-fill; add personnel + per-diem |
+| 4 Events/guest/set lists | `04-guestlist` | allotment + **Enforced cap** blocks over-request; approve flow; set list |
+| 5 Flights + accommodations | `05-travel` | add flight (fixture status) → flight grid; hotel via Places; rooming list |
+| 6 Advancing + day sheets | `06-daysheets` | advance status pipeline; **day-sheet PDF generates**; CSV export |
+| 7 Offline-first | `07-offline` | `context.setOffline(true)` → active tour still reads; queue an edit → back online → it syncs |
+| 8 Budget + settlement | `08-money` | accountant sees budget rollup + settlement P/L; **crew is denied all money** |
+| 9 Chat + notifications | `09-chat` | actor A sends → actor B receives; broadcast push; notification fires |
+| 10 AI | `10-ai` | ingest a sample confirmation → structured line items (fixture); assistant answers grounded |
+| 11 Launch/import | `11-import` | Master Tour CSV import; full cross-role smoke |
+
+### 18.4 The per-phase loop (what "build it while testing it" means)
+Every phase runs this before it's allowed to close:
+```
+build the feature (services → rules → functions → components)
+  → npm run lint && build && test:run && test:rules   (unit + rules, incl. deny tests)
+  → write/extend e2e/happy-paths/NN-<phase>.spec.ts     (seed via /qa callables)
+  → start emulators + dev server, run:
+       QA_BASE_URL=http://localhost:5173 npm run test:e2e:happy   → MUST be green
+  → (if Playwright MCP available) quick exploratory 375px sweep per QA_PLAYWRIGHT.md
+  → update /qa toolkit: src/data/qaChecklist.ts + docs/QA_HAPPY_PATHS.md  (CLAUDE.md mandate)
+  → deploy Firebase changes (if any) → commit + push
+```
+A red spec **blocks the phase** — fix forward, don't advance. This is the "always testing as you build" guarantee.
+
+### 18.5 Reused vs new
+- **Reuse verbatim:** the `e2e/happy-paths/` harness shape (config, `helpers/{env,auth,provision,walk}.ts`), `npm run test:e2e:happy*` scripts, the `/qa` toolkit + shared-progress collection, `docs/QA_PLAYWRIGHT.md`, and (per CLAUDE.md) the `qa-runner` subagent to drive it off the main context.
+- **New (per phase):** the numbered tour specs above, tour provisioning callables (`provisionTour`, `seedDemoTour` in `functions/src/qa/` — mirror Blue Seal's `grantAllRolesForAdminTesting`/`seedIntakeSchemas`), the `QA_MODE` fixture branch in each integration function, and rewritten `qaChecklist.ts` items for the touring flows.
 
 ---
 
