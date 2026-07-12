@@ -4,7 +4,9 @@
 >
 > **What this doc is:** the equivalent of Blue Seal's `design.md` for a *new* product. It defines *what* Loadout is, the domain data model, the roles, the phased build, the competitive positioning, and exactly what carries over from the Blue Seal scaffolding vs. what gets rebuilt. It deliberately mirrors the Blue Seal `design.md` section skeleton so the same working discipline (`CLAUDE.md`) applies unchanged.
 >
-> **Source of truth for *how* we build:** the existing `CLAUDE.md` (core principles, per-feature loop, callable/rules/service patterns, deploy discipline, Help Center + QA upkeep). Nothing in this doc overrides it. Where the touring domain forces a deviation from a Blue Seal convention, it is **flagged explicitly** (see §7.1 — the multi-tenant rules deviation).
+> **Source of truth for *how* we build:** the existing `CLAUDE.md` (core principles, per-feature loop, callable/rules/service patterns, deploy discipline, Help Center + QA upkeep). Nothing in this doc overrides it.
+>
+> **Design bar: stay ~1-to-1 with Blue Seal.** Same Firebase footprint, same account/custom-claims system, same multi-role + `activeRole`, same multi-channel `notify.ts` (in-app + email via the Trigger Email extension + WhatsApp), same `onSchedule` scheduler, same Vertex-Gemini AI in `functions/src/ai/`. The touring domain is modelled on Blue Seal's **`projectManager`-runs-many-clients** pattern: a **tour manager runs many bands** the way a PM runs many properties. When in doubt, do it the way Blue Seal already does it — this doc points at the specific files to copy.
 
 ---
 
@@ -38,27 +40,26 @@ It replaces the fragmented reality of most tours: a WhatsApp group, a shared Goo
 
 ## 3. User Roles & Auth Tiers
 
-> **This is the single biggest architectural difference from Blue Seal.** Blue Seal roles are **global** (a user *is* a `tradesperson` everywhere). Loadout roles are **per-tour** (or per-org): the same person can be the `owner` of their own tour and `crew` on someone else's next week. This is a **multi-tenant** model. See §7.1 for how the security rules must adapt.
+> **This maps almost 1-to-1 onto Blue Seal's existing role model — not a new paradigm.** Blue Seal's `projectManager` is a **global custom-claim role that manages many clients/properties/projects**, scoped by ownership fields on the docs (`properties/{id}.projectManagerId == uid()`) and get()-based membership checks in rules. **"A tour manager runs multiple bands" is exactly that pattern.** So Loadout reuses Blue Seal's account system, custom-claims, multi-role + `activeRole` view-switching, and self-serve-role provisioning **verbatim** — we just rename the role enum and add a `Band` entity that a manager owns many of (the way a PM owns many properties). See §7.1 — there is **no new "multi-tenant" mechanism**; it's the same resource-field + get() membership checks Blue Seal already uses for chats/jobPosts/reviewPairs.
 
-### 3.1 The two-layer role model (copied from Master Tour, proven)
+### 3.1 The role model (mirrors Blue Seal's `client`/`tradesperson`/`projectManager` exactly)
 
-**Layer 1 — Platform claims (global, via custom claims — reuse Blue Seal's machinery verbatim):**
-- `admin` — Loadout staff. Support desk, user management, audit. (Keep Blue Seal's `admin` exactly.)
-- `qa` — capability claim that unlocks the `/qa` toolkit; never a "view". (Keep verbatim.)
-- Everyone else is just an authenticated `user` at the platform layer. **Their power comes from tour membership, not a global claim.**
+**Global custom-claim roles** — set by `provisionAccount` (rename Blue Seal's `z.enum([...])`), mirrored to `users/{uid}.roles[]` + `activeRole`, multi-role with implied-role invariants, `admin`/`qa` granted separately. **Same machinery, renamed enum:**
 
-**Layer 2 — Tour membership role (per-tour, stored in a membership doc — NEW):**
+| Blue Seal role | → Loadout role | Self-serve? | Manages many of… (like PM→properties) |
+| --- | --- | --- | --- |
+| `client` (default) | **`crew`** (default) | ✅ signup | — (is added to tours) |
+| `projectManager` | **`tourManager`** | ✅ (`addRoleToSelf`, like PM) | **Bands** → **Tours** they own/manage |
+| `client` (owns their jobs) | **`artist`** | ✅ | their own **Band(s)** |
+| `admin` | **`admin`** | promoted (CLI/callable) | everything |
+| `qa` | **`qa`** | capability claim | unlocks `/qa` only |
 
-| Role | Can do | Sees financials? |
-| --- | --- | --- |
-| **`owner`** | Everything on the tour incl. delete tour, manage members & their roles, all settlement. Creator of the tour. | ✅ |
-| **`manager`** (TM/PM) | Build/edit everything **except** member management and settlement writes. Add/edit days, events, schedule, travel, venues, guest lists, advancing, push notifications. | ➖ read-only unless also granted accountant |
-| **`accountant`** | Financial access — revenue/expense settlement, per-diem, exports. Can view all days regardless of visibility. | ✅ (this is the gated seam) |
-| **`crew`** | Consume the tour on mobile/web: itinerary, schedule, travel, hotels, venue, day sheet, their own call times. Submit **guest-list requests**. Cannot edit tour structure. | ❌ |
+Implied roles mirror Blue Seal (`tradesperson ⇒ client`): here `tourManager ⇒ crew` and `artist ⇒ crew`, so a manager/artist can also just be crew on someone else's tour.
 
-Plus **granular guest-list sub-permissions** layered on `crew` (Master Tour has exactly this): `guestlist:submit` (request +N up to your allotment) vs `guestlist:manage` (approve/deny, see all).
-
-**Design rationale (flag in commit):** splitting **`accountant`** and **member-management** out of an otherwise-powerful `manager` is the key sensitive seam — it mirrors Master Tour's separation of *Accounting* and *Users* from *Manager*, and it maps cleanly onto Blue Seal's own instinct to gate money explicitly.
+**Per-tour role detail** (who on *this* tour is manager vs. accountant vs. plain crew) is **not a global claim** — it's the tour-membership record, exactly like Blue Seal stamps `projectManagerId`/`invitedContractorIds` on a job. On the tour doc:
+- `ownerUid`, `managerUids[]`, `accountantUids[]`, `memberUids[]` (memberUids = union, the read key). Rules check these as **resource-field arrays** (`uid() in resource.data.memberUids`) — the same shape as Blue Seal's `uid() in resource.data.invitedContractorIds`.
+- **Accountant** is the gated financial seam (mirrors Master Tour's Accounting split and Blue Seal's explicit money-gating): only `accountantUids`/`ownerUid` read/write settlement + budget.
+- Guest-list sub-permissions (`guestlist:submit` vs `guestlist:manage`) layer on a crew membership, same idea as Blue Seal's granular flags.
 
 ### 3.2 Visibility (a second, orthogonal axis — also from Master Tour)
 
@@ -69,12 +70,12 @@ Role says *what you can do*; **visibility** says *which items you can see*:
 
 Model visibility as a field on each item (`visibility: "all" | { memberUids: string[] }`), enforced in rules and filtered in queries.
 
-### 3.3 How membership & invites work
+### 3.3 Bands, membership & invites (the "manager runs many bands" structure)
 
-- A user creates an account (reuse Blue Seal auth verbatim: email/password, Google, magic link).
-- Creating a tour makes them its `owner`.
-- They invite crew by email or **one-tap invite link** (Blue Seal already has a one-tap invite-link pattern from its job-invite flow — lift it). Invitee joins as `crew` (or a role the owner picks).
-- Crew are **free forever**; only builder seats (`owner`/`manager`/`accountant`) count toward billing (see §12). This "charge the builder, crew ride free" model is what drives org-wide adoption — a TM can mandate the app to 40 crew without a per-seat fight.
+- A user creates an account (reuse Blue Seal auth verbatim: email/password, Google, magic link, branded verification email).
+- A **`tourManager`** (or `artist`) creates one or more **Bands** (`bands/{bandId}`, `managerUids[]`/`ownerUid`) — the direct analogue of a PM's client roster. Under a Band they create **Tours**. One manager, many bands, many tours — all scoped by the same ownership fields Blue Seal uses for a PM's properties/projects.
+- They invite crew by email or **one-tap invite link** (lift Blue Seal's `rosterInvites` + `linkRosterInvitesOnSignup` / `/join?code=` pattern — it already auto-links a roster invite on signup). Invitee is added to `memberUids` (and `managerUids`/`accountantUids` if promoted).
+- Crew are **free forever**; only builder seats (`tourManager`/`artist`/accountant memberships) count toward billing (see §12). "Charge the builder, crew ride free" drives org-wide adoption — a TM mandates the app to 40 crew without a per-seat fight.
 
 ---
 
@@ -161,18 +162,21 @@ Per-Event. Songs → { guest performers, tech notes, set-specific notes }. Optio
 ### 5.11 Files & Notes
 Per-Day/Event attachments (contracts, riders, stage plots) with **visibility**. Notes per day. Storage-backed, scoped by tour + uploader (reuse Blue Seal's storage-path + upload-scoping patterns).
 
-### 5.12 Notifications & Real-time Sync
-Custom TM→crew push; per-item reminders; change fan-out. Reuse Blue Seal's notifications store + FCM SW; add tour-scoped notification types.
+### 5.12 Notifications & Real-time Sync (reuse Blue Seal's exact multi-channel stack)
+Custom TM→crew push, per-item reminders, change fan-out — all through Blue Seal's existing `functions/src/lib/notify.ts`, which already routes one notification to **three channels: in-app (`notifications` collection) + email + WhatsApp** (SMS kept as an opt-in fallback). Email goes via **`enqueueMail` → the `mail` collection → the Firebase "Trigger Email" extension**, branded with `emailTemplate.ts` (`brandedEmailHtml`). Reuse the notifications store, `NotificationsPanel`, and FCM SW verbatim; the **only** change is adding tour-scoped entries to the existing `NotificationType` union (e.g. `schedule_changed`, `travel_changed`, `guestlist_decided`, `daysheet_published`, `tour_broadcast`) — exactly how Blue Seal added `pm_welcome`, `invoice_sent`, etc.
 
-### 5.13 AI Assistant & AI Ingestion (Firebase-native AI)
-Two AI surfaces, both server-side via Cloud Functions (reuse Blue Seal's `aiChat` callable + floating-panel pattern). **Stack: Firebase AI Logic (Vertex AI in Firebase) with Gemini**, optionally orchestrated with **Genkit** — keeps the model call inside the Firebase project (App Check-protected, no separate backend, billing on the same GCP project). See §16.
-- **AI ingestion (now table-stakes — every 2024-26 competitor has it):** forward a booking/hotel/flight confirmation email or drop a rider/advance PDF → Gemini (multimodal, reads the PDF/image) parses it into **structured schedule / travel / advance line items** the TM confirms with one tap. This is the single most-copied new feature in the category — ship it, don't skip it.
-- **Grounded assistant (the frontier, where the incumbent has nothing):**
-  - **Day-sheet drafting** — "draft tomorrow's day sheet" from the tour data.
-  - **Routing sanity** — "is this drive doable between load-out and next load-in?" (grounded in the Directions/Routes data).
-  - **Budget Q&A** — "how far over per-diem are we this leg?" over the budget rollups.
-  - **Ask-the-tour** — "what's the wifi password / load-in time at tonight's venue?" over the tour's own data (RAG over Firestore).
-Gate behind the paid builder tier (mirror Blue Seal's paid-AI pattern). Ground every answer in the tour's Firestore data — never free-generate logistics.
+### 5.13 AI Assistant & AI Ingestion (literally Blue Seal's `functions/src/ai/` — 1-to-1)
+**No new AI stack.** Blue Seal already runs Vertex AI Gemini server-side in Cloud Functions: `@google-cloud/vertexai`, `gemini-2.5-flash`, env `VERTEX_MODEL`/`VERTEX_LOCATION`, lazy per-function client, function-calling **tools** (`ai/tools.ts` + `ai/chatTools.ts`), App Check-gated, with explicit "bail early to save a Vertex call" cost discipline. Loadout reuses that pattern verbatim and even **maps each feature onto an existing Blue Seal AI function to copy**:
+
+| Loadout AI feature | Copy Blue Seal's… | What it does there |
+| --- | --- | --- |
+| **Document ingestion** (forward a hotel/flight confirmation or rider PDF → structured schedule/travel/advance line items) | **`ai/parseReceipt.ts`** | Gemini multimodal reads an uploaded receipt image/PDF → structured JSON. *Same shape, different schema.* |
+| **Grounded assistant** ("what's tonight's load-in / wifi?", scoped to a tour) | **`ai/chat.ts` + `chatTools.ts` + `tools.ts`** | Gemini assistant with function-calling tools grounded in a job's data. |
+| **Day-sheet / message drafting** | **`ai/draftQuote.ts` / `draftInvoiceNote.ts` / `suggestReplies.ts`** | Draft structured text from record data. |
+| **Tour digest** ("what changed today across my tours") | **`ai/projectsDigest.ts`** | Scheduled cross-entity summary for a manager. |
+| **Generate-a-tour-from-a-prompt** | **`ai/generateProjectFromPrompt.ts`** | Turns a freeform prompt into a structured entity. |
+
+Ingestion is table-stakes (every 2024-26 competitor has it); the grounded assistant is the frontier (the incumbent has none). Gate behind the paid builder tier (Blue Seal's paid-AI pattern). Ground every answer in the tour's Firestore data — never free-generate logistics.
 
 ### 5.14 Crew Chat (per-tour messaging — promoted from open question to a feature)
 Real-time crew chat, **scoped to a tour** (like Blue Seal's job-bounded chat — lift that engine, don't rebuild a messenger):
@@ -194,13 +198,17 @@ Blue Seal's PWA is shell-cache only. Loadout needs **offline read of the active 
 ### 6.1 The spine (verified from Master Tour's structure)
 
 ```
-users/{uid}                         [KEEP from Blue Seal — add tourIds[] denormalized for "my tours"]
+users/{uid}                         [KEEP from Blue Seal — add roles[]/activeRole (already there), bandIds[]/tourIds[] for "mine"]
+
+bands/{bandId}                      ← the "manager runs many bands" entity (mirrors Blue Seal properties/{id})
+  - name, ownerUid, managerUids: string[], createdAt      ← scoped exactly like properties.projectManagerId
 
 tours/{tourId}
-  - name, artistName, startDate, endDate, ownerUid
-  - memberUids: string[]            ← denormalized for cheap rule reads (see §7.1)
+  - bandId, name, startDate, endDate
+  - ownerUid, managerUids[], accountantUids[], memberUids[]   ← resource-field access keys (like invitedContractorIds)
   - status, coverImagePath, timezoneDefault
-  tours/{tourId}/members/{uid}      ← the membership doc: { role, guestlistPerm, addedBy, addedAt }
+  tours/{tourId}/members/{uid}      ← per-tour role detail: { role: manager|accountant|crew, guestlistPerm, addedBy, addedAt }
+                                        (the *arrays above* are the fast rule-check mirror, maintained by a Fn trigger)
   tours/{tourId}/days/{dayId}
      - date, dayType, city, country, timezone, venueId?, notes, confirmed
      tours/{tourId}/days/{dayId}/scheduleItems/{itemId}   { title, start, end, details, visibility, reminder, confirmed }
@@ -234,8 +242,8 @@ contacts/{contactId}  { name, company, phone, email, placeId?, ownerUid | orgId,
 ```
 
 ### 6.2 Denormalization rules
-- `tours/{tourId}.memberUids: string[]` — mirror of the members subcollection, kept in sync by a Cloud Function trigger on member add/remove. **Enables cheap `uid in resource.data.memberUids` rule checks** without a per-read `get()`.
-- `users/{uid}.tourIds: string[]` — for the "my tours" list query.
+- `tours/{tourId}.{ownerUid,managerUids,accountantUids,memberUids}` — the access-key arrays, mirror of the `members` subcollection, kept in sync by a Cloud Function trigger on member add/remove/role-change. Rules check them as resource fields (`uid() in resource.data.memberUids`) — the same shape as Blue Seal's `invitedContractorIds`.
+- `bands/{bandId}.managerUids` + `users/{uid}.{bandIds,tourIds}` — for "my bands / my tours" list queries and band-level access.
 - Day carries a denormalized `venueName`/`city` snapshot for offline day-sheet render even if the venue doc isn't cached.
 
 ### 6.3 KEEP-as-is collections (lift from Blue Seal generic infra)
@@ -252,15 +260,15 @@ venues/{venueId}/specs/{fileId}
 
 ## 7. Security Rules — Key Principles
 
-### 7.1 ⚠️ The one deliberate deviation from Blue Seal (flag in every relevant commit)
+### 7.1 Membership = the same pattern Blue Seal already uses (NOT a deviation)
 
-Blue Seal's `CLAUDE.md` mandates: *"Role checks via custom claims — never doc lookups."* **That rule assumes global roles. Loadout is multi-tenant, so it cannot hold.** A user's role is *per-tour*, and custom claims can't scale to "role in each of N tours" (claim size limits, staleness). The adaptation:
+Earlier drafts framed per-tour roles as a "deviation" from CLAUDE.md's "prefer custom claims over doc lookups." **That was wrong** — Blue Seal's rules already use `get()`/`exists()` in ~20 places (chats check `get(chats/$(chatId)).data.clientId == uid()`, jobPosts applications, reviewPairs, etc.) **and** resource-field array membership (`uid() in resource.data.get('invitedContractorIds', [])`). Loadout uses those **same two techniques**, so it's consistent with the real codebase, not a departure:
 
-- **Read hot-path (cheap, no lookup):** membership is checked via the denormalized array — `allow read: if request.auth.uid in resource.data.memberUids`. One document read, no extra `get()`.
-- **Write / role-gated path (one lookup):** for edits and financial access, do a single `get(/databases/$(db)/documents/tours/$(tourId)/members/$(uid))` and check `.role`. This is a **justified, contained** use of a rules `get()` — documented here and in a comment at the top of `firestore.rules`.
-- **Platform `admin`/`qa`** still use custom claims exactly as Blue Seal does.
+- **Read/most writes (no lookup):** `allow read: if uid() in resource.data.memberUids` — identical to Blue Seal's `uid() in resource.data.invitedContractorIds`. `managerUids`/`accountantUids` gate edits + financials the same way.
+- **Where a child doc must consult its parent tour** (e.g. a schedule item under a day), either denormalize the access key onto the child (preferred — a Fn trigger stamps `memberUids`/`tourId`, then it's a resource-field check) **or** `get()` the parent — **exactly how Blue Seal's chat `messages` get() their parent `chat`.** Not novel.
+- **Global claims** (`hasRole('tourManager')`, `isAdmin()`, `qa`) gate role-level capability, same as Blue Seal's `hasRole('projectManager')`.
 
-This is exactly the kind of "push back when a doc contradicts reality" the CLAUDE.md asks for — the deviation is intentional and localized, not convention drift.
+Net: the Band/Tour access model is the `projectManager`→`properties`/`projects`/`jobs` model with different names. No new mechanism, no CLAUDE.md tension.
 
 ### 7.2 Otherwise unchanged Blue Seal principles
 Default-deny; every collection gets explicit read/create/update/delete; every rule gets an allow **and** a deny test in `tests/rules/`; financials (`settlement`) require `accountant`/`owner` membership; per-item `visibility` enforced in rules for `crew`.
@@ -276,14 +284,14 @@ Reuse Blue Seal's callable pattern **verbatim** (App Check enforced, Zod input, 
 
 - `functions/src/tours/` — `createTour`, `addTourMember` (+ maintains `memberUids`/`tourIds` denorm), `removeTourMember`, `setMemberRole`, `cascadeDayDateChange` (marks items unconfirmed).
 - `functions/src/invites/` — `createInviteLink`, `acceptInvite` (lift Blue Seal's roster-invite/one-tap-invite functions).
-- `functions/src/notify/` — `pushTourUpdate` (fan-out to member FCM tokens), reminder scheduler. Reuse Blue Seal `notify`/`messaging`.
+- **Notifications/email — reuse Blue Seal verbatim:** call `lib/notify.ts` (in-app + email + WhatsApp in one call); email flows through `enqueueMail` → `mail` collection → **Trigger Email extension** with `emailTemplate.brandedEmailHtml`. Add tour `NotificationType`s to the existing union. Reminders + flight refresh use **`onSchedule(...)`** (same as Blue Seal's `scheduledOverdue`/`nudgeReviewPairs`).
 - `functions/src/travel/` — `refreshFlightStatus` (FlightAware AeroAPI; scheduled + on-demand), `computeGroundRoute` (Directions/Routes API). All provider calls are **server-side only** — keys never reach the client; responses cached into the travel-item doc for offline.
 - `functions/src/places/` — `placesAutocomplete` + `placeDetails` (thin server proxy to **Places API (New)**; keeps the key server-side, lets us cache + rate-limit + dedupe into the `venues`/`contacts` collections). `linkBusinessProfile` (venue-claim via **Google Business Profile API**, v1.1+).
 - `functions/src/budget/` — `recomputeBudgetRollup` (Firestore trigger on budget line / hotel / flight / per-diem / settlement change → updates `budget/summary`), `exportBudget` (PDF/CSV).
 - `functions/src/settlement/` — `exportSettlement` (PDF/CSV), `recomputePnl` (posts actuals up into the budget).
 - `functions/src/chat/` — reuse Blue Seal chat: `onMessageCreate` (FCM fan-out + SMS fallback), channel provisioning. (§5.14)
 - `functions/src/daysheets/` — `generateDaySheetPdf` (reuse `jspdf` server or client).
-- `functions/src/ai/` — `aiChat` grounded in tour data (RAG over Firestore), `ingestDocument` (parse forwarded confirmation / rider PDF → structured line items). **Stack: Firebase AI Logic / Vertex AI (Gemini), optionally via Genkit** — App Check-protected, billed on the same GCP project (§16).
+- `functions/src/ai/` — **copy Blue Seal's `ai/` folder pattern verbatim** (`@google-cloud/vertexai`, `gemini-2.5-flash`, `VERTEX_MODEL`/`VERTEX_LOCATION` env, lazy client, function-calling tools): `aiChat` (from `ai/chat.ts`+`chatTools.ts`), `ingestDocument` (from `ai/parseReceipt.ts`), `draftDaySheet` (from `ai/draftQuote.ts`), `tourDigest` (from `ai/projectsDigest.ts`). App Check-protected, same GCP project (§16).
 - **KEEP verbatim:** `functions/src/{auth,lib,admin,diagnostics,stats,support,qa,seed}` (seed rewritten for tour demo data).
 - **DROP:** `functions/src/{vetting,insurance,invoicing,jobs,jobPosts,reviews,vouches,prospects,projectManager,projects,sales,billing,payments}` (payments returns only if/when you add Stripe billing in §12).
 
@@ -304,8 +312,8 @@ Reuse Blue Seal's callable pattern **verbatim** (App Check enforced, Zod input, 
 **Phase 0 — Fork & rebrand the scaffolding (1 day)**
 Clone the Blue Seal repo into a new project; strip the Blue Seal domain (see §13 map); rebrand manifest/theme/naming to Loadout; wire a fresh Firebase project; confirm `lint && build && test:run` green on the emptied shell. Auth, router-guard system, app shell, PWA, admin, Help Center, QA toolkit, notifications all survive.
 
-**Phase 1 — Multi-tenant foundation (2–3 days)**
-The new-vs-Blue-Seal core. Membership model (`tours/{id}/members`), the two-layer role system, the `firestore.rules` deviation (§7.1) with full allow/deny tests, `memberUids`/`tourIds` denorm triggers, "my tours" dashboard, create-tour + invite-link + accept-invite. **Everything downstream depends on this — do not rush it.**
+**Phase 1 — Bands, Tours & membership (2–3 days) — the PM model, renamed**
+Rename Blue Seal's role enum (`client/tradesperson/projectManager` → `crew/artist/tourManager`), keep multi-role + `activeRole` + implied roles + `admin`/`qa` verbatim. Add the **`Band`** entity (owned like `properties`) and **`Tour`** under it, with `ownerUid`/`managerUids`/`accountantUids`/`memberUids` access arrays + a Fn trigger to maintain them, rules using the same resource-field/`get()` membership checks Blue Seal already uses (§7.1), full allow/deny tests, "my bands / my tours" dashboard, create-band/tour + invite-link + accept-invite (lift `rosterInvites`). **Everything downstream depends on this — do not rush it.**
 
 **Phase 2 — Tour spine: Days + Schedule (2–3 days)**
 Tour → Days (bulk-create from range, day types, TZ), per-Day schedule items with visibility/reminders/confirmed. Mobile-first day dashboard (crew read) + manager edit. 375px is the design target — a crew member's phone.
@@ -332,7 +340,7 @@ Tour **budget** (projected vs actual, category/leg rollups via `recomputeBudgetR
 Per-tour **chat** channels (tour/group/DM) on Blue Seal's chat engine, FCM fan-out + SMS fallback; TM broadcast push, per-item reminders, change fan-out, unconfirmed-cascade.
 
 **Phase 10 — AI: ingestion + grounded assistant (2–3 days)**
-**Firebase AI Logic / Vertex (Gemini)** via Cloud Functions: `ingestDocument` (forward-a-PDF → structured line items — the table-stakes feature), then the grounded `aiChat` (day-sheet drafting, routing/budget Q&A, ask-the-tour). Paid-tier gated, App Check-protected.
+**Copy Blue Seal's `functions/src/ai/` (Vertex Gemini)**: `ingestDocument` (clone `parseReceipt.ts` — forward-a-PDF → structured line items, the table-stakes feature), then the grounded `aiChat` (clone `chat.ts`+`chatTools.ts` — day-sheet drafting, routing/budget Q&A, ask-the-tour). Paid-tier gated, App Check-protected.
 
 **Phase 11 — Launch readiness (1–2 days)**
 Sentry, analytics, Master Tour **CSV importer** (the acquisition wedge — competitors lead with "import your Master Tour data"), e2e smoke across roles, install-prompt polish.
@@ -447,14 +455,14 @@ If you find yourself building any of the above, stop and ask.
 ## 15. Open Questions
 
 1. **Product name** — Loadout is a codename. Decide before Phase 0 (slug/manifest/theme depend on it).
-2. **Org vs. tour as the tenancy unit** — Master Tour uses **Organizations** that own many tours + shared permissions. This plan models tenancy at the **tour** level for MVP simplicity (a tour = a tenant). If you expect agencies managing many artists/tours with shared crew and shared permissions, add an **Org** layer above Tour now (it's much cheaper before Phase 1 than after). **Recommendation: ship tour-level tenancy for MVP; design the membership doc so an `orgId` can be layered in later.** — *needs your call.*
+2. **Tenancy** — *Largely resolved by mirroring Blue Seal's PM model:* a **`tourManager` owns many `Bands`, each with many `Tours`** — the exact shape of a `projectManager` owning many `properties`/`projects`. Band is the natural grouping. Only open question: if **agencies** need a shared layer *above* a single manager's bands (multiple managers, shared crew pool, shared billing), add an **`Org`** above Band later — the same way you'd add it above a PM. **Recommendation: Band-level for MVP (no Org); it's the PM pattern you already run.**
 3. **Legs** — Master Tour has no explicit "Leg" entity; routing derives from event locations. Model legs as a UI grouping/filter over date ranges, not a stored entity, unless you want per-leg budgets. *(Default: UI-only.)*
 4. **Flight/route data provider** — FlightAware (Master Tour's choice) vs. alternatives; Google Maps for drive-time (already in the stack). *Needs an API-key/cost decision (→ HUMANTASKS).*
 5. **setlist.fm integration** — nice-to-have; requires a **commercial license negotiation** (free tier is non-commercial). Defer past MVP.
 6. **Pricing specifics** — the exact indie-tier price and the Master Tour anchor need a browser check + a monetization pass before any help copy commits to numbers.
 7. ~~**Crew chat**~~ — **Resolved: in scope.** Building per-tour chat on Blue Seal's chat engine (§5.14, Phase 9).
 8. **Google API budget & billing** — Places (New), Directions/Routes, Maps, and (v1.1) Business Profile all bill per-request on GCP. Need the API key(s), billing enabled, and a monthly cap/quota decision (→ HUMANTASKS). Server-side proxy + Firestore caching (§16) is designed to keep this cheap.
-9. **AI provider** — plan assumes **Firebase AI Logic / Vertex AI (Gemini)** to stay in-project. If you'd rather use Anthropic/OpenAI, it's the same callable pattern with a different SDK — but Vertex-in-Firebase is the lowest-friction, best-infra-leverage default. *Your call; recommend Gemini via Firebase for v1.*
+9. ~~**AI provider**~~ — **Resolved: identical to Blue Seal.** `@google-cloud/vertexai` + `gemini-2.5-flash` server-side in Cloud Functions (copy `functions/src/ai/`). No new stack, no Genkit, no Firebase-AI-Logic SDK.
 
 ---
 
@@ -470,13 +478,14 @@ If you find yourself building any of the above, stop and ask.
 | Files (riders, contracts, day-sheet PDFs, venue photos) | **Cloud Storage** | Uploader-uid-scoped paths (§6.4). |
 | Server logic / integrations | **Cloud Functions v2** (callable + triggers + scheduled) | All third-party API calls live here — never client-side. App Check enforced. |
 | Push | **FCM** | Schedule/travel/guest-list/chat/broadcast (§9). Reuse Blue Seal SW. |
-| **AI** | **Firebase AI Logic / Vertex AI (Gemini)**, optionally **Genkit** | In-project, App Check-gated, one GCP bill (§16.4). |
-| Scheduled work | **Cloud Scheduler** (via scheduled functions) | Flight-status refresh, overdue-advance nudges, reminder fan-out. |
+| **Email** | **`mail` collection → Firebase "Trigger Email" extension** (via `lib/mail.enqueueMail`), branded by `emailTemplate.ts` | Exactly Blue Seal — one `notify.ts` call fans to in-app + email + WhatsApp. |
+| **AI** | **Vertex AI (Gemini) — identical to Blue Seal**: `@google-cloud/vertexai`, `gemini-2.5-flash`, server-side in Cloud Functions | In-project, App Check-gated, one GCP bill. No new stack (§16.4). |
+| Scheduled work | **`onSchedule(...)`** (Cloud Scheduler) — as Blue Seal's `scheduledOverdue`/`nudgeReviewPairs` | Flight-status refresh, overdue-advance nudges, reminder fan-out. |
 | Abuse/quota protection | **App Check** + Blue Seal's `rateLimit` | Protects the paid Google/flight/AI calls from being drained. |
 | Config/rollout | **Remote Config** (optional) | Feature-flag AI, chat, budget per tier without a deploy. |
 | Hosting + CSP | **Firebase Hosting** | Add Google Maps/Places hosts to the CSP (§16.5). |
 
-Optional/consider: **Realtime Database** for chat *presence/typing* (cheaper than Firestore for high-churn ephemeral state); **Firebase Extensions** (e.g. the Gemini/"Multimodal Tasks" extension) to shortcut the AI ingestion function.
+Every row above is a service Blue Seal already uses — this is the same Firebase footprint, not an expanded one. (Optional-only: **Realtime Database** for chat presence/typing if Firestore churn gets expensive — but Blue Seal does chat on Firestore, so default to matching it.)
 
 ### 16.2 Google Places & Maps — "the same integration Google has"
 The correct API for **pulling** rich place data is the **Places API (New)** + Maps/Directions — not the Business Profile API. Used across the app via a **server-side proxy** (`functions/src/places/`) so the key stays private, results are cached into our own `venues`/`contacts` docs, and repeat lookups are free:
@@ -489,11 +498,11 @@ The correct API for **pulling** rich place data is the **Places API (New)** + Ma
 ### 16.3 Google Business Profile API — the venue-side play (v1.1+, not the primary data source)
 Distinct from Places: the **Business Profile API** lets a *business manage its own* Google listing. For us that's the **"claim your venue"** feature — a venue's production team connects their Business Profile to sync verified hours/contact and then maintains their **production pack** in Loadout. That's the parallel to Master Tour's **Venue Tech Packs** moat, and a genuine reason venues opt in. Defer to v1.1; the Places-sourced venue data covers v1.
 
-### 16.4 AI stack (Firebase-native)
-- **Runtime:** Cloud Function → **Vertex AI (Gemini)** through **Firebase AI Logic**; keeps auth/billing/App Check in one project, no separate backend. Consider **Genkit** for the multi-step flows (ingestion → structured output; RAG assistant).
-- **Ingestion:** Gemini multimodal reads forwarded confirmation emails / rider PDFs / photos → structured schedule/travel/advance line items (table-stakes; §5.13).
-- **Assistant:** RAG grounded in the tour's Firestore data; never free-generates logistics. Paid-tier gated.
-- **Guardrails:** App Check + rate limits (paid tokens), Zod-validate the model's structured output before writing, log every call.
+### 16.4 AI stack — copy Blue Seal's `functions/src/ai/` exactly (no new stack)
+- **Runtime:** Cloud Function → **`@google-cloud/vertexai`** (`gemini-2.5-flash`, env `VERTEX_MODEL`/`VERTEX_LOCATION`), lazy per-function client, function-calling **tools** — the identical setup already in Blue Seal's `ai/chat.ts`, `ai/parseReceipt.ts`, `ai/tools.ts`. Server-side, App Check-gated, one GCP bill. **No Firebase-AI-Logic SDK, no Genkit — Blue Seal uses neither.**
+- **Ingestion:** clone **`ai/parseReceipt.ts`** — Gemini multimodal reads a forwarded confirmation / rider PDF/photo → structured JSON line items (table-stakes; §5.13).
+- **Assistant:** clone **`ai/chat.ts` + `chatTools.ts`** — grounded in the tour's Firestore data via function-calling tools; never free-generates logistics. Paid-tier gated.
+- **Guardrails (already Blue Seal's discipline):** App Check + `rateLimit`, "bail early to save a Vertex call," Zod-validate the model's structured output before writing, structured-log every call.
 
 ### 16.5 Cross-cutting: keys, cost, CSP, offline
 - **Keys server-side only.** The client never holds the FlightAware / Places / Vertex keys — every call is a Cloud Function. (Exception: the Maps JS browser key, which is domain-restricted.)
@@ -507,4 +516,4 @@ Distinct from Places: the **Business Profile API** lets a *business manage its o
 
 1. Confirm the product name (Q1) and tenancy decision (Q2) — these two gate everything.
 2. Phase 0: fork + strip + rebrand, green build on the empty shell.
-3. Phase 1: the multi-tenant membership model + the `firestore.rules` deviation with full allow/deny tests. Everything else is downstream of getting this right.
+3. Phase 1: the Bands + Tours + membership model (Blue Seal's `projectManager`→`properties` pattern, renamed) with full allow/deny rules tests. Everything else is downstream of getting this right.
