@@ -209,7 +209,7 @@ Beyond running one tour privately, Loadout is **the shared brain of the touring 
 **Privacy is load-bearing (design it in, not on):**
 - **Hard wall:** nothing from private tour ops (schedules, money, personnel, guest lists) is ever readable by the community layer — separate collections, separate rules, no denormalization across the boundary.
 - **Opt-in everything:** a band is invisible on the map until it opts in; presence is **city-level**, historical/opt-in, never real-time location.
-- **Moderation:** community posts/notes are reportable; admin gets the existing support/moderation tooling (reuse Blue Seal's admin queues). Contributions are attributed (accountability) and removable.
+- **Moderation:** community posts/notes are reportable; admin gets the existing support/moderation tooling (reuse Blue Seal's admin queues + `lib/audit.logAdminAction`). Contributions are **rate-limited** (`enforceRateLimit`) and screened against `utils/blockPatterns.ts` (spam/abuse blocklist), attributed (accountability), and removable. Public band profiles + share links are **SEO/SSG-prerendered** (`prerender.ts`/`useSeo`) so they're fast and linkable.
 
 ### 5.17 Navigation & extra tabs (Master-Tour-familiar + the new surfaces)
 Mirror Master Tour's tab/IA so it feels identical, then add the new surfaces:
@@ -496,7 +496,7 @@ Songkick/Tourbook      Prism.fm       Roadbook/RoadOps        setlist.fm
 
 **Decision to make (flagged):** paywalling the community can throttle the very network effect that makes it valuable. Options: **(a)** free to *read*, Premium to *post*; **(b)** community free at launch to seed it, then gate power features; **(c)** gate fully as described. *Recommend (a) or (b) — the entitlement system supports any split, so this is a switch, not a rebuild.*
 
-**Stripe (in-plan — mirrors Blue Seal, Phase 15):** Blue Seal already ships `@stripe/stripe-js` + a Cloud Functions **payments** domain doing **Stripe Checkout + webhook + entitlement** (its tradesperson Pro subscription). Reuse it: Checkout session → webhook writes an **entitlement** (`subscriptions/{accountId}` + a Premium flag on the band/account) → premium features check it. **Enforce server-side:** every premium callable (AI, community write) verifies the entitlement; rules gate premium collections — **never trust the client** (same discipline as Blue Seal's Pro gating + the `/qa` `setSelfPro` test hook).
+**Stripe (in-plan — mirrors Blue Seal, Phase 15):** Blue Seal already ships `@stripe/stripe-js`, a Cloud Functions **payments** domain, and — crucially — **`lib/entitlements.ts` + `lib/subscription.ts`** (the paywall engine) doing **Stripe Checkout + webhook + entitlement** (its tradesperson Pro subscription). Reuse them: Checkout session → webhook (deduped via the **`webhookEvents`** idempotency collection, so a replayed event can't double-grant) writes an **entitlement** (`subscriptions/{accountId}` + a Premium flag) → premium features check it. **Enforce server-side:** every premium callable (AI, community write) verifies the entitlement; rules gate premium collections — **never trust the client** (same discipline as Blue Seal's Pro gating + the `/qa` `setSelfPro` test hook).
 
 - **Do NOT** take a cut of settlements or ticketing — subscription only.
 
@@ -518,6 +518,19 @@ Songkick/Tourbook      Prism.fm       Roadbook/RoadOps        setlist.fm
 - **Drop functions:** `functions/src/{vetting,insurance,invoicing,jobs,jobPosts,reviews,vouches,prospects,projectManager,projects,sales,billing,payments}`.
 - **Drop UI/data/validation:** all job/quote/invoice/insurance/cert/tradie/prospect/sales/pitch/manage components + views; `src/data/{trades,certifications,cities,intakeSchemas,...}`; `src/validation/{clients,properties,projects,...}`; `src/projectManager/`, `src/sales/`.
 - **Auth roles to rewire** (edit together): `Role` type in `interfaces.ts`, claim mirroring in `functions/src/auth/*`, rules helpers, `rolesFromClaims()` in `auth.ts`, `roleViews.ts`. **But note:** Loadout's real role logic moves to per-tour membership docs (§3, §7.1) — claims only carry `admin`/`qa`.
+
+### 13.1 Also adopt — operational & platform infra (architecture sweep)
+Second-tier Blue Seal infrastructure worth keeping verbatim; several directly power features we've added:
+- **Entitlements/billing engine:** `functions/src/lib/{entitlements,subscription,billing}.ts` — the actual freemium paywall engine (§12), not just "the Stripe pattern." Reuse for the Premium gate.
+- **Webhook idempotency:** the `webhookEvents` collection — dedupes replayed Stripe/FlightAware webhooks so a re-sent event can't double-grant Premium or double-process. Essential once money's involved.
+- **Abuse/spam protection:** `lib/rateLimit.ts` (`enforceRateLimit`) on every paid/community callable + `utils/blockPatterns.ts` (content blocklist) — the community + AI need both from day one.
+- **Error observability:** `diagnostics/reportClientError.ts` → `errorLogs` → the admin **Errors queue** + `utils/errors.ts` (+ optional Sentry). Client errors surface to you.
+- **Support & bug ops:** `functions/src/support/*`, `docs/{SUPPORT_TRIAGE,BUG_TRIAGE}.md`, and the `scripts/{support-triage,bug-triage}.mjs` helpers — a real support loop (the community will need it).
+- **Audit trail:** `lib/audit.ts` (`logAdminAction`) + `auditLog` on every privileged action (moderation removals, role changes, refunds).
+- **Platform stats:** `stats/recomputePlatformStats.ts` (scheduled) → `platformStats` — admin-dashboard metric rollups (adapt to tour/community metrics).
+- **SEO/SSG prerender:** `scripts/prerender.ts` + `useSeo` + `@unhead` — makes **public band profiles** and **public stage-plot/tech-pack share links** fast, linkable, and shareable.
+- **Analytics wrapper:** `utils/analytics.ts`.
+- **Optional but on-brand:** e-signatures (`lib/signature.ts`, `SignatureCanvas`) for **advance sign-off** by a venue/promoter or crew call-time acknowledgement; the `loadtest/` harness + periodic `QA_SECURITY_AUDIT.md`/`UI_UX_AUDIT.md` passes as the product scales.
 
 ---
 
