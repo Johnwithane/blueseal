@@ -310,7 +310,7 @@ Reuse Blue Seal's callable pattern **verbatim** (App Check enforced, Zod input, 
 > Dependency-ordered, mirroring `design.md §10`. Each ends with the CLAUDE.md verify gates + Help/QA upkeep + deploy-before-commit discipline. Estimates assume Claude Code carrying implementation.
 
 **Phase 0 — Fork & rebrand the scaffolding (1 day)**
-Clone the Blue Seal repo into a new project; strip the Blue Seal domain (see §13 map); rebrand manifest/theme/naming to Loadout; wire a fresh Firebase project; confirm `lint && build && test:run` green on the emptied shell. Auth, router-guard system, app shell, PWA, admin, Help Center, QA toolkit, notifications all survive.
+Clone the Blue Seal repo into a new project; strip the Blue Seal domain (see §13 map); stand up the **modular design-system token layer** (`theme/preset.ts` + `main.css` with neutral placeholder brand — §17); rebrand manifest/naming; wire a fresh Firebase project; confirm `lint && build && test:run` green on the emptied shell. Auth, router-guard system, app shell, PWA, admin, Help Center, QA toolkit, notifications all survive.
 
 **Phase 1 — Bands, Tours & membership (2–3 days) — the PM model, renamed**
 Rename Blue Seal's role enum (`client/tradesperson/projectManager` → `crew/artist/tourManager`), keep multi-role + `activeRole` + implied roles + `admin`/`qa` verbatim. Add the **`Band`** entity (owned like `properties`) and **`Tour`** under it, with `ownerUid`/`managerUids`/`accountantUids`/`memberUids` access arrays + a Fn trigger to maintain them, rules using the same resource-field/`get()` membership checks Blue Seal already uses (§7.1), full allow/deny tests, "my bands / my tours" dashboard, create-band/tour + invite-link + accept-invite (lift `rosterInvites`). **Everything downstream depends on this — do not rush it.**
@@ -509,6 +509,33 @@ Distinct from Places: the **Business Profile API** lets a *business manage its o
 - **Cache everything into Firestore.** A flight status, a place detail, a route calc is written onto the owning doc — so it renders **offline** and a repeat view costs zero API calls.
 - **CSP additions** (Blue Seal ships a strict CSP in `firebase.json`): allow `*.googleapis.com`, `maps.googleapis.com`, `*.gstatic.com`, `maps.google.com` in `connect-src`/`img-src`/`script-src` as needed. Keep it tight.
 - **HUMANTASKS (new key/billing items to append at fork):** GCP billing enabled; **Places API (New)** + **Directions/Routes** + **Maps JS** enabled with a key + monthly quota cap; **FlightAware AeroAPI** account + key; **Vertex AI** enabled in the project; (v1.1) **Business Profile API** access. Each with a spend cap.
+
+---
+
+## 17. Design System & Theming (modular, PrimeVue-first, brand-swappable)
+
+> Goal: **build almost entirely from PrimeVue components**, driven by a **modular token layer** with **one isolated brand file** you edit later to rebrand — colours, button styles, radii, type — without touching component code. This mirrors Blue Seal's exact setup (`src/theme/preset.ts` + `src/assets/main.css`); we keep the technique and swap the values.
+
+### 17.1 The three layers (edit inward-out; each is independent)
+1. **PrimeVue Aura + `definePreset` — `src/theme/preset.ts`.** The component engine. Aura is the base; `definePreset(Aura, {...})` remaps Aura's **primitive ramps** (green/red/amber/blue families that drive every Button/Tag/Message/focus-ring severity) to our brand ramps, and maps `semantic.primary` to the brand primary. **This is why every PrimeVue component inherits the brand for free** — we don't restyle components, we retune the tokens they already read. Use PrimeVue for everything with a component (Button, InputText, Select, DataTable, Dialog, Tag, Stepper, Menu, Toast…). Hand-rolled CSS only where no PrimeVue component fits.
+2. **CSS-variable design tokens — `src/assets/main.css` `:root`.** The single source of truth for everything theme-sensitive, as Blue Seal does it, grouped:
+   - **Brand palette** (the identity ramps — the thing you swap): `--brand-primary`, `--brand-accent`, plus each ramp 50–950.
+   - **Semantic surfaces**: `--bg`, `--surface`, `--text`, `--muted`, `--border`, `--surface-alt`.
+   - **Functional semantics** (NOT identity — success/warn/danger/info + `-tint`/`-text` triplets).
+   - **Typography**: `--font-body`, `--font-display`, `--font-heading` (+ optional logo/hand).
+   - **Shape/depth**: `--radius-sm/md/lg`, `--shadow-sm/md`.
+   - **Domain tokens** (the tour equivalent of Blue Seal's `--bs-status-*`): day-type + confirm-state colours — `--day-show`, `--day-travel`, `--day-off`, `--day-press`, `--state-confirmed`, `--state-unconfirmed`. Every day-sheet/kanban/pill reads these, so re-tinting the whole app's status language is one block.
+   - `preset.ts` ramps and `main.css` tokens **mirror each other — retune together** (Blue Seal notes this discipline in-file; keep it).
+3. **Component conventions (thin, documented).** A short set of rules so the UI reads as one system: primary action = `Button` (primary), destructive = `Button severity="danger"`, subtle = `text`/`outlined`; Tailwind for **layout/spacing only** (per `CLAUDE.md`), tokens for **any colour/type/radius**; never inline a hex. A handful of base wrappers already come from Blue Seal (`FieldError`, `LoadingState`, `TabBar`, `CalendarView`, `InitialsAvatar`) — reuse, don't reinvent.
+
+### 17.2 "Leave space for branding" — how it's isolated
+- **Rebranding = editing two files, nothing else:** the ramps in `theme/preset.ts` and the `:root` block in `main.css`. Because components read tokens, a full re-skin is a token swap — no component edits, no regressions. (Same principle as Blue Seal's "swap the six colour ramps.")
+- **Ship a neutral placeholder brand now.** Phase 0 lays down a deliberately plain, accessible palette (neutral primary + standard functional colours) so the app looks clean and consistent immediately; drop the real Loadout brand ramps in later by editing that one layer. Nothing downstream depends on the placeholder values.
+- **Editable later, safely.** Tokens are CSS vars, so a future "brand settings" surface *could* drive them at runtime — but MVP keeps it a **deliberate code edit** (exactly like Blue Seal treats `help.ts`/`qaChecklist.ts`: reviewed, typed, in-repo), which is the right default until a real theming-admin need appears.
+- **Light/dark ready.** Keep Blue Seal's light-first tokens and leave the `prefers-color-scheme` / `[data-theme]` hooks in place so a dark mode is a second token set, not a rewrite.
+
+### 17.3 Where it sits in the build
+Phase 0 (fork/rebrand) stands up `theme/preset.ts` + `main.css` with the neutral placeholder tokens and confirms PrimeVue renders through them; every later phase consumes tokens + PrimeVue components only. Accessibility bar: WCAG AA contrast on the placeholder palette (validate when the real brand lands too), 375px-first.
 
 ---
 
