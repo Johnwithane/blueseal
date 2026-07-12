@@ -20,7 +20,14 @@ This plan is grounded in deep research on Master Tour (Eventric) and ~30 competi
 
 **Loadout is the single source of truth for a touring production.** A tour manager builds a tour once — dates, venues, crew, travel, schedule — and every band member and crew person carries the whole thing in their pocket, **offline, in a dead-signal load-in dock**, with push notifications when anything changes.
 
-It replaces the fragmented reality of most tours: a WhatsApp group, a shared Google Sheet, a PDF day sheet emailed at 1am, and a tour accountant's laptop. Master Tour proved the category (250,000+ professionals, 150,000+ tours) but is anchored to an **aging desktop app** where the *building* happens — mobile can only consume and lightly edit. Loadout's wedge is to be **mobile-first and fully capable on the phone**, **genuinely offline-first**, and **AI-assisted** (Master Tour ships no AI — though the newer challengers all do, so AI intake is table-stakes, not a moat; see §11), at a price that also serves the indie/one-off-tour segment Master Tour's flat ~$65–75/mo ignores.
+It replaces the fragmented reality of most tours: a WhatsApp group, a shared Google Sheet, a PDF day sheet emailed at 1am, and a tour accountant's laptop. Master Tour proved the category (250,000+ professionals, 150,000+ tours) but is aging tech.
+
+**Adoption strategy — deliberate familiarity (this is the north star for the UI).** The front-end **usability, navigation, tab structure, terminology, and screen layouts mirror Master Tour** so its hundreds of thousands of existing users switch with **zero relearning**. We do *not* reinvent the interface — familiarity IS the adoption plan. The wins live **underneath and alongside**:
+- **Underneath:** a faster, modern backend (Firebase) and genuinely **offline-first** behaviour.
+- **Built-in:** **AI tools** Master Tour has none of.
+- **Alongside:** a couple of extra tabs, and the headline differentiator — an **interactive map + community** (§5.16): bands see each other, and share notes/recommendations on venues, restaurants, and things to do in each city. That turns a private ops tool into a **network that gets more valuable with every band** — the one thing an incumbent can't quickly copy.
+
+> We replicate Master Tour's *usability and layout patterns* (not protectable), skinned with our own brand (§17) — **not** its trademarked branding/logo/proprietary artwork.
 
 **The three load-bearing behaviours to nail (these are what make or break the product):**
 1. **Offline-first read of the active tour** — crew open the app in a basement venue with no signal and see today's schedule, venue, hotel, and their call time. (Master Tour's #1 retained behaviour.)
@@ -189,6 +196,26 @@ This resolves old open-question #7 in favour of building chat in — the researc
 ### 5.15 Offline-first (a real engineering investment — bigger than Blue Seal's PWA)
 Blue Seal's PWA is shell-cache only. Loadout needs **offline read of the active tour's data** (Firestore `persistentLocalCache` / IndexedDB persistence + offline-aware UI states + a "last synced" indicator + queued writes for `manager`+ edits). This is a Phase-in-its-own-right, not a polish step.
 
+### 5.16 Community & Interactive Map (the headline differentiator — a touring social network)
+Beyond running one tour privately, Loadout is **the shared brain of the touring community**: a map-based network where bands leave and read on-the-ground intel city by city. This is the moat (§11.5) — Master Tour has nothing like it — and its own **public data domain, walled off from private tour ops**.
+
+**What it is:**
+- **Interactive map tab.** A world/city map of **venues, restaurants, and things-to-do**, each pin carrying band-contributed notes + recommendations. Filter by city, category, or "venues I'm playing." Zoom into a city → everything worth knowing on the road.
+- **Shared Places database** (`places` — separate from the private tour `venues` usage): **venue | restaurant | coffee | activity | essential** (laundry, pharmacy, ER, parking) POIs. Core data (name/address/geo/hours/photos) is **seeded from Google Places** (§16.2); the value we own is the **band-contributed layer** on top.
+- **Band notes & recommendations.** A band leaves a note/tip/rating on a place — "load-in is down the alley," "best late-night taco within walking distance," "green-room wifi = …," "promoter runs late, budget +30 min," "great catering." Attributed to their **band profile**. Others reading it instantly know the ground truth.
+- **See other bands.** A **community feed** of posts/recommendations (geo-tagged, filterable by city/venue), and — **opt-in, city-level only, never live GPS** — presence: "who else has played this venue / is in this city." Discovery + connection between touring acts.
+- **Band profiles** (`bandProfiles` — public within the app): name, photo, genre, links, and the recommendations they've contributed. Ties to the private `Band` entity but exposes **only** what the band chooses to make public.
+
+**Privacy is load-bearing (design it in, not on):**
+- **Hard wall:** nothing from private tour ops (schedules, money, personnel, guest lists) is ever readable by the community layer — separate collections, separate rules, no denormalization across the boundary.
+- **Opt-in everything:** a band is invisible on the map until it opts in; presence is **city-level**, historical/opt-in, never real-time location.
+- **Moderation:** community posts/notes are reportable; admin gets the existing support/moderation tooling (reuse Blue Seal's admin queues). Contributions are attributed (accountability) and removable.
+
+### 5.17 Navigation & extra tabs (Master-Tour-familiar + the new surfaces)
+Mirror Master Tour's tab/IA so it feels identical, then add the new surfaces:
+- **Familiar tabs:** Itinerary/Days, Schedule, Travel, Contacts/Personnel, Guest List, Settlement, Reports/Day Sheets, Advance.
+- **New tabs:** **Map/Community**, and the **AI assistant** surfaced throughout (floating panel like Blue Seal + an entry point). Keep the addition minimal so the app still reads as "Master Tour, but faster + with a map."
+
 ---
 
 ## 6. Data Model (Firestore)
@@ -239,6 +266,13 @@ tours/{tourId}
 venues/{venueId}   { name, placeId, address, geo(geohash), phone, website, hours, photos[], googleRating,   // ← Places-sourced
                      capacity, keyContacts[], productionSpecs, claimedByUid?, businessProfileLinked? }        // ← our proprietary layer
 contacts/{contactId}  { name, company, phone, email, placeId?, ownerUid | orgId, vcardImport? }
+
+// ── PUBLIC COMMUNITY DOMAIN (§5.16) — SEPARATE rules; NEVER joined to private tour data ──
+bandProfiles/{bandId}  { displayName, photo, genre, links[], ownerUid, isPublic, mapOptIn, cityPresence[] }  // only what the band chooses to expose
+places/{placeId}       { category: venue|restaurant|coffee|activity|essential, name, geo(geohash), googlePlaceId, address, hours, photos[], googleRating, city }
+places/{placeId}/notes/{noteId}  { bandId, body, rating?, tags[], createdAt, reportCount }   // band-contributed intel (the value we own)
+posts/{postId}         { bandId, kind: tip|review|shout, body, placeId?, city, geo, createdAt }  // community feed, geo-tagged
+reports/{reportId}     { targetType, targetId, byUid, reason, status }   // moderation queue (reuse admin tooling)
 ```
 
 ### 6.2 Denormalization rules
@@ -345,7 +379,18 @@ Per-tour **chat** channels (tour/group/DM) on Blue Seal's chat engine, FCM fan-o
 **Phase 11 — Launch readiness (1–2 days)**
 Sentry, analytics, Master Tour **CSV importer** (the acquisition wedge — competitors lead with "import your Master Tour data"), e2e smoke across roles, install-prompt polish.
 
-**Rough total: ~5–6 weeks** of focused build (vs. Blue Seal's ~3 weeks — the multi-tenant model, real offline, and the flights/Places/budget/chat/AI integrations are the added cost).
+— *Private tour-ops MVP complete here (~5–6 weeks). The community layer below is the differentiator; it can run as a parallel track or a fast-follow.* —
+
+**Phase 12 — Community foundation: Places DB + Band Profiles (2–3 days)**
+Stand up the **public community domain** (§5.16) with its own default-deny rules **walled off from tour ops**: the shared `places` collection (venue/restaurant/coffee/activity/essential, seeded from Google Places), public `bandProfiles` (opt-in, exposing only chosen fields), and the report/moderation queue wired to the existing admin tooling. Spec `12-community`.
+
+**Phase 13 — Interactive Map + band notes/recommendations (3–4 days)**
+The **Map tab** (Google Maps): city/category-filtered pins for venues + restaurants + things-to-do, each opening band-contributed **notes & recommendations** (add/read/rate/tag). "Places near tonight's venue." Spec `13-map`.
+
+**Phase 14 — Community feed + opt-in presence (2–3 days)**
+Geo-tagged **posts feed** (tips/reviews/shouts), filter by city/venue, and **opt-in, city-level** band presence ("who's played here / is in town"). Reporting + moderation end-to-end. Spec `14-feed`.
+
+**Rough total: ~5–6 weeks** for the private tour-ops MVP, **+ ~1.5–2 weeks** for the community/map layer (Phases 12–14). The community domain is deliberately separable so it never blocks the ops MVP.
 
 ---
 
@@ -393,12 +438,13 @@ Songkick/Tourbook      Prism.fm       Roadbook/RoadOps        setlist.fm
 4. **Incumbency + trust** (Beyoncé/Sabrina Carpenter-tier tours).
 
 ### 11.5 Where a clone wins (the opportunities — build these deliberately)
-1. **Mobile-first *building*, not just consuming** — kill the desktop dependency. Master Tour's v7 mobile redesign drew concrete backlash in app-store reviews: "doesn't open to the current day," "can't swipe between days," "too much tapping," crashes, can't open attachments (Android 4.21★). These are literal, fixable UX wins.
-2. **AI document ingestion — now the price of entry, not a bonus.** Every 2024–26 entrant (RoadOps, Daysheets AI Import, DaySync, Advance With Me, Toursmart) leads with "forward a confirmation / drop a PDF → structured schedule/travel/advance." **Master Tour ships none.** A clone without it reads as legacy on arrival — so build it in Phase 10, and push past parity toward the *frontier* (agentic routing checks, auto-advance drafting, ask-the-tour) that only Music Mogul AI / Toursmart are gesturing at.
-3. **Modern, reliable UX + clean data migration** — reliability and fast attachments are table stakes the incumbent is currently *failing*; that's the opening.
+0. **Familiar UI = frictionless adoption (the strategy).** Match Master Tour's usability/layout so its huge existing user base switches with **zero relearning** — then win on everything below. Familiarity removes the #1 reason people don't switch tools.
+1. **A map-based band community — the real moat.** Bands share venue/restaurant/city intel and see each other on a map (§5.16). It's a **network effect** (more bands → more value) and the one thing no incumbent has; it's what makes this the *ultimate resource* for TMs, not just another day-sheet app.
+2. **AI document ingestion + assistant** — every 2024–26 entrant leads with "forward a confirmation / drop a PDF → structured schedule/travel/advance"; **Master Tour ships none.** Build it (Phase 10), then push to the frontier (routing checks, auto-advance drafting, ask-the-tour).
+3. **Faster, modern, reliable backend** — reliability + fast attachments are table stakes the incumbent is currently *failing* (v7 backlash: crashes, "doesn't open to current day," "too much tapping"). Same familiar UX, none of the jank.
 4. **Two-way calendar sync + QuickBooks/Xero export + a public API** — Master Tour is CSV-export-only, one-way iCal, no API.
-5. **An indie/per-tour tier** — Master Tour's flat ~$65–75/mo ignores the one-off-tour / small-act segment (where BandHelper ~$8/mo and free My Tour Book already play). A two-tier product (cheap indie / full pro) covers both ends.
-6. **A first-class Master Tour importer** — RoadOps and others already treat "import your Master Tour data" as a proven acquisition lever; lock-in frustration is real.
+5. **An indie/per-tour tier** — Master Tour's flat ~$65–75/mo ignores the one-off-tour / small-act segment. A two-tier product (cheap indie / full pro) covers both ends.
+6. **A first-class Master Tour importer** — the proven acquisition lever; import your Master Tour data on day one.
 
 **Reality check on the competitive window:** the incumbent is no longer asleep — Eventric took **$5M in Dec 2024** and is building a **venue-data moat** (Venue Tech Packs), and a well-funded challenger (**Daysheets**, VC-backed, on its 2.0 rebuild) plus the incumbent's **own ex-VP-of-Engineering (RoadOps)** are already executing on exactly the mobile-first/offline-first/AI thesis above. This is a **crowded, actively-contested** category, not open water. The defensible bet is the **whitespace no single player nails today: a modern, AI-native, offline-first app that unifies day-of-show *execution* with *advancing* AND *settlement*** — the booking/agency tools (Prism/Gigwell/Stagent/Muzeek) own settlement but not execution; the execution challengers (RoadOps/Daysheets) are thin on settlement. Own all three.
 
@@ -463,6 +509,10 @@ If you find yourself building any of the above, stop and ask.
 7. ~~**Crew chat**~~ — **Resolved: in scope.** Building per-tour chat on Blue Seal's chat engine (§5.14, Phase 9).
 8. **Google API budget & billing** — Places (New), Directions/Routes, Maps, and (v1.1) Business Profile all bill per-request on GCP. Need the API key(s), billing enabled, and a monthly cap/quota decision (→ HUMANTASKS). Server-side proxy + Firestore caching (§16) is designed to keep this cheap.
 9. ~~**AI provider**~~ — **Resolved: identical to Blue Seal.** `@google-cloud/vertexai` + `gemini-2.5-flash` server-side in Cloud Functions (copy `functions/src/ai/`). No new stack, no Genkit, no Firebase-AI-Logic SDK.
+10. **UI parity depth** — replicate Master Tour's *layout/navigation/terminology* (the plan's intent), skinned with our brand. Confirm we're matching **usability**, not pixel-cloning their proprietary artwork/branding (IP-safe). *Recommend: pattern parity, own skin.*
+11. **Community privacy defaults** — plan assumes: band map presence **opt-in + city-level only** (never live GPS); private tour ops **never** exposed to the community; contributions attributed + reportable. *Confirm these defaults with the TM — artists are cautious here.*
+12. **Community timing** — build it as **Phases 12–14 fast-follow** after the ops MVP, or pull it earlier as the adoption hook? *Recommend: ops MVP first (it's the foundation), community immediately after — but it's separable, so it can flex.*
+13. **Community moderation policy** — attribution + report-and-remove + admin queue is in; do we also need pre-moderation, blocklists, or verified-band gating before posting? *Needs a light policy call.*
 
 ---
 
@@ -493,7 +543,7 @@ The correct API for **pulling** rich place data is the **Places API (New)** + Ma
 - **Place Details** — address, lat/lng (+ our geohash), phone, website, opening hours, **photos**, Google rating; store `placeId` for stable re-fetch.
 - **Directions / Routes API** — ground drive-time, distance, and time zones between stops; "overdrive" detection (§5.4).
 - **Maps JS + Static Maps** — venue/hotel pins, the tour-route map, day-sheet static map thumbnails. Blue Seal already ships `@googlemaps/js-api-loader` + `useGoogleMaps`.
-- **Where it plugs in:** venue creation, hotel lookup, airport pickers, "nearest hospital/pharmacy/parking" on the day sheet, the tour overview map.
+- **Where it plugs in:** venue creation, hotel lookup, airport pickers, "nearest hospital/pharmacy/parking" on the day sheet, the tour overview map — **and it seeds the community `places` database** (§5.16): restaurants/coffee/activities/essentials by category power the Map tab, onto which bands layer their own notes & recommendations. Places gives the base facts; the community owns the intel.
 
 ### 16.3 Google Business Profile API — the venue-side play (v1.1+, not the primary data source)
 Distinct from Places: the **Business Profile API** lets a *business manage its own* Google listing. For us that's the **"claim your venue"** feature — a venue's production team connects their Business Profile to sync verified hours/contact and then maintains their **production pack** in Loadout. That's the parallel to Master Tour's **Venue Tech Packs** moat, and a genuine reason venues opt in. Defer to v1.1; the Places-sourced venue data covers v1.
@@ -515,6 +565,8 @@ Distinct from Places: the **Business Profile API** lets a *business manage its o
 ## 17. Design System & Theming (modular, PrimeVue-first, brand-swappable)
 
 > Goal: **build almost entirely from PrimeVue components**, driven by a **modular token layer** with **one isolated brand file** you edit later to rebrand — colours, button styles, radii, type — without touching component code. This mirrors Blue Seal's exact setup (`src/theme/preset.ts` + `src/assets/main.css`); we keep the technique and swap the values.
+>
+> **North star: usability parity with Master Tour (§1).** The *layout, navigation, tab structure, and terminology* replicate Master Tour so its users feel instantly at home — PrimeVue components are arranged to match that familiar information architecture. The **brand skin** (colours/type/logo) is ours via the token layer; the **UX patterns** are Master-Tour-familiar. Same feel, our paint, faster underneath.
 
 ### 17.1 The three layers (edit inward-out; each is independent)
 1. **PrimeVue Aura + `definePreset` — `src/theme/preset.ts`.** The component engine. Aura is the base; `definePreset(Aura, {...})` remaps Aura's **primitive ramps** (green/red/amber/blue families that drive every Button/Tag/Message/focus-ring severity) to our brand ramps, and maps `semantic.primary` to the brand primary. **This is why every PrimeVue component inherits the brand for free** — we don't restyle components, we retune the tokens they already read. Use PrimeVue for everything with a component (Button, InputText, Select, DataTable, Dialog, Tag, Stepper, Menu, Toast…). Hand-rolled CSS only where no PrimeVue component fits.
@@ -568,6 +620,9 @@ Each phase adds its spec; **`00-smoke` (auth + roles) re-runs every phase** so t
 | 9 Chat + notifications | `09-chat` | actor A sends → actor B receives; broadcast push; notification fires |
 | 10 AI | `10-ai` | ingest a sample confirmation → structured line items (fixture); assistant answers grounded |
 | 11 Launch/import | `11-import` | Master Tour CSV import; full cross-role smoke |
+| 12 Community foundation | `12-community` | create public band profile; add a place; **private tour data is NOT readable via community rules** (the wall) |
+| 13 Map + notes | `13-map` | map pins by category/city; add + read a band note/recommendation on a place |
+| 14 Feed + presence | `14-feed` | post a geo-tagged tip; opt-in presence shows city-level only; report → moderation removes it |
 
 ### 18.4 The per-phase loop (what "build it while testing it" means)
 Every phase runs this before it's allowed to close:
