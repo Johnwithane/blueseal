@@ -140,7 +140,7 @@ const qaActive = computed(() => route.path === "/qa");
   align-items: center;
   gap: 0.75rem;
   padding: 0.625rem 0.75rem;
-  border-radius: 0.5rem;
+  border-radius: 10px;
   color: var(--bs-muted);
   font-size: 0.9375rem;
   font-weight: 500;
@@ -150,19 +150,20 @@ const qaActive = computed(() => route.path === "/qa");
 .side-row:hover {
   color: var(--bs-text);
   background: var(--bs-surface-alt);
+  text-decoration: none;
 }
-/* Active row: solid blue pill with white text/icon. Beats the previous
-   subtle-bold styling, which was too easy to miss against the white panel
-   background. The active state still wins over hover because `:hover` only
-   sets background (this rule is more specific). */
+/* Active row: soft brand tint with navy text — an unmissable coloured block
+   that stays calm (Airbnb-style), replacing the earlier solid-navy pill which
+   read heavy against an otherwise white panel. Wins over hover because this
+   selector also covers :hover. */
 .side-row--active,
 .side-row--active:hover {
-  color: white;
-  background: var(--bs-blue);
+  color: var(--bs-blue);
+  background: var(--bs-info-tint);
   font-weight: 600;
 }
 .side-row--active .side-row__icon {
-  color: white;
+  color: var(--bs-blue);
 }
 .side-row__icon {
   font-size: 1.125rem;

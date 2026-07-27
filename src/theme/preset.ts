@@ -22,6 +22,10 @@ const RED = { 50: "#FCF2F2", 100: "#F8DCDE", 200: "#F1BBBE", 300: "#E68E93", 400
 
 export const BlueSealPreset = definePreset(Aura, {
   primitive: {
+    // 2026-07 visual refresh: one notch rounder than stock Aura across every
+    // control (buttons, inputs, dialogs, tags) — matches the 16px .bs-card
+    // scale in main.css without going pill-shaped.
+    borderRadius: { none: "0", xs: "4px", sm: "6px", md: "8px", lg: "10px", xl: "14px" },
     // success — green/emerald/lime → brand functional green
     green: GREEN,
     emerald: GREEN,

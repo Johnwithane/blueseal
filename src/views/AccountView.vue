@@ -64,6 +64,7 @@ import GoogleBusinessPanel from "@/components/GoogleBusinessPanel.vue";
 import LocationPicker, { type LocationValue } from "@/components/LocationPicker.vue";
 import TabBar from "@/components/TabBar.vue";
 import { roleViewMeta, type ViewRole } from "@/data/roleViews";
+import { LAUNCH } from "@/config/launchFlags";
 
 const auth = useAuthStore();
 const route = useRoute();
@@ -1452,7 +1453,7 @@ async function grantAllTrades() {
           </AccordionContent>
         </AccordionPanel>
 
-        <AccordionPanel value="recommendations">
+        <AccordionPanel v-if="LAUNCH.vouches" value="recommendations">
           <AccordionHeader>
             <span class="flex items-center gap-2">
               <i class="pi pi-thumbs-up"></i>
@@ -1565,7 +1566,7 @@ async function grantAllTrades() {
         </div>
 
         <div
-          v-if="!auth.hasProjectManagerRole"
+          v-if="LAUNCH.projectManagerRole && !auth.hasProjectManagerRole"
           class="mt-4 rounded-lg bg-[color:var(--bs-surface-alt)] p-4"
         >
           <div class="flex items-start gap-3">

@@ -58,14 +58,18 @@
      migrated onto these yet — new/edited code should use them, and the
      remaining ad-hoc radii/shadows get folded in during the visual pass. */
 
-  /* Radius — 12px is the established .bs-card value; 16px the .bs-trade-tile. */
-  --bs-radius-sm: 6px;
+  /* Radius — cards sit at 16px (--bs-radius-lg) since the 2026-07 visual
+     refresh; 12px stays the mid value for inner elements, 20px for hero
+     surfaces. Airbnb-calm: generous rounding, hairline borders. */
+  --bs-radius-sm: 8px;
   --bs-radius: 12px;
   --bs-radius-lg: 16px;
+  --bs-radius-xl: 20px;
 
-  /* Elevation — --bs-shadow-sm matches the current .bs-card shadow exactly. */
-  --bs-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
-  --bs-shadow-md: 0 8px 24px -12px rgba(55, 76, 118, 0.25);
+  /* Elevation — soft, believable shadows (Airbnb's resting/raised pair):
+     sm = resting card, md = hover/overlay lift. */
+  --bs-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05), 0 2px 8px rgba(15, 23, 42, 0.04);
+  --bs-shadow-md: 0 6px 16px rgba(15, 23, 42, 0.12);
 
   /* --- Job status palette --------------------------------------------------
      Per-status accent for kanban dots (KanbanBoard) and list sections (JobList).
@@ -201,8 +205,9 @@ a:hover, a:focus-visible { text-decoration: underline; }
 .bs-card {
   background: #fff;
   border: 1px solid var(--bs-border);
-  border-radius: 12px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  border-radius: var(--bs-radius-lg);
+  box-shadow: var(--bs-shadow-sm);
+  transition: box-shadow 180ms ease;
 }
 
 /* Shared Blue Seal AI avatar — used in the assistant panel header,
@@ -282,9 +287,12 @@ a:hover, a:focus-visible { text-decoration: underline; }
 }
 
 .bs-empty {
-  border: 2px dashed var(--bs-border);
-  border-radius: 12px;
-  padding: 2rem;
+  /* Solid hairline on a soft well (dashed read as "unfinished") — an empty
+     state should feel calm and intentional, like Airbnb's. */
+  border: 1px solid var(--bs-border);
+  background: var(--bs-surface-alt);
+  border-radius: var(--bs-radius-lg);
+  padding: 2.5rem 1.5rem;
   text-align: center;
   color: var(--bs-muted);
 }

@@ -13,17 +13,23 @@ import { subscribeMyJobPosts, subscribeJobPostMeta } from "@/firebase/services/j
 import type { JobDoc, JobPostDoc, WithId } from "@/firebase/interfaces";
 import { useFormatters } from "@/composables";
 import { tradeLabel } from "@/data/trades";
+import { LAUNCH } from "@/config/launchFlags";
 
 const auth = useAuthStore();
 const { relativeTime } = useFormatters();
 const jobs = ref<WithId<JobDoc>[]>([]);
 const posts = ref<WithId<JobPostDoc>[]>([]);
 const view = ref<"jobs" | "posts" | "trades">("jobs");
-const viewOptions = [
+// "Posted jobs" is a job-board surface. With the board flagged off it stays
+// hidden UNLESS this client already has posts from before the flag flipped —
+// an open post with applicants must never become unreachable.
+const viewOptions = computed(() => [
   { label: "My jobs", value: "jobs" },
-  { label: "Posted jobs", value: "posts" },
+  ...(LAUNCH.jobBoard || posts.value.length > 0
+    ? [{ label: "Posted jobs", value: "posts" }]
+    : []),
   { label: "Saved trades", value: "trades" },
-];
+]);
 
 // Completed view for "My jobs": flips JobList to the terminal-status
 // partition (complete / reviewed / cancelled) — filing is automatic.
@@ -135,8 +141,11 @@ function formatBudget(min: number, max: number): string {
          reached via the Search tab in the bottom nav, so it's no longer a
          header button here. -->
     <Teleport defer to="#app-shell-header-action">
-      <RouterLink to="/jobs/post">
+      <RouterLink v-if="LAUNCH.jobBoard" to="/jobs/post">
         <Button label="Post a job" icon="pi pi-megaphone" size="small" />
+      </RouterLink>
+      <RouterLink v-else to="/search">
+        <Button label="Find a tradesperson" icon="pi pi-search" size="small" />
       </RouterLink>
     </Teleport>
 
@@ -173,13 +182,14 @@ function formatBudget(min: number, max: number): string {
         class="bs-empty"
       >
         <i class="pi pi-inbox text-3xl mb-2 block"></i>
-        <p>No active jobs. Post a job to get bids, or pick a specific tradesperson to send a direct request.</p>
+        <p v-if="LAUNCH.jobBoard">No active jobs. Post a job to get bids, or pick a specific tradesperson to send a direct request.</p>
+        <p v-else>No active jobs yet. Find a verified tradesperson and request a quote to get started.</p>
         <div class="flex gap-2 justify-center mt-3">
-          <RouterLink to="/jobs/post">
+          <RouterLink v-if="LAUNCH.jobBoard" to="/jobs/post">
             <Button label="Post a job" icon="pi pi-megaphone" />
           </RouterLink>
           <RouterLink to="/search">
-            <Button label="Browse tradespeople" icon="pi pi-search" outlined />
+            <Button label="Browse tradespeople" icon="pi pi-search" :outlined="LAUNCH.jobBoard" />
           </RouterLink>
         </div>
         <!-- A posted job (with its applicants) lives on the other tab — make

@@ -13,6 +13,7 @@ import BlueSealLockup from "@/components/brand/BlueSealLockup.vue";
 import type { NotificationDoc, WithId } from "@/firebase/interfaces";
 import { useNotificationsStore } from "@/stores/notifications";
 import { roleViewMeta, type ViewRole } from "@/data/roleViews";
+import { LAUNCH } from "@/config/launchFlags";
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -65,6 +66,9 @@ interface PrimaryAction {
 const primaryActions = computed<PrimaryAction[]>(() => {
   if (!auth.isAuthenticated) return [];
   if (auth.activeRole === "tradesperson") {
+    // Job-board actions only when the board is launched; otherwise the
+    // header stays clean — Jobs/Calendar live in the shell nav.
+    if (!LAUNCH.jobBoard) return [];
     return [
       {
         label: "Browse open jobs",
@@ -79,10 +83,13 @@ const primaryActions = computed<PrimaryAction[]>(() => {
     return [{ label: "Vetting queue", icon: "pi pi-shield", to: "/admin/vetting" }];
   }
   // Default = client view.
-  return [
+  const actions: PrimaryAction[] = [
     { label: "Find a tradesperson", icon: "pi pi-search", to: "/search" },
-    { label: "Post a job", icon: "pi pi-megaphone", to: "/jobs/post" },
   ];
+  if (LAUNCH.jobBoard) {
+    actions.push({ label: "Post a job", icon: "pi pi-megaphone", to: "/jobs/post" });
+  }
+  return actions;
 });
 
 const avatarInitial = computed(() => {

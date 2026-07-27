@@ -835,3 +835,16 @@ record; only App Check enforcement (and the optional `ping` cleanup) remain.
 - **What:** Add `VITE_UNSPLASH_ACCESS_KEY` to the CI build env. Per `.github/workflows/deploy.yml`, public `VITE_*` config is inlined as literals (it ships in the browser bundle) — add the Unsplash **Access Key** there the same way (read-only Search/Download API; never the Secret Key). Then redeploy hosting.
 - **Compliance note (Unsplash API Guidelines):** we trigger the required download endpoint on selection and credit the photographer in the picker, and we re-host the chosen image to our own Storage rather than hot-linking. Persistent on-profile attribution + any hotlink-vs-rehost decision should get a quick review before heavy use. Production apps also need Unsplash to approve the app beyond the 50 req/hr demo limit.
 - **Verify:** In prod, open a tradesperson's profile as the owner → Edit → the banner / portfolio image controls show a "Choose from Unsplash" button; searching returns results and picking one sets the image.
+
+## Launch simplification (2026-07)
+
+### [ ] Turn the QA toolkit OFF in production before real users arrive
+
+- **Why:** The `/qa` toolkit's fabrication callables can mint an approved, publicly visible tradesperson (and toggle Pro, reset data). Client-side it's gated on the `qa` claim, but the server kill switch should be thrown too before launch.
+- **What:** Set `QA_TOOLKIT_ENABLED=false` on the Cloud Functions runtime env and `firebase deploy --only functions`. (The guard in `functions/src/qa/guard.ts` then rejects every fabrication call regardless of claims.)
+- **Verify:** As a qa-claim account, hitting "Become a tradesperson" in `/qa` returns a failed-precondition error.
+
+### [ ] (Optional) Dark the hidden AI callables server-side too
+
+- **Why:** The 2026-07 launch flags (`src/config/launchFlags.ts`) hide the AI assistant client-side (bubble, AI chat tab, "Draft with AI" buttons). The callables themselves are still live behind the Pro entitlement — fine for launch, but if you want belt-and-braces, flip the per-feature keys in `functions/src/lib/entitlements.ts` (`requireAiEntitlement`) to reject `chat` / `suggestReplies` / `draftQuote` / `draftInvoiceNote` / `updateJobLog` while leaving `receiptOcr` on, then `firebase deploy --only functions`.
+- **Verify:** Receipt OCR in the expenses flow still works; a direct `aiChat` call returns permission-denied.

@@ -1,6 +1,7 @@
 import { computed, type ComputedRef } from "vue";
 import { useRoute, type RouteLocationNormalizedLoaded } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
+import { LAUNCH } from "@/config/launchFlags";
 
 export interface NavItem {
   key: string;
@@ -37,9 +38,9 @@ function prefix(path: string) {
 // Excludes /jobs/post and /jobs/browse, which have their own nav items.
 function jobsMatcher(r: RouteLocationNormalizedLoaded): boolean {
   if (r.path === "/dashboard" || r.path.startsWith("/dashboard/")) {
-    // The Clients tab lives at /dashboard?view=clients and has its own nav
-    // item — don't also light up "Jobs" there.
-    return r.query.view !== "clients";
+    // The Clients and Calendar tabs live at /dashboard?view=… and have their
+    // own nav items — don't also light up "Jobs" there.
+    return r.query.view !== "clients" && r.query.view !== "calendar";
   }
   if (r.path === "/jobs/post" || r.path === "/jobs/browse" || r.path === "/jobs/new")
     return false;
@@ -70,16 +71,17 @@ export function useNavItems(): {
     if (!auth.isAuthenticated) return [];
 
     if (auth.activeRole === "tradesperson") {
-      // Side panel is daily-action focused: Jobs/Browse/Profile/
-      // Notifications/Recommendations. Profile is duplicated here (it also
-      // appears as the avatar at the bottom of the panel) because tradies
-      // wanted a labelled row in the main list — the avatar alone was easy
-      // to miss. On mobile the bottom bar already has a Profile tab, so
-      // this row is desktop-only (`mobile: false`). Browse sits before
-      // Notifications so the bottom-bar order reads Jobs → Browse →
-      // Alerts → Profile, putting work-acquisition actions ahead of
-      // passive notifications.
-      return [
+      // Side panel is daily-action focused. Profile is duplicated here (it
+      // also appears as the avatar at the bottom of the panel) because
+      // tradies wanted a labelled row in the main list — the avatar alone
+      // was easy to miss. On mobile the bottom bar already has a Profile
+      // tab, so that row is desktop-only (`mobile: false`).
+      //
+      // Launch flags trim this list to the run-your-work loop: Jobs +
+      // Calendar + New job + My page. Browse (job board), Recommendations
+      // (vouches) and the Pro tools (Clients, Reports) come back when their
+      // flags flip on.
+      const items: NavItem[] = [
         {
           key: "dashboard",
           label: "Jobs",
@@ -88,9 +90,21 @@ export function useNavItems(): {
           mobile: true,
           matches: jobsMatcher,
         },
+        // The scheduling surface — a dashboard tab, surfaced as a first-class
+        // destination. Mobile slot: with the job board hidden the bottom bar
+        // reads Jobs → Calendar → Alerts → Profile; when Browse is on it
+        // takes the second slot instead and Calendar goes desktop-only.
+        {
+          key: "calendar",
+          label: "Calendar",
+          mobileLabel: "Calendar",
+          icon: "pi-calendar",
+          to: "/dashboard?view=calendar",
+          mobile: !LAUNCH.jobBoard,
+          matches: (r) => r.path.startsWith("/dashboard") && r.query.view === "calendar",
+        },
         // Bring-your-own-client job creation. Mirrors the title-row "New job"
-        // button on the dashboard; desktop side-panel only (`mobile: false`)
-        // so the mobile bottom bar stays Jobs → Browse → Alerts → Profile.
+        // button on the dashboard; desktop side-panel only (`mobile: false`).
         {
           key: "new-job",
           label: "New job",
@@ -99,7 +113,9 @@ export function useNavItems(): {
           mobile: false,
           matches: exact("/jobs/new"),
         },
-        {
+      ];
+      if (LAUNCH.jobBoard) {
+        items.push({
           key: "browse",
           label: "Browse jobs",
           mobileLabel: "Browse",
@@ -107,76 +123,78 @@ export function useNavItems(): {
           to: "/jobs/browse",
           mobile: true,
           matches: prefix("/jobs/browse"),
-        },
-        // The tradesperson's own public page — the thing clients see, and where
-        // they edit it in place. Easy to reach from the side panel (and the
-        // ProfileMenu) so it isn't buried in Account. Desktop-only here; on
-        // mobile it lives in the Profile tab's menu. Highlights on their own
-        // /tradies/<uid> or their vanity /u/<slug>.
-        {
-          key: "my-page",
-          label: "My page",
-          icon: "pi-id-card",
-          to: `/tradies/${auth.fbUser?.uid ?? ""}`,
-          mobile: false,
-          matches: (r) =>
-            r.path.startsWith("/u/") || r.path === `/tradies/${auth.fbUser?.uid ?? ""}`,
-        },
-        // Applied is no longer its own nav destination — it's a view inside
-        // Jobs (the SelectButton in TradieDashboard). The standalone
-        // /my-applications route is kept alive for notification deep-links
-        // and shared URLs but doesn't surface in the nav.
-        {
+        });
+      }
+      // The tradesperson's own public page — the thing clients see, and where
+      // they edit it in place. Easy to reach from the side panel (and the
+      // ProfileMenu) so it isn't buried in Account. Desktop-only here; on
+      // mobile it lives in the Profile tab's menu. Highlights on their own
+      // /tradies/<uid> or their vanity /u/<slug>.
+      items.push({
+        key: "my-page",
+        label: "My page",
+        icon: "pi-id-card",
+        to: `/tradies/${auth.fbUser?.uid ?? ""}`,
+        mobile: false,
+        matches: (r) =>
+          r.path.startsWith("/u/") || r.path === `/tradies/${auth.fbUser?.uid ?? ""}`,
+      });
+      // Applied is no longer its own nav destination — it's a view inside
+      // Jobs (the SelectButton in TradieDashboard). The standalone
+      // /my-applications route is kept alive for notification deep-links
+      // and shared URLs but doesn't surface in the nav.
+      if (LAUNCH.vouches) {
+        items.push({
           key: "vouches",
           label: "Recommendations",
           icon: "pi-verified",
           to: "/account/recommendations",
           mobile: false,
           matches: exact("/account/recommendations"),
-        },
-        // Pro tools, grouped at the bottom of the list (below Recommendations):
-        // Clients book + recurring billing, then Reports. Desktop side-panel
-        // only — on mobile, Clients is a tab in the dashboard and Reports rides
-        // the dashboard header button. Clients highlights on the ?view=clients
-        // tab or any /clients/:id detail page.
-        {
-          key: "clients",
-          label: "Clients",
-          icon: "pi-users",
-          to: "/dashboard?view=clients",
-          mobile: false,
-          matches: (r) =>
-            (r.path.startsWith("/dashboard") && r.query.view === "clients") ||
-            r.path.startsWith("/clients"),
-        },
-        // Earnings / job reports. Desktop side-panel only, like the dashboard
-        // header button it mirrors.
-        {
-          key: "reports",
-          label: "Reports",
-          icon: "pi-chart-bar",
-          to: "/reports",
-          mobile: false,
-          matches: exact("/reports"),
-        },
-        // Notifications sits LAST in the nav, directly above the Help footer —
-        // a high-frequency utility pinned to the bottom rather than a primary
-        // destination. (mobile: true keeps it in the mobile bottom bar, where
-        // it stays last among the mobile items.)
-        {
-          key: "notifications",
-          label: "Notifications",
-          mobileLabel: "Alerts",
-          icon: "pi-bell",
-          to: "",
-          mobile: true,
-          matches: () => false,
-        },
-        // Account + Payouts moved into ProfileMenu (avatar at bottom of side
-        // panel / Profile tab on mobile). The standalone /account and
-        // /payouts routes still work — they're just not surfaced in the
-        // side panel to avoid duplicating the menu.
-      ];
+        });
+      }
+      if (LAUNCH.proTools) {
+        // Pro tools, grouped at the bottom of the list: Clients book +
+        // recurring billing, then Reports. Desktop side-panel only.
+        items.push(
+          {
+            key: "clients",
+            label: "Clients",
+            icon: "pi-users",
+            to: "/dashboard?view=clients",
+            mobile: false,
+            matches: (r) =>
+              (r.path.startsWith("/dashboard") && r.query.view === "clients") ||
+              r.path.startsWith("/clients"),
+          },
+          {
+            key: "reports",
+            label: "Reports",
+            icon: "pi-chart-bar",
+            to: "/reports",
+            mobile: false,
+            matches: exact("/reports"),
+          },
+        );
+      }
+      // Notifications sits LAST in the nav, directly above the Help footer —
+      // a high-frequency utility pinned to the bottom rather than a primary
+      // destination. (mobile: true keeps it in the mobile bottom bar, where
+      // it stays last among the mobile items.)
+      items.push({
+        key: "notifications",
+        label: "Notifications",
+        mobileLabel: "Alerts",
+        icon: "pi-bell",
+        to: "",
+        mobile: true,
+        matches: () => false,
+      });
+      // Account + Payouts moved into ProfileMenu (avatar at bottom of side
+      // panel / Profile tab on mobile). The standalone /account and
+      // /payouts routes still work — they're just not surfaced in the
+      // side panel to avoid duplicating the menu.
+      return items;
     }
 
     if (auth.activeRole === "admin") {
@@ -412,7 +430,7 @@ export function useNavItems(): {
     }
 
     // Default = client view (also covers null activeRole during auth init).
-    return [
+    const clientItems: NavItem[] = [
       {
         key: "dashboard",
         label: "Jobs",
@@ -439,7 +457,9 @@ export function useNavItems(): {
         mobile: true,
         matches: prefix("/search"),
       },
-      {
+    ];
+    if (LAUNCH.jobBoard) {
+      clientItems.push({
         key: "post-job",
         label: "Post a job",
         mobileLabel: "Post",
@@ -449,10 +469,11 @@ export function useNavItems(): {
         // Jobs, keeping the bottom bar to Jobs + Search + Alerts.
         mobile: false,
         matches: exact("/jobs/post"),
-      },
-      // Account moved into ProfileMenu — see the tradesperson and admin
-      // notes above. Same logic across all three roles.
-    ];
+      });
+    }
+    // Account moved into ProfileMenu — see the tradesperson and admin
+    // notes above. Same logic across all three roles.
+    return clientItems;
   });
 
   const mobileItems = computed<NavItem[]>(() =>

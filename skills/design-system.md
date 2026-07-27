@@ -78,10 +78,14 @@ hand-map Tailwind colour classes to statuses (a recurring drift — see audit R7
 
 | Token | Value | Use |
 |-------|-------|-----|
-| `--bs-radius-sm` | `6px` | inputs, small chips |
-| `--bs-radius` | `12px` | cards (matches `.bs-card`) |
-| `--bs-radius-lg` | `16px` | tiles (matches `.bs-trade-tile`) |
+| `--bs-radius-sm` | `8px` | inputs, small chips |
+| `--bs-radius` | `12px` | mid-size inner elements |
+| `--bs-radius-lg` | `16px` | cards (matches `.bs-card`) and tiles |
+| `--bs-radius-xl` | `20px` | hero surfaces |
 | `--bs-radius-pill` | `999px` | pills, fully-round |
+
+(2026-07 visual refresh: cards moved from 12px → 16px, and the PrimeVue
+preset's primitive `borderRadius` went one notch rounder to match.)
 
 ## Typography
 

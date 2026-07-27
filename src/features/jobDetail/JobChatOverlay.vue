@@ -9,6 +9,7 @@ import { useAssistantStore } from "@/stores/assistant";
 import { useAuthStore } from "@/stores/auth";
 import { useNotificationsStore } from "@/stores/notifications";
 import type { JobDoc, WithId } from "@/firebase/interfaces";
+import { LAUNCH } from "@/config/launchFlags";
 
 const props = defineProps<{
   job: WithId<JobDoc>;
@@ -27,7 +28,7 @@ const notifs = useNotificationsStore();
 type Sub = "chat" | "ai";
 const sub = ref<Sub>("chat");
 
-const showAiTab = computed(() => props.isTradie);
+const showAiTab = computed(() => props.isTradie && LAUNCH.aiAssistant);
 
 function close() {
   visible.value = false;
@@ -138,7 +139,7 @@ watch(visible, (v) => {
               v-if="sub === 'chat'"
               :chat-id="job.chatId"
               :job-id="job.id"
-              :enable-ai-replies="isTradie"
+              :enable-ai-replies="isTradie && LAUNCH.aiAssistant"
               class="chat-fill"
             />
             <div v-else-if="sub === 'ai' && showAiTab" class="ai-fill">

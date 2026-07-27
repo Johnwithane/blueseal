@@ -42,6 +42,7 @@ import AvailabilityEditor from "@/components/AvailabilityEditor.vue";
 import MyApplicationsList from "@/components/MyApplicationsList.vue";
 import ClientsPanel from "@/components/clients/ClientsPanel.vue";
 import InsuranceUploadCard from "@/components/InsuranceUploadCard.vue";
+import { LAUNCH } from "@/config/launchFlags";
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -94,18 +95,24 @@ const insuranceBanner = computed<{ icon: string; text: string; cta: string } | n
   }
   return null;
 });
-// List is the default — jobs-first triage. Board is the renamed kanban
-// (clients of the dashboard don't know the term "kanban"). Calendar is
-// the scheduling/blocking surface. Applied surfaces the job-board
-// applications the tradie has sent — same data as /my-applications but
-// co-located with the rest of their job pipeline.
+// List is the default — jobs-first triage. Calendar is the scheduling/
+// blocking surface. The launch flags trim the rest: Board (read-only kanban)
+// only when kanbanBoard is on; Applied (job-board applications) only when
+// the job board is on; Clients (Pro CRM) only when proTools is on. Two tabs
+// — Jobs + Calendar — is the Uber-driver-app launch shape.
 type DashboardView = "list" | "board" | "calendar" | "applied" | "clients";
 const viewOptions: { label: string; value: DashboardView; icon: string }[] = [
   { label: "List", value: "list", icon: "pi-list" },
-  { label: "Board", value: "board", icon: "pi-th-large" },
+  ...(LAUNCH.kanbanBoard
+    ? [{ label: "Board", value: "board" as const, icon: "pi-th-large" }]
+    : []),
   { label: "Calendar", value: "calendar", icon: "pi-calendar" },
-  { label: "Applied", value: "applied", icon: "pi-send" },
-  { label: "Clients", value: "clients", icon: "pi-users" },
+  ...(LAUNCH.jobBoard
+    ? [{ label: "Applied", value: "applied" as const, icon: "pi-send" }]
+    : []),
+  ...(LAUNCH.proTools
+    ? [{ label: "Clients", value: "clients" as const, icon: "pi-users" }]
+    : []),
 ];
 
 // `view` is mirrored to the `?view=` query param so the side-panel "Clients"
@@ -499,6 +506,7 @@ const awaitingVerificationMessage = computed(() => {
         @click="router.push(`/tradies/${auth.fbUser?.uid ?? ''}`)"
       />
       <Button
+        v-if="LAUNCH.proTools"
         label="Reports"
         icon="pi pi-chart-bar"
         size="small"

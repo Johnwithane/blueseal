@@ -13,6 +13,7 @@ import { useGoogleOneTap } from "@/composables/useGoogleOneTap";
 import { humanizeError } from "@/utils/errors";
 import { normalizeReferralCode } from "@/utils/referralCode";
 import { useSeo } from "@/composables/useSeo";
+import { LAUNCH } from "@/config/launchFlags";
 
 useSeo({ title: "Create your account", noindex: true });
 
@@ -31,12 +32,14 @@ const route = useRoute();
 // right after this signup completes.
 
 // Preselect the role from /sign-up?as=tradesperson | projectManager (the old
-// /sign-up/tradie route redirects here). Default client.
+// /sign-up/tradie route redirects here). Default client. PM signup is only
+// offered while the projectManager launch flag is on — a ?as=projectManager
+// deep link falls back to client rather than exposing a hidden role.
 type SignupRole = "client" | "tradesperson" | "projectManager";
 const selectedRole = ref<SignupRole>(
   route.query.as === "tradesperson"
     ? "tradesperson"
-    : route.query.as === "projectManager"
+    : route.query.as === "projectManager" && LAUNCH.projectManagerRole
       ? "projectManager"
       : "client",
 );
@@ -185,6 +188,7 @@ async function google() {
             <span class="role-option-sub">Offering services</span>
           </button>
           <button
+            v-if="LAUNCH.projectManagerRole"
             type="button"
             role="radio"
             :aria-checked="selectedRole === 'projectManager'"
@@ -221,7 +225,11 @@ async function google() {
         <small v-if="fieldErrors.password" class="text-[color:var(--bs-danger)]">{{ fieldErrors.password }}</small>
       </div>
 
-      <div v-if="isTradie">
+      <!-- Rep-referral capture rides the sales launch flag. A code arriving
+           via a /join?ref= link still gets honoured silently (referralCode is
+           pre-filled and threaded through provisionAccount) — only the manual
+           entry field hides. -->
+      <div v-if="isTradie && (LAUNCH.salesRole || refFromLink)">
         <label class="text-sm font-medium">
           Referral code <span class="text-[color:var(--bs-muted)] font-normal">(optional)</span>
         </label>

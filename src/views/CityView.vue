@@ -11,6 +11,7 @@ import { TRADES } from "@/data/trades";
 import SealCharacter from "@/components/SealCharacter.vue";
 import { useSeo } from "@/composables/useSeo";
 import { citySeo, TRUST_POINTS, HOW_IT_WORKS } from "@/seo/content";
+import { LAUNCH } from "@/config/launchFlags";
 
 const route = useRoute();
 const router = useRouter();
@@ -62,7 +63,7 @@ function findInCity() {
           <p class="mt-2 text-[color:var(--bs-muted)]">{{ city.intro }}</p>
           <div class="mt-5 flex flex-wrap gap-3">
             <Button :label="`Find a pro in ${city.name}`" icon="pi pi-search" @click="findInCity" />
-            <RouterLink to="/jobs/post">
+            <RouterLink v-if="LAUNCH.jobBoard" to="/jobs/post">
               <Button label="Post a job, get quotes" icon="pi pi-send" severity="secondary" outlined />
             </RouterLink>
           </div>

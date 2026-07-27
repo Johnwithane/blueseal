@@ -200,16 +200,15 @@ async function onMarkAllRead() {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* Matches BottomNav.vue's `.bottom-tab--active` — solid blue block filling
-   the tab cell edge-to-edge. Only colors change (no margin/radius shift)
-   so the icon doesn't reposition on selection. */
+/* Matches BottomNav.vue's `.bottom-tab--active` — brand-navy colour shift on
+   the frosted bar. Only colors change (no margin/radius shift) so the icon
+   doesn't reposition on selection. */
 .shell-tab--active {
-  color: white;
-  background: var(--bs-blue);
+  color: var(--bs-blue);
   font-weight: 600;
 }
 .shell-tab--active .shell-tab__icon {
-  color: white;
+  color: var(--bs-blue);
 }
 .shell-tab__icon {
   font-size: 1.25rem;

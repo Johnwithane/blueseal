@@ -10,6 +10,7 @@ import { TRADES } from "@/data/trades";
 import SealCharacter from "@/components/SealCharacter.vue";
 import { useSeo } from "@/composables/useSeo";
 import { tradePageSeo, TRUST_POINTS, HOW_IT_WORKS } from "@/seo/content";
+import { LAUNCH } from "@/config/launchFlags";
 
 const route = useRoute();
 const tradeKey = computed(() => String(route.params.trade ?? ""));
@@ -49,7 +50,7 @@ useSeo(() => tradePageSeo(tradeKey.value) ?? { title: "Trade not found", noindex
             <RouterLink :to="`/search?trade=${trade.key}`">
               <Button :label="`Find a ${label} near you`" icon="pi pi-search" />
             </RouterLink>
-            <RouterLink to="/jobs/post">
+            <RouterLink v-if="LAUNCH.jobBoard" to="/jobs/post">
               <Button label="Post a job, get quotes" icon="pi pi-send" severity="secondary" outlined />
             </RouterLink>
           </div>

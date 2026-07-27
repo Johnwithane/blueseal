@@ -130,11 +130,10 @@ const isActive = computed(() => route.path === "/account");
   min-height: 48px;
   transition: color 120ms ease;
 }
-/* Matches BottomNav.vue's `.bottom-tab--active` — solid blue block. Only
-   colors change so the avatar and label stay put on selection. */
+/* Matches BottomNav.vue's `.bottom-tab--active` — brand-navy colour shift.
+   Only colors change so the avatar and label stay put on selection. */
 .profile-tab--active {
-  color: white;
-  background: var(--bs-blue);
+  color: var(--bs-blue);
   font-weight: 600;
 }
 .profile-tab__label {

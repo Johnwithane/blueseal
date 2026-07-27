@@ -31,6 +31,7 @@ import type {
   WithId,
 } from "@/firebase/interfaces";
 import { tradeLabel } from "@/data/trades";
+import { LAUNCH } from "@/config/launchFlags";
 import { useSeo } from "@/composables/useSeo";
 import { tradiePersonLd } from "@/seo/jsonld";
 import { clampDescription } from "@/seo/markdown";
@@ -1231,16 +1232,25 @@ onMounted(async () => {
             </article>
           </section>
 
-          <!-- Recommendations -->
+          <!-- Recommendations. With the vouches flag off, existing accepted
+               recommendations still display (they're real social proof) but
+               the own-profile manage/empty-state entry point hides — no new
+               vouches get initiated while the feature is dark. -->
           <section
-            v-if="!isProspect && (vouchesFrom.length || vouchesFor.length || isOwnProfile)"
+            v-if="
+              !isProspect &&
+              (vouchesFrom.length || vouchesFor.length || (isOwnProfile && LAUNCH.vouches))
+            "
             class="bs-card profile-section"
           >
             <div class="mb-2 flex items-center justify-between gap-2">
               <h2 class="profile-section__title mb-0">
                 <i class="pi pi-thumbs-up" aria-hidden="true"></i> Recommendations
               </h2>
-              <RouterLink v-if="isOwnProfile" :to="{ name: 'AccountRecommendations' }">
+              <RouterLink
+                v-if="isOwnProfile && LAUNCH.vouches"
+                :to="{ name: 'AccountRecommendations' }"
+              >
                 <Button label="Manage" icon="pi pi-pencil" size="small" text />
               </RouterLink>
             </div>

@@ -9,6 +9,7 @@ import { useSubscriptionStore } from "@/stores/subscription";
 import { useProCheckout } from "@/composables/useProCheckout";
 import { useSeo } from "@/composables/useSeo";
 import type { SubscriptionPlan } from "@/firebase/interfaces";
+import { LAUNCH } from "@/config/launchFlags";
 
 // Public pricing page. Core app is free for everyone; Blue Seal Pro is the
 // tradesperson upgrade. Role-aware CTA: a signed-in non-Pro tradesperson goes
@@ -16,7 +17,7 @@ import type { SubscriptionPlan } from "@/firebase/interfaces";
 useSeo({
   title: "Pricing — Blue Seal",
   description:
-    "Blue Seal is free for clients and tradespeople. Blue Seal Pro ($29 CAD/mo or $290/yr) adds an AI assistant, waives your clients' service fee, a client book with recurring billing, and more — 30-day free trial.",
+    "Blue Seal is free for clients and tradespeople. Blue Seal Pro ($29 CAD/mo or $290/yr) waives your clients' service fee, brands your quotes and invoices, and more — 30-day free trial.",
 });
 
 const auth = useAuthStore();
@@ -66,7 +67,7 @@ const proCtaLabel = computed(() => {
         </p>
         <ul class="mt-4 space-y-2 text-sm flex-1">
           <li class="flex gap-2"><i class="pi pi-check text-[color:var(--bs-blue)]"></i> Search, quote, and hire verified pros</li>
-          <li class="flex gap-2"><i class="pi pi-check text-[color:var(--bs-blue)]"></i> Per-job chat, scheduling, and the job board</li>
+          <li class="flex gap-2"><i class="pi pi-check text-[color:var(--bs-blue)]"></i> Per-job chat and scheduling{{ LAUNCH.jobBoard ? ", and the job board" : "" }}</li>
           <li class="flex gap-2"><i class="pi pi-check text-[color:var(--bs-blue)]"></i> Quotes, invoices, time tracking &amp; receipts</li>
           <li class="flex gap-2"><i class="pi pi-check text-[color:var(--bs-blue)]"></i> Receipt scanning (AI), free forever</li>
         </ul>
@@ -98,11 +99,11 @@ const proCtaLabel = computed(() => {
           30-day free trial. Cancel anytime.
         </p>
         <ul class="mt-4 space-y-2 text-sm flex-1">
-          <li class="flex gap-2"><i class="pi pi-star-fill text-[color:var(--bs-blue)]"></i> <span><strong>AI assistant</strong> — diagnose, draft quotes &amp; invoices, summarize jobs</span></li>
+          <li v-if="LAUNCH.aiAssistant" class="flex gap-2"><i class="pi pi-star-fill text-[color:var(--bs-blue)]"></i> <span><strong>AI assistant</strong> — diagnose, draft quotes &amp; invoices, summarize jobs</span></li>
           <li class="flex gap-2"><i class="pi pi-star-fill text-[color:var(--bs-blue)]"></i> <span><strong>Your clients pay no service fee</strong> on card payments — you're cheaper to hire</span></li>
-          <li class="flex gap-2"><i class="pi pi-star-fill text-[color:var(--bs-blue)]"></i> <span><strong>Featured placement</strong> on clients' job posts</span></li>
-          <li class="flex gap-2"><i class="pi pi-star-fill text-[color:var(--bs-blue)]"></i> <span><strong>Business reports + CSV export</strong> for tax time</span></li>
-          <li class="flex gap-2"><i class="pi pi-star-fill text-[color:var(--bs-blue)]"></i> <span><strong>Clients &amp; recurring billing</strong> — a client book + standing charges Blue Seal drafts for you each period</span></li>
+          <li v-if="LAUNCH.jobBoard" class="flex gap-2"><i class="pi pi-star-fill text-[color:var(--bs-blue)]"></i> <span><strong>Featured placement</strong> on clients' job posts</span></li>
+          <li v-if="LAUNCH.proTools" class="flex gap-2"><i class="pi pi-star-fill text-[color:var(--bs-blue)]"></i> <span><strong>Business reports + CSV export</strong> for tax time</span></li>
+          <li v-if="LAUNCH.proTools" class="flex gap-2"><i class="pi pi-star-fill text-[color:var(--bs-blue)]"></i> <span><strong>Clients &amp; recurring billing</strong> — a client book + standing charges Blue Seal drafts for you each period</span></li>
           <li class="flex gap-2"><i class="pi pi-star-fill text-[color:var(--bs-blue)]"></i> <span><strong>Branded quotes &amp; invoices</strong> — your logo, banner &amp; brand colour on every PDF and on-screen</span></li>
         </ul>
         <Button

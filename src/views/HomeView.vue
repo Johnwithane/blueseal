@@ -13,6 +13,7 @@ import { useGoogleMaps } from "@/composables/useGoogleMaps";
 import { useSeo } from "@/composables/useSeo";
 import { homeSeo } from "@/seo/content";
 import { RECRUIT_HOMEPAGE } from "@/seo/site";
+import { LAUNCH } from "@/config/launchFlags";
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -57,6 +58,14 @@ function onWhereEnter(e: KeyboardEvent) {
 }
 
 function startPost() {
+  // Job board off: the hero form becomes search-first — same inputs, but it
+  // hands off to the tradesperson search (which accepts ?q=) instead of the
+  // post-a-job wizard.
+  if (!LAUNCH.jobBoard) {
+    const q = jobDescribe.value.trim();
+    router.push({ name: "Search", query: q ? { q } : {} });
+    return;
+  }
   // Carry the picked location into the post draft so the wizard's location step
   // lands prefilled. Merge only the address keys — any other in-progress draft
   // fields stay untouched. (PostJobView hydrates jobPostDraft on mount.)
@@ -156,35 +165,59 @@ onMounted(() => {
 });
 
 // How it works — three steps, rendered as oversized editorial numerals.
-const steps = [
-  {
-    title: "Post your job",
-    blurb:
-      "Describe what you need and add a few photos. It's free, and it only takes a couple of minutes.",
-  },
-  {
-    title: "Compare quotes",
-    blurb:
-      "Verified tradespeople in your area apply with quotes. Check their profiles and pick the one that suits you.",
-  },
-  {
-    title: "Done & reviewed",
-    blurb:
-      "Chat, schedule and pay in one place, then leave a review. The whole job stays on record if you ever need it.",
-  },
-];
+// Copy branches on the job-board flag: post-and-get-bids vs find-and-request.
+const steps = LAUNCH.jobBoard
+  ? [
+      {
+        title: "Post your job",
+        blurb:
+          "Describe what you need and add a few photos. It's free, and it only takes a couple of minutes.",
+      },
+      {
+        title: "Compare quotes",
+        blurb:
+          "Verified tradespeople in your area apply with quotes. Check their profiles and pick the one that suits you.",
+      },
+      {
+        title: "Done & reviewed",
+        blurb:
+          "Chat, schedule and pay in one place, then leave a review. The whole job stays on record if you ever need it.",
+      },
+    ]
+  : [
+      {
+        title: "Find a verified pro",
+        blurb:
+          "Search tradespeople in your area. Every profile shows checked ID, trade ticket and ratings from real jobs.",
+      },
+      {
+        title: "Request a quote",
+        blurb:
+          "Describe the job and add a few photos. The pro comes back with a clear, itemised quote — you decide.",
+      },
+      {
+        title: "Done & reviewed",
+        blurb:
+          "Chat, schedule and pay in one place, then leave a review. The whole job stays on record if you ever need it.",
+      },
+    ];
 
 // "What sets us apart" — standout features. Short, concrete proof — no fee
 // figures or SLAs (those aren't live; see MONETIZATION.md).
 const standoutFeatures = [
-  {
-    kicker: "AI built in",
-    title: "An AI sidekick on every job",
-    blurb:
-      "Snap a photo to work out what's wrong, draft a quote in seconds, or catch up on a long thread. All without leaving the chat.",
-    points: ["Photo-based diagnosis", "Faster, clearer quotes", "Instant job summaries"],
-    seal: "scene-ai",
-  },
+  // AI card rides the assistant launch flag — don't advertise what's hidden.
+  ...(LAUNCH.aiAssistant
+    ? [
+        {
+          kicker: "AI built in",
+          title: "An AI sidekick on every job",
+          blurb:
+            "Snap a photo to work out what's wrong, draft a quote in seconds, or catch up on a long thread. All without leaving the chat.",
+          points: ["Photo-based diagnosis", "Faster, clearer quotes", "Instant job summaries"],
+          seal: "scene-ai",
+        },
+      ]
+    : []),
   {
     kicker: "One job, one thread",
     title: "Chat and a status board, together",
@@ -218,8 +251,14 @@ const standoutFeatures = [
 // The whole-job pipeline — the core separator from a directory. Five stages
 // that all live inside Blue Seal, where a directory stops at the introduction.
 const pipeline = [
-  { icon: "pi-megaphone", label: "Post or request", sub: "Get bids, or message a pro direct" },
-  { icon: "pi-calculator", label: "Itemised quote", sub: "Clear pricing, drafted with AI" },
+  LAUNCH.jobBoard
+    ? { icon: "pi-megaphone", label: "Post or request", sub: "Get bids, or message a pro direct" }
+    : { icon: "pi-send", label: "Request a quote", sub: "Straight to a verified pro" },
+  {
+    icon: "pi-calculator",
+    label: "Itemised quote",
+    sub: LAUNCH.aiAssistant ? "Clear pricing, drafted with AI" : "Clear, line-by-line pricing",
+  },
   { icon: "pi-calendar", label: "Schedule", sub: "Pick a time, on a shared board" },
   { icon: "pi-receipt", label: "Invoice", sub: "Auto-built when the job's done" },
   { icon: "pi-check-circle", label: "Paid & reviewed", sub: "Pay in-app; both sides rate" },
@@ -339,8 +378,15 @@ onMounted(async () => {
                 <RouterLink to="/dashboard" class="bs-btn bs-btn--primary bs-btn--lg">
                   <i class="pi pi-home" aria-hidden="true"></i>Go to your dashboard
                 </RouterLink>
-                <RouterLink to="/jobs/browse" class="bs-btn bs-btn--secondary bs-btn--lg">
+                <RouterLink
+                  v-if="LAUNCH.jobBoard"
+                  to="/jobs/browse"
+                  class="bs-btn bs-btn--secondary bs-btn--lg"
+                >
                   <i class="pi pi-megaphone" aria-hidden="true"></i>Browse open jobs
+                </RouterLink>
+                <RouterLink v-else to="/jobs/new" class="bs-btn bs-btn--secondary bs-btn--lg">
+                  <i class="pi pi-plus" aria-hidden="true"></i>Start a new job
                 </RouterLink>
               </div>
 
@@ -382,13 +428,15 @@ onMounted(async () => {
                     type="submit"
                     class="bs-btn bs-btn--red w-full justify-center sm:w-auto sm:!rounded-full"
                   >
-                    <i class="pi pi-send" aria-hidden="true"></i><span>Post your job</span>
+                    <i class="pi pi-send" aria-hidden="true"></i>
+                    <span>{{ LAUNCH.jobBoard ? "Post your job" : "Find a pro" }}</span>
                   </button>
                 </form>
 
                 <!-- The quieter "browse pros yourself" path. Posting is the lead;
-                     searching stays available but secondary. -->
-                <p class="mt-4">
+                     searching stays available but secondary. (Redundant when the
+                     form itself is search-first, so it rides the board flag.) -->
+                <p v-if="LAUNCH.jobBoard" class="mt-4">
                   <RouterLink to="/search" class="bs-btn bs-btn--text">
                     or browse verified tradespeople →
                   </RouterLink>
@@ -940,15 +988,23 @@ onMounted(async () => {
         <h2 class="bs-display mt-6 text-4xl leading-[1.02] tracking-[-0.015em] sm:text-6xl">
           Ready to <span class="bs-mark">seal</span> the deal?
         </h2>
-        <p class="mx-auto mt-4 max-w-2xl text-lg text-[color:var(--bs-blue-dark)]/80">
+        <p v-if="LAUNCH.jobBoard" class="mx-auto mt-4 max-w-2xl text-lg text-[color:var(--bs-blue-dark)]/80">
           Post your job and let verified tradespeople in your area come to you with quotes. Blue
           Seal is built for trusted trades across Canada.
         </p>
+        <p v-else class="mx-auto mt-4 max-w-2xl text-lg text-[color:var(--bs-blue-dark)]/80">
+          Find a verified tradesperson in your area and get a clear, itemised quote. Blue Seal is
+          built for trusted trades across Canada.
+        </p>
         <div class="mt-8 flex flex-wrap justify-center gap-3">
-          <RouterLink to="/jobs/post" class="bs-btn bs-btn--primary bs-btn--lg">
+          <RouterLink v-if="LAUNCH.jobBoard" to="/jobs/post" class="bs-btn bs-btn--primary bs-btn--lg">
             <i class="pi pi-send" aria-hidden="true"></i>Post your job
           </RouterLink>
-          <RouterLink to="/search" class="bs-btn bs-btn--secondary bs-btn--lg">
+          <RouterLink
+            to="/search"
+            class="bs-btn bs-btn--lg"
+            :class="LAUNCH.jobBoard ? 'bs-btn--secondary' : 'bs-btn--primary'"
+          >
             <i class="pi pi-search" aria-hidden="true"></i>Browse tradespeople
           </RouterLink>
         </div>
@@ -961,7 +1017,10 @@ onMounted(async () => {
             Get verified as a tradesperson →
           </RouterLink>
         </p>
-        <p v-if="!auth.isAuthenticated" class="mt-2 text-[color:var(--bs-blue-dark)]/75">
+        <p
+          v-if="LAUNCH.projectManagerRole && !auth.isAuthenticated"
+          class="mt-2 text-[color:var(--bs-blue-dark)]/75"
+        >
           Agent or property manager?
           <RouterLink
             to="/sign-up?as=projectManager"

@@ -1,4 +1,5 @@
 import type { Role } from "@/firebase/interfaces";
+import { LAUNCH } from "@/config/launchFlags";
 
 // ---------------------------------------------------------------------------
 // Single source of truth for how each role is labelled + iconned wherever the
@@ -38,13 +39,18 @@ const META: Record<Role, RoleViewMeta> = {
 
 // Canonical order for listing views in any switcher. Excludes qa, so it never
 // surfaces as a view. Most-used views first; admin last (staff-only).
-export const VIEW_ROLE_ORDER: ViewRole[] = [
-  "client",
-  "tradesperson",
-  "projectManager",
-  "sales",
-  "admin",
-];
+// Launch flags filter out hidden roles here — the ONE spot that feeds every
+// switcher (header menu, side panel, Account page, overlay), so flipping the
+// flag restores the view everywhere at once. Route guards still honour held
+// roles, so anyone who already has a hidden role isn't locked out of a deep
+// link — the view just stops being offered.
+export const VIEW_ROLE_ORDER: ViewRole[] = (
+  ["client", "tradesperson", "projectManager", "sales", "admin"] as ViewRole[]
+).filter((r) => {
+  if (r === "projectManager") return LAUNCH.projectManagerRole;
+  if (r === "sales") return LAUNCH.salesRole;
+  return true;
+});
 
 /** Label + icon for a role. Total over Role (qa included) so callers needn't guard. */
 export function roleViewMeta(role: Role): RoleViewMeta {

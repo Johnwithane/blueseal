@@ -6,6 +6,7 @@ import { useAuthStore } from "@/stores/auth";
 import { humanizeError } from "@/utils/errors";
 import { safeRedirect } from "@/utils/redirect";
 import { useSeo } from "@/composables/useSeo";
+import { LAUNCH } from "@/config/launchFlags";
 
 useSeo({ title: "Welcome to Blue Seal", noindex: true });
 
@@ -107,6 +108,7 @@ async function chooseProjectManager() {
           </span>
         </button>
         <button
+          v-if="LAUNCH.projectManagerRole"
           type="button"
           class="role-option"
           :disabled="!!busy"

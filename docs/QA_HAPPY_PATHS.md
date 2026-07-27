@@ -10,6 +10,28 @@
 
 ---
 
+## ⚠️ Launch flags (2026-07): what's hidden right now
+
+The launch build hides several features behind **launch flags**
+(`src/config/launchFlags.ts` — hide, don't remove; flip a flag to bring one
+back). While a flag is off, **skip that feature's paths below** — its entry
+points aren't rendered:
+
+| Flag (off by default) | Hidden surface | Paths to skip |
+| --- | --- | --- |
+| `jobBoard` | Post a job, Browse jobs, applications & quotes on posts | §2.1, §3.1–3.3, §4.1–4.2, board parts of §5 |
+| `projectManagerRole` | PM role, cockpit, projects/dispatch | §13 (all) |
+| `salesRole` | Sales rep role, referral codes, rep vetting | §11 (all) |
+| `aiAssistant` | AI bubble, AI chat tab, "Draft with AI" (receipt OCR **stays on**) | §8.2 (AI paywall) |
+| `proTools` | Reports, Clients CRM + recurring billing | §8.3 |
+| `vouches` | Recommendations panel + nav | recommendation steps in §9 |
+| `kanbanBoard` | The read-only Board tab on the tradie dashboard | Board checks in §5 |
+
+Direct requests (§2.2), tradesperson-created jobs (§2.3), the job pipeline
+(§5), payments (§6), and reviews (§7) are the launch core — test those first.
+
+---
+
 ## 0. Setup & reference (read first)
 
 ### Environment

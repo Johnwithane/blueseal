@@ -22,6 +22,7 @@ import { useNotificationsStore } from "@/stores/notifications";
 import { useSubscriptionStore } from "@/stores/subscription";
 import { useAuthStore } from "@/stores/auth";
 import { useAppUpdate, usePushAutoPrompt } from "@/composables";
+import { LAUNCH } from "@/config/launchFlags";
 
 const route = useRoute();
 const router = useRouter();
@@ -205,8 +206,9 @@ function openFromToast(notifId: string) {
     <ConfirmDialog />
     <!-- Renders outside the chromeless gate so admins and tradies both see
          it on their respective pages. The bubble has its own route + role
-         visibility rules. -->
-    <AssistantBubble />
+         visibility rules. Launch-flagged off with the rest of the AI surface
+         (receipt OCR stays on — it lives in the expenses flow, not here). -->
+    <AssistantBubble v-if="LAUNCH.aiAssistant" />
     <!-- Global "Report a bug" button — its own visibility rule (qa/admin only).
          Lets testers file a reproducible bug from anywhere in the app. -->
     <ReportBugButton />

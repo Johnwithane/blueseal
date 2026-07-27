@@ -29,6 +29,7 @@ import { useFormatters } from "@/composables/useFormatters";
 import { useToast } from "@/composables/useToast";
 import { usePaywallStore } from "@/stores/paywall";
 import { humanizeError } from "@/utils/errors";
+import { LAUNCH } from "@/config/launchFlags";
 
 const props = defineProps<{
   visible: boolean;
@@ -908,6 +909,7 @@ function close() {
             Note to client (optional)
           </label>
           <Button
+            v-if="LAUNCH.aiAssistant"
             label="Draft with AI"
             icon="pi pi-sparkles"
             text

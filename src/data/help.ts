@@ -1,4 +1,7 @@
 import type { FaqItem, HelpArticle, HelpCategory } from "@/firebase/interfaces";
+// Relative (not @/) import: this file is also loaded by the Node prerender
+// script, which resolves real paths only — see scripts/prerender.ts.
+import { LAUNCH } from "../config/launchFlags";
 
 // ---------------------------------------------------------------------------
 // Help Center content — THE single source of truth.
@@ -75,6 +78,23 @@ const categories: HelpCategory[] = [
     icon: "pi pi-shield",
   },
 ];
+
+// The job-board variant of the "win-work" article body, kept whole so the
+// article flips back verbatim when LAUNCH.jobBoard turns on.
+const WIN_WORK_BODY_WITH_BOARD = `Once you're verified, work reaches you two ways:
+
+1. **Direct requests:** clients find your profile and request a quote. These land as new job threads; respond quickly with a clear quote to win the job.
+2. **Browse jobs:** clients post jobs to the board. Browse postings in your trade and area and **apply with a full itemized quote** (line items, taxes, optional upfront fee). The client compares quotes side by side and accepts one, so a clear, well-priced quote wins the job outright. Track everything you've applied to under **My applications**.
+
+Can't price a job without seeing it? On either path, toggle **Site visit first** instead of quoting blind. Add a single visit fee (or leave it at $0 for a free visit). The client agrees with one tap, you do the visit, and the fee is **pre-filled into your real quote**, which you can keep to charge on top or delete to waive.
+
+Need answers before you can price it? On the job board you can also apply with **Chat first**: your opening message starts a conversation on the post, and you send your full quote from your application when you're ready (**Send quote**). If the client picks you, the conversation **carries over into the job chat**, so nothing gets repeated.
+
+Browsing with the **Any trade** filter and spot a job outside your trade? Use the **share icon** on the card (or **Refer this job** on the post) to send it to a verified tradesperson in that trade. They're notified and can apply directly.
+
+A complete, verified profile with a strong portfolio and good reviews wins more work, since clients can see your reputation at a glance.
+
+Want an edge? **Blue Seal Pro** features your applications at the top of clients' job posts (clearly marked "Featured"), and adds the AI assistant, a service-fee waiver for your clients, business reports, and a client book with recurring billing. See "Blue Seal Pro" below or the Pricing page.`;
 
 const articles: HelpArticle[] = [
   {
@@ -277,41 +297,37 @@ If something needs another look, we'll let you know what to re-upload, so you wo
   {
     slug: "win-work",
     categoryId: "for-tradespeople",
-    title: "Winning work: requests, browsing, and applications",
-    excerpt: "Two ways jobs come in: direct requests and the job board.",
+    title: LAUNCH.jobBoard
+      ? "Winning work: requests, browsing, and applications"
+      : "Winning work: requests, quoting, and your own jobs",
+    excerpt: LAUNCH.jobBoard
+      ? "Two ways jobs come in: direct requests and the job board."
+      : "Direct requests from clients, plus jobs you create for your own clients.",
     audience: "tradesperson",
     keywords: ["leads", "browse jobs", "apply", "requests", "applications", "win work"],
-    body: `Once you're verified, work reaches you two ways:
+    body: LAUNCH.jobBoard
+      ? WIN_WORK_BODY_WITH_BOARD
+      : `Once you're verified, work reaches you two ways:
 
 1. **Direct requests:** clients find your profile and request a quote. These land as new job threads; respond quickly with a clear quote to win the job.
-2. **Browse jobs:** clients post jobs to the board. Browse postings in your trade and area and **apply with a full itemized quote** (line items, taxes, optional upfront fee). The client compares quotes side by side and accepts one, so a clear, well-priced quote wins the job outright. Track everything you've applied to under **My applications**.
+2. **Your own jobs:** already have the client? Tap **New job** on your dashboard, build the job, and invite them by link (or run it solo and keep everything — schedule, work order, invoice — on record in one place).
 
-Can't price a job without seeing it? On either path, toggle **Site visit first** instead of quoting blind. Add a single visit fee (or leave it at $0 for a free visit). The client agrees with one tap, you do the visit, and the fee is **pre-filled into your real quote**, which you can keep to charge on top or delete to waive.
+Can't price a job without seeing it? Toggle **Site visit first** instead of quoting blind. Add a single visit fee (or leave it at $0 for a free visit). The client agrees with one tap, you do the visit, and the fee is **pre-filled into your real quote**, which you can keep to charge on top or delete to waive.
 
-Need answers before you can price it? On the job board you can also apply with **Chat first**: your opening message starts a conversation on the post, and you send your full quote from your application when you're ready (**Send quote**). If the client picks you, the conversation **carries over into the job chat**, so nothing gets repeated.
-
-Browsing with the **Any trade** filter and spot a job outside your trade? Use the **share icon** on the card (or **Refer this job** on the post) to send it to a verified tradesperson in that trade. They're notified and can apply directly.
-
-A complete, verified profile with a strong portfolio and good reviews wins more work, since clients can see your reputation at a glance.
-
-Want an edge? **Blue Seal Pro** features your applications at the top of clients' job posts (clearly marked "Featured"), and adds the AI assistant, a service-fee waiver for your clients, business reports, and a client book with recurring billing. See "Blue Seal Pro" below or the Pricing page.`,
+A complete, verified profile with a strong portfolio and good reviews wins more work, since clients can see your reputation at a glance.`,
   },
   {
     slug: "blue-seal-pro",
     categoryId: "for-tradespeople",
     title: "Blue Seal Pro",
-    excerpt: "The optional upgrade: AI assistant, fee waiver, featured placement, reports, clients and recurring billing.",
+    excerpt: "The optional upgrade for tradespeople: fee waiver, branding, and more.",
     audience: "tradesperson",
     popular: true,
     keywords: ["pro", "subscription", "upgrade", "ai", "trial", "billing", "cancel", "clients", "recurring"],
-    body: `Blue Seal Pro is the optional upgrade for tradespeople. The core app (quoting, invoicing, scheduling, chat, the job board) stays free. Pro adds:
+    body: `Blue Seal Pro is the optional upgrade for tradespeople. The core app (quoting, invoicing, scheduling, chat) stays free. Pro adds:
 
-- **AI assistant:** diagnose problems, draft quotes and invoice notes, and summarize jobs. (Receipt scanning stays free for everyone.)
-- **Your clients pay no service fee:** the Blue Seal service fee on card payments is waived for your jobs, so you're cheaper to hire.
-- **Featured placement:** your applications appear first on clients' job posts, marked "Featured".
-- **Business reports + CSV export:** revenue and tax-collected summaries plus an accountant-ready export.
-- **Clients & recurring billing:** keep a client book (add or import your existing clients) and put your regulars on a standing charge Blue Seal drafts for you to review and send each period.
-- **Branded quotes & invoices:** put your logo, a letterhead banner, and your brand colour on every quote and invoice, on the PDF and on screen.
+${LAUNCH.aiAssistant ? "- **AI assistant:** diagnose problems, draft quotes and invoice notes, and summarize jobs. (Receipt scanning stays free for everyone.)\n" : ""}- **Your clients pay no service fee:** the Blue Seal service fee on card payments is waived for your jobs, so you're cheaper to hire.
+${LAUNCH.jobBoard ? '- **Featured placement:** your applications appear first on clients\' job posts, marked "Featured".\n' : ""}${LAUNCH.proTools ? "- **Business reports + CSV export:** revenue and tax-collected summaries plus an accountant-ready export.\n- **Clients & recurring billing:** keep a client book (add or import your existing clients) and put your regulars on a standing charge Blue Seal drafts for you to review and send each period.\n" : ""}- **Branded quotes & invoices:** put your logo, a letterhead banner, and your brand colour on every quote and invoice, on the PDF and on screen.
 
 **Price:** $29 CAD/month or $290 CAD/year (two months free on annual). Every new subscription starts with a **30-day free trial**. A card is required, but you won't be charged until the trial ends, and you can cancel anytime before then for $0.
 
@@ -623,15 +639,13 @@ const faqs: FaqItem[] = [
   },
   {
     question: "Is Blue Seal free to use?",
-    answer:
-      "Yes. Creating an account, searching for tradespeople, posting a job, quoting, invoicing, and scheduling are all free, for clients and tradespeople alike. You pay for the work itself through the job thread. Tradespeople can optionally subscribe to **Blue Seal Pro** for the AI assistant, featured placement, and more, but the core app stays free.",
+    answer: `Yes. Creating an account, searching for tradespeople, ${LAUNCH.jobBoard ? "posting a job, " : "requesting quotes, "}quoting, invoicing, and scheduling are all free, for clients and tradespeople alike. You pay for the work itself through the job thread. Tradespeople can optionally subscribe to **Blue Seal Pro** for extra business tools, but the core app stays free.`,
     categoryId: "getting-started",
     audience: "all",
   },
   {
     question: "What is Blue Seal Pro and how much does it cost?",
-    answer:
-      "Blue Seal Pro is an optional upgrade for tradespeople ($29 CAD/month or $290 CAD/year) with a 30-day free trial. It adds the AI assistant, waives the Blue Seal service fee for your clients on card payments, features your applications at the top of clients' job posts, includes business reports with a CSV export, gives you a client book with recurring billing for your regulars, and lets you brand your quotes and invoices with your own logo, banner, and colour. The core app stays free.",
+    answer: `Blue Seal Pro is an optional upgrade for tradespeople ($29 CAD/month or $290 CAD/year) with a 30-day free trial. It ${LAUNCH.aiAssistant ? "adds the AI assistant, " : ""}waives the Blue Seal service fee for your clients on card payments${LAUNCH.jobBoard ? ", features your applications at the top of clients' job posts" : ""}${LAUNCH.proTools ? ", includes business reports with a CSV export, gives you a client book with recurring billing for your regulars" : ""}, and lets you brand your quotes and invoices with your own logo, banner, and colour. The core app stays free.`,
     categoryId: "for-tradespeople",
     audience: "tradesperson",
   },
@@ -1012,8 +1026,9 @@ const faqs: FaqItem[] = [
   },
   {
     question: "How do jobs reach me?",
-    answer:
-      "Two ways: **direct requests** from clients who find your profile, and the **job board**, where you browse postings in your trade and area and apply. Track everything you've applied to under My applications.",
+    answer: LAUNCH.jobBoard
+      ? "Two ways: **direct requests** from clients who find your profile, and the **job board**, where you browse postings in your trade and area and apply. Track everything you've applied to under My applications."
+      : "Two ways: **direct requests** from clients who find your profile and request a quote, and **jobs you create yourself** for your own clients (tap **New job** on your dashboard, then invite the client by link — or run it solo). Either way the whole job lives in one thread: chat, schedule, work order, and invoice.",
     categoryId: "for-tradespeople",
     audience: "tradesperson",
   },
@@ -1377,4 +1392,65 @@ const faqs: FaqItem[] = [
   },
 ];
 
-export const HELP_CONTENT_SEED: HelpContentSeed = { categories, articles, faqs };
+// ---------------------------------------------------------------------------
+// Launch-flag filtering (hide, don't remove — see src/config/launchFlags.ts).
+// Help must describe only what a user can actually see and do: content for a
+// flagged-off feature is filtered out of the exported seed here, and comes
+// back automatically the moment its flag flips on. The integrity test runs on
+// the filtered set, so hidden entries can't break slugs/refs either way.
+// ---------------------------------------------------------------------------
+
+const hiddenCategoryIds = new Set<string>(
+  LAUNCH.projectManagerRole ? [] : ["for-project-managers"],
+);
+
+const hiddenArticleSlugs = new Set<string>([
+  ...(LAUNCH.jobBoard ? [] : ["post-a-job", "rebates-and-grants"]),
+  ...(LAUNCH.proTools ? [] : ["clients-and-recurring-billing"]),
+  ...(LAUNCH.vouches ? [] : []),
+]);
+
+const hiddenFaqQuestions = new Set<string>([
+  ...(LAUNCH.salesRole
+    ? []
+    : ["I have a referral code. What do I get?", "Who is the Blue Seal rep on my account?"]),
+  ...(LAUNCH.projectManagerRole
+    ? []
+    : [
+        "A project manager set up a project for me on Blue Seal. What is this?",
+        "Do I have to use the trades my project manager picked?",
+        "My project manager added a job to my project after I accepted it. Do I have to approve it?",
+        "A project manager is featuring me on their profile. Can I opt out?",
+      ]),
+  ...(LAUNCH.jobBoard
+    ? []
+    : [
+        'What does "Invited to quote" mean on Browse jobs?',
+        "What's the difference between requesting a quote and posting a job?",
+        'What does the "Featured" tag on an applicant mean?',
+        "Can I ask an applicant questions before accepting their quote?",
+        "How do I decline an applicant?",
+        "An applicant updated their quote, how can I tell?",
+        "Does Blue Seal offer rebates or grants?",
+        "Is my address shared publicly when I post a job?",
+        "What if no one applies to my job?",
+        "A client asked about my quote, where do I answer?",
+        "Can I revise my quote after applying?",
+        "How do I know when there are new jobs near me?",
+        "Can I refer a job to another tradesperson?",
+      ]),
+  ...(LAUNCH.aiAssistant
+    ? []
+    : ["Can the assistant help with the actual trade work, not just the app?"]),
+  ...(LAUNCH.vouches ? [] : ["What are recommendations / vouches?"]),
+]);
+
+export const HELP_CONTENT_SEED: HelpContentSeed = {
+  categories: categories.filter((c) => !hiddenCategoryIds.has(c.id)),
+  articles: articles.filter(
+    (a) => !hiddenArticleSlugs.has(a.slug) && !hiddenCategoryIds.has(a.categoryId),
+  ),
+  faqs: faqs.filter(
+    (f) => !hiddenCategoryIds.has(f.categoryId) && !hiddenFaqQuestions.has(f.question),
+  ),
+};

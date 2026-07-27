@@ -60,11 +60,17 @@ const isHomeActive = computed(() => route.path === "/");
   display: flex;
   align-items: stretch;
   gap: 0;
-  background: white;
+  /* Frosted translucent bar (Airbnb/iOS-style) — content scrolling behind it
+     reads through the blur, keeping the bar feeling light. Solid-white
+     fallback for browsers without backdrop-filter. */
+  background: rgba(255, 255, 255, 0.92);
   border-top: 1px solid var(--bs-border);
-  /* No vertical padding on the container — top + safe-area-bottom live on
-     each tab instead, so the active tab's solid blue fill reaches the
-     bar's top edge and the screen's bottom edge with no white gap. */
+}
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .bottom-nav {
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+  }
 }
 
 .bottom-tab {
@@ -89,21 +95,15 @@ const isHomeActive = computed(() => route.path === "/");
   min-height: 48px;
   transition: color 120ms ease;
 }
-/* Active state is a solid blue block filling the tab cell edge-to-edge —
-   no border-radius, no inset margin. Only colors change between
-   active/inactive so the icon and label stay put on selection. */
+/* Active state: brand-navy icon + label on the frosted bar (Airbnb-style
+   colour shift — no filled block). Only colors change between active and
+   inactive so the icon and label stay put on selection. */
 .bottom-tab--active {
-  color: white;
-  background: var(--bs-blue);
+  color: var(--bs-blue);
   font-weight: 600;
 }
 .bottom-tab--active .bottom-tab__icon {
-  color: white;
-}
-/* The brand/Home tab opts out of the active treatment — the Blue Seal
-   logo is itself blue, so it'd vanish against the active background. */
-.bottom-tab--brand.bottom-tab--active {
-  background: transparent;
+  color: var(--bs-blue);
 }
 .bottom-tab__icon {
   font-size: 1.25rem;

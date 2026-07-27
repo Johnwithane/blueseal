@@ -14,6 +14,7 @@ import { useToast } from "@/composables/useToast";
 import { useFormatters } from "@/composables/useFormatters";
 import { humanizeError } from "@/utils/errors";
 import type { SubscriptionPlan } from "@/firebase/interfaces";
+import { LAUNCH } from "@/config/launchFlags";
 
 // Blue Seal Pro management — mirrors PayoutsPanel. Rendered in AccountView's
 // "Blue Seal Pro" tab. The subscription store (started in App.vue) holds live
@@ -103,9 +104,8 @@ async function manage() {
               You've got Blue Seal Pro free until {{ date(subscription.proCompUntil) }}. Enjoy!
             </template>
             <template v-else>
-              Unlock the AI assistant, waive your clients' service fee, get featured placement,
-              run business reports, and bill clients on repeat — $29 CAD/month or $290/year,
-              30-day free trial.
+              Waive your clients' service fee and brand your quotes &amp; invoices —
+              $29 CAD/month or $290/year, 30-day free trial.
             </template>
           </p>
         </div>
@@ -157,11 +157,11 @@ async function manage() {
     <div class="bs-card p-5">
       <h3 class="text-base font-semibold">What Blue Seal Pro includes</h3>
       <ul class="mt-2 list-disc pl-5 text-sm text-[color:var(--bs-text)]/85 space-y-1">
-        <li><strong>AI assistant</strong> — diagnose, draft quotes &amp; invoice notes, and summarize jobs.</li>
+        <li v-if="LAUNCH.aiAssistant"><strong>AI assistant</strong> — diagnose, draft quotes &amp; invoice notes, and summarize jobs.</li>
         <li><strong>Your clients pay no service fee</strong> — the Blue Seal fee is waived on card payments for your jobs, so you're cheaper to hire.</li>
-        <li><strong>Featured placement</strong> — your applications appear first on clients' job posts.</li>
-        <li><strong>Business reports + CSV export</strong> — revenue, tax collected, and an accountant-ready export.</li>
-        <li><strong>Clients &amp; recurring billing</strong> — keep a client book and put your regulars on a standing charge Blue Seal drafts for you to review and send each period.</li>
+        <li v-if="LAUNCH.jobBoard"><strong>Featured placement</strong> — your applications appear first on clients' job posts.</li>
+        <li v-if="LAUNCH.proTools"><strong>Business reports + CSV export</strong> — revenue, tax collected, and an accountant-ready export.</li>
+        <li v-if="LAUNCH.proTools"><strong>Clients &amp; recurring billing</strong> — keep a client book and put your regulars on a standing charge Blue Seal drafts for you to review and send each period.</li>
         <li><strong>Branded quotes &amp; invoices</strong> — your logo, a letterhead banner, and your brand colour on the quotes and invoices clients see (PDF + on-screen).</li>
       </ul>
       <p class="mt-3 text-xs text-[color:var(--bs-muted)]">

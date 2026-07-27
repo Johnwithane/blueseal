@@ -17,6 +17,7 @@ import { useToast } from "@/composables/useToast";
 import { useConfirmAction } from "@/composables/useConfirmAction";
 import { useInsuranceGate } from "@/composables/useInsuranceGate";
 import { humanizeError } from "@/utils/errors";
+import { LAUNCH } from "@/config/launchFlags";
 import QuoteComposer from "@/components/QuoteComposer.vue";
 import type {
   QuoteComposerInitial,
@@ -394,7 +395,7 @@ function close() {
 
       <!-- AI draft — on the scope step (or the full form), where the rows land. -->
       <div
-        v-if="mode === 'quote' && (!inWizard || wizardStep === 0)"
+        v-if="LAUNCH.aiAssistant && mode === 'quote' && (!inWizard || wizardStep === 0)"
         class="mb-4 flex items-center gap-2"
       >
         <Button
