@@ -6,27 +6,29 @@
 >
 > Reference for intended behaviour: the in-app **Help Center** (`/help`). Each
 > path cites the relevant article/FAQ slug — open `/help` and search the slug if
-> you're unsure how something *should* work.
+> you're unsure how something _should_ work.
 
 ---
 
 ## 0. Setup & reference (read first)
 
 ### Environment
+
 - Test against the **deployed test-mode site** (the URL Johnny gives you).
 - **Stripe is in TEST MODE** — no real money ever moves. Use the test cards below.
 - Test **mobile-first**: do every path at **375px width** first (Chrome DevTools
   device toolbar → iPhone SE / "Responsive" 375), then re-check on desktop.
 
 ### Get your accounts (the QA toolkit)
+
 1. Sign up at `/sign-up` — create **one account** (you'll hold multiple roles on it).
 2. Ask an admin to grant your account the **QA role** (Admin → Users → your user →
    tick **qa** → Save). One-time.
 3. Open **`/qa`** (also in the left side panel as **QA toolkit**, and `/qa` works
    on mobile). From here you self-serve, no admin needed:
-   - **Become an approved tradesperson** — pick trade(s) → *Provision me*. You're
+   - **Become an approved tradesperson** — pick trade(s) → _Provision me_. You're
      instantly approved + visible (no vetting wait) on those trades.
-   - **Blue Seal Pro** — *Enable Pro* / *Disable Pro* to test free vs Pro.
+   - **Blue Seal Pro** — _Enable Pro_ / _Disable Pro_ to test free vs Pro.
    - **Reset my data** — wipes your jobs/posts/applications + sets your tradie
      profile back to draft, so you can re-run a flow clean.
    - **Switch views** — use the role switcher (side panel / Account) to move
@@ -34,14 +36,16 @@
      view — there's no "QA view".)
 
 ### Stripe test cards (CAD · any future expiry · any CVC · any postal code)
-| Card number | Result |
-| --- | --- |
-| `4242 4242 4242 4242` | Payment succeeds |
-| `4000 0000 0000 0002` | Card declined |
-| `4000 0000 0000 9995` | Declined — insufficient funds |
+
+| Card number           | Result                             |
+| --------------------- | ---------------------------------- |
+| `4242 4242 4242 4242` | Payment succeeds                   |
+| `4000 0000 0000 0002` | Card declined                      |
+| `4000 0000 0000 9995` | Declined — insufficient funds      |
 | `4000 0027 6000 3184` | 3-D Secure challenge (complete it) |
 
 ### Logging bugs
+
 - Use the floating **Report a bug** button (bottom-right, visible to QA on every
   screen). It auto-captures the page + your active role.
 - **A screenshot of the page is attached automatically** when you open the
@@ -49,17 +53,18 @@
   excluded). Delete it if it's not useful, or add a clearer one below.
 - **Want a sharper/other shot? paste it** — copy a screenshot (e.g. Win
   **⊞+Shift+S**, Mac **⌘+Shift+4**) then **Ctrl/⌘+V** inside the bug dialog.
-  All images are converted to WebP automatically. (A *Choose file* fallback
+  All images are converted to WebP automatically. (A _Choose file_ fallback
   exists.) Note: a few surfaces (maps, chart canvases, cross-origin images) can
   render blank in the auto-shot, so paste a real capture for those.
 - Fill **Title, Severity, Steps, Expected, Actual**. Submit → it lands in admin
-  triage (`/admin/bug-reports`). You can see your own in `/qa` → *My bug reports*.
+  triage (`/admin/bug-reports`). You can see your own in `/qa` → _My bug reports_.
 - **Crashes/JS errors are captured automatically** in the **Error log** (visible
-  to QA at `/qa` → *Error log*, and admins at `/admin/errors`). If you hit a
+  to QA at `/qa` → _Error log_, and admins at `/admin/errors`). If you hit a
   white screen or a console error, still file a bug **and** note it's in the
   error log.
 
 ### Severity guide
+
 - **Critical** — blocks a core flow / data loss / payment wrong / security.
 - **High** — feature broken, no workaround.
 - **Medium** — broken with a workaround, or wrong on one screen.
@@ -67,17 +72,19 @@
 
 ---
 
-## 1. Onboarding & verification  → help: `get-verified`, `create-an-account`, `insurance-and-getting-covered`
+## 1. Onboarding & verification → help: `get-verified`, `create-an-account`, `insurance-and-getting-covered`
 
 Tradesperson verification has three independent documents — **ID**, **certification(s)**,
 **insurance** — that gate different things. Walk all four states.
 
 ### 1.1 Client sign-up (the simple one)
+
 1. `/sign-up`, choose **Client**, enter name/email/password, accept terms.
 2. **Expected:** lands on the client dashboard; no wizard; can immediately search
    and post jobs. A verification email is sent.
 
 ### 1.2 Tradesperson onboarding — NO ID / NO cert / NO insurance
+
 1. `/sign-up`, choose **Tradesperson** → lands in the 7-step onboarding wizard.
 2. Fill **Basics** (name + bio), **Trades** (primary trade), **Pricing**, **Area**
    (location), optionally **Hours**. Skip the **Documents** step entirely.
@@ -88,26 +95,29 @@ Tradesperson verification has three independent documents — **ID**, **certific
    **not visible** to clients.
 
 ### 1.3 Tradesperson onboarding — ID ONLY
+
 1. From 1.2, in **Documents** upload a government **ID** only (any test image).
 2. Try **Submit**.
 3. **Expected:** still **cannot submit** — certification is still required. The
    blocker now names only the missing cert (ID is satisfied).
 
 ### 1.4 Tradesperson onboarding — CERT + ID, NO insurance
+
 1. Add **one certification per trade** (upload an image, or declare "no formal
    certification" where allowed) **and** the **ID**. Leave **insurance** empty.
 2. **Submit for vetting.**
 3. **Expected:** submits successfully → status **Pending review**; the form goes
    read-only with a "Withdraw to edit" option.
 4. As **admin** (or have the admin tester) approve the ID + cert in the vetting
-   queue. *(QA shortcut: provisioning via `/qa` approves you instantly — use that
-   when you only need an approved tradie, not to test the vetting gate itself.)*
+   queue. _(QA shortcut: provisioning via `/qa` approves you instantly — use that
+   when you only need an approved tradie, not to test the vetting gate itself.)_
 5. **Expected after approval:** you become **visible/eligible** — you appear in
    client search and can browse the job board. **No "Insured" badge** (insurance
    is optional). Insurance-related disclosures appear later (see 4.2 / path uses
    the uninsured waiver).
 
 ### 1.5 Tradesperson onboarding — ALL docs incl. insurance
+
 1. As 1.4, plus upload **insurance**. Test **both** branches:
    - **Blue Seal additional-insured** declared, and
    - **own-policy** path → you sign the **liability release**.
@@ -116,6 +126,7 @@ Tradesperson verification has three independent documents — **ID**, **certific
    your public profile.
 
 ### 1.6 Google sign-up — client AND tradesperson (no spurious error)
+
 1. `/sign-up`, choose **Client**, accept terms, click **Continue with Google**,
    pick a Google account.
 2. **Expected:** **no error toast/message** (regression guard — this used to flash
@@ -126,14 +137,16 @@ Tradesperson verification has three independent documents — **ID**, **certific
    **tradesperson** role already granted (resume works on return — see 1.2).
 5. From `/sign-in` (not sign-up), a **brand-new** Google account → you're redirected
    to the **`/welcome`** step ("How will you use Blue Seal?"). It **cannot be
-   skipped** (no silent client default). Choose *tradesperson* → `/onboarding`;
-   choose *client* → dashboard. A **returning** Google account skips `/welcome` and
+   skipped** (no silent client default). Choose _tradesperson_ → `/onboarding`;
+   choose _client_ → dashboard. A **returning** Google account skips `/welcome` and
    lands on the dashboard (or its redirect target).
 6. **Mobile (375px):** popup + `/welcome` cards usable; no horizontal scroll.
 
 ### 1.7 Google One Tap — "Continue as <name>" (only when configured)
+
 > One Tap is **OFF until `VITE_GOOGLE_OAUTH_CLIENT_ID` is set** (see HUMANTASKS).
 > With it unset, skip this path — the button flow (1.6) is the coverage.
+
 1. Logged out, open `/sign-in` (or `/sign-up`). **Expected:** the **"Continue as
    <name>"** One Tap card appears (top-right on desktop).
 2. Tap it. **Expected:** signs in with no password. A **brand-new** account lands on
@@ -144,9 +157,10 @@ Tradesperson verification has three independent documents — **ID**, **certific
 
 ---
 
-## 2. Job creation  → help: `post-a-job`, `request-a-quote`, `find-a-tradesperson`, `bring-your-own-client`
+## 2. Job creation → help: `post-a-job`, `request-a-quote`, `find-a-tradesperson`, `bring-your-own-client`
 
 ### 2.1 Client posts a job to the board (open marketplace)
+
 1. As **Client**, `/jobs/post`. Wizard: **trade → describe → trade-specific
    details → photos (≥1) → when & where (address) → review**.
 2. Confirm the **draft persists** (reload mid-wizard → fields restored) and the
@@ -156,6 +170,7 @@ Tradesperson verification has three independent documents — **ID**, **certific
    you can see it under your posted jobs.
 
 ### 2.2 Client requests a quote from a specific tradesperson (direct)
+
 1. As **Client**, `/search` → open a tradesperson profile → **Request a quote**.
 2. Same wizard shape (trade only shown if they offer 2+).
 3. Submit.
@@ -163,7 +178,9 @@ Tradesperson verification has three independent documents — **ID**, **certific
    notified (in-app + email); a job chat opens.
 
 ### 2.3 Tradesperson creates a job for their own client (invite / solo)
-1. As **Tradesperson**, `/jobs/new`. Enter client name + email, trade, address.
+
+1. As **Tradesperson**, `/jobs/new`. Enter client name, trade, address. **Email
+   and phone are both optional** — only the name is required.
 2. **Trade field:** if your profile has a single trade, it shows as a read-only
    line (no dropdown to change). With two-plus trades it's a dropdown defaulted
    to your primary trade, changeable.
@@ -176,12 +193,12 @@ Tradesperson verification has three independent documents — **ID**, **certific
    attached), and any photos you attached show as the job's intake photos. This
    flow is **free** (no Pro needed). Mobile (375px): the photo grid is 3-up and the
    form is single-column.
-5a. **Skip the quote (price already agreed).** Create another job with **"Quote
+   5a. **Skip the quote (price already agreed).** Create another job with **"Quote
    already agreed — skip straight to the work"** turned ON. **Expected:** the job
    opens directly at **In progress** with no quote step (server stamps fixed
    billing + 0% job-line tax; no `quotes/{jobId}` doc). You invoice from logged
    time + materials, exactly like a solo job — there's nothing to quote or accept.
-5b. **One-tap invite link → the job.** Copy the invite link and open it
+   5b. **One-tap invite link → the job.** Copy the invite link and open it
    signed-out (incognito) as the client, then tap **View my job**. **Expected:**
    for a **brand-new** client email, one tap signs them straight in (no email
    typing, no inbox detour) and lands them on `/jobs/:id` with the job claimed
@@ -200,14 +217,31 @@ Tradesperson verification has three independent documents — **ID**, **certific
    (suppression list / CASL address / email-link enabled) and respects the
    invite unsubscribe. If it can't send, the tradesperson can still record
    acceptance / mark paid offline.
+8. **No client email at all (phone booking).** Create a job with the **email left
+   blank** (add a phone number instead). **Expected:** it saves — no "enter a
+   valid email address" block. The success dialog says you're running it solo and
+   shows **no invite link** (there's no invite to mint). On the job page the
+   banner reads **Solo job / no client email on file** with an **Invite client**
+   button; the job's Brief tab shows **Client contact** with the phone as a
+   tap-to-call link (tradesperson only). Tap **Invite client**, enter an email →
+   the first invite is minted and emailed, and the banner flips to **Waiting for
+   … to join**. (Server: `createInviteJob` with no email writes
+   `clientInvite: null`; `resendJobInvite` with `newEmail` mints it.)
+9. **Fill in the trade-specific brief as the tradesperson.** On a job you created,
+   open the **Brief** tab. **Expected:** the trade-specific fields are **editable**
+   (not greyed out) with a **Save details** button. Save → the answers persist and
+   the job's **status does not change** (it stays where it was; only the client's
+   "Submit brief" advances a job). On a marketplace job (`sourcePostId` set) and on
+   a closed job (complete / reviewed / cancelled) the fields stay read-only.
 
 ---
 
-## 3. Applications & quotes (tradesperson)  → help: `win-work`
+## 3. Applications & quotes (tradesperson) → help: `win-work`
 
 Provision yourself on the post's trade first (`/qa`) so the post is in your feed.
 
 ### 3.1 Apply with a full itemized quote (default)
+
 1. As **Tradesperson**, `/jobs/browse` → open a post → **Apply**.
 2. Build an itemized quote: line items, optional **upfront fee**, **proposed
    start date**, estimated duration, terms, cover note.
@@ -216,28 +250,56 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    already applied). The client sees your quote in their compare view.
 
 ### 3.2 Apply — "I need a site visit first"
+
 1. On a post, choose **Site visit first**. Set a visit fee (**$0 is allowed**),
    optional date, note. Submit.
 2. **Expected:** the client sees "Site visit: $X / Free visit" instead of a price.
    After they accept, the job enters **Requested** and you send a firm quote later.
 
 ### 3.3 Apply — "Chat first" / ask for more information
+
 1. On a post, choose **Chat first**, write your questions. Submit (no quote yet).
 2. **Expected:** the client sees "Wants to chat" and can open a Q&A thread.
 3. After the client answers, **revise your application** to attach a full quote.
 4. **Expected:** the client's compare view shows your quote with a "Revised" mark.
 
 ### 3.4 Direct-request quote + propose a site visit
+
 1. On a **Requested** direct job (from 2.2), open it and **send a quote**
    (itemized). Optionally try **Draft with AI** — see 8.2 for the Pro gate.
 2. Alternatively **propose a site visit** on the direct job.
 3. **Expected:** job moves to **Quoted**; the client is notified.
 
+### 3.5 Pick how to quote (time & materials vs itemized vs site visit)
+
+1. On a **Requested** direct job, tap **Prepare quote**. **Expected:** before any
+   form, three cards: **Time & materials**, **Itemized quote**, **Site visit
+   first**. Footer shows **Cancel** only (nothing to send yet).
+2. Choose **Time & materials**. **Expected:** the form opens pre-seeded with an
+   **Hourly** line at your profile rate and a **Materials** line at $0 — set the
+   hours, price or delete the materials line, and send. The optional money
+   sections (discount, upfront fee, validity, terms) are **hidden**; a **Show
+   every option** link reveals them.
+3. Tap **← Change how you're quoting** → choose **Itemized quote**. **Expected:**
+   back to the four-step guided wizard, and **the lines you already typed are
+   still there** (nothing is reset by switching).
+4. On wizard step 1, tap **Back**. **Expected:** returns to the three cards
+   rather than dead-ending on a disabled button.
+5. **Scope of work section order.** In the composer, the three \*\*+ Hourly /
+   - Flat rate / + Materials** buttons sit **above** an **"On this quote (N)"\*\*
+     block that holds the rows. Tapping one adds a row into that block below and
+     focuses its description — the row must not appear above the add buttons.
+6. **Resend/revise an existing quote.** Open **Prepare quote** on an
+   already-quoted job. **Expected:** no chooser — straight to the full form with
+   every section, hydrated from the sent quote.
+7. Mobile (375px): each card is a full-width tap target at least 64px tall.
+
 ---
 
-## 4. Client reviews & accepts  → help: `post-a-job`, `the-job-thread`
+## 4. Client reviews & accepts → help: `post-a-job`, `the-job-thread`
 
 ### 4.1 Compare applications & accept a quote
+
 1. As **Client**, open your posted job → review applications. Expand quote
    breakdowns; open an applicant **chat**; **decline** one (optional reason).
 2. **Accept** an applicant's quote → **sign** on the signature pad.
@@ -247,12 +309,14 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    applicant count (bid-blind).
 
 ### 4.2 Accept an uninsured tradesperson (waiver)
+
 1. Use a tradesperson with **no insurance** (1.4 state). As the client, accept
    their quote.
 2. **Expected:** before signing you must tick the **uninsured acknowledgement**;
    the signature also records the waiver.
 
 ### 4.3 Direct quote — accept / decline / revise
+
 1. On a **Quoted** direct job, as the client **Accept** (sign), **Decline** (with
    reason), or have the tradie **revise & resend**.
 2. **Expected:** accept → **In progress**; decline → stays **Quoted**, tradie can
@@ -260,7 +324,7 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 
 ---
 
-## 5. Job pipeline (the kanban)  → help: `work-order-time-and-change-orders`
+## 5. Job pipeline (the kanban) → help: `work-order-time-and-change-orders`
 
 1. On an **In progress** job, as the **Tradesperson**: **clock in / clock out**,
    add **travel** and **expenses**, and **scan a receipt** (receipt OCR).
@@ -291,34 +355,65 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    Client **Approves** (→ Awaiting payment) or **Requests changes** (tradie
    re-submits).
 
+### 5.1 Dashboard calendar — month default + day detail
+
+1. As **Tradesperson**, `/dashboard/tradie?view=calendar`. **Expected:** it opens
+   on **Month** (not Week); the Month/Week toggle is top-right with Month first.
+2. Month cells show up to two job chips **prefixed with the start time**
+   (e.g. `09:00 Boiler service`), then `+N more`. A blocked day is tinted red
+   with a ban icon; a working day shows a small blue dot.
+3. **Tap any day cell.** **Expected:** a **day sheet** opens titled with the full
+   date, showing the day's **working hours**, then an **hour rail** with each
+   scheduled job drawn against the hours it occupies (title, `HH:MM – HH:MM`,
+   client). Tapping a job block closes the sheet and opens that job. An empty day
+   reads **Nothing scheduled**.
+4. **Blocking moved into the sheet.** A bare tap on a month cell must **no longer
+   block the day**. Instead the sheet's footer has **Block day** (future,
+   unblocked days only) → confirm dialog → the day tints red. Re-open a blocked
+   day → the sheet shows a red **You've blocked this day** bar with **Unblock**.
+5. **Multi-day jobs.** A job with `scheduledStart` Mon and `scheduledEnd` Wed
+   appears on **all three** days, not just Monday. The time prefix shows only on
+   the first day.
+6. **Read-only viewers.** Open a tradesperson's public profile calendar as a
+   client / signed-out. **Expected:** days still open the sheet, but there is
+   **no Block day / Unblock** control anywhere.
+7. **Week view** still works (toggle to it): day headers are tappable and open the
+   same sheet; the per-day **Block day** button is unchanged.
+8. Mobile (375px): the month grid stays 7 columns and the day sheet fits without
+   horizontal scroll.
+
 ---
 
-## 6. Payments (Stripe test mode)  → help: `quotes-and-invoices`, `paying-for-a-job`, `getting-paid-out`
+## 6. Payments (Stripe test mode) → help: `quotes-and-invoices`, `paying-for-a-job`, `getting-paid-out`
 
 ### 6.1 Pay an upfront fee
+
 1. Accept a quote that has an **upfront fee** (3.1). As the client, pay it with
    `4242 4242 4242 4242`.
 2. **Expected:** fee marked paid; job moves from **Awaiting upfront payment** to
    **In progress**.
 
 ### 6.2 Invoice → card payment → service fee
+
 1. As the **Tradesperson**, send the invoice. As the **Client**, pay by **card**.
 2. **Expected:** a **Blue Seal service fee** is shown at checkout (**5%, min $2,
    capped $99**) before you confirm; `4242…` succeeds; job → **Complete**.
 3. Try `4000 0000 0000 0002` → **Expected:** decline surfaced, job stays unpaid.
 
 ### 6.3 Pro fee waiver
+
 1. Make the tradesperson **Pro** (`/qa` → Enable Pro). As the client, pay their
    invoice by card.
 2. **Expected:** the service fee is **waived to $0**.
 
 ### 6.4 Offline payment (no fee)
+
 1. Mark an invoice paid by **e-transfer / cash** instead of card.
 2. **Expected:** **no service fee**; job completes.
 
 ---
 
-## 7. Reviews  → help: `mutual-reviews`
+## 7. Reviews → help: `mutual-reviews`
 
 1. On a **Complete** job: as the **Client**, leave a public review (overall +
    quality/punctuality/communication/value). As the **Tradesperson**, leave a
@@ -329,21 +424,24 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 
 ---
 
-## 8. Blue Seal Pro & the paywall  → help: `blue-seal-pro`, `clients-and-recurring-billing`
+## 8. Blue Seal Pro & the paywall → help: `blue-seal-pro`, `clients-and-recurring-billing`
 
 ### 8.1 Start a real trial (Stripe path)
+
 1. As a tradesperson **without** Pro, start the trial via the upgrade flow →
    Stripe Checkout (card required, `4242…`).
 2. **Expected:** status becomes **Trialing** (30 days); the billing portal lets
-   you cancel/switch. *(For most QA, just toggle Pro instantly in `/qa` instead.)*
+   you cancel/switch. _(For most QA, just toggle Pro instantly in `/qa` instead.)_
 
 ### 8.2 Paywall on AI tools
+
 1. As a **non-Pro** tradesperson, try an **AI** tool (AI assistant, **Draft with
    AI** on a quote/invoice, suggested replies).
 2. **Expected:** the **Blue Seal Pro paywall** popup appears. Enable Pro (`/qa`)
    → the same action now works. **Receipt OCR stays free** (re-confirm 5.2).
 
 ### 8.3 Clients tab + recurring billing (Pro)
+
 1. As a **Pro** tradesperson, open **Clients**, create a **recurring plan**.
 2. **Expected:** it **drafts** an invoice each period and **never auto-sends or
    auto-charges**; you can pause/resume. (Whole Clients tab is Pro-gated.)
@@ -355,7 +453,7 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 1. **Role switching (all three surfaces stay in sync).** As an account holding
    several views (e.g. Client + Tradesperson + Project manager + Sales + Admin),
    check each switcher: **(a)** the header avatar menu lists a "Switch to X view"
-   item for every view you hold *except* the one you're in; **(b)** the side
+   item for every view you hold _except_ the one you're in; **(b)** the side
    panel "Viewing as" **dropdown** opens to the same full list (no truncated
    "C.. T.. A.." labels) with the current view marked active; **(c)** Account →
    Your roles lists every view with an "Active" badge on the current one and a
@@ -374,8 +472,8 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    the top of the card. A **single-role** user sees **no** badge (one context,
    so it'd be noise). Check at 375px — the chip wraps under the body, never
    clipping the title.
-4. **PWA install** — install to home screen (iPhone/Android/desktop). → `install-the-app`
-5. **In-app update (the banner must not loop).** With the app already open on an
+5. **PWA install** — install to home screen (iPhone/Android/desktop). → `install-the-app`
+6. **In-app update (the banner must not loop).** With the app already open on an
    older build, ship a new build. **Expected:** within ~30s (or on tab refocus) a
    "A new version of Blue Seal is available" banner appears; tap **Update** → the
    app reloads **once** to the newest build and the banner **does not come back**.
@@ -383,12 +481,20 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    Update, confirm a single reload lands the new build (no repeating popup). A
    `critical` release shows the blocking "Update required" overlay instead; same
    one-tap, single-reload result.
-6. **Help Center** — browse `/help`, search, open an article and a FAQ. →
+7. **Help Center** — browse `/help`, search, open an article and a FAQ. →
    `report-a-problem`
+8. **Vanity profile URL resolves (regression).** As a **Pro tradesperson with a
+   claimed handle**, open **My page** (side panel, or `/tradies/<your-uid>`).
+   **Expected:** the URL swaps to `/u/<your-handle>` and the profile **renders**.
+   It must **not** show "Profile not found". Check it signed-out too (paste
+   `/tradies/<uid>` in a private window) and from a **vouch chip** on another
+   tradesperson's profile — navigating profile-to-profile must load the new
+   person, not keep showing the previous one. (Both routes render the same
+   component, so the page has to re-resolve on a route change, not just on mount.)
 
 ---
 
-## 10. The QA toolkit itself  → (no help article; internal)
+## 10. The QA toolkit itself → (no help article; internal)
 
 1. **Provision** yourself as a tradesperson on a given trade (`/qa`) → confirm you
    appear in client **search** and can **browse jobs**.
@@ -397,7 +503,7 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    draft; re-provision and re-run.
 4. **File a bug** via the floating button (paste a screenshot) → confirm it
    appears in **My bug reports** (`/qa`) and in **admin triage** (`/admin/bug-reports`).
-5. **Error log** — trigger nothing special; just confirm `/qa` → *Error log* lists
+5. **Error log** — trigger nothing special; just confirm `/qa` → _Error log_ lists
    recent captured errors and you can mark one **Resolved**.
 6. **Browse-area override (job board).** Provision yourself as a tradesperson,
    then open **Browse open jobs**. Use the QA-only **"QA: browse area"** dropdown
@@ -410,7 +516,7 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 
 ---
 
-## 11. Sales reps  → (rep-internal; no public help article)
+## 11. Sales reps → (rep-internal; no public help article)
 
 > Requires an admin to grant your account the **sales** role (Admin → Users →
 > your user → tick **sales** → Save). The sales tools live under **/sales** (use
@@ -461,12 +567,12 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    signed up via your code (step 5) to **live**, then run them to a **card-paid
    invoice** (6.2) while they are **not** Pro (so the platform service fee
    applies). **Expected:** one `commissions` doc with id `service_fee_<invoiceId>`,
-   `repId` = the owning rep, `ownerKind` "referral", `source` "service_fee",
+   `repId` = the owning rep, `ownerKind` "referral", `source` "service*fee",
    `status` "accrued", and `commissionCents` = **10%** of the fee's platform
    portion. Exactly one doc, and a webhook retry never adds a second. Then make
    them **Pro** and pay another card invoice. **Expected:** the fee is waived to
    $0, so **no** new commission is written (nothing for the platform to share). A
-   real **Pro subscription** payment (8.1) writes a `subscription_<stripeInvoiceId>`
+   real **Pro subscription** payment (8.1) writes a `subscription*<stripeInvoiceId>`
    doc at 10% of the amount charged; the referral **free comp month** writes
    nothing (there is no Stripe charge behind it).
 10. **Commission reverses on a refund / lost chargeback (money seam).** From step
@@ -480,7 +586,7 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
     `_reversal` doc, and a later larger partial refund escalates it upward (never
     double-counts). A dispute that closes **won** (or without loss) leaves the
     commission intact; only a **lost** chargeback reverses it (fully).
-10b. **Upfront-fee commission (money seam).** On a PM-driven job with an upfront
+    10b. **Upfront-fee commission (money seam).** On a PM-driven job with an upfront
     fee, pay the upfront by card (6.1). **Expected:** rep + PM commission accrue
     keyed `service_fee_upfront_<jobId>` (distinct from the final invoice entry),
     each 10% of the upfront's platform portion. Refund the upfront → matching
@@ -517,7 +623,7 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 
 ---
 
-## 12. Admin — all jobs & postings  → (admin-internal; no public help article)
+## 12. Admin — all jobs & postings → (admin-internal; no public help article)
 
 > Requires the **admin** role. Open **Admin → Manage → Jobs & postings**
 > (`/admin/jobs`). This is the system-wide view of every job and every job-board
@@ -549,7 +655,7 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 
 ---
 
-## 13. Project managers  → (real estate agents, property managers, landlords; help article pending)
+## 13. Project managers → (real estate agents, property managers, landlords; help article pending)
 
 > A **project manager** (PM) recommends trades, sets up jobs for their clients, and
 > earns a referral commission. Self-serve, **no vetting**: the role enables instantly
@@ -583,7 +689,7 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    **Request** opens a fresh quote to them; the **x** removes them. The same list shows
    under **Saved trades** on the client dashboard. (Reuses the existing `savedTradies`
    shortlist.)
-5a. **Roster: search reaches unverified + profile-less tradespeople.** Search the name of
+   5a. **Roster: search reaches unverified + profile-less tradespeople.** Search the name of
    a tradesperson who isn't verified yet (`isVisible` false, mid-onboarding) or who has the
    tradesperson role but never built a profile at all. **Expected:** they now appear in the
    results with a "Not verified yet" note and can be added (the old client-side search only
@@ -600,7 +706,7 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    goes live (vetted), they appear on the PM's roster and get a free first month of Pro
    (granted at go-live, like a rep code). Sanity: the rep `?ref=` link still works
    unchanged. (Server attribution: `users/{tradieUid}.referredByPmId`.)
-6a. **Roster: email invite a tradesperson by name + email.** In the **Roster** page's
+   6a. **Roster: email invite a tradesperson by name + email.** In the **Roster** page's
    "New to Blue Seal? Email them an invite" card, enter a name + a fresh email and **Send
    invite** (`sendRosterInvite`). **Expected:** a row appears under **Invites** as pending
    ("Invited just now") and the recipient gets a CASL-compliant email (mailing address +
@@ -644,8 +750,8 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    **Re-copy the invite link later.** Re-open a pending project and tap **Resend
    invite**. **Expected:** a fresh "**Shareable sign-in link**" appears with a Copy
    button for the **same** client email (not only on an email change), and the
-   client is re-emailed; the newest link is the one that works. *(Requires the
-   `resendProjectInvite` function deploy — see HUMANTASKS.)*
+   client is re-emailed; the newest link is the one that works. _(Requires the
+   `resendProjectInvite` function deploy — see HUMANTASKS.)_
 
    Open the invite link (or the emailed
    magic link) in a fresh session, confirm the client's email, sign in, and confirm
@@ -655,6 +761,7 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    card flips to **Accepted**, and back in the PM cockpit the project shows
    **Accepted** (the PM gets a notification). Decline on a second project instead
    and confirm it shows **Declined**.
+
 9. **Dispatch + compare-and-choose (P3b-2).** Pre-req: the PM has at least one
    **saved trade** whose trade matches a job in the project, and that tradesperson
    is **visible/approved**. After the client accepts (path 8), sign in as that
@@ -670,14 +777,14 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    `drivenByProjectManagerId` (the winner was a preferred contractor — the
    commission trigger, P4). A tradesperson NOT on the PM's list never sees the
    posting.
-9b. **Public-board fallback (P3b-2b).** On a scoped posting with no quotes, the
+   9b. **Public-board fallback (P3b-2b).** On a scoped posting with no quotes, the
    client opens the posting (from **Posted jobs**) and taps **Open to all trades
    nearby**. **Expected:** the posting flips to **Open**, drops out of the invited
    contractors' "Invited to quote" lists, and now appears in the normal radius feed
    for any verified tradesperson in the area (its address is geocoded at this step).
    A preferred contractor who still wins after the fallback keeps the
    `drivenByProjectManagerId` stamp (commission); an off-list public winner does not.
-9c. **PM read-only visibility (P3b-3).** In the cockpit, tap a project to open its
+   9c. **PM read-only visibility (P3b-3).** In the cockpit, tap a project to open its
    detail (`/manage/projects/:id`). **Expected:** each job shows its posting status;
    while quotes arrive you see the **amounts** (to broker the pick); once the client
    picks a contractor, that job shows the **winner + job status + scheduled dates**.
@@ -686,113 +793,116 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    cannot open another PM's project or postings. (Covered by the PM-read tests in
    `tests/rules/jobPosts.test.ts` + `tests/rules/jobs.test.ts`.)
 10. **Project money / permission seam (rules).** The project doc is server-managed:
-   the client cannot forge `status` (no direct write) and only the project's own
-   client can accept/decline; only the owning PM or linked client reads it. A scoped
-   posting is readable + appliable only by an invited contractor (`status:"invited"`
-   + `invitedContractorIds`), and the job's PM fields are pinned immutable against
-   party writes (covered by `tests/rules/projects.test.ts`, the invited-post tests
-   in `tests/rules/jobPosts.test.ts`, the jobs-update pins, and `respondToProject`
-   unit tests).
-10b. **PM commission accrues on payment (P4).** Take a PM-driven job (path 9, won by
-   a preferred contractor) through to a **card-paid** invoice. **Expected:** TWO
-   commission ledger entries accrue on the same fee — the tradesperson's rep (if any)
-   AND the PM, each 10% of Blue Seal's platform portion, with distinct deterministic
-   ids (`service_fee_<inv>` and `service_fee_<inv>_pm_<pmId>`). A full refund / lost
-   dispute reverses BOTH. A public-fallback win by an off-list contractor accrues NO
-   PM entry (not PM-driven). Pro-waived fee = no entries. (Verify on real Firestore +
-   Stripe test mode; covered by `commissionAccrual` unit tests.)
-10c. **PM earnings + payouts (P4).** In the cockpit **Earnings** section: see the
-   unpaid balance + paid-to-date. Tap **Review & sign the agreement** (signature pad)
-   → then **Start Stripe setup** (Connect Express onboarding) → return to `/manage`.
-   **Expected:** once Stripe reports payouts enabled, the panel reads "Payouts are
-   live"; the monthly scheduler pays the PM the same way as a rep ($50 min,
-   claim-before-pay) once their balance clears. The agreement gates payout setup only,
-   never the cockpit. A PM reads only their own commission/payout entries (rules).
-10d. **Public profile (P5a).** In the cockpit **Public profile** section: edit the
-   business name + about + brand colour, upload a logo + cover, then **Claim** a
-   `/pm/<handle>` link (3-30 lowercase letters/numbers/hyphens; reserved words
-   rejected) and **toggle Publish on**. **Expected:** open `/pm/<handle>` (signed out
-   / incognito) and see the published profile (cover, logo, name, about). With Publish
-   **off**, the same link reads "Profile not found" to the public, but the owner sees
-   a preview banner. No vetting/review gate; publishing is instant.
-10e. **PM navigation + dashboard (UX redesign).** As a project manager, confirm the
-   **side nav is PM-specific** (Dashboard, Properties, Jobs, Trades, Earnings, Public
-   profile) — NOT the client nav. **Expected:** `/manage` is a Dashboard overview (stat
-   tiles for properties / active projects / jobs in progress / unpaid earnings, quick
-   actions, a payout-setup nudge, recent projects), and each nav item / tile routes to
-   its own section. Mobile bottom bar = Dashboard + Properties + Alerts.
+    the client cannot forge `status` (no direct write) and only the project's own
+    client can accept/decline; only the owning PM or linked client reads it. A scoped
+    posting is readable + appliable only by an invited contractor (`status:"invited"`
 
-   **First-run Get started checklist.** As a *brand-new* PM (empty roster, no
-   projects), the dashboard shows an ordered **Get started** card above the tiles with
-   three steps — **Add your trusted trades** (listed first, on purpose), Add a property,
-   Set up your first project — each with a button into its section and an `x/3 done`
-   counter. **Expected:** completing a step ticks it off (line-through, check icon);
-   the card disappears once you have **≥1 roster trade AND ≥1 project** (a property is
-   recommended but optional). The "trades first" order matters: a project created with
-   an empty roster dispatches to nobody and falls back to the public board.
+- `invitedContractorIds`), and the job's PM fields are pinned immutable against
+  party writes (covered by `tests/rules/projects.test.ts`, the invited-post tests
+  in `tests/rules/jobPosts.test.ts`, the jobs-update pins, and `respondToProject`
+  unit tests).
+  10b. **PM commission accrues on payment (P4).** Take a PM-driven job (path 9, won by
+  a preferred contractor) through to a **card-paid** invoice. **Expected:** TWO
+  commission ledger entries accrue on the same fee — the tradesperson's rep (if any)
+  AND the PM, each 10% of Blue Seal's platform portion, with distinct deterministic
+  ids (`service_fee_<inv>` and `service_fee_<inv>_pm_<pmId>`). A full refund / lost
+  dispute reverses BOTH. A public-fallback win by an off-list contractor accrues NO
+  PM entry (not PM-driven). Pro-waived fee = no entries. (Verify on real Firestore +
+  Stripe test mode; covered by `commissionAccrual` unit tests.)
+  10c. **PM earnings + payouts (P4).** In the cockpit **Earnings** section: see the
+  unpaid balance + paid-to-date. Tap **Review & sign the agreement** (signature pad)
+  → then **Start Stripe setup** (Connect Express onboarding) → return to `/manage`.
+  **Expected:** once Stripe reports payouts enabled, the panel reads "Payouts are
+  live"; the monthly scheduler pays the PM the same way as a rep ($50 min,
+  claim-before-pay) once their balance clears. The agreement gates payout setup only,
+  never the cockpit. A PM reads only their own commission/payout entries (rules).
+  10d. **Public profile (P5a).** In the cockpit **Public profile** section: edit the
+  business name + about + brand colour, upload a logo + cover, then **Claim** a
+  `/pm/<handle>` link (3-30 lowercase letters/numbers/hyphens; reserved words
+  rejected) and **toggle Publish on**. **Expected:** open `/pm/<handle>` (signed out
+  / incognito) and see the published profile (cover, logo, name, about). With Publish
+  **off**, the same link reads "Profile not found" to the public, but the owner sees
+  a preview banner. No vetting/review gate; publishing is instant.
+  10e. **PM navigation + dashboard (UX redesign).** As a project manager, confirm the
+  **side nav is PM-specific** (Dashboard, Properties, Jobs, Trades, Earnings, Public
+  profile) — NOT the client nav. **Expected:** `/manage` is a Dashboard overview (stat
+  tiles for properties / active projects / jobs in progress / unpaid earnings, quick
+  actions, a payout-setup nudge, recent projects), and each nav item / tile routes to
+  its own section. Mobile bottom bar = Dashboard + Properties + Alerts.
+
+**First-run Get started checklist.** As a _brand-new_ PM (empty roster, no
+projects), the dashboard shows an ordered **Get started** card above the tiles with
+three steps — **Add your trusted trades** (listed first, on purpose), Add a property,
+Set up your first project — each with a button into its section and an `x/3 done`
+counter. **Expected:** completing a step ticks it off (line-through, check icon);
+the card disappears once you have **≥1 roster trade AND ≥1 project** (a property is
+recommended but optional). The "trades first" order matters: a project created with
+an empty roster dispatches to nobody and falls back to the public board.
 10f. **Property -> Projects -> Jobs drill-down.** From **Properties**, tap a property to
-   open it; tap **New project here** and create a project (it's scoped to that property,
-   no property picker). **Expected:** the project appears under that property and opens
-   to its read-only jobs/quotes; the Dashboard "recent projects" and the **Jobs** board
-   (every PM-driven job, read-only) also reflect it.
+open it; tap **New project here** and create a project (it's scoped to that property,
+no property picker). **Expected:** the project appears under that property and opens
+to its read-only jobs/quotes; the Dashboard "recent projects" and the **Jobs** board
+(every PM-driven job, read-only) also reflect it.
 10g. **Photos on properties + projects.** Add/edit a property and attach a **photo**;
-   create a project and attach a **photo**. **Expected:** the photo shows as a hero on
-   the property + project detail pages and as a thumbnail on the lists + dashboard; the
-   client invited to the project can see the project photo (world-read storage).
+create a project and attach a **photo**. **Expected:** the photo shows as a hero on
+the property + project detail pages and as a thumbnail on the lists + dashboard; the
+client invited to the project can see the project photo (world-read storage).
 10h. **Find / feature trades + contractor opt-out (P5b).** In **Trades**, tap **Find a
-   tradesperson** -> search -> Save one. In **Public profile -> Featured trades**, toggle
-   that saved trade **on**. **Expected:** they appear under "Trades I recommend" on your
-   public `/pm/<handle>` page (each card -> request a quote), and the contractor gets a
-   `pm_featured` notification. As that contractor, open **/featured-by-pms** and tap
-   **Remove me**. **Expected:** they drop off the PM's profile and can't be re-featured
-   until they opt back in (covered by `featuredContractors.test.ts` + rules tests).
+tradesperson** -> search -> Save one. In **Public profile -> Featured trades**, toggle
+that saved trade **on**. **Expected:** they appear under "Trades I recommend" on your
+public `/pm/<handle>` page (each card -> request a quote), and the contractor gets a
+`pm_featured` notification. As that contractor, open **/featured-by-pms** and tap
+**Remove me**. **Expected:** they drop off the PM's profile and can't be re-featured
+until they opt back in (covered by `featuredContractors.test.ts` + rules tests).
 10i. **Business card (QR to public profile).** From the **dashboard** tap **My business
-   card** (or **Public profile -> Business card**, route `/manage/card`). Pick a theme
-   (Cream/Navy), tweak the scan caption + optional phone, then **download the 2-sided
-   PDF** and a **PNG**. Scan the QR with a phone. **Expected:** the card shows your
-   name/brand + the trades you recommend (from your featured contractors); the QR opens
-   your public profile (`/pm/<handle>`, or `/project-managers/<uid>` if you haven't
-   claimed a handle). If your profile isn't published yet, a warning tells you to publish
-   it first (so the scan resolves for clients).
+card** (or **Public profile -> Business card**, route `/manage/card`). Pick a theme
+(Cream/Navy), tweak the scan caption + optional phone, then **download the 2-sided
+PDF** and a **PNG**. Scan the QR with a phone. **Expected:** the card shows your
+name/brand + the trades you recommend (from your featured contractors); the QR opens
+your public profile (`/pm/<handle>`, or `/project-managers/<uid>` if you haven't
+claimed a handle). If your profile isn't published yet, a warning tells you to publish
+it first (so the scan resolves for clients).
 10j. **PM tools expansion (2026-06).** A batch of cockpit additions; the Pro ones gate
-   behind the **same Blue Seal Pro subscription tradespeople use** (a PM can subscribe
-   through the normal paywall → trial → Stripe, no "add the tradesperson role" bounce).
-   - **Welcome email.** Become a PM → a one-time "Welcome to Blue Seal" email + in-app
-     notification arrives, linking to `/manage` (re-adding the role doesn't re-send).
-   - **Restore archived property.** Properties → archive one → **Archived (N)** section
-     → **Restore** → it's back in the active list.
-   - **Multi-unit.** Edit a property → add **units** (chips) → Save (card shows "N
-     units"). New project on it → a **Unit** picker appears → pick one → the unit shows
-     on the project detail + the property's project list.
-   - **Edit a project.** On a pending project, **Edit project** → change label / add a
-     job → **Save changes**. Offered only pre-accept (server rejects edits after accept).
-   - **Add jobs after accept (client approves each).** On an **accepted** project,
-     **Add jobs** → add a job (trade+title+desc), optionally **Draft jobs** with AI →
-     **Send to client for approval**. The job lands under "Awaiting your client's
-     approval" as **Pending client** (no posting yet) and the client is notified; it
-     does **not** dispatch until they approve. As the client (dashboard → "Projects set
-     up for you"), **Approve** dispatches that one job to the matching saved trades
-     (no address re-asked — reuses the accept address) and notifies the PM; **Decline**
-     marks it Declined on the PM detail and notifies the PM. The headline job count
-     ignores declined adds. (Requires the `proposeProjectJobs` + `respondToProjectJob`
-     function deploy.)
-   - **Roster availability.** Roster cards show each contractor's available weekdays.
-   - **Clients (Pro)** `/manage/clients`: all clients gathered from your projects,
-     searchable, active/total counts. Non-Pro → the Pro gate.
-   - **Calendar (Pro)** `/manage/calendar`: every scheduled job across your projects on
-     the read-only calendar. Non-Pro → the Pro gate.
-   - **Branded profile + business card (Pro).** Non-Pro PMs see the Pro gate on Public
-     profile + Business card.
-   - **AI — draft a project (Pro).** New project → "Draft the jobs with AI" → describe
-     the work → **Draft jobs** → rows populate to review. Non-Pro → paywall.
-   - **AI — Catch me up (Pro).** Dashboard → **Catch me up** → a plain-language status
-     digest (status only — never the chat/invoice). Non-Pro → paywall.
+behind the **same Blue Seal Pro subscription tradespeople use** (a PM can subscribe
+through the normal paywall → trial → Stripe, no "add the tradesperson role" bounce).
+
+- **Welcome email.** Become a PM → a one-time "Welcome to Blue Seal" email + in-app
+  notification arrives, linking to `/manage` (re-adding the role doesn't re-send).
+- **Restore archived property.** Properties → archive one → **Archived (N)** section
+  → **Restore** → it's back in the active list.
+- **Multi-unit.** Edit a property → add **units** (chips) → Save (card shows "N
+  units"). New project on it → a **Unit** picker appears → pick one → the unit shows
+  on the project detail + the property's project list.
+- **Edit a project.** On a pending project, **Edit project** → change label / add a
+  job → **Save changes**. Offered only pre-accept (server rejects edits after accept).
+- **Add jobs after accept (client approves each).** On an **accepted** project,
+  **Add jobs** → add a job (trade+title+desc), optionally **Draft jobs** with AI →
+  **Send to client for approval**. The job lands under "Awaiting your client's
+  approval" as **Pending client** (no posting yet) and the client is notified; it
+  does **not** dispatch until they approve. As the client (dashboard → "Projects set
+  up for you"), **Approve** dispatches that one job to the matching saved trades
+  (no address re-asked — reuses the accept address) and notifies the PM; **Decline**
+  marks it Declined on the PM detail and notifies the PM. The headline job count
+  ignores declined adds. (Requires the `proposeProjectJobs` + `respondToProjectJob`
+  function deploy.)
+- **Roster availability.** Roster cards show each contractor's available weekdays.
+- **Clients (Pro)** `/manage/clients`: all clients gathered from your projects,
+  searchable, active/total counts. Non-Pro → the Pro gate.
+- **Calendar (Pro)** `/manage/calendar`: every scheduled job across your projects on
+  the read-only calendar. Non-Pro → the Pro gate.
+- **Branded profile + business card (Pro).** Non-Pro PMs see the Pro gate on Public
+  profile + Business card.
+- **AI — draft a project (Pro).** New project → "Draft the jobs with AI" → describe
+  the work → **Draft jobs** → rows populate to review. Non-Pro → paywall.
+- **AI — Catch me up (Pro).** Dashboard → **Catch me up** → a plain-language status
+  digest (status only — never the chat/invoice). Non-Pro → paywall.
+
 11. **Mobile (375px).** Re-run the signup cards + cockpit + saved-trades + properties +
-   projects (incl. the client accept + address form), the tradesperson "Invited to
-   quote" section, the cockpit Earnings + Public-profile editors, and the public
-   `/pm/<handle>` page at 375px. **Expected:** the role cards stack and stay tappable;
-   the cockpit cards, the new-project form, the accept address form, and the public
-   profile read cleanly.
+    projects (incl. the client accept + address form), the tradesperson "Invited to
+    quote" section, the cockpit Earnings + Public-profile editors, and the public
+    `/pm/<handle>` page at 375px. **Expected:** the role cards stack and stay tappable;
+    the cockpit cards, the new-project form, the accept address form, and the public
+    profile read cleanly.
 
 ---
 

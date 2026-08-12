@@ -119,7 +119,12 @@ export interface InviteJobInput {
   description: string;
   trade: string;
   clientName: string;
-  clientEmail: string;
+  // null = no email on file (phone-booked job). No invite is minted and
+  // `inviteLink` comes back null — it's a solo job until the tradesperson adds
+  // an address via resendJobInvite({ newEmail }).
+  clientEmail: string | null;
+  // Tradesperson's own note of the client's number, shown on the job page.
+  clientPhone: string | null;
   address: Omit<JobAddress, "geo">;
   urgency: Urgency;
   preferredStart: string | null; // YYYY-MM-DD or null
@@ -128,13 +133,14 @@ export interface InviteJobInput {
   skipQuote?: boolean;
 }
 
-export async function createInviteJob(
-  input: InviteJobInput,
-): Promise<{ jobId: string; inviteLink: string; emailed: boolean }> {
-  const fn = httpsCallable<InviteJobInput, { jobId: string; inviteLink: string; emailed: boolean }>(
-    functions,
-    "createInviteJob",
-  );
+export interface InviteJobResult {
+  jobId: string;
+  inviteLink: string | null;
+  emailed: boolean;
+}
+
+export async function createInviteJob(input: InviteJobInput): Promise<InviteJobResult> {
+  const fn = httpsCallable<InviteJobInput, InviteJobResult>(functions, "createInviteJob");
   const res = await fn(input);
   return res.data;
 }
@@ -166,15 +172,10 @@ export async function revokeJobInvite(jobId: string): Promise<{ ok: true }> {
 // returns a custom token the client signs in with (then claims the job); for an
 // email that already has an account it emails the magic link instead (takeover
 // guard) and returns { mode: "emailed" }. Unauthenticated by design.
-export type RedeemJobInviteResult =
-  | { mode: "signin"; customToken: string }
-  | { mode: "emailed" };
+export type RedeemJobInviteResult = { mode: "signin"; customToken: string } | { mode: "emailed" };
 
 export async function redeemJobInvite(token: string): Promise<RedeemJobInviteResult> {
-  const fn = httpsCallable<{ token: string }, RedeemJobInviteResult>(
-    functions,
-    "redeemJobInvite",
-  );
+  const fn = httpsCallable<{ token: string }, RedeemJobInviteResult>(functions, "redeemJobInvite");
   const res = await fn({ token });
   return res.data;
 }
@@ -197,10 +198,7 @@ export type ClaimJobInviteResult =
 // Two-phase: confirm:false previews the invites matching the signed-in
 // user's verified email; confirm:true attaches them as the jobs' client.
 export async function claimJobInvite(confirm: boolean): Promise<ClaimJobInviteResult> {
-  const fn = httpsCallable<{ confirm: boolean }, ClaimJobInviteResult>(
-    functions,
-    "claimJobInvite",
-  );
+  const fn = httpsCallable<{ confirm: boolean }, ClaimJobInviteResult>(functions, "claimJobInvite");
   const res = await fn({ confirm });
   return res.data;
 }
@@ -352,6 +350,18 @@ export async function saveJobIntakeAndAdvance(
   });
 }
 
+// The tradesperson filling the trade-specific brief themselves — on a job they
+// created for their own client (no client account to fill it in), or one where
+// they took the details over the phone. Deliberately does NOT touch status: the
+// brief is reference material for the quote, and the tradie's own job is
+// already at whatever stage they've driven it to.
+export async function saveJobIntake(
+  id: string,
+  intakeFormData: Record<string, unknown>,
+): Promise<void> {
+  await updateDoc(doc(db, "jobs", id), { intakeFormData });
+}
+
 // Subscribe to all jobs for a tradesperson (kanban + calendar + list feed).
 // Recurring-billing backing jobs (originType "recurring_plan") are filtered out
 // — they're hidden billing vehicles surfaced only under their client, never on
@@ -434,10 +444,10 @@ export interface SubmitJobForApprovalInput {
 export async function submitJobForApproval(
   input: SubmitJobForApprovalInput,
 ): Promise<{ ok: true; total: number; lineItemsCount: number }> {
-  const fn = httpsCallable<SubmitJobForApprovalInput, { ok: true; total: number; lineItemsCount: number }>(
-    functions,
-    "submitJobForApproval",
-  );
+  const fn = httpsCallable<
+    SubmitJobForApprovalInput,
+    { ok: true; total: number; lineItemsCount: number }
+  >(functions, "submitJobForApproval");
   const res = await fn(input);
   return res.data;
 }
@@ -448,10 +458,7 @@ export async function clientApproveJob(jobId: string): Promise<{ ok: true }> {
   return res.data;
 }
 
-export async function clientRequestChanges(
-  jobId: string,
-  reason: string,
-): Promise<{ ok: true }> {
+export async function clientRequestChanges(jobId: string, reason: string): Promise<{ ok: true }> {
   const fn = httpsCallable<{ jobId: string; reason: string }, { ok: true }>(
     functions,
     "clientRequestChanges",
@@ -482,10 +489,7 @@ export async function markUpfrontFeePaid(jobId: string): Promise<{ ok: true }> {
 
 /** Client-side "I've paid the upfront fee" nudge — pings the tradesperson to confirm receipt. */
 export async function clientMarkUpfrontFeePaid(jobId: string): Promise<{ ok: true }> {
-  const fn = httpsCallable<{ jobId: string }, { ok: true }>(
-    functions,
-    "clientMarkUpfrontFeePaid",
-  );
+  const fn = httpsCallable<{ jobId: string }, { ok: true }>(functions, "clientMarkUpfrontFeePaid");
   const res = await fn({ jobId });
   return res.data;
 }
@@ -493,10 +497,26 @@ export async function clientMarkUpfrontFeePaid(jobId: string): Promise<{ ok: tru
 /** Create (or refresh) the Stripe PaymentIntent to pay a job's upfront fee by card. */
 export async function createUpfrontFeePaymentIntent(
   jobId: string,
-): Promise<{ clientSecret: string | null; serviceFee: { totalFeeCents: number; chargeTotalCents: number; baseAmountCents: number; waived: boolean } }> {
+): Promise<{
+  clientSecret: string | null;
+  serviceFee: {
+    totalFeeCents: number;
+    chargeTotalCents: number;
+    baseAmountCents: number;
+    waived: boolean;
+  };
+}> {
   const fn = httpsCallable<
     { jobId: string },
-    { clientSecret: string | null; serviceFee: { totalFeeCents: number; chargeTotalCents: number; baseAmountCents: number; waived: boolean } }
+    {
+      clientSecret: string | null;
+      serviceFee: {
+        totalFeeCents: number;
+        chargeTotalCents: number;
+        baseAmountCents: number;
+        waived: boolean;
+      };
+    }
   >(functions, "createUpfrontFeePaymentIntent");
   const res = await fn({ jobId });
   return res.data;
@@ -533,10 +553,7 @@ export interface InvoicePartyInfo {
  * user doc. Auth: either party of the job, or an admin.
  */
 export async function getInvoicePartyInfo(jobId: string): Promise<InvoicePartyInfo> {
-  const fn = httpsCallable<{ jobId: string }, InvoicePartyInfo>(
-    functions,
-    "getInvoicePartyInfo",
-  );
+  const fn = httpsCallable<{ jobId: string }, InvoicePartyInfo>(functions, "getInvoicePartyInfo");
   const res = await fn({ jobId });
   return res.data;
 }
@@ -552,29 +569,18 @@ export async function getInvoicePartyInfo(jobId: string): Promise<InvoicePartyIn
  * id, so we probe both seats (client first, then tradesperson) and
  * return whichever matches.
  */
-export async function findJobIdByChatId(
-  chatId: string,
-  uid: string,
-): Promise<string | null> {
+export async function findJobIdByChatId(chatId: string, uid: string): Promise<string | null> {
   const asClient = await getDocs(
     query(jobsCol(), where("clientId", "==", uid), where("chatId", "==", chatId), limit(1)),
   );
   if (!asClient.empty) return asClient.docs[0].id;
   const asTradie = await getDocs(
-    query(
-      jobsCol(),
-      where("tradespersonId", "==", uid),
-      where("chatId", "==", chatId),
-      limit(1),
-    ),
+    query(jobsCol(), where("tradespersonId", "==", uid), where("chatId", "==", chatId), limit(1)),
   );
   return asTradie.empty ? null : asTradie.docs[0].id;
 }
 
-export async function listJobsForTradie(
-  tradieUid: string,
-  max = 200,
-): Promise<WithId<JobDoc>[]> {
+export async function listJobsForTradie(tradieUid: string, max = 200): Promise<WithId<JobDoc>[]> {
   const q = query(
     jobsCol(),
     where("tradespersonId", "==", tradieUid),
@@ -585,10 +591,7 @@ export async function listJobsForTradie(
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
-export async function listJobsForClient(
-  clientUid: string,
-  max = 200,
-): Promise<WithId<JobDoc>[]> {
+export async function listJobsForClient(clientUid: string, max = 200): Promise<WithId<JobDoc>[]> {
   const q = query(
     jobsCol(),
     where("clientId", "==", clientUid),
@@ -608,8 +611,6 @@ export async function listJobsForClient(
  * createdAt order). `max` caps the scan; the view surfaces when the cap is hit.
  */
 export async function listAllJobs(max = 300): Promise<WithId<JobDoc>[]> {
-  const snap = await getDocs(
-    query(jobsCol(), orderBy("createdAt", "desc"), limit(max)),
-  );
+  const snap = await getDocs(query(jobsCol(), orderBy("createdAt", "desc"), limit(max)));
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }

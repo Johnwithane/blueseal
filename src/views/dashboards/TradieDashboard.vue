@@ -139,7 +139,7 @@ const viewTabs = computed(() =>
 
 const viewHint = computed(() => {
   if (view.value === "board") return "Pipeline overview. Tap a card to open the job.";
-  if (view.value === "calendar") return "Tap a free day to block it off.";
+  if (view.value === "calendar") return "Tap a day to see its hours and jobs, or to block it off.";
   if (view.value === "applied") return "Jobs you've applied to, grouped by status.";
   if (view.value === "clients")
     return "Your client book — add, import, and set up recurring billing.";
@@ -166,11 +166,7 @@ const blockError = ref<string | null>(null);
 
 // Block-off pattern: 'custom' uses the inline range picker; the other three
 // hardcode an absolute set of single-day ranges via utils/blockPatterns.
-type BlockPattern =
-  | "custom"
-  | "weekendsToYearEnd"
-  | "fridays8"
-  | "weekdaysNextMonth";
+type BlockPattern = "custom" | "weekendsToYearEnd" | "fridays8" | "weekdaysNextMonth";
 const blockPattern = ref<BlockPattern>("custom");
 const patternOptions = [
   { label: "Custom range", value: "custom" as const },
@@ -195,8 +191,7 @@ const patternPreviewSummary = computed(() => {
   if (r.length === 0) return "";
   const first = r[0].start;
   const last = r[r.length - 1].end;
-  const fmt = (d: Date) =>
-    d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const fmt = (d: Date) => d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   return `${r.length} day${r.length === 1 ? "" : "s"} blocked — ${fmt(first)} to ${fmt(last)}`;
 });
 
@@ -314,8 +309,7 @@ async function saveAvailability() {
   const parsed = weeklyAvailabilitySchema.safeParse(draftAvailability.value);
   if (!parsed.success) {
     availabilityError.value =
-      parsed.error.issues[0]?.message ??
-      "Times must be in HH:MM format (00:00 to 23:59).";
+      parsed.error.issues[0]?.message ?? "Times must be in HH:MM format (00:00 to 23:59).";
     return;
   }
   // Sanity check: every block must have end > start.
@@ -351,9 +345,7 @@ const vetting = computed(() => tradie.value?.vettingStatus);
 // Distinguish them so the empty state tells the user the truth (waiting on
 // admin) instead of telling them to redo onboarding.
 const idApproved = computed(() => tradie.value?.idVerified === true);
-const hasApprovedTrade = computed(
-  () => (tradie.value?.verifiedTrades?.length ?? 0) > 0,
-);
+const hasApprovedTrade = computed(() => (tradie.value?.verifiedTrades?.length ?? 0) > 0);
 const awaitingVerification = computed(
   () =>
     !!tradie.value &&
@@ -368,7 +360,6 @@ const awaitingVerificationMessage = computed(() => {
   if (missing.length === 0) return "";
   return `Your application is approved — our team still needs to verify your ${missing.join(" and ")} before your profile goes live. You'll get a notification when it's done; nothing more for you to do right now.`;
 });
-
 </script>
 
 <template>
@@ -393,289 +384,266 @@ const awaitingVerificationMessage = computed(() => {
          retry instead of leaving the pro stranded or bouncing to onboarding. -->
     <div v-if="loadError" class="bs-container pt-8">
       <div class="bs-card p-6 text-center max-w-md mx-auto">
-        <i class="pi pi-exclamation-triangle text-2xl text-[color:var(--bs-muted)]" aria-hidden="true"></i>
+        <i
+          class="pi pi-exclamation-triangle text-2xl text-[color:var(--bs-muted)]"
+          aria-hidden="true"
+        ></i>
         <p class="mt-3 font-medium">Couldn't load your dashboard</p>
         <p class="mt-1 text-sm text-[color:var(--bs-muted)]">{{ loadError }}</p>
-        <Button label="Try again" icon="pi pi-refresh" class="mt-4" :loading="loading" @click="loadProfile" />
+        <Button
+          label="Try again"
+          icon="pi pi-refresh"
+          class="mt-4"
+          :loading="loading"
+          @click="loadProfile"
+        />
       </div>
     </div>
 
     <div v-else class="bs-container pt-4">
-    <div
-      v-if="insuranceBanner"
-      class="mb-4 rounded-lg border border-[#f0d8a8] bg-[#fff5e6] px-3 py-2 text-sm font-medium text-[color:var(--bs-text)]"
-    >
-      <div class="flex items-start gap-2">
-        <i :class="['pi', insuranceBanner.icon, 'shrink-0 text-[#b45309] mt-0.5']" aria-hidden="true"></i>
-        <span class="min-w-0 flex-1">{{ insuranceBanner.text }}</span>
+      <div
+        v-if="insuranceBanner"
+        class="mb-4 rounded-lg border border-[#f0d8a8] bg-[#fff5e6] px-3 py-2 text-sm font-medium text-[color:var(--bs-text)]"
+      >
+        <div class="flex items-start gap-2">
+          <i
+            :class="['pi', insuranceBanner.icon, 'shrink-0 text-[#b45309] mt-0.5']"
+            aria-hidden="true"
+          ></i>
+          <span class="min-w-0 flex-1">{{ insuranceBanner.text }}</span>
+        </div>
+        <div class="mt-2 flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+          <button
+            type="button"
+            class="inline-flex items-center gap-1.5 font-semibold text-[color:var(--bs-blue-dark)]"
+            @click="showInsuranceUpload = true"
+          >
+            <i class="pi pi-upload text-xs" aria-hidden="true"></i>
+            {{ insuranceBanner.cta === "Renew now" ? "Upload renewal" : "Upload my insurance" }}
+          </button>
+          <a
+            :href="INSURANCE_PARTNER.url"
+            target="_blank"
+            rel="noopener"
+            class="inline-flex items-center gap-1 font-semibold text-[color:var(--bs-blue-dark)] no-underline"
+          >
+            {{ insuranceBanner.cta }}
+            <i class="pi pi-external-link text-xs" aria-hidden="true"></i>
+          </a>
+        </div>
       </div>
-      <div class="mt-2 flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
-        <button
-          type="button"
-          class="inline-flex items-center gap-1.5 font-semibold text-[color:var(--bs-blue-dark)]"
-          @click="showInsuranceUpload = true"
-        >
-          <i class="pi pi-upload text-xs" aria-hidden="true"></i>
-          {{ insuranceBanner.cta === "Renew now" ? "Upload renewal" : "Upload my insurance" }}
-        </button>
-        <a
-          :href="INSURANCE_PARTNER.url"
-          target="_blank"
-          rel="noopener"
-          class="inline-flex items-center gap-1 font-semibold text-[color:var(--bs-blue-dark)] no-underline"
-        >
-          {{ insuranceBanner.cta }}
-          <i class="pi pi-external-link text-xs" aria-hidden="true"></i>
-        </a>
-      </div>
-    </div>
 
-    <Dialog
-      v-model:visible="showInsuranceUpload"
-      modal
-      dismissable-mask
-      header="Your insurance"
-      :style="{ width: '92vw', maxWidth: '640px' }"
-    >
-      <InsuranceUploadCard
-        v-if="auth.fbUser"
-        :tradesperson-id="auth.fbUser.uid"
-        :existing="insuranceDoc"
-        @submitted="refreshInsurance"
-        @updated="refreshInsurance"
-      />
-    </Dialog>
-    <p class="hidden sm:block text-[color:var(--bs-muted)] text-sm mb-4">
-      {{ viewHint }}
-    </p>
+      <Dialog
+        v-model:visible="showInsuranceUpload"
+        modal
+        dismissable-mask
+        header="Your insurance"
+        :style="{ width: '92vw', maxWidth: '640px' }"
+      >
+        <InsuranceUploadCard
+          v-if="auth.fbUser"
+          :tradesperson-id="auth.fbUser.uid"
+          :existing="insuranceDoc"
+          @submitted="refreshInsurance"
+          @updated="refreshInsurance"
+        />
+      </Dialog>
+      <p class="hidden sm:block text-[color:var(--bs-muted)] text-sm mb-4">
+        {{ viewHint }}
+      </p>
 
-    <!-- Availability + block-off live with the Calendar view since that's
+      <!-- Availability + block-off live with the Calendar view since that's
          where scheduling lives. Kept on their own row so the tabs above
          stay fixed in place across view switches. -->
-    <div
-      v-if="tradie?.isVisible && view === 'calendar'"
-      class="flex items-center gap-2 mb-4"
-    >
-      <Button
-        label="Availability"
-        icon="pi pi-clock"
-        outlined
-        class="flex-1 min-w-0"
-        @click="openAvailabilityEditor"
-      />
-      <Button
-        label="Block time"
-        icon="pi pi-ban"
-        outlined
-        severity="danger"
-        class="flex-1 min-w-0"
-        @click="openBlockEditor"
-      />
-    </div>
+      <div v-if="tradie?.isVisible && view === 'calendar'" class="flex items-center gap-2 mb-4">
+        <Button
+          label="Availability"
+          icon="pi pi-clock"
+          outlined
+          class="flex-1 min-w-0"
+          @click="openAvailabilityEditor"
+        />
+        <Button
+          label="Block time"
+          icon="pi pi-ban"
+          outlined
+          severity="danger"
+          class="flex-1 min-w-0"
+          @click="openBlockEditor"
+        />
+      </div>
 
-    <!-- New job (bring your own client) + Reports ride the shell's title-row
+      <!-- New job (bring your own client) + Reports ride the shell's title-row
          action slot — the same top-of-page spot as the client's "Post a job"
          — instead of taking a row under the tabs. Vetted-tradie-only (same
          gate as the New-job callable). Shown across all dashboard views, like
          the client button, rather than just the list view. -->
-    <Teleport
-      v-if="tradie?.isVisible"
-      defer
-      to="#app-shell-header-action"
-    >
-      <Button
-        label="New job"
-        icon="pi pi-plus"
-        size="small"
-        @click="router.push('/jobs/new')"
-      />
-      <!-- Quick jump to their own public page (view + edit in place), so it's
+      <Teleport v-if="tradie?.isVisible" defer to="#app-shell-header-action">
+        <Button label="New job" icon="pi pi-plus" size="small" @click="router.push('/jobs/new')" />
+        <!-- Quick jump to their own public page (view + edit in place), so it's
            reachable from the dashboard, not buried in Account. -->
-      <Button
-        label="My page"
-        icon="pi pi-id-card"
-        size="small"
-        outlined
-        @click="router.push(`/tradies/${auth.fbUser?.uid ?? ''}`)"
-      />
-      <Button
-        label="Reports"
-        icon="pi pi-chart-bar"
-        size="small"
-        text
-        @click="router.push('/reports')"
-      />
-    </Teleport>
+        <Button
+          label="My page"
+          icon="pi pi-id-card"
+          size="small"
+          outlined
+          @click="router.push(`/tradies/${auth.fbUser?.uid ?? ''}`)"
+        />
+        <Button
+          label="Reports"
+          icon="pi pi-chart-bar"
+          size="small"
+          text
+          @click="router.push('/reports')"
+        />
+      </Teleport>
 
-    <!-- Completed-view toggle, list view only. Right-aligned on its own row,
+      <!-- Completed-view toggle, list view only. Right-aligned on its own row,
          matching the client dashboard's toggle placement. -->
-    <div
-      v-if="view === 'list' && tradie?.isVisible"
-      class="mb-3 flex items-center justify-end"
-    >
-      <Button
-        :label="showCompleted ? 'Back to active jobs' : 'View completed'"
-        :icon="showCompleted ? 'pi pi-arrow-left' : 'pi pi-check-circle'"
-        text
-        size="small"
-        @click="showCompleted = !showCompleted"
-      />
-    </div>
+      <div v-if="view === 'list' && tradie?.isVisible" class="mb-3 flex items-center justify-end">
+        <Button
+          :label="showCompleted ? 'Back to active jobs' : 'View completed'"
+          :icon="showCompleted ? 'pi pi-arrow-left' : 'pi pi-check-circle'"
+          text
+          size="small"
+          @click="showCompleted = !showCompleted"
+        />
+      </div>
 
-    <JobList
-      v-if="view === 'list' && tradie?.isVisible"
-      :jobs="jobs"
-      viewer-role="tradesperson"
-      :show-completed="showCompleted"
-    />
-    <KanbanBoard v-else-if="view === 'board' && tradie?.isVisible" :jobs="jobs" />
-    <CalendarView
-      v-else-if="view === 'calendar' && tradie?.isVisible"
-      :jobs="jobs"
-      :availability="tradie.weeklyAvailability"
-      :blocks="bookings"
-      is-editable
-      @remove-block="removeBlock"
-      @block-day="blockDay"
-    />
-    <!-- Applied: job-board applications. Independent of `tradie.isVisible`
+      <JobList
+        v-if="view === 'list' && tradie?.isVisible"
+        :jobs="jobs"
+        viewer-role="tradesperson"
+        :show-completed="showCompleted"
+      />
+      <KanbanBoard v-else-if="view === 'board' && tradie?.isVisible" :jobs="jobs" />
+      <CalendarView
+        v-else-if="view === 'calendar' && tradie?.isVisible"
+        :jobs="jobs"
+        :availability="tradie.weeklyAvailability"
+        :blocks="bookings"
+        is-editable
+        @remove-block="removeBlock"
+        @block-day="blockDay"
+      />
+      <!-- Applied: job-board applications. Independent of `tradie.isVisible`
          (an unverified tradie can't actually submit applications anyway, but
          we render the list either way and let the empty state speak). -->
-    <MyApplicationsList v-else-if="view === 'applied'" />
-    <!-- Clients book (CRM + recurring billing — Blue Seal Pro). Self-gates on
+      <MyApplicationsList v-else-if="view === 'applied'" />
+      <!-- Clients book (CRM + recurring billing — Blue Seal Pro). Self-gates on
          Pro and runs its own subscribe, so it's independent of `isVisible`. -->
-    <ClientsPanel v-else-if="view === 'clients'" />
+      <ClientsPanel v-else-if="view === 'clients'" />
 
-    <div
-      v-if="awaitingVerification && view !== 'clients'"
-      class="bs-empty mt-4"
-    >
-      <i class="pi pi-check-circle text-3xl mb-2 block text-[color:var(--bs-blue)]"></i>
-      <p>{{ awaitingVerificationMessage }}</p>
-    </div>
-    <div
-      v-else-if="!tradie?.isVisible && vetting !== 'pending' && view !== 'clients'"
-      class="bs-empty mt-4"
-    >
-      <i class="pi pi-clock text-3xl mb-2 block"></i>
-      <p>Your profile isn't live yet. Finish onboarding to start receiving requests.</p>
-      <RouterLink to="/onboarding" class="inline-block mt-3">
-        <Button label="Continue onboarding" icon="pi pi-arrow-right" />
-      </RouterLink>
-    </div>
-    <!-- Application submitted, awaiting review: the isVisible-gated views
+      <div v-if="awaitingVerification && view !== 'clients'" class="bs-empty mt-4">
+        <i class="pi pi-check-circle text-3xl mb-2 block text-[color:var(--bs-blue)]"></i>
+        <p>{{ awaitingVerificationMessage }}</p>
+      </div>
+      <div
+        v-else-if="!tradie?.isVisible && vetting !== 'pending' && view !== 'clients'"
+        class="bs-empty mt-4"
+      >
+        <i class="pi pi-clock text-3xl mb-2 block"></i>
+        <p>Your profile isn't live yet. Finish onboarding to start receiving requests.</p>
+        <RouterLink to="/onboarding" class="inline-block mt-3">
+          <Button label="Continue onboarding" icon="pi pi-arrow-right" />
+        </RouterLink>
+      </div>
+      <!-- Application submitted, awaiting review: the isVisible-gated views
          (list/board/calendar) render nothing, so give the same reassuring
          placeholder the browse view uses instead of blank space (P2-02). -->
-    <div
-      v-else-if="
-        vetting === 'pending' &&
-        !tradie?.isVisible &&
-        (view === 'list' || view === 'board' || view === 'calendar')
-      "
-      class="bs-empty mt-4"
-    >
-      <i class="pi pi-hourglass text-3xl mb-2 block"></i>
-      <p>You'll see jobs here once your application is approved (typically 1 to 2 business days). We'll notify you the moment you're live.</p>
-    </div>
-
-    <Dialog
-      v-model:visible="availabilityOpen"
-      modal
-      header="Manage weekly availability"
-      :style="{ width: '90vw', maxWidth: '40rem' }"
-      :draggable="false"
-    >
-      <p class="mb-3 text-sm text-[color:var(--bs-muted)]">
-        Set the hours you're typically available each day. Clients see this on
-        your public profile and use it when requesting quotes.
-      </p>
-      <Message
-        v-if="availabilityError"
-        severity="error"
-        :closable="false"
-        class="mb-3"
-      >
-        {{ availabilityError }}
-      </Message>
-      <AvailabilityEditor v-if="draftAvailability" v-model="draftAvailability" />
-      <template #footer>
-        <Button
-          label="Cancel"
-          severity="secondary"
-          text
-          @click="availabilityOpen = false"
-        />
-        <Button
-          label="Save"
-          icon="pi pi-save"
-          :loading="savingAvailability"
-          @click="saveAvailability"
-        />
-      </template>
-    </Dialog>
-
-    <Dialog
-      v-model:visible="blockOpen"
-      modal
-      header="Block off time"
-      :style="{ width: '90vw', maxWidth: '28rem' }"
-      :draggable="false"
-    >
-      <p class="mb-3 text-sm text-[color:var(--bs-muted)]">
-        Mark dates as unavailable (vacation, training, anything that should
-        block bookings). Pick a single day or a range.
-      </p>
-      <Message
-        v-if="blockError"
-        severity="error"
-        :closable="false"
-        class="mb-3"
-      >
-        {{ blockError }}
-      </Message>
-      <SelectButton
-        v-model="blockPattern"
-        :options="patternOptions"
-        option-label="label"
-        option-value="value"
-        :allow-empty="false"
-        class="mb-3 w-full"
-      />
-      <DatePicker
-        v-if="blockPattern === 'custom'"
-        v-model="blockRange"
-        selection-mode="range"
-        :manual-input="false"
-        inline
-        :min-date="new Date()"
-        class="w-full"
-      />
       <div
-        v-else
-        class="rounded-lg border border-[color:var(--bs-border)] bg-[color:var(--bs-surface-alt)] p-3 text-sm"
+        v-else-if="
+          vetting === 'pending' &&
+          !tradie?.isVisible &&
+          (view === 'list' || view === 'board' || view === 'calendar')
+        "
+        class="bs-empty mt-4"
       >
-        <div class="font-semibold">{{ patternPreviewSummary }}</div>
-        <p class="mt-1 text-[color:var(--bs-muted)]">
-          You can delete individual days later from the calendar view if plans
-          change. Existing blocks aren't touched.
+        <i class="pi pi-hourglass text-3xl mb-2 block"></i>
+        <p>
+          You'll see jobs here once your application is approved (typically 1 to 2 business days).
+          We'll notify you the moment you're live.
         </p>
       </div>
-      <template #footer>
-        <Button
-          label="Cancel"
-          severity="secondary"
-          text
-          @click="blockOpen = false"
+
+      <Dialog
+        v-model:visible="availabilityOpen"
+        modal
+        header="Manage weekly availability"
+        :style="{ width: '90vw', maxWidth: '40rem' }"
+        :draggable="false"
+      >
+        <p class="mb-3 text-sm text-[color:var(--bs-muted)]">
+          Set the hours you're typically available each day. Clients see this on your public profile
+          and use it when requesting quotes.
+        </p>
+        <Message v-if="availabilityError" severity="error" :closable="false" class="mb-3">
+          {{ availabilityError }}
+        </Message>
+        <AvailabilityEditor v-if="draftAvailability" v-model="draftAvailability" />
+        <template #footer>
+          <Button label="Cancel" severity="secondary" text @click="availabilityOpen = false" />
+          <Button
+            label="Save"
+            icon="pi pi-save"
+            :loading="savingAvailability"
+            @click="saveAvailability"
+          />
+        </template>
+      </Dialog>
+
+      <Dialog
+        v-model:visible="blockOpen"
+        modal
+        header="Block off time"
+        :style="{ width: '90vw', maxWidth: '28rem' }"
+        :draggable="false"
+      >
+        <p class="mb-3 text-sm text-[color:var(--bs-muted)]">
+          Mark dates as unavailable (vacation, training, anything that should block bookings). Pick
+          a single day or a range.
+        </p>
+        <Message v-if="blockError" severity="error" :closable="false" class="mb-3">
+          {{ blockError }}
+        </Message>
+        <SelectButton
+          v-model="blockPattern"
+          :options="patternOptions"
+          option-label="label"
+          option-value="value"
+          :allow-empty="false"
+          class="mb-3 w-full"
         />
-        <Button
-          label="Save block"
-          icon="pi pi-save"
-          severity="danger"
-          :loading="savingBlock"
-          @click="saveBlock"
+        <DatePicker
+          v-if="blockPattern === 'custom'"
+          v-model="blockRange"
+          selection-mode="range"
+          :manual-input="false"
+          inline
+          :min-date="new Date()"
+          class="w-full"
         />
-      </template>
-    </Dialog>
+        <div
+          v-else
+          class="rounded-lg border border-[color:var(--bs-border)] bg-[color:var(--bs-surface-alt)] p-3 text-sm"
+        >
+          <div class="font-semibold">{{ patternPreviewSummary }}</div>
+          <p class="mt-1 text-[color:var(--bs-muted)]">
+            You can delete individual days later from the calendar view if plans change. Existing
+            blocks aren't touched.
+          </p>
+        </div>
+        <template #footer>
+          <Button label="Cancel" severity="secondary" text @click="blockOpen = false" />
+          <Button
+            label="Save block"
+            icon="pi pi-save"
+            severity="danger"
+            :loading="savingBlock"
+            @click="saveBlock"
+          />
+        </template>
+      </Dialog>
     </div>
   </section>
 </template>

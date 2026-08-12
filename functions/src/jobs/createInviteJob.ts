@@ -29,7 +29,14 @@ const Input = z.object({
   description: z.string().trim().min(1).max(4000),
   trade: z.string().trim().min(1).max(50),
   clientName: z.string().trim().min(1).max(80),
-  clientEmail: z.string().trim().toLowerCase().email().max(200),
+  // Optional: a phone-booked job may have no email to invite. Absent means no
+  // invite is minted at all — the job runs solo until the tradesperson adds an
+  // address via resendJobInvite({ newEmail }). .nullable() because the callable
+  // SDK delivers unset keys as null, which bare .optional() rejects.
+  clientEmail: z.string().trim().toLowerCase().email().max(200).nullable().optional(),
+  // Tradesperson's own note of the client's number, for calling from the job
+  // page. Stored verbatim; never used for delivery, so it isn't parsed.
+  clientPhone: z.string().trim().max(30).nullable().optional(),
   address: z.object({
     line1: z.string().trim().min(1).max(200),
     city: z.string().trim().min(1).max(100),
@@ -67,14 +74,18 @@ export const createInviteJob = onCall(CALLABLE_OPTS, async (req) => {
     throw new HttpsError("invalid-argument", parsed.error.issues[0]?.message ?? "Invalid input");
   }
   const input = parsed.data;
+  const clientEmail = input.clientEmail || null;
+  const clientPhone = input.clientPhone || null;
 
   // Self-dealing block: a tradesperson inviting their own inbox could claim
   // the job themselves and act as both parties. Reviews are gated separately
   // (acceptedOffline / null clientId), but there's no legitimate reason to
   // allow this at all. Checked again at claim time for second-account games.
-  const callerEmail = (await adminAuth.getUser(uid)).email ?? "";
-  if (callerEmail && emailHashOf(callerEmail) === emailHashOf(input.clientEmail)) {
-    throw new HttpsError("failed-precondition", "You can't invite your own email address.");
+  if (clientEmail) {
+    const callerEmail = (await adminAuth.getUser(uid)).email ?? "";
+    if (callerEmail && emailHashOf(callerEmail) === emailHashOf(clientEmail)) {
+      throw new HttpsError("failed-precondition", "You can't invite your own email address.");
+    }
   }
 
   try {
@@ -98,9 +109,9 @@ export const createInviteJob = onCall(CALLABLE_OPTS, async (req) => {
   // Copyable invite-link token. The raw token is returned ONCE to the
   // tradesperson (the UI builds /invite/{token}); only the hash is stored.
   // The link can't sign anyone in — it can only trigger sending a magic link
-  // to the stored invite email, so inbox control stays the credential.
-  const token = randomBytes(32).toString("base64url");
-  const tokenHash = sha256(token);
+  // to the stored invite email, so inbox control stays the credential. No
+  // email means no invite and therefore no token to mint.
+  const token = clientEmail ? randomBytes(32).toString("base64url") : null;
 
   const preferredStart = input.preferredStart
     ? Timestamp.fromDate(new Date(`${input.preferredStart}T00:00:00.000Z`))
@@ -116,6 +127,7 @@ export const createInviteJob = onCall(CALLABLE_OPTS, async (req) => {
       clientId: null,
       tradespersonId: uid,
       clientName: input.clientName,
+      clientPhone,
       clientPhotoURL: null,
       tradespersonName: tradieName,
       tradespersonPhotoURL: tradiePhoto,
@@ -148,19 +160,23 @@ export const createInviteJob = onCall(CALLABLE_OPTS, async (req) => {
       sourcePostId: null,
       // Skips onJobCreated's "new job request" page — the tradie created it.
       inviteOriginated: true,
-      clientInvite: {
-        emailLower: input.clientEmail,
-        clientName: input.clientName,
-        status: "invited",
-        invitedAt: FieldValue.serverTimestamp(),
-        expiresAt: Timestamp.fromMillis(Date.now() + INVITE_TTL_MS),
-        claimedAt: null,
-        revokedAt: null,
-        resendCount: 0,
-        lastSentAt: null,
-        emailedAt: null,
-        tokenHash,
-      },
+      // No email → no invite. The job is solo from the start; the tradesperson
+      // can invite the client later (resendJobInvite with a newEmail).
+      clientInvite: clientEmail
+        ? {
+            emailLower: clientEmail,
+            clientName: input.clientName,
+            status: "invited",
+            invitedAt: FieldValue.serverTimestamp(),
+            expiresAt: Timestamp.fromMillis(Date.now() + INVITE_TTL_MS),
+            claimedAt: null,
+            revokedAt: null,
+            resendCount: 0,
+            lastSentAt: null,
+            emailedAt: null,
+            tokenHash: sha256(token as string),
+          }
+        : null,
     });
     batch.set(chatRef, {
       jobId: jobRef.id,
@@ -179,11 +195,11 @@ export const createInviteJob = onCall(CALLABLE_OPTS, async (req) => {
     // copy-link-only — the job is already created either way.
     let emailed = false;
     try {
-      if (!(await isInviteEmailSuppressed(input.clientEmail))) {
-        const signinLink = await inviteMagicLink(input.clientEmail);
+      if (clientEmail && !(await isInviteEmailSuppressed(clientEmail))) {
+        const signinLink = await inviteMagicLink(clientEmail);
         if (signinLink) {
           emailed = await sendInviteEmail({
-            toEmail: input.clientEmail,
+            toEmail: clientEmail,
             clientName: input.clientName,
             tradieName,
             tradeName: input.trade,
@@ -205,7 +221,9 @@ export const createInviteJob = onCall(CALLABLE_OPTS, async (req) => {
     logger.info("success", { ...ctx, jobId: jobRef.id, emailed });
     return {
       jobId: jobRef.id,
-      inviteLink: `${appBaseUrl()}/invite/${token}`,
+      // null when the job was created without a client email — there's no
+      // invite to share yet.
+      inviteLink: token ? `${appBaseUrl()}/invite/${token}` : null,
       emailed,
     };
   } catch (err) {

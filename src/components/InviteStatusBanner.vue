@@ -4,6 +4,11 @@
 // controls: re-email the magic link, copy a fresh invite link (rotates the
 // token — old links die), fix a typo'd email, or revoke. Hidden once
 // claimed (the real client renders as the counterparty instead).
+//
+// `invite` is null when the job was created without a client email (a phone
+// booking). That reads the same as a revoked invite — a solo job — except the
+// call to action is "invite" rather than "re-invite"; supplying an email in the
+// dialog mints the first invite through the same resendJobInvite path.
 import { computed, ref } from "vue";
 import Button from "primevue/button";
 import StatusBanner from "@/components/StatusBanner.vue";
@@ -17,7 +22,7 @@ import type { ClientInvite } from "@/firebase/interfaces";
 
 const props = defineProps<{
   jobId: string;
-  invite: ClientInvite;
+  invite: ClientInvite | null;
 }>();
 
 const emit = defineEmits<{
@@ -27,7 +32,10 @@ const emit = defineEmits<{
 const toast = useToast();
 const { confirmDestructive } = useConfirmAction();
 
-const isInvited = computed(() => props.invite.status === "invited");
+const isInvited = computed(() => props.invite?.status === "invited");
+// No invite has ever existed on this job (created without a client email), as
+// opposed to one the tradesperson revoked.
+const neverInvited = computed(() => props.invite === null);
 const busy = ref<"" | "email" | "link" | "revoke" | "fix">("");
 
 const showFixDialog = ref(false);
@@ -42,7 +50,7 @@ async function resendEmail() {
     toast.success(
       res.emailed ? "Invite emailed" : "Email not configured",
       res.emailed
-        ? `A fresh sign-in link is on its way to ${props.invite.emailLower}.`
+        ? `A fresh sign-in link is on its way to ${props.invite?.emailLower ?? "your client"}.`
         : "Copy the link and text it to your client instead.",
     );
     emit("changed");
@@ -118,7 +126,7 @@ function revoke() {
 
 function openFix() {
   fixEmail.value = "";
-  fixName.value = props.invite.clientName;
+  fixName.value = props.invite?.clientName ?? "";
   showFixDialog.value = true;
 }
 </script>
@@ -126,7 +134,7 @@ function openFix() {
 <template>
   <div>
     <!-- Invited: waiting for the client to join. -->
-    <StatusBanner v-if="isInvited" severity="info" icon="pi-user-plus">
+    <StatusBanner v-if="isInvited && invite" severity="info" icon="pi-user-plus">
       <template #title>Waiting for {{ invite.clientName }} to join</template>
       <template #body>
         <p class="text-sm text-[color:var(--bs-muted)] mt-1 break-words">
@@ -168,17 +176,23 @@ function openFix() {
       </template>
     </StatusBanner>
 
-    <!-- Revoked: solo job. -->
+    <!-- No invite (created without an email) or revoked: solo job either way. -->
     <StatusBanner v-else severity="info" icon="pi-user" title="Solo job">
       <template #body>
         <p class="text-sm text-[color:var(--bs-muted)] mt-1">
-          The invite was revoked — you're running this one yourself. Quotes,
-          time tracking and invoicing all work as usual.
+          <template v-if="neverInvited">
+            No client email on file, so nobody's been invited. Quotes, time tracking and invoicing
+            all work as usual.
+          </template>
+          <template v-else>
+            The invite was revoked — you're running this one yourself. Quotes, time tracking and
+            invoicing all work as usual.
+          </template>
         </p>
       </template>
       <template #actions>
         <Button
-          label="Re-invite client"
+          :label="neverInvited ? 'Invite client' : 'Re-invite client'"
           icon="pi pi-user-plus"
           size="small"
           outlined
@@ -190,12 +204,23 @@ function openFix() {
     <Dialog
       v-model:visible="showFixDialog"
       modal
-      :header="isInvited ? 'Fix the invite email' : 'Re-invite your client'"
+      :header="
+        isInvited
+          ? 'Fix the invite email'
+          : neverInvited
+            ? 'Invite your client'
+            : 'Re-invite your client'
+      "
       class="w-[92vw] max-w-md"
     >
       <p class="text-sm text-[color:var(--bs-muted)]">
-        We'll send a fresh sign-in link to the new address. Older invite links
-        stop working.
+        <template v-if="neverInvited">
+          We'll email them a sign-in link so they can follow the job, approve your quote and pay. No
+          password needed.
+        </template>
+        <template v-else>
+          We'll send a fresh sign-in link to the new address. Older invite links stop working.
+        </template>
       </p>
       <div class="space-y-2 mt-3">
         <InputText v-model="fixName" placeholder="Client name" maxlength="80" class="w-full" />

@@ -190,7 +190,8 @@ function lineIssue(l: UiLine): string | null {
     return isLineIncomplete(l) ? "Add a description so this line counts toward the total." : null;
   }
   if (l.kind === "hourly") {
-    if (effectiveRateCents(l) == null) return "Enter an hourly rate, or switch this line to Flat rate.";
+    if (effectiveRateCents(l) == null)
+      return "Enter an hourly rate, or switch this line to Flat rate.";
     if ((l.hoursInput ?? 0) <= 0) return "Enter the estimated hours.";
     return null;
   }
@@ -229,7 +230,13 @@ function buildLineItems(): LineItem[] {
       const rate = effectiveRateCents(l);
       if (rate == null || rate <= 0) continue;
       if (!l.hoursInput || l.hoursInput <= 0) continue;
-      out.push({ kind: "hourly", description: desc, quantity: l.hoursInput, unitPrice: rate, taxRate });
+      out.push({
+        kind: "hourly",
+        description: desc,
+        quantity: l.hoursInput,
+        unitPrice: rate,
+        taxRate,
+      });
     } else {
       const amount = centsFromDollars(l.amountDollars);
       if (amount <= 0) continue;
@@ -291,7 +298,14 @@ const totalHourlyHours = computed(() => {
 
 function emptyLine(kind: LineItemKind): UiLine {
   const rateDollars = props.hourlyRateCents != null ? props.hourlyRateCents / 100 : 0;
-  return { kind, description: "", hoursInput: 0, rateDollars, amountDollars: 0, taxRatePercent: 13 };
+  return {
+    kind,
+    description: "",
+    hoursInput: 0,
+    rateDollars,
+    amountDollars: 0,
+    taxRatePercent: 13,
+  };
 }
 
 function defaultKind(): LineItemKind {
@@ -301,7 +315,9 @@ function defaultKind(): LineItemKind {
 function addLine(kind?: LineItemKind) {
   lines.value = [...lines.value, emptyLine(kind ?? defaultKind())];
   void nextTick(() => {
-    const inputs = document.querySelectorAll<HTMLInputElement>(".quote-composer-line-description input");
+    const inputs = document.querySelectorAll<HTMLInputElement>(
+      ".quote-composer-line-description input",
+    );
     inputs[inputs.length - 1]?.focus();
   });
 }
@@ -337,7 +353,8 @@ function uiLinesFromLineItems(items: LineItem[]): UiLine[] {
   const mapped = items.map((li): UiLine => {
     const kind: LineItemKind = li.kind ?? "labour";
     if (kind === "hourly") {
-      const storedRate = li.unitPrice && li.unitPrice > 0 ? li.unitPrice : (props.hourlyRateCents ?? 0);
+      const storedRate =
+        li.unitPrice && li.unitPrice > 0 ? li.unitPrice : (props.hourlyRateCents ?? 0);
       return {
         kind: "hourly",
         description: li.description,
@@ -497,148 +514,25 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
 <template>
   <div class="space-y-4">
     <!-- Line items -->
-    <section v-show="sectionShown('items')" class="rounded-lg border border-[color:var(--bs-border)] p-3">
+    <section
+      v-show="sectionShown('items')"
+      class="rounded-lg border border-[color:var(--bs-border)] p-3"
+    >
       <header class="flex items-center gap-2 mb-2">
         <i class="pi pi-list text-[color:var(--bs-blue)]"></i>
         <h4 class="font-semibold text-sm">Scope of work</h4>
       </header>
       <p class="text-xs text-[color:var(--bs-muted)] mb-2">
-        Mix hourly time, flat-rate fees, and parts/materials. Hourly lines start
-        from your profile rate ({{ hourlyRateCents ? money(hourlyRateCents) + "/hr" : "not set" }}) —
-        edit the rate per line as needed.
+        Mix hourly time, flat-rate fees, and parts/materials. Hourly lines start from your profile
+        rate ({{ hourlyRateCents ? money(hourlyRateCents) + "/hr" : "not set" }}) — edit the rate
+        per line as needed.
       </p>
 
-      <Message v-if="hasHourlyLineWithoutRate" severity="warn" :closable="false" class="mb-3 text-xs">
-        One or more Hourly lines have no rate. Enter a rate for the line, or
-        switch the row to Flat rate.
-      </Message>
-
-      <ul class="space-y-3">
-        <li
-          v-for="(l, i) in lines"
-          :key="i"
-          class="rounded-lg border border-[color:var(--bs-border)] p-3"
-        >
-          <div class="flex items-center justify-between gap-2 mb-2">
-            <div class="flex items-center gap-1 flex-wrap">
-              <button
-                v-for="opt in kindOptions"
-                :key="opt.value"
-                type="button"
-                class="quote-kind-chip"
-                :class="{ 'quote-kind-chip--active': l.kind === opt.value }"
-                @click="setLineKind(i, opt.value)"
-              >
-                <i :class="opt.icon"></i>
-                {{ opt.label }}
-              </button>
-            </div>
-            <button
-              type="button"
-              class="text-[color:var(--bs-danger)] hover:text-[color:var(--bs-danger)] p-1"
-              aria-label="Remove line"
-              @click="removeLine(i)"
-            >
-              <i class="pi pi-times text-sm"></i>
-            </button>
-          </div>
-
-          <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">Description</label>
-          <InputText
-            v-model="l.description"
-            :placeholder="
-              l.kind === 'hourly'
-                ? 'e.g. On-site diagnostics'
-                : l.kind === 'materials'
-                ? 'e.g. Pipe + fittings'
-                : 'e.g. Install new shower mixer'
-            "
-            maxlength="200"
-            :invalid="!!displayedLineIssue(l) && !l.description.trim()"
-            class="quote-composer-line-description w-full text-sm"
-          />
-          <p v-if="displayedLineIssue(l)" class="text-[11px] text-[color:var(--bs-danger)] mt-1">
-            {{ displayedLineIssue(l) }}
-          </p>
-
-          <!-- Hourly -->
-          <div v-if="l.kind === 'hourly'" class="mt-2">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <div>
-                <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">Estimated hours</label>
-                <NumberField
-                  v-model="l.hoursInput"
-                  :min="0"
-                  :max-fraction-digits="2"
-                  suffix=" hrs"
-                  :invalid="showErrors && !!l.description.trim() && (l.hoursInput ?? 0) <= 0"
-                  :input-class="'text-sm w-full'"
-                  fluid
-                />
-              </div>
-              <div>
-                <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">Rate</label>
-                <NumberField
-                  v-model="l.rateDollars"
-                  mode="currency"
-                  currency="CAD"
-                  :min="0"
-                  :max-fraction-digits="2"
-                  suffix="/hr"
-                  :invalid="showErrors && !!l.description.trim() && effectiveRateCents(l) == null"
-                  :input-class="'text-sm w-full'"
-                  fluid
-                />
-              </div>
-            </div>
-            <div class="flex items-center justify-end mt-1.5 text-xs">
-              <span v-if="effectiveRateCents(l) && l.hoursInput > 0" class="text-[color:var(--bs-muted)]">
-                {{ l.hoursInput }} hrs × {{ money(effectiveRateCents(l)!) }}/hr =
-                <span class="font-semibold text-[color:var(--bs-text)]">{{
-                  money(Math.round(l.hoursInput * (effectiveRateCents(l) ?? 0)))
-                }}</span>
-                <span class="text-[10px]"> est.</span>
-              </span>
-            </div>
-          </div>
-
-          <!-- Flat rate / Materials -->
-          <div v-else class="mt-2">
-            <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">
-              {{ l.kind === "materials" ? "Cost to client" : "Amount" }}
-            </label>
-            <NumberField
-              v-model="l.amountDollars"
-              mode="currency"
-              currency="CAD"
-              :min="0"
-              :max-fraction-digits="2"
-              :invalid="showErrors && !!l.description.trim() && (l.amountDollars ?? 0) <= 0"
-              :input-class="'text-sm w-full font-semibold'"
-              fluid
-            />
-          </div>
-
-          <!-- Tax per line -->
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
-            <div>
-              <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">Tax rate</label>
-              <NumberField
-                v-model="l.taxRatePercent"
-                :min="0"
-                :max="50"
-                :max-fraction-digits="2"
-                :step="1"
-                suffix=" %"
-                :input-class="'text-sm w-full'"
-                fluid
-              />
-            </div>
-          </div>
-        </li>
-      </ul>
-
-      <div class="mt-3 grid grid-cols-3 gap-2">
+      <!-- Add controls come FIRST: "pick what to add" is the action, and the
+           rows it creates land in their own labelled block underneath. With
+           the buttons below the list, tapping "Materials" pushed a new row up
+           out of view and read as though the form had rearranged itself. -->
+      <div class="grid grid-cols-3 gap-2">
         <button type="button" class="quote-add-btn" @click="addLine('hourly')">
           <i class="pi pi-plus text-xs"></i> Hourly
         </button>
@@ -648,6 +542,152 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
         <button type="button" class="quote-add-btn" @click="addLine('materials')">
           <i class="pi pi-plus text-xs"></i> Materials
         </button>
+      </div>
+
+      <Message
+        v-if="hasHourlyLineWithoutRate"
+        severity="warn"
+        :closable="false"
+        class="mt-3 mb-1 text-xs"
+      >
+        One or more Hourly lines have no rate. Enter a rate for the line, or switch the row to Flat
+        rate.
+      </Message>
+
+      <div class="mt-4 border-t border-[color:var(--bs-border)] pt-3">
+        <h5 class="mb-2 text-xs font-semibold uppercase tracking-wide text-[color:var(--bs-muted)]">
+          On this quote
+          <span v-if="lines.length" class="font-normal">({{ lines.length }})</span>
+        </h5>
+        <ul class="space-y-3">
+          <li
+            v-for="(l, i) in lines"
+            :key="i"
+            class="rounded-lg border border-[color:var(--bs-border)] p-3"
+          >
+            <div class="flex items-center justify-between gap-2 mb-2">
+              <div class="flex items-center gap-1 flex-wrap">
+                <button
+                  v-for="opt in kindOptions"
+                  :key="opt.value"
+                  type="button"
+                  class="quote-kind-chip"
+                  :class="{ 'quote-kind-chip--active': l.kind === opt.value }"
+                  @click="setLineKind(i, opt.value)"
+                >
+                  <i :class="opt.icon"></i>
+                  {{ opt.label }}
+                </button>
+              </div>
+              <button
+                type="button"
+                class="text-[color:var(--bs-danger)] hover:text-[color:var(--bs-danger)] p-1"
+                aria-label="Remove line"
+                @click="removeLine(i)"
+              >
+                <i class="pi pi-times text-sm"></i>
+              </button>
+            </div>
+
+            <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">Description</label>
+            <InputText
+              v-model="l.description"
+              :placeholder="
+                l.kind === 'hourly'
+                  ? 'e.g. On-site diagnostics'
+                  : l.kind === 'materials'
+                    ? 'e.g. Pipe + fittings'
+                    : 'e.g. Install new shower mixer'
+              "
+              maxlength="200"
+              :invalid="!!displayedLineIssue(l) && !l.description.trim()"
+              class="quote-composer-line-description w-full text-sm"
+            />
+            <p v-if="displayedLineIssue(l)" class="text-[11px] text-[color:var(--bs-danger)] mt-1">
+              {{ displayedLineIssue(l) }}
+            </p>
+
+            <!-- Hourly -->
+            <div v-if="l.kind === 'hourly'" class="mt-2">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1"
+                    >Estimated hours</label
+                  >
+                  <NumberField
+                    v-model="l.hoursInput"
+                    :min="0"
+                    :max-fraction-digits="2"
+                    suffix=" hrs"
+                    :invalid="showErrors && !!l.description.trim() && (l.hoursInput ?? 0) <= 0"
+                    :input-class="'text-sm w-full'"
+                    fluid
+                  />
+                </div>
+                <div>
+                  <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">Rate</label>
+                  <NumberField
+                    v-model="l.rateDollars"
+                    mode="currency"
+                    currency="CAD"
+                    :min="0"
+                    :max-fraction-digits="2"
+                    suffix="/hr"
+                    :invalid="showErrors && !!l.description.trim() && effectiveRateCents(l) == null"
+                    :input-class="'text-sm w-full'"
+                    fluid
+                  />
+                </div>
+              </div>
+              <div class="flex items-center justify-end mt-1.5 text-xs">
+                <span
+                  v-if="effectiveRateCents(l) && l.hoursInput > 0"
+                  class="text-[color:var(--bs-muted)]"
+                >
+                  {{ l.hoursInput }} hrs × {{ money(effectiveRateCents(l)!) }}/hr =
+                  <span class="font-semibold text-[color:var(--bs-text)]">{{
+                    money(Math.round(l.hoursInput * (effectiveRateCents(l) ?? 0)))
+                  }}</span>
+                  <span class="text-[10px]"> est.</span>
+                </span>
+              </div>
+            </div>
+
+            <!-- Flat rate / Materials -->
+            <div v-else class="mt-2">
+              <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">
+                {{ l.kind === "materials" ? "Cost to client" : "Amount" }}
+              </label>
+              <NumberField
+                v-model="l.amountDollars"
+                mode="currency"
+                currency="CAD"
+                :min="0"
+                :max-fraction-digits="2"
+                :invalid="showErrors && !!l.description.trim() && (l.amountDollars ?? 0) <= 0"
+                :input-class="'text-sm w-full font-semibold'"
+                fluid
+              />
+            </div>
+
+            <!-- Tax per line -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+              <div>
+                <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">Tax rate</label>
+                <NumberField
+                  v-model="l.taxRatePercent"
+                  :min="0"
+                  :max="50"
+                  :max-fraction-digits="2"
+                  :step="1"
+                  suffix=" %"
+                  :input-class="'text-sm w-full'"
+                  fluid
+                />
+              </div>
+            </div>
+          </li>
+        </ul>
       </div>
 
       <!-- Templates: load a saved scope of work, or save the current one.
@@ -697,7 +737,10 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
     </section>
 
     <!-- Discount -->
-    <section v-show="sectionShown('discount')" class="rounded-lg border border-[color:var(--bs-border)] p-3">
+    <section
+      v-show="sectionShown('discount')"
+      class="rounded-lg border border-[color:var(--bs-border)] p-3"
+    >
       <header class="flex items-center gap-2 mb-2">
         <i class="pi pi-percentage text-[color:var(--bs-blue)]"></i>
         <h4 class="font-semibold text-sm">Discount</h4>
@@ -728,7 +771,9 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
           />
         </div>
         <div>
-          <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">Label (optional)</label>
+          <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1"
+            >Label (optional)</label
+          >
           <InputText
             v-model="discountLabel"
             placeholder="e.g. New customer"
@@ -740,7 +785,10 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
     </section>
 
     <!-- Upfront fee -->
-    <section v-show="sectionShown('upfront')" class="rounded-lg border border-[color:var(--bs-border)] p-3">
+    <section
+      v-show="sectionShown('upfront')"
+      class="rounded-lg border border-[color:var(--bs-border)] p-3"
+    >
       <header class="flex items-center gap-2 mb-2">
         <i class="pi pi-wallet text-[color:var(--bs-blue)]"></i>
         <h4 class="font-semibold text-sm">Upfront fee</h4>
@@ -748,8 +796,8 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
       <p class="text-xs text-[color:var(--bs-muted)] mb-2">
         Require part of the quote before you start. Job moves to
         <span class="font-semibold">Awaiting upfront payment</span>
-        on acceptance; work begins once you mark it received. The amount is
-        credited against the final invoice.
+        on acceptance; work begins once you mark it received. The amount is credited against the
+        final invoice.
       </p>
       <SelectButton
         v-model="upfrontMode"
@@ -795,7 +843,10 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
     </section>
 
     <!-- Validity -->
-    <section v-show="sectionShown('validity')" class="rounded-lg border border-[color:var(--bs-border)] p-3">
+    <section
+      v-show="sectionShown('validity')"
+      class="rounded-lg border border-[color:var(--bs-border)] p-3"
+    >
       <label class="font-semibold text-sm flex items-center gap-2 mb-2">
         <i class="pi pi-calendar text-[color:var(--bs-blue)]"></i>
         Valid for
@@ -816,7 +867,10 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
 
     <!-- Timing: when work can start + how long it should take. Shown to the
          client alongside the quote so availability is part of the comparison. -->
-    <section v-show="sectionShown('timing')" class="rounded-lg border border-[color:var(--bs-border)] p-3">
+    <section
+      v-show="sectionShown('timing')"
+      class="rounded-lg border border-[color:var(--bs-border)] p-3"
+    >
       <header class="flex items-center gap-2 mb-2">
         <i class="pi pi-calendar-plus text-[color:var(--bs-blue)]"></i>
         <h4 class="font-semibold text-sm">Timing</h4>
@@ -847,7 +901,10 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
     </section>
 
     <!-- Note + terms -->
-    <section v-show="sectionShown('notes')" class="rounded-lg border border-[color:var(--bs-border)] p-3">
+    <section
+      v-show="sectionShown('notes')"
+      class="rounded-lg border border-[color:var(--bs-border)] p-3"
+    >
       <template v-if="!hideNote">
         <label class="font-semibold text-sm flex items-center gap-2 mb-2">
           <i class="pi pi-comment text-[color:var(--bs-blue)]"></i>
@@ -877,7 +934,7 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
     <section
       v-show="sectionShown('summary')"
       class="rounded-lg border-2 border-[color:var(--bs-blue)] p-3"
-      style="background: color-mix(in srgb, var(--bs-blue-light) 30%, transparent);"
+      style="background: color-mix(in srgb, var(--bs-blue-light) 30%, transparent)"
     >
       <h4 class="font-semibold text-sm mb-2">Summary</h4>
       <dl class="text-sm space-y-1">
@@ -924,12 +981,7 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
 
     <!-- Everything blocking the send, in one place next to the submit button.
          Only after a failed attempt — the per-field highlights match this list. -->
-    <Message
-      v-if="showErrors && issues.length"
-      severity="error"
-      :closable="false"
-      class="text-xs"
-    >
+    <Message v-if="showErrors && issues.length" severity="error" :closable="false" class="text-xs">
       <p class="font-semibold mb-1">Before this quote can go out:</p>
       <ul class="list-disc ms-4 space-y-0.5">
         <li v-for="(msg, i) in issues" :key="i">{{ msg }}</li>
@@ -951,7 +1003,9 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
         @keyup.enter="onSaveTemplate"
       />
       <p class="mt-2 text-xs text-[color:var(--bs-muted)]">
-        Saves the {{ previewLines.length }} current line item{{ previewLines.length === 1 ? "" : "s" }}
+        Saves the {{ previewLines.length }} current line item{{
+          previewLines.length === 1 ? "" : "s"
+        }}
         (with rates) so future quotes can start from them.
       </p>
       <template #footer>
@@ -981,7 +1035,10 @@ watch(state, (s) => emit("update:state", s), { immediate: true, deep: true });
   font-size: 0.75rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.1s, border-color 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    border-color 0.1s,
+    color 0.1s;
 }
 .quote-kind-chip:hover {
   border-color: var(--bs-blue);

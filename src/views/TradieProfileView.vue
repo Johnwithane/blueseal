@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRoute, useRouter, RouterLink } from "vue-router";
 import Button from "primevue/button";
 import Tag from "primevue/tag";
@@ -18,10 +18,7 @@ import { isTradieSaved, saveTradie, unsaveTradie } from "@/firebase/services/sav
 import { humanizeError } from "@/utils/errors";
 import { getProspect, selfServeRemoveProspect } from "@/firebase/services/prospects";
 import { listReviewsFor } from "@/firebase/services/reviews";
-import {
-  listAcceptedVouchesFor,
-  listAcceptedVouchesFrom,
-} from "@/firebase/services/vouches";
+import { listAcceptedVouchesFor, listAcceptedVouchesFrom } from "@/firebase/services/vouches";
 import type {
   ProspectDoc,
   ReviewDoc,
@@ -151,8 +148,7 @@ const tagline = computed(() => tradie.value?.tagline?.trim() || "");
 const isProActive = computed(
   () =>
     !isProspect.value &&
-    (tradie.value?.isPro === true ||
-      (!!auth.fbUser && tradie.value?.id === auth.fbUser.uid)),
+    (tradie.value?.isPro === true || (!!auth.fbUser && tradie.value?.id === auth.fbUser.uid)),
 );
 const brandColor = computed(() => (isProActive.value ? tradie.value?.brandColor || null : null));
 // The profile-page COVER image (Pro display; owner always previews). Distinct
@@ -670,7 +666,28 @@ async function confirmRemove() {
   }
 }
 
-onMounted(async () => {
+// Both /tradies/:uid and /u/:slug are backed by THIS component, and <RouterView>
+// has no :key — so navigating between them (the canonical-slug redirect below,
+// or a vouch chip linking to another tradesperson) patches the existing instance
+// instead of remounting. onMounted would never fire again, leaving the page
+// showing "Profile not found" (or the previous person's profile). Load on a
+// watcher over the route params so every navigation re-resolves.
+let loadToken = 0;
+
+function resetProfileState() {
+  loading.value = true;
+  tradie.value = null;
+  prospect.value = null;
+  isProspect.value = false;
+  reviews.value = [];
+  vouchesFrom.value = [];
+  vouchesFor.value = [];
+  saved.value = false;
+  removed.value = false;
+}
+
+async function load() {
+  const token = ++loadToken;
   try {
     // Resolve the target uid. On /u/:slug we look the handle up in the public
     // profileSlugs registry; on /tradies/:uid we use the param directly.
@@ -679,10 +696,12 @@ onMounted(async () => {
     if (!uid && slugParam) {
       uid = (await resolveSlugToUid(slugParam).catch(() => null)) ?? undefined;
     }
-    if (!uid) {
-      loading.value = false;
-      return; // unknown handle / no id → "Profile not found"
-    }
+    if (token !== loadToken) return; // a newer navigation won the race
+    // The canonical redirect below lands us back here with this person already
+    // loaded. Keep what we have rather than refetching the whole profile.
+    if (uid && tradie.value?.id === uid) return;
+    resetProfileState();
+    if (!uid) return; // unknown handle / no id → "Profile not found"
     // getTradesperson REJECTS (not resolves null) when the doc isn't publicly
     // readable: a prospect id (no tradespeople doc), or a draft/rejected
     // profile a non-owner can't read — the tradespeople read rule has no
@@ -690,14 +709,15 @@ onMounted(async () => {
     // failure as "not a readable tradie" and fall through to the prospect
     // lookup, instead of letting the rejection hang the page on "Loading…".
     const t = await getTradesperson(uid).catch(() => null);
+    if (token !== loadToken) return;
     if (t) {
-      // Canonical vanity URL: a slugged profile redirects /tradies/:uid → /u/slug
-      // (never from /u/, so no loop). The replace re-mounts + re-resolves.
+      tradie.value = t;
+      // Canonical vanity URL: a slugged profile swaps /tradies/:uid → /u/slug
+      // (never from /u/, so no loop). Purely a URL change — we keep the doc we
+      // just fetched, and the re-triggered load short-circuits on it above.
       if (route.name === "TradieProfile" && t.slug) {
         void router.replace({ name: "TradieHome", params: { slug: t.slug } });
-        return;
       }
-      tradie.value = t;
       // Best-effort: heart state for signed-in viewers. Never blocks the page.
       if (auth.fbUser && auth.fbUser.uid !== uid) {
         isTradieSaved(auth.fbUser.uid, uid)
@@ -710,6 +730,7 @@ onMounted(async () => {
         listAcceptedVouchesFrom(uid),
         listAcceptedVouchesFor(uid),
       ]);
+      if (token !== loadToken) return;
       reviews.value = r;
       vouchesFrom.value = vFrom;
       vouchesFor.value = vFor;
@@ -718,6 +739,7 @@ onMounted(async () => {
       // Render it through THIS same profile shell (unclaimed), mapping its
       // fields + public Google reviews onto the tradie shape.
       const pr = await getProspect(uid).catch(() => null);
+      if (token !== loadToken) return;
       if (pr) {
         prospect.value = pr;
         isProspect.value = true;
@@ -726,9 +748,17 @@ onMounted(async () => {
       }
     }
   } finally {
-    loading.value = false;
+    if (token === loadToken) loading.value = false;
   }
-});
+}
+
+watch(
+  () => [route.params.uid, route.params.slug],
+  () => void load(),
+  {
+    immediate: true,
+  },
+);
 </script>
 
 <template>
@@ -752,11 +782,15 @@ onMounted(async () => {
         v-if="isProspect && removed"
         class="mb-4 flex items-start gap-3 rounded-lg border border-[color:var(--bs-success)] bg-[color:var(--bs-success-tint)] p-3"
       >
-        <i class="pi pi-check-circle text-lg mt-0.5 text-[color:var(--bs-success)]" aria-hidden="true"></i>
+        <i
+          class="pi pi-check-circle text-lg mt-0.5 text-[color:var(--bs-success)]"
+          aria-hidden="true"
+        ></i>
         <div class="text-sm">
           <div class="font-semibold text-[color:var(--bs-success-text)]">Listing removed</div>
           <p class="text-[color:var(--bs-success-text)]">
-            This listing has been taken down and won't be re-added. If this was a mistake, email support.
+            This listing has been taken down and won't be re-added. If this was a mistake, email
+            support.
           </p>
         </div>
       </div>
@@ -765,7 +799,10 @@ onMounted(async () => {
         v-else-if="isProspect"
         class="mb-4 flex items-start gap-3 rounded-lg border border-[color:var(--bs-warning)] bg-[color:var(--bs-warning-tint)] p-3"
       >
-        <i class="pi pi-info-circle text-lg mt-0.5 text-[color:var(--bs-warning)]" aria-hidden="true"></i>
+        <i
+          class="pi pi-info-circle text-lg mt-0.5 text-[color:var(--bs-warning)]"
+          aria-hidden="true"
+        ></i>
         <div class="flex-1 text-sm">
           <div class="font-semibold text-[color:var(--bs-warning-text)]">Unclaimed listing</div>
           <p class="text-[color:var(--bs-warning-text)]">
@@ -794,8 +831,8 @@ onMounted(async () => {
         <div class="text-sm">
           <div class="font-semibold text-[color:var(--bs-warning-text)]">Preview mode</div>
           <p class="text-[color:var(--bs-warning-text)]">
-            This is how your profile will look — it isn't visible to clients
-            until your trade certification + ID are approved.
+            This is how your profile will look — it isn't visible to clients until your trade
+            certification + ID are approved.
           </p>
         </div>
       </div>
@@ -808,7 +845,9 @@ onMounted(async () => {
         <div class="profile-hero__scrim" aria-hidden="true"></div>
         <!-- Edit the cover image right on the banner (owner, edit mode). -->
         <div v-if="isOwnProfile && editing" class="profile-hero__cover-edit">
-          <span class="profile-hero__cover-edit__label"><i class="pi pi-image"></i> Cover image</span>
+          <span class="profile-hero__cover-edit__label"
+            ><i class="pi pi-image"></i> Cover image</span
+          >
           <button type="button" :disabled="uploadingCover" @click="coverInput?.click()">
             <i :class="uploadingCover ? 'pi pi-spin pi-spinner' : 'pi pi-upload'"></i> Upload
           </button>
@@ -826,7 +865,13 @@ onMounted(async () => {
           <span v-if="!tradie.isPro" class="profile-hero__cover-edit__hint">
             Shown to clients on Pro
           </span>
-          <input ref="coverInput" type="file" accept="image/*" class="hidden" @change="onCoverFile" />
+          <input
+            ref="coverInput"
+            type="file"
+            accept="image/*"
+            class="hidden"
+            @change="onCoverFile"
+          />
         </div>
         <div class="profile-hero__tools">
           <button
@@ -882,7 +927,10 @@ onMounted(async () => {
             <span>{{ tradesWithYears.map((t) => t.label).join(" · ") }}</span>
             <template v-if="tradie.serviceRadiusKm">
               <span class="profile-hero__dot" aria-hidden="true">·</span>
-              <span><i class="pi pi-map-marker" aria-hidden="true"></i> {{ tradie.serviceRadiusKm }} km radius</span>
+              <span
+                ><i class="pi pi-map-marker" aria-hidden="true"></i> {{ tradie.serviceRadiusKm }} km
+                radius</span
+              >
             </template>
           </div>
           <div class="profile-hero__badges">
@@ -924,7 +972,9 @@ onMounted(async () => {
             </template>
             <template v-else>
               <div class="profile-cta__price">Your page</div>
-              <p class="profile-cta__note">Edit it in place. Changes show to clients straight away.</p>
+              <p class="profile-cta__note">
+                Edit it in place. Changes show to clients straight away.
+              </p>
               <Button
                 label="Edit your page"
                 icon="pi pi-pencil"
@@ -987,19 +1037,27 @@ onMounted(async () => {
             <ul class="profile-facts">
               <li v-if="topExperienceYears">
                 <i class="pi pi-briefcase" aria-hidden="true"></i>
-                <span><strong>{{ topExperienceYears }} years</strong> experience</span>
+                <span
+                  ><strong>{{ topExperienceYears }} years</strong> experience</span
+                >
               </li>
               <li v-if="tradie.paidJobsCount">
                 <i class="pi pi-check-square" aria-hidden="true"></i>
-                <span><strong>{{ tradie.paidJobsCount }} jobs</strong> paid through Blue Seal</span>
+                <span
+                  ><strong>{{ tradie.paidJobsCount }} jobs</strong> paid through Blue Seal</span
+                >
               </li>
               <li v-if="tradie.serviceRadiusKm">
                 <i class="pi pi-map-marker" aria-hidden="true"></i>
-                <span>Serves within <strong>{{ tradie.serviceRadiusKm }} km</strong></span>
+                <span
+                  >Serves within <strong>{{ tradie.serviceRadiusKm }} km</strong></span
+                >
               </li>
               <li v-if="tradie.languages && tradie.languages.length">
                 <i class="pi pi-comments" aria-hidden="true"></i>
-                <span>Speaks <strong>{{ tradie.languages.join(", ") }}</strong></span>
+                <span
+                  >Speaks <strong>{{ tradie.languages.join(", ") }}</strong></span
+                >
               </li>
             </ul>
           </div>
@@ -1066,7 +1124,9 @@ onMounted(async () => {
                 Your link <span class="font-normal">(Blue Seal Pro)</span>
               </label>
               <div class="flex items-center gap-1">
-                <span class="text-sm text-[color:var(--bs-muted)] whitespace-nowrap">blueseal.app/u/</span>
+                <span class="text-sm text-[color:var(--bs-muted)] whitespace-nowrap"
+                  >blueseal.app/u/</span
+                >
                 <InputText
                   v-model="slugDraft"
                   placeholder="your-business"
@@ -1186,7 +1246,10 @@ onMounted(async () => {
               </ul>
             </div>
 
-            <p v-if="isProspect && reviews.length" class="-mt-1 mb-3 text-xs text-[color:var(--bs-muted)]">
+            <p
+              v-if="isProspect && reviews.length"
+              class="-mt-1 mb-3 text-xs text-[color:var(--bs-muted)]"
+            >
               <i class="pi pi-google mr-1" aria-hidden="true"></i>
               From this business's public Google listing.
             </p>
@@ -1205,7 +1268,12 @@ onMounted(async () => {
                    clients who signed up without a profile photo). -->
               <header class="flex items-start justify-between gap-3 mb-1">
                 <div class="flex items-center gap-2 min-w-0">
-                  <Avatar v-if="r.clientPhotoURL" :image="r.clientPhotoURL" shape="circle" size="small" />
+                  <Avatar
+                    v-if="r.clientPhotoURL"
+                    :image="r.clientPhotoURL"
+                    shape="circle"
+                    size="small"
+                  />
                   <Avatar
                     v-else
                     :label="reviewerInitial(r)"
@@ -1256,13 +1324,18 @@ onMounted(async () => {
                     :title="v.message || ''"
                     class="bs-pill verified inline-flex items-center gap-1 hover:underline"
                   >
-                    <Avatar v-if="v.fromPhotoURL" :image="v.fromPhotoURL" shape="circle" size="small" />
+                    <Avatar
+                      v-if="v.fromPhotoURL"
+                      :image="v.fromPhotoURL"
+                      shape="circle"
+                      size="small"
+                    />
                     <Avatar
                       v-else
                       :label="vouchInitial(v.fromDisplayName)"
                       shape="circle"
                       size="small"
-                      style="background-color: var(--bs-blue); color: white;"
+                      style="background-color: var(--bs-blue); color: white"
                     />
                     <span>{{ v.fromDisplayName }}</span>
                     <span v-if="v.fromPrimaryTrade" class="text-xs opacity-75">
@@ -1291,7 +1364,7 @@ onMounted(async () => {
                       :label="vouchInitial(v.toDisplayName)"
                       shape="circle"
                       size="small"
-                      style="background-color: var(--bs-blue); color: white;"
+                      style="background-color: var(--bs-blue); color: white"
                     />
                     <span>{{ v.toDisplayName }}</span>
                     <span v-if="v.toPrimaryTrade" class="text-xs opacity-75">
@@ -1310,7 +1383,8 @@ onMounted(async () => {
               <RouterLink
                 :to="{ name: 'AccountRecommendations' }"
                 class="text-[color:var(--bs-blue)] hover:underline"
-              >recommend tradespeople you've worked with</RouterLink>
+                >recommend tradespeople you've worked with</RouterLink
+              >
               to build out your network.
             </div>
           </section>
@@ -1349,7 +1423,10 @@ onMounted(async () => {
                 class="review-row__rating"
               />
               <span class="text-sm text-[color:var(--bs-muted)]">
-                {{ googleReviews.reviewCount }} review{{ googleReviews.reviewCount === 1 ? "" : "s" }} on Google
+                {{ googleReviews.reviewCount }} review{{
+                  googleReviews.reviewCount === 1 ? "" : "s"
+                }}
+                on Google
               </span>
             </div>
 
@@ -1360,7 +1437,12 @@ onMounted(async () => {
             >
               <header class="flex items-start justify-between gap-3 mb-1">
                 <div class="flex items-center gap-2 min-w-0">
-                  <Avatar v-if="g.authorPhotoUrl" :image="g.authorPhotoUrl" shape="circle" size="small" />
+                  <Avatar
+                    v-if="g.authorPhotoUrl"
+                    :image="g.authorPhotoUrl"
+                    shape="circle"
+                    size="small"
+                  />
                   <Avatar
                     v-else
                     :label="googleAuthorInitial(g.authorName)"
@@ -1370,7 +1452,12 @@ onMounted(async () => {
                   />
                   <div class="min-w-0">
                     <div class="text-sm font-medium truncate">{{ g.authorName }}</div>
-                    <Rating :model-value="g.rating" readonly :cancel="false" class="review-row__rating" />
+                    <Rating
+                      :model-value="g.rating"
+                      readonly
+                      :cancel="false"
+                      class="review-row__rating"
+                    />
                   </div>
                 </div>
                 <span class="text-xs text-[color:var(--bs-muted)] flex-none">

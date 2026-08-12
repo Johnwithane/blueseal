@@ -70,19 +70,27 @@ export const resendJobInvite = onCall(CALLABLE_OPTS, async (req) => {
   if (job.clientId !== null) {
     throw new HttpsError("failed-precondition", "Your client already joined — nothing to resend.");
   }
-  const invite = job.clientInvite;
-  if (!invite) throw new HttpsError("failed-precondition", "This job has no invite.");
+  const invite = job.clientInvite ?? null;
+  // A job created without a client email has no invite at all. Supplying one
+  // here MINTS the first invite (same path the UI's "Invite client" uses); a
+  // bare resend has nothing to send.
+  if (!invite && !newEmail) {
+    throw new HttpsError(
+      "failed-precondition",
+      "This job has no client email — add one to send an invite.",
+    );
+  }
   // A revoked invite can only come back via an explicit newEmail (re-invite);
   // a plain resend of a revoked invite is almost certainly a mistake.
-  if (invite.status === "revoked" && !newEmail) {
+  if (invite?.status === "revoked" && !newEmail) {
     throw new HttpsError(
       "failed-precondition",
       "This invite was revoked — provide the client's email to re-invite.",
     );
   }
 
-  const targetEmail = newEmail ?? invite.emailLower;
-  const targetName = newClientName ?? invite.clientName;
+  const targetEmail = newEmail ?? (invite as InviteData).emailLower;
+  const targetName = newClientName ?? invite?.clientName ?? "Your client";
 
   // Self-invite block, same as createInviteJob.
   const callerEmail = (await adminAuth.getUser(uid)).email ?? "";
@@ -92,7 +100,7 @@ export const resendJobInvite = onCall(CALLABLE_OPTS, async (req) => {
 
   // Email-channel cooldown (rotating the copy link any time is fine — only
   // actual sends are throttled).
-  if (channel === "email" && invite.lastSentAt) {
+  if (channel === "email" && invite?.lastSentAt) {
     const since = Date.now() - invite.lastSentAt.toMillis();
     if (since < EMAIL_COOLDOWN_MS) {
       throw new HttpsError(
@@ -103,15 +111,34 @@ export const resendJobInvite = onCall(CALLABLE_OPTS, async (req) => {
   }
 
   const token = randomBytes(32).toString("base64url");
-  const update: Record<string, unknown> = {
-    "clientInvite.emailLower": targetEmail,
-    "clientInvite.clientName": targetName,
-    "clientInvite.status": "invited",
-    "clientInvite.revokedAt": null,
-    "clientInvite.tokenHash": sha256(token),
-    "clientInvite.expiresAt": Timestamp.fromMillis(Date.now() + INVITE_TTL_MS),
-    "clientInvite.resendCount": FieldValue.increment(1),
-  };
+  // Minting the FIRST invite writes the whole map (dot-paths can't extend a
+  // null); a re-send patches the fields that change and leaves the audit
+  // trail — invitedAt, claimedAt, emailedAt — alone.
+  const update: Record<string, unknown> = invite
+    ? {
+        "clientInvite.emailLower": targetEmail,
+        "clientInvite.clientName": targetName,
+        "clientInvite.status": "invited",
+        "clientInvite.revokedAt": null,
+        "clientInvite.tokenHash": sha256(token),
+        "clientInvite.expiresAt": Timestamp.fromMillis(Date.now() + INVITE_TTL_MS),
+        "clientInvite.resendCount": FieldValue.increment(1),
+      }
+    : {
+        clientInvite: {
+          emailLower: targetEmail,
+          clientName: targetName,
+          status: "invited",
+          invitedAt: FieldValue.serverTimestamp(),
+          expiresAt: Timestamp.fromMillis(Date.now() + INVITE_TTL_MS),
+          claimedAt: null,
+          revokedAt: null,
+          resendCount: 0,
+          lastSentAt: null,
+          emailedAt: null,
+          tokenHash: sha256(token),
+        },
+      };
   // Keep the denormalized counterparty name in sync when the tradesperson
   // corrects it (admin SDK bypasses the rules pin on clientName, by design).
   if (newClientName) update.clientName = targetName;
@@ -132,8 +159,16 @@ export const resendJobInvite = onCall(CALLABLE_OPTS, async (req) => {
       }
     }
     if (emailed) {
-      update["clientInvite.emailedAt"] = FieldValue.serverTimestamp();
-      update["clientInvite.lastSentAt"] = FieldValue.serverTimestamp();
+      // Firestore rejects an update that names both a field and its sub-field,
+      // so stamp inside the map on the mint path and by dot-path on the resend.
+      if (invite) {
+        update["clientInvite.emailedAt"] = FieldValue.serverTimestamp();
+        update["clientInvite.lastSentAt"] = FieldValue.serverTimestamp();
+      } else {
+        const fresh = update.clientInvite as Record<string, unknown>;
+        fresh.emailedAt = FieldValue.serverTimestamp();
+        fresh.lastSentAt = FieldValue.serverTimestamp();
+      }
     }
   }
 

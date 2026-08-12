@@ -533,12 +533,7 @@ export interface RosterInviteDoc {
 // tradespeople/{uid}
 // ---------------------------------------------------------------------------
 export type PricingModel = "hourly" | "quote" | "both";
-export type VettingStatus =
-  | "draft"
-  | "pending"
-  | "info_requested"
-  | "approved"
-  | "rejected";
+export type VettingStatus = "draft" | "pending" | "info_requested" | "approved" | "rejected";
 
 export interface AvailabilityBlock {
   start: string; // "HH:mm"
@@ -574,11 +569,7 @@ export interface RatingDimension {
 // /tradespeople/{uid}.isVisible = true post-cutover; `restricted` means
 // Stripe needs more info from the tradesperson (pendingRequirements).
 // ---------------------------------------------------------------------------
-export type ConnectOnboardingStatus =
-  | "not_started"
-  | "in_progress"
-  | "restricted"
-  | "enabled";
+export type ConnectOnboardingStatus = "not_started" | "in_progress" | "restricted" | "enabled";
 
 export interface PayoutsState {
   stripeAccountId: string | null;
@@ -893,11 +884,7 @@ export interface TradespersonContact {
 // the public doc: enough for claimProspect's equality query, useless for
 // harvesting. (Firestore reads are all-or-nothing per doc, so a plaintext email
 // on a publicly readable doc would leak — hence the hash.)
-export type ProspectStatus =
-  | "listed"
-  | "outreach_sent"
-  | "claimed"
-  | "suppressed";
+export type ProspectStatus = "listed" | "outreach_sent" | "claimed" | "suppressed";
 
 // How we obtained the prospect's data — drives provenance/audit and the CASL
 // consent posture. Mirrors the `dataBasis` enum the import file carries.
@@ -1096,7 +1083,19 @@ export interface InsuranceVerificationDoc {
 // when expiresAt passes (frontend filter) but the admin can also re-submit.
 // ---------------------------------------------------------------------------
 export type CanadaProvince =
-  | "ON" | "BC" | "AB" | "QC" | "MB" | "SK" | "NS" | "NB" | "NL" | "PE" | "YT" | "NT" | "NU";
+  | "ON"
+  | "BC"
+  | "AB"
+  | "QC"
+  | "MB"
+  | "SK"
+  | "NS"
+  | "NB"
+  | "NL"
+  | "PE"
+  | "YT"
+  | "NT"
+  | "NU";
 
 export interface WsibVerificationDoc {
   fileUrl: string;
@@ -1216,6 +1215,10 @@ export interface JobAddress {
 // never leaks the credential.
 export type ClientInviteStatus = "invited" | "claimed" | "revoked";
 
+// A job created WITHOUT a client email has no invite at all (clientInvite null)
+// — there's nowhere to send a magic link, so it starts as a solo job and the
+// tradesperson can invite the client later from the job page (resendJobInvite
+// with a newEmail mints the invite then).
 export interface ClientInvite {
   emailLower: string; // lowercased+trimmed at the boundary; claim matches on this
   clientName: string; // what the tradesperson entered; also denormalized to job.clientName
@@ -1288,6 +1291,12 @@ export interface JobDoc {
   // generic label + initial-circle avatar.
   clientName?: string | null;
   clientPhotoURL?: string | null;
+  // Optional contact number the TRADESPERSON recorded for their own client on a
+  // bring-your-own-client job — most of that work is arranged by phone, so this
+  // is the number they call from the job page. Never collected from (or shown
+  // to) marketplace clients: those jobs leave it null. Not pinned in the rules,
+  // so either party can correct a typo.
+  clientPhone?: string | null;
   tradespersonName?: string | null;
   tradespersonPhotoURL?: string | null;
   status: JobStatus;
@@ -1564,12 +1573,7 @@ export interface SessionDoc {
 // `status`: "parsing" while the OCR callable is running, "ready" once
 // fields are usable, "invoiced" once pulled into an invoice line item.
 // ---------------------------------------------------------------------------
-export type ExpenseCategory =
-  | "materials"
-  | "fuel"
-  | "disposal"
-  | "parking"
-  | "other";
+export type ExpenseCategory = "materials" | "fuel" | "disposal" | "parking" | "other";
 
 export type ExpenseStatus = "parsing" | "ready" | "invoiced";
 
@@ -1784,12 +1788,7 @@ export interface JobPostMetaDoc {
 // client explicitly dismisses *this* applicant with a reason (declineApplication)
 // — the card leaves the client's active list and the tradie sees the reason and
 // can revise + re-apply. `withdrawn` is tradie-initiated.
-export type ApplicationStatus =
-  | "pending"
-  | "selected"
-  | "rejected"
-  | "declined"
-  | "withdrawn";
+export type ApplicationStatus = "pending" | "selected" | "rejected" | "declined" | "withdrawn";
 
 export interface ProposedPrice {
   type: "fixed" | "hourly";
@@ -2471,12 +2470,7 @@ export interface AssistantMessageDoc {
 // resolution failed or hadn't run yet — those still render with the gross
 // amount, just without a line-item breakdown.
 // ---------------------------------------------------------------------------
-export type PayoutStatus =
-  | "pending"
-  | "in_transit"
-  | "paid"
-  | "failed"
-  | "canceled";
+export type PayoutStatus = "pending" | "in_transit" | "paid" | "failed" | "canceled";
 
 export interface PayoutDoc {
   tradespersonId: string;
@@ -2881,11 +2875,7 @@ export interface NotificationDoc {
 // query, not by id — keeps the pending_signup → accepted path immutable-id
 // safe.
 // ---------------------------------------------------------------------------
-export type VouchStatus =
-  | "pending_acceptance"
-  | "pending_signup"
-  | "accepted"
-  | "declined";
+export type VouchStatus = "pending_acceptance" | "pending_signup" | "accepted" | "declined";
 
 export interface VouchDoc {
   fromUserId: string;

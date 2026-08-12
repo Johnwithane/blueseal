@@ -10,12 +10,7 @@ import { storage } from "@/firebase/config";
 import IntakeFormRenderer from "@/components/IntakeFormRenderer.vue";
 import VerifiedBadge from "@/components/VerifiedBadge.vue";
 import ImageLightbox from "@/components/ImageLightbox.vue";
-import type {
-  IntakeField,
-  JobDoc,
-  TradespersonDoc,
-  WithId,
-} from "@/firebase/interfaces";
+import type { IntakeField, JobDoc, TradespersonDoc, WithId } from "@/firebase/interfaces";
 
 const props = defineProps<{
   job: WithId<JobDoc>;
@@ -61,16 +56,32 @@ const privateNotes = defineModel<string>("privateNotes", { required: true });
 
 // Marketplace jobs (sourcePostId set) come in with their intake already filled
 // from the source post, so we show it read-only rather than gating on a brief.
-const hasIntakeData = computed(
-  () => Object.keys(props.job.intakeFormData ?? {}).length > 0,
-);
+const hasIntakeData = computed(() => Object.keys(props.job.intakeFormData ?? {}).length > 0);
 
 const emit = defineEmits<{
   "submit-brief": [];
+  "save-brief": [];
   "return-to-applicants": [];
   "save-notes": [];
   "update-log": [];
 }>();
+
+// Who may type into the trade-specific brief.
+//
+// Client: on a direct-booked job, at "accepted" — that's the step where they
+// answer the questionnaire and submit it, advancing the job to "requested".
+const clientCanEditBrief = computed(
+  () => props.isClient && props.job.status === "accepted" && !props.job.sourcePostId,
+);
+// Tradesperson: on their own direct-booked job, until it's closed out. On an
+// invite job there IS no client to fill this in (and on a phone-booked job the
+// tradie took the details verbally), so leaving it read-only stranded the
+// questionnaire empty forever. Their save is reference-only — it never moves
+// the job's status the way the client's "Submit brief" does.
+const CLOSED_STATUSES = ["complete", "reviewed", "cancelled"];
+const tradieCanEditBrief = computed(
+  () => props.isTradie && !props.job.sourcePostId && !CLOSED_STATUSES.includes(props.job.status),
+);
 
 function tradieDisplayName() {
   return props.tradieInfo?.displayName?.trim() || "Your tradesperson";
@@ -97,14 +108,11 @@ function tradieAvatarInitial() {
           :label="tradieAvatarInitial()"
           size="large"
           shape="circle"
-          style="background-color: var(--bs-blue); color: white; font-weight: 600;"
+          style="background-color: var(--bs-blue); color: white; font-weight: 600"
         />
         <div class="min-w-0 flex-1">
           <div class="font-semibold text-sm truncate">{{ tradieDisplayName() }}</div>
-          <div
-            v-if="tradieInfo?.ratingCount"
-            class="text-xs text-[color:var(--bs-muted)] mt-0.5"
-          >
+          <div v-if="tradieInfo?.ratingCount" class="text-xs text-[color:var(--bs-muted)] mt-0.5">
             {{ tradieInfo.ratingAvg.toFixed(1) }} ★ ({{ tradieInfo.ratingCount }})
           </div>
           <div class="flex flex-wrap items-center gap-1 mt-2">
@@ -126,17 +134,28 @@ function tradieAvatarInitial() {
         v-if="tradieInfo"
         :to="{ name: 'TradieProfile', params: { uid: tradieInfo.id } }"
         class="mt-3 text-xs text-[color:var(--bs-blue)] inline-block"
-      >View full profile →</RouterLink>
+        >View full profile →</RouterLink
+      >
+    </div>
+
+    <!-- Tradesperson-only: the client's number, one tap to call. Only ever set
+         on jobs the tradesperson created for their own client. -->
+    <div v-if="isTradie && job.clientPhone" class="bs-card p-3">
+      <h3 class="font-semibold text-sm mb-1">Client contact</h3>
+      <a
+        :href="`tel:${job.clientPhone}`"
+        class="inline-flex items-center gap-2 text-sm text-[color:var(--bs-blue)]"
+      >
+        <i class="pi pi-phone text-xs" aria-hidden="true"></i>
+        <span>{{ job.clientPhone }}</span>
+      </a>
     </div>
 
     <!-- Original request + photos + trade-specific intake. -->
     <div class="bs-card p-4">
       <h3 class="font-semibold text-sm mb-2">Original request</h3>
       <p class="text-sm whitespace-pre-wrap">{{ job.description }}</p>
-      <div
-        v-if="job.intakePhotos.length"
-        class="grid grid-cols-3 sm:grid-cols-4 gap-2 mt-3"
-      >
+      <div v-if="job.intakePhotos.length" class="grid grid-cols-3 sm:grid-cols-4 gap-2 mt-3">
         <button
           v-for="p in job.intakePhotos"
           :key="p"
@@ -160,13 +179,13 @@ function tradieAvatarInitial() {
            trade-specific brief here. Marketplace jobs carry their answers over
            from the source post, so when there's intake data we render it
            read-only. Either way it only shows if the trade has a questionnaire. -->
-      <div
-        v-if="intakeFields.length && (!job.sourcePostId || hasIntakeData)"
-        class="mt-4"
-      >
+      <div v-if="intakeFields.length && (!job.sourcePostId || hasIntakeData)" class="mt-4">
         <h4 class="font-medium text-sm mb-2">Trade-specific details</h4>
+        <p v-if="tradieCanEditBrief" class="text-xs text-[color:var(--bs-muted)] mb-2">
+          Fill these in yourself if you took the details in person or over the phone.
+        </p>
         <IntakeFormRenderer
-          v-if="isClient && job.status === 'accepted' && !job.sourcePostId"
+          v-if="clientCanEditBrief || tradieCanEditBrief"
           v-model="intakeDraft"
           :fields="intakeFields"
         />
@@ -177,7 +196,7 @@ function tradieAvatarInitial() {
           readonly
           @update:model-value="() => {}"
         />
-        <div v-if="isClient && job.status === 'accepted' && !job.sourcePostId" class="mt-3 flex flex-col sm:flex-row sm:items-center gap-2">
+        <div v-if="clientCanEditBrief" class="mt-3 flex flex-col sm:flex-row sm:items-center gap-2">
           <Button
             label="Submit brief"
             icon="pi pi-send"
@@ -192,6 +211,16 @@ function tradieAvatarInitial() {
             size="small"
             :loading="returningToApplicants"
             @click="emit('return-to-applicants')"
+          />
+        </div>
+        <!-- Tradesperson's own save: stores the answers, leaves the status alone. -->
+        <div v-else-if="tradieCanEditBrief" class="mt-3">
+          <Button
+            label="Save details"
+            icon="pi pi-check"
+            size="small"
+            :loading="savingIntake"
+            @click="emit('save-brief')"
           />
         </div>
       </div>
@@ -209,7 +238,11 @@ function tradieAvatarInitial() {
         type="button"
         class="ai-update-log w-full flex items-center gap-3 rounded-lg p-3 mb-3 text-left transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
         :disabled="updatingLog"
-        :title="updatingLog ? 'Summarising…' : 'Have AI summarise recent client messages into a new log entry'"
+        :title="
+          updatingLog
+            ? 'Summarising…'
+            : 'Have AI summarise recent client messages into a new log entry'
+        "
         @click="emit('update-log')"
       >
         <span class="ai-update-log__icon shrink-0">

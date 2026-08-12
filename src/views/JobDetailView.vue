@@ -19,6 +19,7 @@ import {
   markJobPaid,
   markUpfrontFeePaid,
   updatePrivateNotes,
+  saveJobIntake,
   saveJobIntakeAndAdvance,
 } from "@/firebase/services/jobs";
 import {
@@ -165,9 +166,7 @@ const invoiceId = ref<string | null>(null);
 // client opens /invoices/:id/pay), so we can't key off clientSecret anymore;
 // instead we read the tradie's public payouts state. When false, the client
 // only gets the fee-free offline path (mark-as-paid).
-const invoicePayable = computed(
-  () => tradieInfo.value?.payouts?.payoutsEnabled === true,
-);
+const invoicePayable = computed(() => tradieInfo.value?.payouts?.payoutsEnabled === true);
 const loading = ref(true);
 // When the URL points at a job the signed-in user can't read (notification
 // pointing at a stale or wrong id, deep link from another account) the
@@ -295,7 +294,9 @@ const runningKindLabel = computed(() => {
   if (!e) return "";
   if (e.kind === "travel") return "Travel";
   if (e.kind === "extra") {
-    return approvedHourlyExtras.value.find((x) => x.id === e.extraId)?.description ?? "Change order";
+    return (
+      approvedHourlyExtras.value.find((x) => x.id === e.extraId)?.description ?? "Change order"
+    );
   }
   return "Labour";
 });
@@ -501,10 +502,7 @@ const tabs = computed<JobTab[]>(() => {
       icon: "pi-calendar",
       // Nudge the tradie to set a date once the job is active and there
       // isn't one yet.
-      badge:
-        isTradie.value && s === "in_progress" && !job.value.scheduledStart
-          ? "dot"
-          : undefined,
+      badge: isTradie.value && s === "in_progress" && !job.value.scheduledStart ? "dot" : undefined,
     },
     {
       key: "workorder",
@@ -517,8 +515,7 @@ const tabs = computed<JobTab[]>(() => {
       key: "invoice",
       label: "Invoice",
       icon: "pi-receipt",
-      badge:
-        s === "awaiting_client_approval" || s === "awaiting_payment" ? "dot" : undefined,
+      badge: s === "awaiting_client_approval" || s === "awaiting_payment" ? "dot" : undefined,
     },
   ];
 });
@@ -686,10 +683,7 @@ async function load() {
 // One-time dependent loads keyed off the resolved job. Kept separate from the
 // live job subscription so it runs exactly once per mount (see load()).
 async function loadJobDependents(j: WithId<JobDoc>) {
-  const [remote, invoice] = await Promise.all([
-    getIntakeSchema(j.trade),
-    getInvoiceByJobId(j.id),
-  ]);
+  const [remote, invoice] = await Promise.all([getIntakeSchema(j.trade), getInvoiceByJobId(j.id)]);
   intakeFields.value = remote?.fields ?? SEED_INTAKE_SCHEMAS[j.trade] ?? [];
   invoiceId.value = invoice?.id ?? null;
 
@@ -863,7 +857,6 @@ function openReviewFromBanner() {
   }
 }
 
-
 // Add or edit a booked visit. Runs collision detection first; on a clash we
 // surface the existing schedule-conflict dialog and stash the pending session
 // until the tradie decides ("Schedule anyway" → commitPendingSession). The job
@@ -879,12 +872,9 @@ async function onSaveSession(payload: {
   pendingSession.value = payload;
   savingSession.value = true;
   try {
-    const conflicts = await findCollisions(
-      job.value.tradespersonId,
-      payload.start,
-      payload.end,
-      { excludeJobId: job.value.id },
-    );
+    const conflicts = await findCollisions(job.value.tradespersonId, payload.start, payload.end, {
+      excludeJobId: job.value.id,
+    });
     if (conflicts.length > 0) {
       collisions.value = conflicts;
       showCollisionDialog.value = true;
@@ -995,6 +985,24 @@ async function submitBrief() {
     await load();
   } catch (e) {
     toast.error("Couldn't save brief", humanizeError(e));
+  } finally {
+    savingIntake.value = false;
+  }
+}
+
+// The tradesperson filling the trade-specific brief in themselves (invite jobs
+// have no client to do it, and phone bookings are scoped verbally). No required
+// -field gate: they're the pro, and unlike the client's submit this doesn't
+// advance the job, so a half-filled brief is a legitimate save.
+async function saveBrief() {
+  if (!job.value || savingIntake.value) return;
+  savingIntake.value = true;
+  try {
+    await saveJobIntake(job.value.id, intakeDraft.value);
+    toast.success("Details saved");
+    await load();
+  } catch (e) {
+    toast.error("Couldn't save details", humanizeError(e));
   } finally {
     savingIntake.value = false;
   }
@@ -1212,7 +1220,8 @@ function onReturnToApplicants() {
           >
             <i class="pi pi-shield mr-1"></i>
             You're not insured for this job. Sign a quick waiver to start —
-            <RouterLink to="/account" class="underline font-medium">or get covered first</RouterLink>.
+            <RouterLink to="/account" class="underline font-medium">or get covered first</RouterLink
+            >.
           </div>
           <!-- Running: stop + what's on the clock (kind · rate). -->
           <div v-if="clockRunningOn(job.id)" class="flex items-center gap-2 flex-wrap">
@@ -1226,7 +1235,8 @@ function onReturnToApplicants() {
               @click="onHeaderClockOut"
             />
             <span v-if="runningKindLabel" class="text-xs text-[color:var(--bs-muted)]">
-              {{ runningKindLabel }}<template v-if="runningRateText"> · {{ runningRateText }}</template>
+              {{ runningKindLabel
+              }}<template v-if="runningRateText"> · {{ runningRateText }}</template>
             </span>
           </div>
 
@@ -1304,7 +1314,9 @@ function onReturnToApplicants() {
           <div class="flex-1 min-w-0">
             <div class="font-semibold">Leave {{ counterpartyName }} a review</div>
             <p class="text-sm text-[color:var(--bs-muted)] mt-1">
-              Hidden until they review you back.<template v-if="reviewDaysLeft !== null && reviewDaysLeft > 0">
+              Hidden until they review you back.<template
+                v-if="reviewDaysLeft !== null && reviewDaysLeft > 0"
+              >
                 {{ " " }}{{ reviewDaysLeft }} day{{ reviewDaysLeft === 1 ? "" : "s" }} left.
               </template>
             </p>
@@ -1339,7 +1351,9 @@ function onReturnToApplicants() {
           <div class="flex-1 min-w-0">
             <div class="font-semibold">Waiting on {{ counterpartyName }}</div>
             <p class="text-sm text-[color:var(--bs-muted)] mt-1">
-              Your review is in. Once they submit theirs, both go live.<template v-if="reviewDaysLeft !== null && reviewDaysLeft > 0">
+              Your review is in. Once they submit theirs, both go live.<template
+                v-if="reviewDaysLeft !== null && reviewDaysLeft > 0"
+              >
                 {{ " " }}{{ reviewDaysLeft }} day{{ reviewDaysLeft === 1 ? "" : "s" }} left.
               </template>
             </p>
@@ -1369,11 +1383,13 @@ function onReturnToApplicants() {
            while browsing tab content. -->
 
       <!-- Bring-your-own-client: the invited client hasn't joined yet
-           (clientId null) — show the tradesperson the invite state. -->
+           (clientId null) — show the tradesperson the invite state. A null
+           clientInvite is a job created without a client email; the banner
+           renders it as a solo job with an "Invite client" action. -->
       <InviteStatusBanner
-        v-if="isTradie && job.clientId === null && job.clientInvite"
+        v-if="isTradie && job.clientId === null"
         :job-id="job.id"
-        :invite="job.clientInvite"
+        :invite="job.clientInvite ?? null"
         class="mb-4"
         @changed="load"
       />
@@ -1432,8 +1448,8 @@ function onReturnToApplicants() {
           <div>
             <div class="font-semibold">Awaiting client details</div>
             <p class="text-sm text-[color:var(--bs-muted)] mt-1">
-              The client is filling in the trade-specific brief. You can introduce
-              yourself in chat in the meantime — they'll see your message.
+              The client is filling in the trade-specific brief. You can introduce yourself in chat
+              in the meantime — they'll see your message.
             </p>
           </div>
         </div>
@@ -1507,19 +1523,17 @@ function onReturnToApplicants() {
               {{ formatScheduled(job.scheduledStart, job.scheduledEnd) }}
             </p>
             <p class="text-xs text-[color:var(--bs-muted)] mt-1">
-              {{ isClient
-                ? "The tradesperson will arrive at the agreed time. Use the chat below for any last-minute updates."
-                : "Reminder will fire 24 h ahead. Use the chat for any last-minute coordination." }}
+              {{
+                isClient
+                  ? "The tradesperson will arrive at the agreed time. Use the chat below for any last-minute updates."
+                  : "Reminder will fire 24 h ahead. Use the chat for any last-minute coordination."
+              }}
             </p>
           </div>
         </div>
       </div>
 
-      <JobTabBar
-        :tabs="tabs"
-        :model-value="activeTab"
-        @update:model-value="onTabChange"
-      />
+      <JobTabBar :tabs="tabs" :model-value="activeTab" @update:model-value="onTabChange" />
 
       <div>
         <BriefTab
@@ -1537,6 +1551,7 @@ function onReturnToApplicants() {
           :returning-to-applicants="returningToApplicants"
           :updating-log="updatingLog"
           @submit-brief="submitBrief"
+          @save-brief="saveBrief"
           @return-to-applicants="onReturnToApplicants"
           @save-notes="saveNotes"
           @update-log="updateLogManually"
@@ -1591,11 +1606,7 @@ function onReturnToApplicants() {
         :is-tradie="isTradie"
         @click="chatOverlayOpen = true"
       />
-      <JobChatOverlay
-        v-model:visible="chatOverlayOpen"
-        :job="job"
-        :is-tradie="isTradie"
-      />
+      <JobChatOverlay v-model:visible="chatOverlayOpen" :job="job" :is-tradie="isTradie" />
 
       <!-- Trust escape hatch: a real route to raise an issue on a committed /
            paid job, routed to the support queue with job context (P2-15). -->
@@ -1622,7 +1633,7 @@ function onReturnToApplicants() {
     <div
       v-if="showStickyCTA && job"
       class="fixed right-0 bottom-0 z-30 border-t border-[color:var(--bs-border)] bg-white/95 backdrop-blur p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-2px_8px_rgba(0,0,0,0.04)]"
-      style="left: var(--bs-content-left-offset, 0px);"
+      style="left: var(--bs-content-left-offset, 0px)"
     >
       <div class="bs-container">
         <!-- Tradie hint: an agreed site visit will be pre-filled into the quote. -->
@@ -1653,7 +1664,11 @@ function onReturnToApplicants() {
         />
         <Button
           v-else-if="job.status === 'awaiting_upfront_payment'"
-          :label="job.upfrontFee ? `Mark upfront received — ${money(job.upfrontFee.amountCents)}` : 'Mark upfront received'"
+          :label="
+            job.upfrontFee
+              ? `Mark upfront received — ${money(job.upfrontFee.amountCents)}`
+              : 'Mark upfront received'
+          "
           icon="pi pi-check"
           severity="success"
           class="w-full"
@@ -1708,8 +1723,7 @@ function onReturnToApplicants() {
     >
       <p class="text-sm text-[color:var(--bs-text)] mb-3">
         The time you picked overlaps with
-        {{ collisions.length }} existing
-        {{ collisions.length === 1 ? "booking" : "bookings" }}:
+        {{ collisions.length }} existing {{ collisions.length === 1 ? "booking" : "bookings" }}:
       </p>
       <ul class="space-y-2">
         <li
@@ -1735,9 +1749,8 @@ function onReturnToApplicants() {
         </li>
       </ul>
       <p class="mt-4 text-xs text-[color:var(--bs-muted)]">
-        You can still schedule on top — useful when a block-off was a soft hold
-        you're happy to override. It also lets you double-book if that's actually
-        what you mean.
+        You can still schedule on top — useful when a block-off was a soft hold you're happy to
+        override. It also lets you double-book if that's actually what you mean.
       </p>
       <template #footer>
         <Button label="Pick a different time" text @click="showCollisionDialog = false" />
@@ -1767,13 +1780,13 @@ function onReturnToApplicants() {
         <i class="pi pi-exclamation-triangle text-[color:var(--bs-warning)] mr-1"></i>
         This job already has a
         <span class="font-semibold">{{ money(job.upfrontFee.amountCents) }}</span>
-        upfront fee paid. Refunds are handled outside Blue Seal —
-        coordinate that with the {{ isClient ? "tradesperson" : "client" }} before cancelling.
+        upfront fee paid. Refunds are handled outside Blue Seal — coordinate that with the
+        {{ isClient ? "tradesperson" : "client" }} before cancelling.
       </div>
       <p class="text-sm text-[color:var(--bs-text)] mb-3">
         <template v-if="cancelNeedsApproval">
-          The tradesperson is committed to this job, so this sends them a request
-          to accept. Tell them what changed — they'll see it in their inbox.
+          The tradesperson is committed to this job, so this sends them a request to accept. Tell
+          them what changed — they'll see it in their inbox.
         </template>
         <template v-else>
           Tell the tradesperson what changed. They'll see this in their inbox.
@@ -1806,8 +1819,8 @@ function onReturnToApplicants() {
       :style="{ width: '28rem', maxWidth: '92vw' }"
     >
       <p class="text-sm text-[color:var(--bs-text)] mb-3">
-        This sends the tradesperson a request to pause the job. Once they accept,
-        either of you can resume it any time.
+        This sends the tradesperson a request to pause the job. Once they accept, either of you can
+        resume it any time.
       </p>
       <label class="block text-[11px] text-[color:var(--bs-muted)] mb-1">Reason</label>
       <Textarea

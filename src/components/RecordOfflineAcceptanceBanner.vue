@@ -50,7 +50,10 @@ async function record() {
   submitting.value = true;
   try {
     await recordOfflineQuoteAcceptance(props.jobId);
-    toast.success("Acceptance recorded", "The job is now active — track time and invoice as usual.");
+    toast.success(
+      "Acceptance recorded",
+      "The job is now active — track time and invoice as usual.",
+    );
     showDialog.value = false;
     emit("recorded");
   } catch (e) {
@@ -67,8 +70,11 @@ async function record() {
       <i class="pi pi-check-square text-[color:var(--bs-blue)] text-lg mt-0.5"></i>
       <div class="min-w-0 flex-1">
         <div class="font-semibold">Did your client accept this quote?</div>
+        <!-- Deliberately says "hasn't joined", not "isn't on Blue Seal": the
+             invited address may well belong to an existing account that simply
+             hasn't accepted the invite. Claiming otherwise reads as a bug. -->
         <p class="text-sm text-[color:var(--bs-muted)] mt-1">
-          Your client isn't on Blue Seal yet. If they've agreed to the quote
+          Your client hasn't joined this job on Blue Seal yet. If they've agreed to the quote
           (verbally, by text, in person), record it here to start the job.
         </p>
         <Button
@@ -95,9 +101,9 @@ async function record() {
         </template>
       </p>
       <p class="text-sm text-[color:var(--bs-muted)] mt-2">
-        This is recorded as <em>accepted by you on your client's behalf</em> — no
-        in-app signature. It will appear in the job log, and your client will see
-        it if they join later. Jobs accepted this way don't earn Blue Seal reviews.
+        This is recorded as <em>accepted by you on your client's behalf</em> — no in-app signature.
+        It will appear in the job log, and your client will see it if they join later. Jobs accepted
+        this way don't earn Blue Seal reviews.
       </p>
       <label class="flex items-start gap-2 mt-4 text-sm">
         <Checkbox v-model="attested" binary />

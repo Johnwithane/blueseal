@@ -135,7 +135,16 @@ If you open a link that belongs to the other role, Blue Seal switches you to it 
     excerpt: "Search by trade and location, then compare verified profiles.",
     audience: "client",
     popular: true,
-    keywords: ["search", "find pro", "filter", "distance", "rating", "shortlist", "which trade", "describe"],
+    keywords: [
+      "search",
+      "find pro",
+      "filter",
+      "distance",
+      "rating",
+      "shortlist",
+      "which trade",
+      "describe",
+    ],
     body: `Use **Find a tradesperson** to search by location and trade. Results show pros near you with their verification badges, rating, and distance.
 
 **Not sure which trade you need?** Just describe the job in the **"What do you need done?"** box: type something like *"my sink is leaking"* or *"power keeps tripping"* and we'll suggest the right trade. Tap a suggestion and it sets the filter for you.
@@ -193,7 +202,8 @@ Your exact address stays private until you accept a quote; the public posting on
     slug: "rebates-and-grants",
     categoryId: "for-clients",
     title: "Rebates and grants on energy work",
-    excerpt: "Posting energy work? We surface programs that may help, but always confirm at the source.",
+    excerpt:
+      "Posting energy work? We surface programs that may help, but always confirm at the source.",
     audience: "client",
     keywords: [
       "rebate",
@@ -243,7 +253,16 @@ Because it's all scoped to one job, you can come back months later and see exact
     excerpt: "What we check, how to submit documents, and going live.",
     audience: "tradesperson",
     popular: true,
-    keywords: ["verification", "apply", "onboarding", "id", "certificate", "insurance", "wsib", "vetting"],
+    keywords: [
+      "verification",
+      "apply",
+      "onboarding",
+      "id",
+      "certificate",
+      "insurance",
+      "wsib",
+      "vetting",
+    ],
     body: `To take work on Blue Seal, your profile is **manually reviewed by our team**. The onboarding wizard walks you through it. We look at:
 
 - **Government photo ID:** confirms you are who you say you are.
@@ -261,7 +280,15 @@ If something needs another look, we'll let you know what to re-upload, so you wo
     title: "Insurance: getting covered & staying covered",
     excerpt: "Why insured pros win more work, how to get covered, and renewal reminders.",
     audience: "tradesperson",
-    keywords: ["insurance", "liability", "coverage", "insured badge", "renew", "renewal", "get covered"],
+    keywords: [
+      "insurance",
+      "liability",
+      "coverage",
+      "insured badge",
+      "renew",
+      "renewal",
+      "get covered",
+    ],
     body: `General-liability insurance is **optional** on Blue Seal, but it's one of the strongest trust signals you can carry. When you upload proof and our team verifies it, a verified **Insured** badge appears on your public profile, and most clients look for it.
 
 **Getting covered.** If you don't have a policy yet, you can get a quote and buy online in minutes. Look for **"Get covered in minutes"** in your onboarding insurance step, on your dashboard, and whenever you go to send a quote without proof of insurance on file. It opens our insurance partner in a new tab; come back and finish your bid when you're done.
@@ -300,10 +327,21 @@ Want an edge? **Blue Seal Pro** features your applications at the top of clients
     slug: "blue-seal-pro",
     categoryId: "for-tradespeople",
     title: "Blue Seal Pro",
-    excerpt: "The optional upgrade: AI assistant, fee waiver, featured placement, reports, clients and recurring billing.",
+    excerpt:
+      "The optional upgrade: AI assistant, fee waiver, featured placement, reports, clients and recurring billing.",
     audience: "tradesperson",
     popular: true,
-    keywords: ["pro", "subscription", "upgrade", "ai", "trial", "billing", "cancel", "clients", "recurring"],
+    keywords: [
+      "pro",
+      "subscription",
+      "upgrade",
+      "ai",
+      "trial",
+      "billing",
+      "cancel",
+      "clients",
+      "recurring",
+    ],
     body: `Blue Seal Pro is the optional upgrade for tradespeople. The core app (quoting, invoicing, scheduling, chat, the job board) stays free. Pro adds:
 
 - **AI assistant:** diagnose problems, draft quotes and invoice notes, and summarize jobs. (Receipt scanning stays free for everyone.)
@@ -423,7 +461,8 @@ You can return to the **Payouts** screen any time to finish setup or open your p
     slug: "bring-your-own-client",
     categoryId: "for-tradespeople",
     title: "Jobs for your own clients (invite them, or run it solo)",
-    excerpt: "Create a job for a client who isn't on Blue Seal: invite them with one link, or manage the whole job yourself.",
+    excerpt:
+      "Create a job for a client who isn't on Blue Seal: invite them with one link, or manage the whole job yourself.",
     audience: "tradesperson",
     popular: true,
     keywords: [
@@ -439,7 +478,11 @@ You can return to the **Payouts** screen any time to finish setup or open your p
     ],
     body: `Most of your customers aren't on Blue Seal, and they don't need to be. **New job** (on your dashboard) lets you set up a job for your own client, so you get the full toolkit (quote, schedule, time tracking, receipts, invoice) for every job you do, not just the ones that come through the platform.
 
-**Creating the job.** Tap **New job**, describe the work, and enter your client's name and email. You can attach up to **8 photos** of the job while you're at it. The job lands in your pipeline like any other, and you get an **invite link** for your client.
+**Creating the job.** Tap **New job**, describe the work, and enter your client's name. Their **phone number and email are both optional**: add the phone if you want to call them from the job page, and the email if you want to invite them. You can attach up to **8 photos** of the job while you're at it. The job lands in your pipeline like any other.
+
+**No email? No problem.** Booked it over the phone and never got an address? Create the job anyway. It runs as a **solo job**: quotes, time tracking, receipts and invoicing all work exactly the same. When you do get their email, tap **Invite client** on the job page and we'll send the sign-in link then.
+
+**Filling in the trade details.** Trade-specific questions (unit type, symptom, fixture, and so on) sit on the job's **Brief** tab. On a job you created, you can fill these in yourself and tap **Save details** — handy when you took the details in person or over the phone.
 
 **Already agreed the price?** Flip on **"Quote already agreed — skip straight to the work"** and the job opens as **in progress** with no quote step. Use it when you've scoped and priced the job in person and just want to run it; you'll invoice from the time and materials you log. Leave it off to send a quote first, the standard way.
 
@@ -539,7 +582,15 @@ For anything involving your immediate safety, contact your local emergency servi
     title: "Showing your Google reviews on your profile",
     excerpt: "Connect your Google Business Profile to display your Google reviews on Blue Seal.",
     audience: "tradesperson",
-    keywords: ["google", "google reviews", "google business", "business profile", "reviews", "reputation", "connect"],
+    keywords: [
+      "google",
+      "google reviews",
+      "google business",
+      "business profile",
+      "reviews",
+      "reputation",
+      "connect",
+    ],
     body: `If you already have a **Google Business Profile** with reviews, you can show those reviews on your Blue Seal profile too. It's handy when you're newer to Blue Seal and still building up reviews here.
 
 **How to connect**
@@ -692,7 +743,8 @@ const faqs: FaqItem[] = [
     audience: "client",
   },
   {
-    question: "My project manager added a job to my project after I accepted it. Do I have to approve it?",
+    question:
+      "My project manager added a job to my project after I accepted it. Do I have to approve it?",
     answer:
       "Yes, and that's the point. A project manager can add a new job to a project you've already accepted (for example an extra trade that comes up partway through), but it doesn't go anywhere until you say so. The new jobs show on your dashboard under **\"Projects set up for you\"** with an **Approve** and a **Decline** for each one. Approving lines that job up for quotes from trusted trades, exactly like the original project; declining lets your project manager know and nothing happens. You won't be asked for your address again, we use the one you gave when you first accepted the project.",
     categoryId: "for-clients",
@@ -701,7 +753,7 @@ const faqs: FaqItem[] = [
   {
     question: "I'm a project manager. How do I set up work for a client?",
     answer:
-      "From your cockpit at **/manage**: add the **property** you manage (an address, with an optional photo), open it, and create a **project** there. A project is a bundle of jobs (each a trade, like \"repaint unit\" or \"fix the sink\"). Add the jobs — and you can attach photos to each one, just like a client posting a job, so the trades quoting it see exactly what you mean. Then invite your client by email. They get a one-tap sign-in link, review the project, and accept. On accept, each job is sent for quotes to the trades you've saved that match it, and your client compares the quotes and picks. You can watch status and quote amounts the whole way (you never see their private chat or invoice), and you earn a commission when one of your trades does the work.",
+      'From your cockpit at **/manage**: add the **property** you manage (an address, with an optional photo), open it, and create a **project** there. A project is a bundle of jobs (each a trade, like "repaint unit" or "fix the sink"). Add the jobs — and you can attach photos to each one, just like a client posting a job, so the trades quoting it see exactly what you mean. Then invite your client by email. They get a one-tap sign-in link, review the project, and accept. On accept, each job is sent for quotes to the trades you\'ve saved that match it, and your client compares the quotes and picks. You can watch status and quote amounts the whole way (you never see their private chat or invoice), and you earn a commission when one of your trades does the work.',
     categoryId: "for-project-managers",
     audience: "client",
   },
@@ -797,7 +849,7 @@ const faqs: FaqItem[] = [
     audience: "tradesperson",
   },
   {
-    question: "What does \"Invited to quote\" mean on Browse jobs?",
+    question: 'What does "Invited to quote" mean on Browse jobs?',
     answer:
       "A project manager who has you in their trusted trades set up a job for their client and invited you to quote on it. It shows in a separate **Invited to quote** section on Browse jobs, and it appears even if your service area isn't set, because the invite is direct rather than based on distance. Open it and send a full quote like any other job post. The client compares the quotes from the trades the project manager invited and picks one. Only the invited trades can see and apply to it; if none of them bid, the client can open the job to the public board.",
     categoryId: "for-tradespeople",
@@ -850,7 +902,7 @@ const faqs: FaqItem[] = [
   {
     question: "I don't know which trade I need, how do I search?",
     answer:
-      "On **Find a tradesperson**, use the **\"What do you need done?\"** box and describe the job in plain words, e.g. *\"my sink is leaking\"* or *\"power keeps tripping\"*. We'll suggest the right trade; tap one to set the filter. Still unsure? **Post a job** and let verified pros tell you what's involved.",
+      'On **Find a tradesperson**, use the **"What do you need done?"** box and describe the job in plain words, e.g. *"my sink is leaking"* or *"power keeps tripping"*. We\'ll suggest the right trade; tap one to set the filter. Still unsure? **Post a job** and let verified pros tell you what\'s involved.',
     categoryId: "for-clients",
     audience: "client",
   },
@@ -927,7 +979,7 @@ const faqs: FaqItem[] = [
   {
     question: "An applicant updated their quote, how can I tell?",
     answer:
-      "Their card shows a **Revised** tag with the new total and an \"Updated\" timestamp. Open the full quote to see exactly what changed before you accept.",
+      'Their card shows a **Revised** tag with the new total and an "Updated" timestamp. Open the full quote to see exactly what changed before you accept.',
     categoryId: "for-clients",
     audience: "client",
   },
@@ -1020,7 +1072,14 @@ const faqs: FaqItem[] = [
   {
     question: "Can I manage jobs for clients who aren't on Blue Seal?",
     answer:
-      "Yes. Tap **New job** on your dashboard. You get the full toolkit (quote, schedule, time tracking, invoice) and your client gets an **invite link**: one tap signs them in, no password or signup form. If they never join, you can run the whole job solo: record their acceptance, finalize the invoice, and mark it paid.",
+      "Yes. Tap **New job** on your dashboard. Only their name is required, so a job you booked over the phone goes in with no email at all. If you do add an email, your client gets an **invite link**: one tap signs them in, no password or signup form. If they never join (or you never invited them), you can run the whole job solo: record their acceptance, finalize the invoice, and mark it paid.",
+    categoryId: "for-tradespeople",
+    audience: "tradesperson",
+  },
+  {
+    question: "Do I have to build a full itemized quote every time?",
+    answer:
+      "No. When you tap **Prepare quote** you pick how to price the job first. **Time & materials** is the quick path: your hourly rate plus an optional materials estimate, and you're ready to send. **Itemized quote** is the guided walkthrough for bigger jobs, with discounts, an upfront fee and terms. **Site visit first** asks to see the job before pricing it. You can switch between them without losing what you've typed.",
     categoryId: "for-tradespeople",
     audience: "tradesperson",
   },
@@ -1055,7 +1114,7 @@ const faqs: FaqItem[] = [
   {
     question: "Can I reuse a quote instead of rebuilding it every time?",
     answer:
-      "Yes, with quote templates. In the quote composer, build your line items once and tap **Save as template** (e.g. \"Full bathroom reno\"). Next time, pick it from **Load a template…** under the line items and it fills the scope of work in, rates included. Give the rates a quick once-over before sending, since templates keep the prices from when you saved them. Templates are private to you; delete one any time from the same dropdown.",
+      'Yes, with quote templates. In the quote composer, build your line items once and tap **Save as template** (e.g. "Full bathroom reno"). Next time, pick it from **Load a template…** under the line items and it fills the scope of work in, rates included. Give the rates a quick once-over before sending, since templates keep the prices from when you saved them. Templates are private to you; delete one any time from the same dropdown.',
     categoryId: "for-tradespeople",
     audience: "tradesperson",
   },
@@ -1083,7 +1142,7 @@ const faqs: FaqItem[] = [
   {
     question: "Can I list the specific services I offer?",
     answer:
-      "Yes. Alongside your trades, you can add a free-text list of the specific jobs you take on, like \"Boiler installation\" or \"Emergency callout\". Add them on the **Trades** step of the onboarding wizard, or anytime from the **Tradesperson** tab in your account. They show as a clear checklist on your public profile so clients can tell at a glance whether you do the job they need.",
+      'Yes. Alongside your trades, you can add a free-text list of the specific jobs you take on, like "Boiler installation" or "Emergency callout". Add them on the **Trades** step of the onboarding wizard, or anytime from the **Tradesperson** tab in your account. They show as a clear checklist on your public profile so clients can tell at a glance whether you do the job they need.',
     categoryId: "for-tradespeople",
     audience: "tradesperson",
   },

@@ -116,8 +116,8 @@ function withdraw(ex: WithId<JobExtraDoc>) {
         <h3 class="font-semibold text-sm">Change orders</h3>
         <p class="text-xs text-[color:var(--bs-muted)] mt-0.5">
           <template v-if="solo">
-            Your client isn't on Blue Seal yet — add extra work as a line item
-            when you finish and invoice the job.
+            Your client hasn't joined this job yet, so there's nobody to approve a change order. Add
+            extra work as a line item when you invoice.
           </template>
           <template v-else>
             Extra work beyond the original quote. The client approves each one before it's billed.
@@ -135,11 +135,7 @@ function withdraw(ex: WithId<JobExtraDoc>) {
       />
     </header>
 
-    <Message
-      v-if="visible.length === 0"
-      severity="info"
-      :closable="false"
-    >
+    <Message v-if="visible.length === 0" severity="info" :closable="false">
       <template v-if="isTradie">
         Hit "Add" when a job picks up extra work. The client approves it before you bill it.
       </template>
@@ -201,7 +197,9 @@ function withdraw(ex: WithId<JobExtraDoc>) {
         <!-- Tradie: clock in against an approved hourly order (rate shown above)
              + withdraw while not yet invoiced. -->
         <div
-          v-else-if="isTradie && (ex.status === 'proposed' || ex.status === 'approved') && !ex.invoicedAt"
+          v-else-if="
+            isTradie && (ex.status === 'proposed' || ex.status === 'approved') && !ex.invoicedAt
+          "
           class="mt-3 flex flex-wrap items-center gap-2"
         >
           <Button
@@ -225,10 +223,6 @@ function withdraw(ex: WithId<JobExtraDoc>) {
       </li>
     </ul>
 
-    <ChangeOrderDialog
-      v-if="isTradie"
-      v-model:visible="showProposeDialog"
-      :job-id="jobId"
-    />
+    <ChangeOrderDialog v-if="isTradie" v-model:visible="showProposeDialog" :job-id="jobId" />
   </div>
 </template>

@@ -152,14 +152,13 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
             steps: [
               "Open the invite link (or emailed magic link) as the client → confirm email → claim → on the dashboard, Accept and enter the job address.",
             ],
-            expected: "Each job dispatches to your matching saved trades; the project shows Accepted.",
+            expected:
+              "Each job dispatches to your matching saved trades; the project shows Accepted.",
           },
           {
             id: "pm-resend-link",
             title: "Re-copy a shareable invite link for a pending project",
-            steps: [
-              "Open a pending (Invite sent) project → Resend invite.",
-            ],
+            steps: ["Open a pending (Invite sent) project → Resend invite."],
             expected:
               "A fresh 'Shareable sign-in link' appears with a Copy button (works for the SAME client email, not only on an email change); the client is also re-emailed. The newest link is the one that works. (Requires the resendProjectInvite function deploy.)",
           },
@@ -188,8 +187,11 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
           {
             id: "pm-public-fallback",
             title: "Public-board fallback (no bids)",
-            steps: ["On a scoped posting with no quotes, the client opens it to all trades nearby."],
-            expected: "It flips to Open, leaves the invited lists, and enters the public radius feed (geocoded).",
+            steps: [
+              "On a scoped posting with no quotes, the client opens it to all trades nearby.",
+            ],
+            expected:
+              "It flips to Open, leaves the invited lists, and enters the public radius feed (geocoded).",
           },
           {
             id: "pm-visibility",
@@ -265,7 +267,8 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
             id: "pm-feature-optout",
             title: "Contractor opt-out",
             steps: ["As that contractor, open /featured-by-pms → Remove me."],
-            expected: "They drop off the PM's profile and can't be re-featured until they opt back in.",
+            expected:
+              "They drop off the PM's profile and can't be re-featured until they opt back in.",
           },
           {
             id: "pm-business-card",
@@ -309,7 +312,9 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
           {
             id: "pm-edit-project",
             title: "Edit a project before it's accepted",
-            steps: ["Open a pending (Invite sent / Client joined) project → Edit project → change the label / add a job → Save changes."],
+            steps: [
+              "Open a pending (Invite sent / Client joined) project → Edit project → change the label / add a job → Save changes.",
+            ],
             expected:
               "The detail updates. Editing is offered only pre-accept; an accepted project has no Edit (server rejects it too).",
           },
@@ -335,7 +340,8 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
             id: "pm-roster-availability",
             title: "Roster shows contractor availability",
             steps: ["Open Roster with at least one saved trade who has set weekly availability."],
-            expected: "Each card shows 'Available Mon, Tue, …' from their weekly availability (omitted if none set).",
+            expected:
+              "Each card shows 'Available Mon, Tue, …' from their weekly availability (omitted if none set).",
           },
           {
             id: "pm-pro-checkout",
@@ -367,9 +373,7 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
           {
             id: "pm-ai-project",
             title: "AI: draft a project from a prompt (Pro)",
-            steps: [
-              "New project → in 'Draft the jobs with AI', describe the work → Draft jobs.",
-            ],
+            steps: ["New project → in 'Draft the jobs with AI', describe the work → Draft jobs."],
             expected:
               "Pro: the job rows populate with trade + title + description to review/edit before creating. Non-Pro: the Blue Seal Pro paywall.",
           },
@@ -407,7 +411,8 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
             id: "sales-become",
             title: "Become a sales rep (QA toolkit) + agreement gate",
             steps: ["QA toolkit → Become a sales rep → you land on /sales."],
-            expected: "A blocking agreement dialog appears; you can't act as a rep until you sign it.",
+            expected:
+              "A blocking agreement dialog appears; you can't act as a rep until you sign it.",
           },
           {
             id: "sales-code",
@@ -422,7 +427,8 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
           {
             id: "sales-referral-signup",
             title: "Referral signup via /join?ref=",
-            expected: "Signup preselects tradesperson with the free-month banner; attribution recorded.",
+            expected:
+              "Signup preselects tradesperson with the free-month banner; attribution recorded.",
           },
           {
             id: "sales-review-application",
@@ -510,7 +516,7 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
             title: "Create a job for your own client (invite / solo, with photos)",
             steps: [
               "Open /jobs/new. Confirm the Trade field: with one trade on your profile it's a read-only line (no dropdown); with two-plus it's a dropdown defaulted to your primary, changeable.",
-              "Enter client name + email, address, and tap Add photo to attach 1-8 images (they compress + preview as thumbnails; × removes one).",
+              "Enter client name + phone + email (only the name is required), address, and tap Add photo to attach 1-8 images (they compress + preview as thumbnails; × removes one).",
               "Leave 'Quote already agreed — skip straight to the work' OFF for this run. Submit.",
             ],
             expected:
@@ -548,9 +554,66 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
             expected:
               "Each send emails the unclaimed client a branded message with the full itemized breakdown and a one-tap magic-link CTA (Review & approve for the quote, View & pay for the invoice). Clicking signs them in, claims the job (clientId backfills on job/quote/invoice), and lands them on it. Gated like the initial invite (suppression / CASL address / email-link enabled) and honours the invite unsubscribe; if it can't send, offline record-acceptance / mark-paid still works. The whole job is runnable from the emails alone, no signup form.",
           },
+          {
+            id: "tradie-invite-job-no-email",
+            title: "Create a job with NO client email (phone booking → solo job)",
+            steps: [
+              "Open /jobs/new. Enter only the client's name and phone number, leave the email blank, fill in the job + address, and submit.",
+              "Open the created job and read the banner at the top, then the Brief tab.",
+              "Tap 'Invite client', enter an email, and send.",
+            ],
+            expected:
+              "The form submits with no 'Enter a valid email address' block. The success dialog says you're running it solo and shows NO invite link. On the job, the banner reads 'Solo job — no client email on file' with an Invite client button, and the Brief tab shows a Client contact card with the phone as a tap-to-call link (tradesperson only). Sending the invite mints the first invite, emails it, and flips the banner to 'Waiting for … to join'.",
+          },
+          {
+            id: "tradie-fill-trade-brief",
+            title: "Fill in the trade-specific brief on your own job",
+            steps: [
+              "Open a job you created (invite or solo) and go to the Brief tab.",
+              "Fill in the trade-specific fields and tap Save details. Re-open the job.",
+              "For contrast, open a marketplace job you won and check the same section.",
+            ],
+            expected:
+              "On your own direct/invite job the fields are EDITABLE (not greyed out) with a Save details button; saving persists the answers and does NOT change the job's status. On a marketplace job (sourcePostId set), and on a closed job (complete / reviewed / cancelled), the fields stay read-only.",
+          },
+          {
+            id: "tradie-quote-style-chooser",
+            title: "Prepare quote starts with how-to-quote (time & materials vs itemized)",
+            steps: [
+              "On a Requested direct job, tap Prepare quote.",
+              "Choose Time & materials, set the hours, then tap '← Change how you're quoting' and pick Itemized quote.",
+              "On wizard step 1 tap Back. Then check the Scope of work section's layout.",
+              "Separately, open Prepare quote on an already-quoted job (resend).",
+            ],
+            expected:
+              "A fresh quote opens on three cards (Time & materials / Itemized quote / Site visit first) with only Cancel in the footer. Time & materials pre-seeds an Hourly line at your profile rate plus a Materials line, and hides discount/upfront/validity/terms behind 'Show every option'. Switching approaches keeps everything you've typed. Back on step 1 returns to the cards, not a dead end. In Scope of work the +Hourly/+Flat rate/+Materials buttons sit ABOVE an 'On this quote (N)' block that holds the rows. A resend skips the chooser and opens the full form. Mobile 375px: cards are full-width, 64px+ tall.",
+          },
+          {
+            id: "tradie-calendar-day-detail",
+            title: "Calendar opens on Month; tapping a day shows its hours + jobs",
+            steps: [
+              "Open /dashboard/tradie?view=calendar with at least one scheduled job.",
+              "Tap a day cell that has a job on it.",
+              "Tap a job block in the sheet. Re-open the sheet on a future free day and use Block day, then re-open that day.",
+              "Also check a multi-day job (scheduledStart Mon, scheduledEnd Wed), and view a tradesperson's public profile calendar as a client.",
+            ],
+            expected:
+              "The calendar opens on Month (Month listed first in the toggle). Cells show job chips prefixed with the start time. Tapping a day opens a sheet with the day's working hours and an hour rail with each job drawn against the hours it occupies; tapping a job opens it. A bare tap no longer blocks the day — Block day lives in the sheet footer, and a blocked day shows an Unblock bar. A multi-day job appears on every day it spans. Read-only viewers get the sheet but NO block/unblock controls. 375px: no horizontal scroll.",
+          },
           { id: "tradie-get-paid", title: "Get paid: invoice → card payment → Stripe payout" },
           { id: "tradie-pro", title: "Blue Seal Pro (toggle free vs Pro features)" },
           { id: "tradie-profile", title: "Profile + branding + vanity /u/<slug>" },
+          {
+            id: "tradie-vanity-url-resolves",
+            title: "My page → /u/<handle> actually renders (not 'Profile not found')",
+            steps: [
+              "As a Pro tradesperson with a claimed handle, tap My page (side panel) or open /tradies/<your-uid>.",
+              "Repeat signed-out in a private window with the same /tradies/<uid> URL.",
+              "From another tradesperson's profile, tap a recommendation (vouch) chip that links to a different profile.",
+            ],
+            expected:
+              "The URL swaps to /u/<handle> and the profile renders in full. It must never show 'Profile not found'. Navigating profile-to-profile loads the NEW person's profile rather than leaving the previous one on screen. (Both routes render the same component, so the page has to re-resolve on route change, not only on mount.)",
+          },
         ],
       },
     ],

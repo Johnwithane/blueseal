@@ -103,7 +103,11 @@ onMounted(async () => {
 const title = ref("");
 const description = ref("");
 const clientName = ref("");
+// Both optional. Plenty of these jobs are booked over the phone, so requiring
+// an email blocked the exact workflow this form exists for. No email = a solo
+// job with no invite; the tradesperson can add one later from the job page.
 const clientEmail = ref("");
+const clientPhone = ref("");
 const addressLine1 = ref("");
 const city = ref("");
 const region = ref("");
@@ -164,7 +168,15 @@ const error = ref<string | null>(null);
 const { errors, clear: clearErrors, setFromZod, focusFirst } = useFormErrors();
 // Matches the on-screen section order (client → job → address) so a validation
 // failure focuses the topmost errored field, not one buried mid-form.
-const FIELD_ORDER = ["clientName", "clientEmail", "trade", "title", "description", "address"];
+const FIELD_ORDER = [
+  "clientName",
+  "clientEmail",
+  "clientPhone",
+  "trade",
+  "title",
+  "description",
+  "address",
+];
 
 // Success state: the invite link is returned exactly once by the callable
 // (only its hash is stored server-side), so it's surfaced here for copying.
@@ -197,6 +209,7 @@ async function submit() {
     description: description.value,
     clientName: clientName.value,
     clientEmail: clientEmail.value,
+    clientPhone: clientPhone.value,
     urgency: urgency.value,
     address: {
       line1: addressLine1.value,
@@ -224,7 +237,12 @@ async function submit() {
         const urls = await Promise.all(
           photos.value.map((p) =>
             uploadFile(
-              makeStoragePath({ scope: "jobs", id: res.jobId, bucket: "intake", filename: p.file.name }),
+              makeStoragePath({
+                scope: "jobs",
+                id: res.jobId,
+                bucket: "intake",
+                filename: p.file.name,
+              }),
               p.file,
             ),
           ),
@@ -262,34 +280,75 @@ function openJob() {
 <template>
   <section class="bs-container max-w-lg py-6">
     <p class="text-sm text-[color:var(--bs-muted)] -mt-1 mb-6">
-      Set up a job for your own client. They don't need a Blue Seal account. You'll
-      get a link to invite them so they can follow along, approve your quote, and pay.
-      Or run the whole job yourself.
+      Set up a job for your own client. They don't need a Blue Seal account. You'll get a link to
+      invite them so they can follow along, approve your quote, and pay. Or run the whole job
+      yourself.
     </p>
 
     <form class="space-y-8" @submit.prevent="submit">
       <!-- Who it's for. Client-first: you're setting the job up FOR someone,
            so anchor on them before the work details. -->
       <fieldset class="space-y-2">
-        <legend class="text-xs font-semibold uppercase tracking-wide text-[color:var(--bs-muted)] mb-3">Your client</legend>
+        <legend
+          class="text-xs font-semibold uppercase tracking-wide text-[color:var(--bs-muted)] mb-3"
+        >
+          Your client
+        </legend>
         <div class="grid sm:grid-cols-2 gap-2">
           <div data-field="clientName">
-            <InputText v-model="clientName" placeholder="Client name" maxlength="80" autocomplete="off" class="w-full" :invalid="!!errors.clientName" />
+            <InputText
+              v-model="clientName"
+              placeholder="Client name"
+              maxlength="80"
+              autocomplete="off"
+              class="w-full"
+              :invalid="!!errors.clientName"
+            />
             <FieldError :message="errors.clientName" />
           </div>
-          <div data-field="clientEmail">
-            <InputText v-model="clientEmail" type="email" placeholder="Client email" maxlength="200" autocomplete="off" class="w-full" :invalid="!!errors.clientEmail" />
-            <FieldError :message="errors.clientEmail" />
+          <div data-field="clientPhone">
+            <InputText
+              v-model="clientPhone"
+              type="tel"
+              placeholder="Phone (optional)"
+              maxlength="30"
+              autocomplete="off"
+              class="w-full"
+              :invalid="!!errors.clientPhone"
+            />
+            <FieldError :message="errors.clientPhone" />
           </div>
         </div>
+        <div data-field="clientEmail">
+          <InputText
+            v-model="clientEmail"
+            type="email"
+            placeholder="Email (optional)"
+            maxlength="200"
+            autocomplete="off"
+            class="w-full"
+            :invalid="!!errors.clientEmail"
+          />
+          <FieldError :message="errors.clientEmail" />
+        </div>
         <p class="text-xs text-[color:var(--bs-muted)]">
-          They'll get a link to follow the job. No account or password needed.
+          <template v-if="clientEmail.trim()">
+            They'll get a link to follow the job. No account or password needed.
+          </template>
+          <template v-else>
+            No email? Create the job anyway and run it yourself. You can invite them from the job
+            page whenever you have their address.
+          </template>
         </p>
       </fieldset>
 
       <!-- What the job is: trade, title, scope, photos. -->
       <fieldset class="space-y-4 border-t border-[color:var(--bs-border)] pt-6">
-        <legend class="text-xs font-semibold uppercase tracking-wide text-[color:var(--bs-muted)] mb-3">The job</legend>
+        <legend
+          class="text-xs font-semibold uppercase tracking-wide text-[color:var(--bs-muted)] mb-3"
+        >
+          The job
+        </legend>
 
         <div data-field="trade">
           <label class="text-sm font-medium">Trade</label>
@@ -317,13 +376,26 @@ function openJob() {
 
         <div data-field="title">
           <label class="text-sm font-medium">Title</label>
-          <InputText v-model="title" placeholder="e.g. Kitchen tap replacement" maxlength="140" class="mt-1 w-full" :invalid="!!errors.title" />
+          <InputText
+            v-model="title"
+            placeholder="e.g. Kitchen tap replacement"
+            maxlength="140"
+            class="mt-1 w-full"
+            :invalid="!!errors.title"
+          />
           <FieldError :message="errors.title" />
         </div>
 
         <div data-field="description">
           <label class="text-sm font-medium">Description</label>
-          <Textarea v-model="description" rows="4" maxlength="4000" class="mt-1 w-full" placeholder="Scope of work, as you'd write it on a quote" :invalid="!!errors.description" />
+          <Textarea
+            v-model="description"
+            rows="4"
+            maxlength="4000"
+            class="mt-1 w-full"
+            placeholder="Scope of work, as you'd write it on a quote"
+            :invalid="!!errors.description"
+          />
           <FieldError :message="errors.description" />
         </div>
 
@@ -331,7 +403,9 @@ function openJob() {
           <label class="text-sm font-medium">
             Photos <span class="font-normal text-[color:var(--bs-muted)]">(optional)</span>
           </label>
-          <p class="text-xs text-[color:var(--bs-muted)] mt-0.5 mb-2">Add up to 8 photos of the job.</p>
+          <p class="text-xs text-[color:var(--bs-muted)] mt-0.5 mb-2">
+            Add up to 8 photos of the job.
+          </p>
           <div class="flex flex-wrap gap-2">
             <div
               v-for="(p, idx) in photos"
@@ -358,13 +432,27 @@ function openJob() {
               <span class="text-xs mt-1">Add photo</span>
             </button>
           </div>
-          <input ref="photoInput" type="file" accept="image/*" multiple class="hidden" @change="onPhotos" />
+          <input
+            ref="photoInput"
+            type="file"
+            accept="image/*"
+            multiple
+            class="hidden"
+            @change="onPhotos"
+          />
         </div>
       </fieldset>
 
       <!-- Where the work is. -->
-      <fieldset data-field="address" class="space-y-2 border-t border-[color:var(--bs-border)] pt-6">
-        <legend class="text-xs font-semibold uppercase tracking-wide text-[color:var(--bs-muted)] mb-3">Job address</legend>
+      <fieldset
+        data-field="address"
+        class="space-y-2 border-t border-[color:var(--bs-border)] pt-6"
+      >
+        <legend
+          class="text-xs font-semibold uppercase tracking-wide text-[color:var(--bs-muted)] mb-3"
+        >
+          Job address
+        </legend>
         <!-- Raw input (not InputText) so the Places autocomplete in onMounted
              can attach to a real HTMLInputElement. autocomplete="off" keeps the
              browser from autofilling the tradesperson's own address over the
@@ -379,16 +467,35 @@ function openJob() {
           autocomplete="off"
         />
         <div class="grid sm:grid-cols-2 gap-2">
-          <InputText v-model="city" placeholder="City" maxlength="100" :invalid="!!errors.address" />
-          <InputText v-model="region" placeholder="Province" maxlength="100" :invalid="!!errors.address" />
-          <InputText v-model="postalCode" placeholder="Postal code (A1A 1A1)" maxlength="7" :invalid="!!errors.address" />
+          <InputText
+            v-model="city"
+            placeholder="City"
+            maxlength="100"
+            :invalid="!!errors.address"
+          />
+          <InputText
+            v-model="region"
+            placeholder="Province"
+            maxlength="100"
+            :invalid="!!errors.address"
+          />
+          <InputText
+            v-model="postalCode"
+            placeholder="Postal code (A1A 1A1)"
+            maxlength="7"
+            :invalid="!!errors.address"
+          />
         </div>
         <FieldError :message="errors.address" />
       </fieldset>
 
       <!-- When it happens. -->
       <fieldset class="border-t border-[color:var(--bs-border)] pt-6">
-        <legend class="text-xs font-semibold uppercase tracking-wide text-[color:var(--bs-muted)] mb-3">Timing</legend>
+        <legend
+          class="text-xs font-semibold uppercase tracking-wide text-[color:var(--bs-muted)] mb-3"
+        >
+          Timing
+        </legend>
         <div class="grid sm:grid-cols-2 gap-2">
           <div>
             <label class="text-sm font-medium">Urgency</label>
@@ -404,21 +511,30 @@ function openJob() {
             <label class="text-sm font-medium">
               Planned start <span class="font-normal text-[color:var(--bs-muted)]">(optional)</span>
             </label>
-            <DatePicker v-model="preferredStart" date-format="yy-mm-dd" show-icon class="mt-1 w-full" />
+            <DatePicker
+              v-model="preferredStart"
+              date-format="yy-mm-dd"
+              show-icon
+              class="mt-1 w-full"
+            />
           </div>
         </div>
       </fieldset>
 
       <!-- Quoting: skip straight to the work when the price is already agreed. -->
       <fieldset class="border-t border-[color:var(--bs-border)] pt-6">
-        <legend class="text-xs font-semibold uppercase tracking-wide text-[color:var(--bs-muted)] mb-3">Quoting</legend>
+        <legend
+          class="text-xs font-semibold uppercase tracking-wide text-[color:var(--bs-muted)] mb-3"
+        >
+          Quoting
+        </legend>
         <div class="flex items-start gap-3">
           <ToggleSwitch v-model="skipQuote" input-id="skipQuote" class="mt-0.5" />
           <label for="skipQuote" class="text-sm cursor-pointer">
             <span class="font-medium">Quote already agreed — skip straight to the work</span>
             <span class="block text-xs text-[color:var(--bs-muted)] mt-0.5">
-              The job opens as in&nbsp;progress. No quote is sent — you'll invoice from
-              the time and materials you log. Leave off to send a quote first.
+              The job opens as in&nbsp;progress. No quote is sent — you'll invoice from the time and
+              materials you log. Leave off to send a quote first.
             </span>
           </label>
         </div>
@@ -445,21 +561,34 @@ function openJob() {
     >
       <p class="text-sm">
         <template v-if="emailed">
-          We've emailed <strong>{{ clientEmail }}</strong> an invite link. You can
-          also share it yourself:
+          We've emailed <strong>{{ clientEmail }}</strong> an invite link. You can also share it
+          yourself:
+        </template>
+        <template v-else-if="inviteLink">
+          Share this invite link with <strong>{{ clientName || "your client" }}</strong
+          >. One tap signs them in, no password needed. Or just run the job yourself.
         </template>
         <template v-else>
-          Share this invite link with <strong>{{ clientName || "your client" }}</strong>.
-          One tap signs them in, no password needed. Or just run the job yourself.
+          You're running this one solo — no email, so no invite went out. Quotes, time tracking and
+          invoicing all work as usual, and you can invite
+          <strong>{{ clientName || "your client" }}</strong> from the job page later.
         </template>
       </p>
       <div
+        v-if="inviteLink"
         class="mt-3 p-2 rounded border border-[color:var(--bs-border)] bg-[color:var(--bs-surface)] text-xs break-all select-all"
       >
         {{ inviteLink }}
       </div>
       <div class="flex gap-2 mt-4">
-        <Button label="Copy link" icon="pi pi-copy" outlined class="flex-1" @click="copyLink" />
+        <Button
+          v-if="inviteLink"
+          label="Copy link"
+          icon="pi pi-copy"
+          outlined
+          class="flex-1"
+          @click="copyLink"
+        />
         <Button label="Open job" icon="pi pi-arrow-right" class="flex-1" @click="openJob" />
       </div>
     </Dialog>

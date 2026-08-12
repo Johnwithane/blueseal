@@ -63,6 +63,18 @@ const canRequestVisit = computed(() => !isResend.value && existingVisitStatus.va
 // so the composer renders every blocking issue inline.
 const attempted = ref(false);
 
+// How the tradesperson wants to price this job. Asked FIRST, before any form:
+// most jobs are simply "my hourly rate plus whatever parts cost", and making
+// everyone build an itemized scope for that was the main complaint about the
+// quote flow. null = the chooser is still on screen.
+//   "tm"       — one hourly line + an optional materials estimate, on a short form.
+//   "itemized" — the full guided walkthrough (unchanged).
+type QuoteStyle = "tm" | "itemized";
+const quoteStyle = ref<QuoteStyle | null>(null);
+// Escape hatch out of the short T&M form into every option (discount, upfront
+// fee, validity, terms) without starting over.
+const tmShowAll = ref(false);
+
 // Guided walkthrough for a FRESH quote: the composer's sections are revealed
 // one step at a time, ending on the full form to review & send. Resends skip
 // it (the tradie is tweaking, not building) and "Skip" drops straight to the
@@ -91,10 +103,69 @@ const WIZARD_STEPS: { title: string; hint: string; sections: QuoteComposerSectio
   },
 ];
 const wizardStep = ref<number | null>(null);
-const inWizard = computed(() => mode.value === "quote" && wizardStep.value !== null);
-const wizardSections = computed<QuoteComposerSection[] | null>(() =>
-  inWizard.value ? WIZARD_STEPS[wizardStep.value as number].sections : null,
+const inWizard = computed(
+  () => mode.value === "quote" && quoteStyle.value === "itemized" && wizardStep.value !== null,
 );
+
+// The short form still needs timing + a note + the running total — it drops the
+// optional money machinery (discount, upfront fee, validity), which is what
+// made the standard flow feel heavy for a rate-and-parts job.
+const TM_SECTIONS: QuoteComposerSection[] = ["items", "timing", "notes", "summary"];
+
+const wizardSections = computed<QuoteComposerSection[] | null>(() => {
+  if (inWizard.value) return WIZARD_STEPS[wizardStep.value as number].sections;
+  if (quoteStyle.value === "tm" && !tmShowAll.value) return TM_SECTIONS;
+  return null;
+});
+
+// Seed the T&M form so there's nothing to assemble: an hourly line at their
+// profile rate, and a materials line they can price or delete. quantity/unitPrice
+// are the stored LineItem shape (hours × cents-per-hour for an hourly line).
+function chooseTimeAndMaterials() {
+  quoteStyle.value = "tm";
+  tmShowAll.value = false;
+  wizardStep.value = null;
+  const existingLines = initial.value?.lineItems ?? [];
+  initial.value = {
+    ...(initial.value ?? {}),
+    lineItems: [
+      ...existingLines,
+      {
+        kind: "hourly",
+        description: "Labour",
+        quantity: 0,
+        unitPrice: hourlyRateCents.value ?? 0,
+        taxRate: 0,
+      },
+      {
+        kind: "materials",
+        description: "Materials",
+        quantity: 1,
+        unitPrice: 0,
+        taxRate: 0,
+      },
+    ],
+  };
+}
+
+function chooseItemized() {
+  quoteStyle.value = "itemized";
+  wizardStep.value = 0;
+}
+
+function chooseSiteVisit() {
+  mode.value = "site_visit";
+  quoteStyle.value = "itemized"; // so the chooser doesn't reappear behind the form
+  wizardStep.value = null;
+}
+
+// Back to the three cards. Line items typed so far survive in the composer;
+// only the presentation changes.
+function reopenChooser() {
+  mode.value = "quote";
+  quoteStyle.value = null;
+  wizardStep.value = null;
+}
 
 function wizardNext() {
   const i = wizardStep.value;
@@ -111,7 +182,10 @@ function wizardNext() {
   wizardStep.value = i + 1 >= WIZARD_STEPS.length ? null : i + 1;
 }
 function wizardBack() {
-  if (wizardStep.value && wizardStep.value > 0) wizardStep.value -= 1;
+  // Back off the first step returns to the approach chooser rather than
+  // dead-ending — the wizard is no longer the start of the flow.
+  if (wizardStep.value === 0) reopenChooser();
+  else if (wizardStep.value) wizardStep.value -= 1;
 }
 function wizardSkip() {
   wizardStep.value = null;
@@ -129,7 +203,8 @@ function onDraftWithAi() {
   if ((composer.value?.totals.subtotal ?? 0) > 0) {
     confirmDestructive(
       {
-        message: "Replace your current line items with an AI draft? What you've typed will be overwritten.",
+        message:
+          "Replace your current line items with an AI draft? What you've typed will be overwritten.",
         header: "Draft with AI",
         acceptLabel: "Replace",
       },
@@ -185,6 +260,8 @@ watch(
     composer.value = null;
     attempted.value = false;
     mode.value = "quote";
+    quoteStyle.value = null;
+    tmShowAll.value = false;
     siteVisitForm.value = null;
     existingVisitStatus.value = null;
     try {
@@ -233,8 +310,14 @@ watch(
     } else if (seededLines) {
       initial.value = { lineItems: seededLines };
     }
-    // Fresh quote → guided walkthrough; resend/edit → straight to the form.
-    wizardStep.value = existing ? null : 0;
+    // Resend/edit → straight to the full form (the tradie is tweaking, not
+    // building). A fresh quote starts on the "how do you want to quote this?"
+    // chooser, which then sets the style + wizard step.
+    if (existing) {
+      quoteStyle.value = "itemized";
+      tmShowAll.value = true;
+    }
+    wizardStep.value = null;
     loading.value = false;
   },
 );
@@ -327,42 +410,73 @@ function close() {
         <div class="flex items-start gap-2">
           <i class="pi pi-info-circle text-[color:var(--bs-warning)] mt-0.5"></i>
           <div class="min-w-0 flex-1">
-            <div class="font-semibold text-sm text-[color:var(--bs-warning-text)]">Client's request</div>
-            <p class="text-sm text-[color:var(--bs-warning-text)] mt-1 whitespace-pre-wrap">{{ priorDeclinedReason }}</p>
+            <div class="font-semibold text-sm text-[color:var(--bs-warning-text)]">
+              Client's request
+            </div>
+            <p class="text-sm text-[color:var(--bs-warning-text)] mt-1 whitespace-pre-wrap">
+              {{ priorDeclinedReason }}
+            </p>
           </div>
         </div>
       </div>
 
-      <!-- Mode toggle: full quote vs "site visit first". Only on a fresh quote
-           with no visit already in flight, and only on the wizard's first step
-           (switching paths mid-walkthrough would be disorienting). -->
-      <div
-        v-if="canRequestVisit && (!inWizard || wizardStep === 0)"
-        role="tablist"
-        aria-label="How you want to respond"
-        class="grid grid-cols-2 gap-1 rounded-xl border border-[color:var(--bs-border)] bg-[color:var(--bs-surface-alt)] p-1 mb-4"
-      >
-        <button
-          type="button"
-          role="tab"
-          :aria-selected="mode === 'quote'"
-          class="flex min-h-[44px] items-center justify-center rounded-lg px-3 py-2 text-center text-sm font-semibold transition-colors"
-          :class="mode === 'quote' ? 'bg-[color:var(--bs-blue)] text-white shadow-sm' : 'text-[color:var(--bs-muted)] hover:text-[color:var(--bs-text)]'"
-          @click="mode = 'quote'"
-        >
-          Send a quote
+      <!-- START HERE on a fresh quote: pick how to price the job before any
+           form appears. Time & materials is first because it's the common case
+           — a rate and some parts, not an itemized scope. -->
+      <div v-if="quoteStyle === null" class="space-y-2">
+        <h4 class="font-semibold">How do you want to quote this?</h4>
+        <p class="text-xs text-[color:var(--bs-muted)] mb-2">
+          You can change your mind at any point — nothing you've typed is lost.
+        </p>
+        <button type="button" class="quote-style-card" @click="chooseTimeAndMaterials">
+          <i class="pi pi-clock quote-style-card__icon"></i>
+          <span class="min-w-0">
+            <span class="block font-semibold text-sm">Time &amp; materials</span>
+            <span class="block text-xs text-[color:var(--bs-muted)] leading-snug">
+              Your hourly rate
+              <template v-if="hourlyRateCents">({{ money(hourlyRateCents) }}/hr)</template>
+              plus an optional materials estimate. Quickest way to send something.
+            </span>
+          </span>
+          <i class="pi pi-chevron-right text-xs opacity-50"></i>
+        </button>
+        <button type="button" class="quote-style-card" @click="chooseItemized">
+          <i class="pi pi-list quote-style-card__icon"></i>
+          <span class="min-w-0">
+            <span class="block font-semibold text-sm">Itemized quote</span>
+            <span class="block text-xs text-[color:var(--bs-muted)] leading-snug">
+              Build the scope line by line, with discounts, an upfront fee and terms. Guided, four
+              short steps.
+            </span>
+          </span>
+          <i class="pi pi-chevron-right text-xs opacity-50"></i>
         </button>
         <button
+          v-if="canRequestVisit"
           type="button"
-          role="tab"
-          :aria-selected="mode === 'site_visit'"
-          class="flex min-h-[44px] items-center justify-center rounded-lg px-3 py-2 text-center text-sm font-semibold transition-colors"
-          :class="mode === 'site_visit' ? 'bg-[color:var(--bs-blue)] text-white shadow-sm' : 'text-[color:var(--bs-muted)] hover:text-[color:var(--bs-text)]'"
-          @click="mode = 'site_visit'"
+          class="quote-style-card"
+          @click="chooseSiteVisit"
         >
-          Site visit first
+          <i class="pi pi-map-marker quote-style-card__icon"></i>
+          <span class="min-w-0">
+            <span class="block font-semibold text-sm">Site visit first</span>
+            <span class="block text-xs text-[color:var(--bs-muted)] leading-snug">
+              Can't price it blind? Ask to see the job first, with an optional callout fee.
+            </span>
+          </span>
+          <i class="pi pi-chevron-right text-xs opacity-50"></i>
         </button>
       </div>
+
+      <!-- Change-approach link, once a path is chosen on a fresh quote. -->
+      <button
+        v-if="quoteStyle !== null && !isResend"
+        type="button"
+        class="mb-3 text-xs text-[color:var(--bs-blue)] underline"
+        @click="reopenChooser"
+      >
+        ← Change how you're quoting
+      </button>
 
       <!-- Wizard chrome: step counter, skip link, title + progress. -->
       <div v-if="inWizard" class="mb-4">
@@ -387,14 +501,16 @@ function close() {
             v-for="i in WIZARD_STEPS.length"
             :key="i"
             class="h-1 flex-1 rounded-full"
-            :class="i - 1 <= wizardStep! ? 'bg-[color:var(--bs-blue)]' : 'bg-[color:var(--bs-border)]'"
+            :class="
+              i - 1 <= wizardStep! ? 'bg-[color:var(--bs-blue)]' : 'bg-[color:var(--bs-border)]'
+            "
           ></span>
         </div>
       </div>
 
       <!-- AI draft — on the scope step (or the full form), where the rows land. -->
       <div
-        v-if="mode === 'quote' && (!inWizard || wizardStep === 0)"
+        v-if="quoteStyle !== null && mode === 'quote' && (!inWizard || wizardStep === 0)"
         class="mb-4 flex items-center gap-2"
       >
         <Button
@@ -412,29 +528,37 @@ function close() {
       </div>
 
       <SiteVisitForm
-        v-if="mode === 'site_visit'"
+        v-if="quoteStyle !== null && mode === 'site_visit'"
         @update:state="(s) => (siteVisitForm = s)"
       />
       <QuoteComposer
-        v-else
+        v-else-if="quoteStyle !== null"
         :hourly-rate-cents="hourlyRateCents"
         :initial="initial"
         :show-errors="attempted"
         :visible-sections="wizardSections"
         @update:state="(s) => (composer = s)"
       />
+
+      <!-- T&M keeps the optional money machinery out of the way until asked. -->
+      <button
+        v-if="quoteStyle === 'tm' && mode === 'quote' && !tmShowAll"
+        type="button"
+        class="mt-3 text-xs text-[color:var(--bs-blue)] underline"
+        @click="tmShowAll = true"
+      >
+        Show every option (discount, upfront fee, validity, terms)
+      </button>
     </template>
 
     <template #footer>
+      <!-- Choosing an approach: nothing to send yet, so only Cancel. -->
+      <div v-if="quoteStyle === null && !loading" class="flex w-full">
+        <Button label="Cancel" text @click="close" />
+      </div>
       <!-- Wizard: Back / Next. The send button only appears on the review form. -->
-      <div v-if="inWizard && !loading" class="flex w-full items-center gap-2">
-        <Button
-          label="Back"
-          icon="pi pi-arrow-left"
-          text
-          :disabled="wizardStep === 0"
-          @click="wizardBack"
-        />
+      <div v-else-if="inWizard && !loading" class="flex w-full items-center gap-2">
+        <Button label="Back" icon="pi pi-arrow-left" text @click="wizardBack" />
         <span class="flex-1"></span>
         <Button
           :label="wizardStep === WIZARD_STEPS.length - 1 ? 'Review & send' : 'Next'"
@@ -444,7 +568,13 @@ function close() {
         />
       </div>
       <div v-else class="flex flex-col-reverse gap-2 w-full sm:flex-row sm:items-center">
-        <Button label="Cancel" text :disabled="submitting" class="w-full sm:w-auto" @click="close" />
+        <Button
+          label="Cancel"
+          text
+          :disabled="submitting"
+          class="w-full sm:w-auto"
+          @click="close"
+        />
         <span class="hidden flex-1 sm:block"></span>
         <Button
           :label="submitLabel"
@@ -460,6 +590,40 @@ function close() {
 </template>
 
 <style>
+/* Approach chooser cards. Full-width tap targets — this is the first thing a
+   tradesperson sees on a phone when a quote is due. */
+.quote-style-card {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 64px;
+  padding: 0.75rem;
+  text-align: left;
+  border: 1px solid var(--bs-border);
+  border-radius: 0.75rem;
+  background: var(--bs-surface);
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
+}
+.quote-style-card:hover,
+.quote-style-card:focus-visible {
+  border-color: var(--bs-blue);
+  background: var(--bs-surface-alt);
+}
+.quote-style-card__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
+  background: var(--bs-info-tint);
+  color: var(--bs-blue);
+  font-size: 0.9rem;
+}
+
 .quote-sheet-dialog {
   width: 100vw;
   max-width: 640px;

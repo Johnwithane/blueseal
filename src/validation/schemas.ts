@@ -66,10 +66,7 @@ export const jobRequestSchema = z.object({
     line1: z.string().trim().min(2).max(200),
     city: z.string().trim().min(2).max(100),
     region: z.string().trim().min(2).max(100),
-    postalCode: z
-      .string()
-      .trim()
-      .regex(caPostalRegex, "Enter a valid Canadian postal code"),
+    postalCode: z.string().trim().regex(caPostalRegex, "Enter a valid Canadian postal code"),
     lat: z.number().optional(),
     lng: z.number().optional(),
   }),
@@ -80,6 +77,12 @@ export const jobRequestSchema = z.object({
 // Tradesperson-created job for an off-platform client (createInviteJob).
 // Email is lowercased here so the invite's emailLower matches what the claim
 // flow compares against; the callable re-validates server-side.
+//
+// Email is OPTIONAL: plenty of these jobs are booked by phone and the
+// tradesperson doesn't have (or doesn't want to chase) an address. Blank means
+// "no invite" — a solo job they run themselves — and they can add the email
+// later from the job page. Both optional contact fields normalize "" → null so
+// the callable stores a real absence rather than an empty string.
 export const inviteJobSchema = z.object({
   trade: tradeKeyEnum,
   title: z.string().trim().min(3, "Give the job a short title").max(140),
@@ -89,17 +92,27 @@ export const inviteJobSchema = z.object({
     .string()
     .trim()
     .toLowerCase()
-    .email("Enter a valid email address")
-    .max(200),
+    .max(200)
+    .refine((v) => v === "" || z.string().email().safeParse(v).success, {
+      message: "Enter a valid email address",
+    })
+    .transform((v) => (v === "" ? null : v)),
+  // Free-form on purpose: Canadian numbers get written a dozen ways and this is
+  // a note-to-self the tradesperson dials, not something we parse or send to.
+  clientPhone: z
+    .string()
+    .trim()
+    .max(30)
+    .refine((v) => v === "" || /^[\d+()\-.\s]{7,30}$/.test(v), {
+      message: "Enter a valid phone number",
+    })
+    .transform((v) => (v === "" ? null : v)),
   urgency: z.enum(["flexible", "this_week", "urgent"]),
   address: z.object({
     line1: z.string().trim().min(2, "Enter the street address").max(200),
     city: z.string().trim().min(2, "Enter the city").max(100),
     region: z.string().trim().min(2, "Enter the province").max(100),
-    postalCode: z
-      .string()
-      .trim()
-      .regex(caPostalRegex, "Enter a valid Canadian postal code"),
+    postalCode: z.string().trim().regex(caPostalRegex, "Enter a valid Canadian postal code"),
   }),
   preferredStart: z
     .string()
@@ -172,10 +185,7 @@ const addressPublicSchema = z.object({
 
 const addressPrivateSchema = z.object({
   line1: z.string().trim().min(2, "Enter your street address").max(200),
-  fullPostal: z
-    .string()
-    .trim()
-    .regex(caPostalRegex, "Enter a valid Canadian postal code"),
+  fullPostal: z.string().trim().regex(caPostalRegex, "Enter a valid Canadian postal code"),
   lat: z.number().refine((n) => n >= -90 && n <= 90),
   lng: z.number().refine((n) => n >= -180 && n <= 180),
 });
@@ -202,8 +212,14 @@ export const createJobPostSchema = z.object({
   budget: budgetRangeSchema,
   urgency: z.enum(["flexible", "this_week", "urgent"]),
   preferredDateWindow: z.object({
-    start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a YYYY-MM-DD date").nullable(),
-    end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a YYYY-MM-DD date").nullable(),
+    start: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Use a YYYY-MM-DD date")
+      .nullable(),
+    end: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Use a YYYY-MM-DD date")
+      .nullable(),
   }),
   // Trade-specific questionnaire answers (keys come from the trade's intake
   // schema). Loose on the client — values are built from typed form inputs;
@@ -271,8 +287,7 @@ const applicationBaseFields = {
 // in preprocess so legacy callers that omit `kind` resolve to "full" —
 // discriminatedUnion needs the discriminator present to route.
 export const submitApplicationSchema = z.preprocess(
-  (val) =>
-    val && typeof val === "object" && !("kind" in val) ? { ...val, kind: "full" } : val,
+  (val) => (val && typeof val === "object" && !("kind" in val) ? { ...val, kind: "full" } : val),
   z.discriminatedUnion("kind", [
     z.object({
       kind: z.literal("full"),
@@ -356,13 +371,7 @@ export type ReviseApplicationInput = z.infer<typeof reviseApplicationSchema>;
 export const sendVouchRequestSchema = z
   .object({
     toUserId: z.string().min(1).max(128).optional(),
-    toEmail: z
-      .string()
-      .trim()
-      .toLowerCase()
-      .email("Enter a valid email")
-      .max(200)
-      .optional(),
+    toEmail: z.string().trim().toLowerCase().email("Enter a valid email").max(200).optional(),
     // Display name the voucher types in. For existing-user requests this is
     // a hint only — the server overwrites with the live displayName on
     // accept. For email invites it's what appears in the invite email and
@@ -370,13 +379,10 @@ export const sendVouchRequestSchema = z
     toDisplayName: z.string().trim().min(1).max(80),
     message: z.string().trim().max(500).optional(),
   })
-  .refine(
-    (v) => (v.toUserId == null) !== (v.toEmail == null),
-    {
-      message: "Provide either toUserId or toEmail, not both",
-      path: ["toUserId"],
-    },
-  );
+  .refine((v) => (v.toUserId == null) !== (v.toEmail == null), {
+    message: "Provide either toUserId or toEmail, not both",
+    path: ["toUserId"],
+  });
 export type SendVouchRequestInput = z.infer<typeof sendVouchRequestSchema>;
 
 export const vouchIdSchema = z.object({
@@ -414,12 +420,10 @@ export const aiChatInputSchema = z
     // persists so the model has context for follow-ups.
     hidden: z.boolean().optional(),
   })
-  .refine(
-    (v) =>
-      v.scope !== "job" ||
-      (typeof v.jobId === "string" && v.jobId.length > 0),
-    { message: "scope=job requires a jobId", path: ["jobId"] },
-  );
+  .refine((v) => v.scope !== "job" || (typeof v.jobId === "string" && v.jobId.length > 0), {
+    message: "scope=job requires a jobId",
+    path: ["jobId"],
+  });
 export type AiChatInput = z.infer<typeof aiChatInputSchema>;
 
 // ---------------------------------------------------------------------------
@@ -438,7 +442,11 @@ export const helpCategorySchema = z.object({
 });
 
 export const helpArticleSchema = z.object({
-  slug: z.string().trim().regex(helpSlugRegex, "Use a lowercase slug (e.g. find-a-tradesperson)").max(80),
+  slug: z
+    .string()
+    .trim()
+    .regex(helpSlugRegex, "Use a lowercase slug (e.g. find-a-tradesperson)")
+    .max(80),
   categoryId: z.string().trim().min(1).max(60),
   title: z.string().trim().min(2).max(120),
   excerpt: z.string().trim().min(2).max(240),
@@ -469,23 +477,39 @@ export const helpContentSchema = z
     const seenCat = new Set<string>();
     data.categories.forEach((c, i) => {
       if (seenCat.has(c.id)) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Duplicate category id "${c.id}"`, path: ["categories", i, "id"] });
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Duplicate category id "${c.id}"`,
+          path: ["categories", i, "id"],
+        });
       }
       seenCat.add(c.id);
     });
     const seenSlug = new Set<string>();
     data.articles.forEach((a, i) => {
       if (seenSlug.has(a.slug)) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Duplicate article slug "${a.slug}"`, path: ["articles", i, "slug"] });
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Duplicate article slug "${a.slug}"`,
+          path: ["articles", i, "slug"],
+        });
       }
       seenSlug.add(a.slug);
       if (!catIds.has(a.categoryId)) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Article "${a.slug}" references unknown category "${a.categoryId}"`, path: ["articles", i, "categoryId"] });
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Article "${a.slug}" references unknown category "${a.categoryId}"`,
+          path: ["articles", i, "categoryId"],
+        });
       }
     });
     data.faqs.forEach((f, i) => {
       if (!catIds.has(f.categoryId)) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: `FAQ #${i + 1} references unknown category "${f.categoryId}"`, path: ["faqs", i, "categoryId"] });
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `FAQ #${i + 1} references unknown category "${f.categoryId}"`,
+          path: ["faqs", i, "categoryId"],
+        });
       }
     });
   });
