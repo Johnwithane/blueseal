@@ -51,7 +51,11 @@ jobs:
       VITE_USE_EMULATORS: "false"
 
     steps:
+      # fetch-depth: 0 — the "Resolve changed functions" step diffs this push
+      # against github.event.before, which isn't in a shallow clone.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # Detect what actually changed in this push so we only deploy the affected
       # targets. Frontend-only pushes (the common case) skip the Cloud Functions
@@ -107,13 +111,86 @@ jobs:
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}
 
-      - name: Deploy Cloud Functions
+      # Deploy ONLY the functions whose source actually changed in this push.
+      # `--only functions` (all ~190) reliably trips the per-minute Functions
+      # mutation quota and fails the step — which used to take Hosting down with
+      # it, so a frontend fix couldn't ship because an unrelated function was
+      # rate-limited. Twice: runs 28974629400 and 31628627790.
+      #
+      # We map changed files under functions/src/**/<name>.ts to their exported
+      # function name (file basename == export name, the convention across
+      # functions/src/index.ts). Anything shared (lib/, index.ts, package.json,
+      # tsconfig) can affect every function, so that falls back to a full deploy.
+      - name: Resolve changed functions
         if: steps.changes.outputs.functions == 'true'
-        run: npx firebase-tools deploy --only functions --project blueseal-762af --non-interactive --force
+        id: fns
+        run: |
+          BASE='${{ github.event.before }}'
+          if [ -z "$BASE" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo "no usable base ref — full deploy"
+            echo "targets=functions" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          CHANGED=$(git diff --name-only "$BASE" '${{ github.sha }}' -- functions/ firebase.json)
+          echo "changed files:"; echo "$CHANGED"
+          NAMES=""
+          for f in $CHANGED; do
+            case "$f" in
+              firebase.json|functions/package.json|functions/package-lock.json|functions/tsconfig.json|functions/src/index.ts|functions/src/lib/*)
+                echo "shared: $f — full deploy"
+                echo "targets=functions" >> "$GITHUB_OUTPUT"; exit 0;;
+              *.test.ts) continue;;
+              *.ts) ;;
+              *) continue;;
+            esac
+            # functions/src/jobs/foo.ts -> the names index.ts re-exports from
+            # "./jobs/foo". Resolving through index.ts (rather than assuming the
+            # basename IS the export) means a shared helper with no export entry
+            # — inviteHelpers, stripeClient, prospects/helpers, ~24 of them —
+            # correctly widens to a full deploy instead of emitting a target
+            # name that doesn't exist and failing the whole step.
+            REL=$(printf '%s' "$f" | sed -E 's#^functions/src/(.*)\.ts$#\1#')
+            FOUND=$(grep -oE "export \{[^}]+\} from \"\./${REL}\"" functions/src/index.ts \
+              | sed -E 's/export \{([^}]*)\}.*/\1/' | tr ',' '\n' | tr -d ' ')
+            if [ -z "$FOUND" ]; then
+              echo "no index.ts export maps to $f — full deploy"
+              echo "targets=functions" >> "$GITHUB_OUTPUT"; exit 0
+            fi
+            NAMES="$NAMES $FOUND"
+          done
+          NAMES=$(printf '%s' "$NAMES" | tr ' ' '\n' | grep -v '^$' | sort -u)
+          if [ -z "$NAMES" ]; then
+            echo "no function sources changed — skipping the functions deploy"
+            echo "targets=" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          TARGETS=$(echo "$NAMES" | sed 's/^/functions:/' | paste -sd, -)
+          echo "targeted deploy: $TARGETS"
+          echo "targets=$TARGETS" >> "$GITHUB_OUTPUT"
+
+      # continue-on-error so a rate-limited function can't skip Hosting below.
+      # The run is still failed explicitly by the gate at the end.
+      - name: Deploy Cloud Functions
+        id: deploy_functions
+        if: steps.changes.outputs.functions == 'true' && steps.fns.outputs.targets != ''
+        continue-on-error: true
+        run: npx firebase-tools deploy --only '${{ steps.fns.outputs.targets }}' --project blueseal-762af --non-interactive --force
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}
 
+      # Always runs, even if the functions deploy above failed. Hosting is the
+      # user-facing release; holding it hostage to a rate-limited (and often
+      # already-deployed) function is what caused the two stuck releases. A
+      # failed functions step still fails the job overall — see the gate below.
       - name: Deploy Hosting
+        if: always() && steps.auth.outcome == 'success'
         run: npx firebase-tools deploy --only hosting --project blueseal-762af --non-interactive
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}
+
+      # Surface a functions failure as a red run (so it isn't silently ignored)
+      # without having blocked the hosting release above.
+      - name: Fail the run if the functions deploy failed
+        if: always() && steps.deploy_functions.outcome == 'failure'
+        run: |
+          echo "::error::Cloud Functions deploy failed. Hosting still shipped; re-run or deploy the affected functions manually."
+          exit 1
