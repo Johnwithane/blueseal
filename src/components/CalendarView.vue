@@ -3,8 +3,14 @@ import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import Button from "primevue/button";
 import SelectButton from "primevue/selectbutton";
+import Select from "primevue/select";
+import InputText from "primevue/inputtext";
+import Textarea from "primevue/textarea";
+import Message from "primevue/message";
 import Dialog from "primevue/dialog";
 import JobCounterparty from "@/components/JobCounterparty.vue";
+import { STATUS_LABEL } from "@/utils/jobStatus";
+import type { SessionWithJob } from "@/firebase/services/sessions";
 import type { BookingDoc, JobDoc, WeeklyAvailability, WithId } from "@/firebase/interfaces";
 
 const props = withDefaults(
@@ -12,6 +18,21 @@ const props = withDefaults(
     jobs: WithId<JobDoc>[];
     availability: WeeklyAvailability;
     blocks?: WithId<BookingDoc>[];
+    /**
+     * Booked visits across the viewer's jobs. When supplied, the calendar draws
+     * ONE BLOCK PER VISIT at its real hours instead of one bar per job spanning
+     * first-to-last visit — a job with two 3-hour visits should read as two
+     * short blocks, not a 3-day bar. Optional so the read-only consumers (public
+     * profile, PM calendar) keep their existing job-window rendering.
+     */
+    sessions?: WithId<SessionWithJob>[];
+    /**
+     * Live jobs the viewer may book time against, for the day sheet's "Add time
+     * to a job" picker. Empty (the default) hides the affordance entirely.
+     */
+    schedulableJobs?: WithId<JobDoc>[];
+    /** Disables the add-time form while the parent is writing. */
+    savingSession?: boolean;
     /**
      * Whether the viewer may change this calendar. Only the tradesperson
      * viewing their OWN calendar (dashboard, or their own public profile) may
@@ -21,11 +42,20 @@ const props = withDefaults(
      */
     isEditable?: boolean;
   }>(),
-  { blocks: () => [], isEditable: false },
+  {
+    blocks: () => [],
+    sessions: () => [],
+    schedulableJobs: () => [],
+    savingSession: false,
+    isEditable: false,
+  },
 );
 const emit = defineEmits<{
   "remove-block": [bookingId: string];
   "block-day": [day: Date];
+  // Book time against an existing job, straight from the calendar. The parent
+  // owns collision detection + the write (it reuses the job page's flow).
+  "add-session": [payload: { jobId: string; start: Date; end: Date; note: string }];
 }>();
 const router = useRouter();
 
@@ -93,21 +123,74 @@ function dateKey(d: Date): string {
   ).padStart(2, "0")}`;
 }
 
-// Group scheduled jobs by ISO date key so both views can index in O(1). A job
-// spanning several days is indexed under EVERY day it covers — a two-day
-// install should show on both days, not just the one it started on.
-const jobsByDateKey = computed(() => {
-  const map = new Map<string, WithId<JobDoc>[]>();
+// One thing drawn on the calendar. Two sources feed it:
+//  - a booked VISIT (jobs/{id}/sessions) — the precise "I'm on site 09:00-12:00"
+//  - a job's own scheduledStart/End window, for jobs with no visits loaded
+// A job's scheduledStart is derived FROM its visits, so a job that has visits is
+// skipped here — otherwise it'd draw twice (once as the visit, once as the
+// window spanning them all).
+interface CalEntry {
+  key: string;
+  jobId: string;
+  title: string;
+  trade: string;
+  clientName?: string | null;
+  clientPhotoURL?: string | null;
+  start: Date;
+  end: Date | null;
+  note: string;
+}
+
+const calEntries = computed<CalEntry[]>(() => {
+  const jobById = new Map(props.jobs.map((j) => [j.id, j]));
+  const out: CalEntry[] = [];
+  const jobsWithVisits = new Set<string>();
+  for (const s of props.sessions) {
+    jobsWithVisits.add(s.jobId);
+    const j = jobById.get(s.jobId);
+    out.push({
+      key: `s-${s.id}`,
+      jobId: s.jobId,
+      title: j?.title ?? "Booked visit",
+      trade: j?.trade ?? "",
+      clientName: j?.clientName ?? null,
+      clientPhotoURL: j?.clientPhotoURL ?? null,
+      start: s.start.toDate(),
+      end: s.end.toDate(),
+      note: s.note ?? "",
+    });
+  }
   for (const job of props.jobs) {
-    if (!job.scheduledStart) continue;
-    const first = startOfDay(job.scheduledStart.toDate());
-    const last = job.scheduledEnd ? startOfDay(job.scheduledEnd.toDate()) : first;
+    if (!job.scheduledStart || jobsWithVisits.has(job.id)) continue;
+    out.push({
+      key: `j-${job.id}`,
+      jobId: job.id,
+      title: job.title,
+      trade: job.trade,
+      clientName: job.clientName,
+      clientPhotoURL: job.clientPhotoURL,
+      start: job.scheduledStart.toDate(),
+      end: job.scheduledEnd ? job.scheduledEnd.toDate() : null,
+      note: "",
+    });
+  }
+  return out;
+});
+
+// Index by ISO date key so both views look up in O(1). An entry spanning
+// several days is indexed under EVERY day it covers — a two-day install should
+// show on both days, not just the one it started on.
+const entriesByDateKey = computed(() => {
+  const map = new Map<string, CalEntry[]>();
+  for (const e of calEntries.value) {
+    const first = startOfDay(e.start);
+    const last = e.end ? startOfDay(e.end) : first;
     // Guard against a bad end-before-start and runaway ranges.
     const cursor = new Date(first);
     for (let i = 0; i < 90 && cursor.getTime() <= last.getTime(); i++) {
       const key = dateKey(cursor);
       const list = map.get(key) ?? [];
-      list.push(job);
+      list.push(e);
       map.set(key, list);
       cursor.setDate(cursor.getDate() + 1);
     }
@@ -115,8 +198,8 @@ const jobsByDateKey = computed(() => {
   return map;
 });
 
-function jobsForDay(d: Date): WithId<JobDoc>[] {
-  return jobsByDateKey.value.get(dateKey(d)) ?? [];
+function entriesForDay(d: Date): CalEntry[] {
+  return entriesByDateKey.value.get(dateKey(d)) ?? [];
 }
 
 // Blocks are stored as [start, end) ranges. A day is "blocked" if it falls
@@ -230,11 +313,9 @@ function confirmBlock() {
 
 const openDay = ref<Date | null>(null);
 const openDayLabel = computed(() => (openDay.value ? dayFmt.format(openDay.value) : ""));
-const openDayJobs = computed(() =>
+const openDayEntries = computed(() =>
   openDay.value
-    ? [...jobsForDay(openDay.value)].sort(
-        (a, b) => (a.scheduledStart?.toMillis() ?? 0) - (b.scheduledStart?.toMillis() ?? 0),
-      )
+    ? [...entriesForDay(openDay.value)].sort((a, b) => a.start.getTime() - b.start.getTime())
     : [],
 );
 const openDayBlocks = computed(() => (openDay.value ? blocksForDay(openDay.value) : []));
@@ -257,7 +338,7 @@ function minutesInOpenDay(ts: Date, fallback: number): number {
 }
 
 interface DayEntry {
-  job: WithId<JobDoc>;
+  entry: CalEntry;
   startMin: number;
   endMin: number;
   timeLabel: string;
@@ -271,16 +352,16 @@ function hhmm(min: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
-// Jobs placed on the hour rail. Anything without a scheduledEnd gets a nominal
-// one-hour block so it's still visible and clickable.
+// Entries placed on the hour rail. Anything with no end gets a nominal one-hour
+// block so it's still visible and clickable.
 const dayEntries = computed<DayEntry[]>(() => {
-  const raw = openDayJobs.value.map((job) => {
-    const startMin = job.scheduledStart ? minutesInOpenDay(job.scheduledStart.toDate(), 0) : 0;
-    const endMin = job.scheduledEnd
-      ? Math.max(startMin + 30, minutesInOpenDay(job.scheduledEnd.toDate(), startMin + 60))
+  const raw = openDayEntries.value.map((entry) => {
+    const startMin = minutesInOpenDay(entry.start, 0);
+    const endMin = entry.end
+      ? Math.max(startMin + 30, minutesInOpenDay(entry.end, startMin + 60))
       : startMin + 60;
     return {
-      job,
+      entry,
       startMin,
       endMin,
       timeLabel: `${hhmm(startMin)} – ${hhmm(endMin)}`,
@@ -351,13 +432,80 @@ function openJob(jobId: string) {
   void router.push({ name: "JobDetail", params: { id: jobId } });
 }
 
+// --- Book time against an existing job, from the calendar --------------------
+// The whole point of the report: rather than opening each job's Schedule tab,
+// pick the day here and add the visit. The parent owns collision detection and
+// the write, so this is purely the form.
+const showAdd = ref(false);
+const addJobId = ref<string | null>(null);
+const addStart = ref("09:00");
+const addEnd = ref("12:00");
+const addNote = ref("");
+const addError = ref("");
+
+const jobOptions = computed(() =>
+  props.schedulableJobs.map((j) => ({
+    value: j.id,
+    label: j.title || "Untitled job",
+    detail: [STATUS_LABEL[j.status] ?? j.status, j.clientName].filter(Boolean).join(" · "),
+  })),
+);
+
+function openAddTime() {
+  if (!openDay.value) return;
+  addJobId.value = props.schedulableJobs[0]?.id ?? null;
+  // Default to the start of their working hours for that day, so the common
+  // case is "pick the job, tap save".
+  const avail = props.availability[dayOfWeekKey(openDay.value)];
+  addStart.value = avail?.[0]?.start ?? "09:00";
+  addEnd.value = avail?.[0]?.end ?? "12:00";
+  addNote.value = "";
+  addError.value = "";
+  showAdd.value = true;
+}
+
+function timeToDate(day: Date, hhmmStr: string): Date | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmmStr.trim());
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h > 23 || min > 59) return null;
+  const d = new Date(day);
+  d.setHours(h, min, 0, 0);
+  return d;
+}
+
+function submitAddTime() {
+  addError.value = "";
+  if (!openDay.value || !addJobId.value) {
+    addError.value = "Pick a job first.";
+    return;
+  }
+  const start = timeToDate(openDay.value, addStart.value);
+  const end = timeToDate(openDay.value, addEnd.value);
+  if (!start || !end) {
+    addError.value = "Enter times as HH:MM.";
+    return;
+  }
+  if (end <= start) {
+    addError.value = "The end time has to be after the start.";
+    return;
+  }
+  emit("add-session", {
+    jobId: addJobId.value,
+    start,
+    end,
+    note: addNote.value.trim().slice(0, 500),
+  });
+  showAdd.value = false;
+  openDay.value = null;
+}
+
 // "09:00" for the month-cell chip. Blank on a continuation day of a multi-day
-// job — it doesn't start at 09:00 on day two, it's just still running.
-function startTimeOn(job: WithId<JobDoc>, d: Date): string {
-  if (!job.scheduledStart) return "";
-  const start = job.scheduledStart.toDate();
-  if (!isSameDay(start, d)) return "";
-  return `${String(start.getHours()).padStart(2, "0")}:${String(start.getMinutes()).padStart(2, "0")}`;
+// entry — it doesn't start at 09:00 on day two, it's just still running.
+function startTimeOn(e: CalEntry, d: Date): string {
+  if (!isSameDay(e.start, d)) return "";
+  return `${String(e.start.getHours()).padStart(2, "0")}:${String(e.start.getMinutes()).padStart(2, "0")}`;
 }
 </script>
 
@@ -448,19 +596,21 @@ function startTimeOn(job: WithId<JobDoc>, d: Date): string {
           </button>
         </article>
         <article
-          v-for="job in jobsForDay(d)"
-          :key="job.id"
+          v-for="e in entriesForDay(d)"
+          :key="e.key"
           class="mt-2 cursor-pointer rounded-md bg-[color:var(--bs-blue)] p-2 text-xs text-white"
-          @click="router.push({ name: 'JobDetail', params: { id: job.id } })"
+          @click="router.push({ name: 'JobDetail', params: { id: e.jobId } })"
         >
-          <div class="line-clamp-1 font-medium">{{ job.title }}</div>
-          <div class="line-clamp-1 opacity-80">{{ job.trade }}</div>
+          <div class="line-clamp-1 font-medium">{{ e.title }}</div>
+          <div class="line-clamp-1 opacity-80">
+            <span v-if="startTimeOn(e, d)">{{ startTimeOn(e, d) }} · </span>{{ e.trade }}
+          </div>
           <div class="mt-1.5 text-white">
             <JobCounterparty
               role="client"
               size="small"
-              :name="job.clientName"
-              :photo-url="job.clientPhotoURL"
+              :name="e.clientName"
+              :photo-url="e.clientPhotoURL"
             />
           </div>
         </article>
@@ -523,18 +673,18 @@ function startTimeOn(job: WithId<JobDoc>, d: Date): string {
                nesting a control inside it would be invalid. Open the day, then
                the job. -->
           <span
-            v-for="job in jobsForDay(d).slice(0, 2)"
-            :key="job.id"
+            v-for="e in entriesForDay(d).slice(0, 2)"
+            :key="e.key"
             class="mb-0.5 block truncate rounded bg-[color:var(--bs-blue)] px-1.5 py-0.5 text-[10px] text-white sm:text-xs"
           >
-            <span v-if="startTimeOn(job, d)" class="font-semibold">{{ startTimeOn(job, d) }}</span>
-            {{ job.title }}
+            <span v-if="startTimeOn(e, d)" class="font-semibold">{{ startTimeOn(e, d) }}</span>
+            {{ e.title }}
           </span>
           <span
-            v-if="jobsForDay(d).length > 2"
+            v-if="entriesForDay(d).length > 2"
             class="text-[10px] text-[color:var(--bs-muted)] sm:text-xs"
           >
-            +{{ jobsForDay(d).length - 2 }} more
+            +{{ entriesForDay(d).length - 2 }} more
           </span>
         </button>
       </div>
@@ -611,15 +761,17 @@ function startTimeOn(job: WithId<JobDoc>, d: Date): string {
           ></div>
           <button
             v-for="e in dayEntries"
-            :key="e.job.id"
+            :key="e.entry.key"
             type="button"
             class="absolute overflow-hidden rounded-md bg-[color:var(--bs-blue)] px-2 py-1 text-left text-xs text-white"
             :style="entryStyle(e)"
-            @click="openJob(e.job.id)"
+            @click="openJob(e.entry.jobId)"
           >
-            <span class="block truncate font-medium">{{ e.job.title }}</span>
+            <span class="block truncate font-medium">{{ e.entry.title }}</span>
             <span class="block truncate opacity-80">{{ e.timeLabel }}</span>
-            <span class="block truncate opacity-80">{{ e.job.clientName || e.job.trade }}</span>
+            <span class="block truncate opacity-80">
+              {{ e.entry.note || e.entry.clientName || e.entry.trade }}
+            </span>
           </button>
           <p
             v-if="!dayEntries.length"
@@ -639,6 +791,81 @@ function startTimeOn(job: WithId<JobDoc>, d: Date): string {
           severity="danger"
           outlined
           @click="askBlock(openDay)"
+        />
+        <!-- The report: book time against a job you already have on, without
+             opening that job first. -->
+        <Button
+          v-if="isEditable && schedulableJobs.length"
+          label="Add time to a job"
+          icon="pi pi-plus"
+          @click="openAddTime"
+        />
+      </template>
+    </Dialog>
+
+    <!-- ADD TIME TO A JOB -->
+    <Dialog
+      v-model:visible="showAdd"
+      modal
+      :header="`Add time — ${openDayLabel || 'this day'}`"
+      :style="{ width: '92vw', maxWidth: '26rem' }"
+      :draggable="false"
+    >
+      <label class="mb-1 block text-xs font-medium">Job</label>
+      <Select
+        v-model="addJobId"
+        :options="jobOptions"
+        option-label="label"
+        option-value="value"
+        placeholder="Pick a job"
+        class="w-full"
+        :filter="jobOptions.length > 8"
+      >
+        <template #option="{ option }">
+          <div class="min-w-0">
+            <div class="truncate text-sm">{{ option.label }}</div>
+            <div class="truncate text-xs text-[color:var(--bs-muted)]">{{ option.detail }}</div>
+          </div>
+        </template>
+      </Select>
+
+      <div class="mt-3 grid grid-cols-2 gap-2">
+        <div>
+          <label class="mb-1 block text-xs font-medium">Start</label>
+          <InputText v-model="addStart" placeholder="09:00" maxlength="5" class="w-full" />
+        </div>
+        <div>
+          <label class="mb-1 block text-xs font-medium">End</label>
+          <InputText v-model="addEnd" placeholder="12:00" maxlength="5" class="w-full" />
+        </div>
+      </div>
+
+      <label class="mb-1 mt-3 block text-xs font-medium">
+        Note <span class="font-normal text-[color:var(--bs-muted)]">(optional)</span>
+      </label>
+      <Textarea
+        v-model="addNote"
+        rows="2"
+        maxlength="500"
+        class="w-full"
+        placeholder="e.g. first fix"
+      />
+
+      <Message v-if="addError" severity="error" :closable="false" class="mt-3 text-xs">
+        {{ addError }}
+      </Message>
+      <p class="mt-2 text-xs text-[color:var(--bs-muted)]">
+        This books a visit on the job — the same as adding it from the job's Schedule tab. Your
+        client sees it too. It doesn't log billable hours.
+      </p>
+
+      <template #footer>
+        <Button label="Cancel" severity="secondary" text @click="showAdd = false" />
+        <Button
+          label="Add to calendar"
+          icon="pi pi-check"
+          :loading="savingSession"
+          @click="submitAddTime"
         />
       </template>
     </Dialog>

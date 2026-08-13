@@ -600,6 +600,20 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
             expected:
               "The calendar opens on Month (Month listed first in the toggle). Cells show job chips prefixed with the start time. Tapping a day opens a sheet with the day's working hours and an hour rail with each job drawn against the hours it occupies; tapping a job opens it. A bare tap no longer blocks the day — Block day lives in the sheet footer, and a blocked day shows an Unblock bar. A multi-day job appears on every day it spans. Read-only viewers get the sheet but NO block/unblock controls. 375px: no horizontal scroll.",
           },
+          {
+            id: "tradie-calendar-add-time",
+            title: "Book time against an existing job from the calendar",
+            steps: [
+              "Dashboard → Calendar → tap a day → Add time to a job.",
+              "Pick a live job, set 09:00–12:00, add a note, then Add to calendar.",
+              "Open that job → Schedule tab, and check the job's work order total.",
+              "Add a second visit that overlaps an existing booking. Then try End before Start, a junk time (99:99), and saving with no job picked.",
+              "Book two short visits on the SAME job on different days.",
+              "Check a public profile calendar and /manage/calendar as a read-only viewer.",
+            ],
+            expected:
+              "The picker lists every LIVE job (accepted / requested / quoted / awaiting upfront / in progress / on hold) with its status + client, and start/end default to that day's working hours; finished + cancelled jobs are absent. Saving puts the visit on the calendar at its real hours and it also shows on the job's Schedule tab. It is SCHEDULING, not timesheeting — the work order time total and the invoice do not change. An overlap still saves but warns and names the clash. Bad input is caught inline (end-before-start, HH:MM, no job). Two visits on one job draw as two separate blocks, not one long bar. Read-only calendars show no Add time button. Mobile 375px: dialog fits.",
+          },
           { id: "tradie-get-paid", title: "Get paid: invoice → card payment → Stripe payout" },
           { id: "tradie-pro", title: "Blue Seal Pro (toggle free vs Pro features)" },
           { id: "tradie-profile", title: "Profile + branding + vanity /u/<slug>" },

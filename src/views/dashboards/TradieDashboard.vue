@@ -27,10 +27,17 @@ import {
 import { weeklyAvailabilitySchema } from "@/validation/schemas";
 import { useToast } from "@/composables/useToast";
 import { humanizeError } from "@/utils/errors";
+import {
+  createSession,
+  subscribeTradieSessions,
+  type SessionWithJob,
+} from "@/firebase/services/sessions";
+import { findCollisions } from "@/firebase/services/bookings";
 import type {
   BookingDoc,
   InsuranceVerificationDoc,
   JobDoc,
+  JobStatus,
   TradespersonDoc,
   WeeklyAvailability,
   WithId,
@@ -197,6 +204,34 @@ const patternPreviewSummary = computed(() => {
 
 let unsub: (() => void) | null = null;
 let unsubBookings: (() => void) | null = null;
+let unsubSessions: (() => void) | null = null;
+
+// Booked visits across every job, so the calendar can draw each visit at its
+// real hours. Windowed generously around today (a year back / a year forward)
+// so an established tradesperson isn't streaming their whole history — the
+// calendar can't page beyond that in one sitting anyway.
+const sessions = ref<WithId<SessionWithJob>[]>([]);
+function sessionWindow(): { from: Date; to: Date } {
+  const from = new Date();
+  from.setFullYear(from.getFullYear() - 1);
+  const to = new Date();
+  to.setFullYear(to.getFullYear() + 1);
+  return { from, to };
+}
+
+// Jobs the tradesperson can book time against from the calendar: everything
+// live, not just in-progress, so they can pencil in work that hasn't started.
+const SCHEDULABLE_STATUSES: JobStatus[] = [
+  "accepted",
+  "requested",
+  "quoted",
+  "awaiting_upfront_payment",
+  "in_progress",
+  "on_hold",
+];
+const schedulableJobs = computed(() =>
+  jobs.value.filter((j) => SCHEDULABLE_STATUSES.includes(j.status)),
+);
 
 async function loadProfile() {
   if (!auth.fbUser) return;
@@ -220,8 +255,19 @@ async function loadProfile() {
   }
   unsub?.();
   unsubBookings?.();
+  unsubSessions?.();
   unsub = subscribeTradieJobs(auth.fbUser.uid, (j) => (jobs.value = j));
   unsubBookings = subscribeBookings(auth.fbUser.uid, (b) => (bookings.value = b));
+  const win = sessionWindow();
+  // Non-fatal: if the collection-group index is still building, the calendar
+  // falls back to drawing one block per job window rather than breaking.
+  unsubSessions = subscribeTradieSessions(
+    auth.fbUser.uid,
+    win.from,
+    win.to,
+    (s) => (sessions.value = s),
+    () => (sessions.value = []),
+  );
   await refreshInsurance();
   loading.value = false;
 }
@@ -231,6 +277,7 @@ onMounted(loadProfile);
 onUnmounted(() => {
   unsub?.();
   unsubBookings?.();
+  unsubSessions?.();
 });
 
 function openAvailabilityEditor() {
@@ -289,6 +336,48 @@ async function removeBlock(bookingId: string) {
     toast.success("Block removed");
   } catch (e) {
     toast.error(humanizeError(e));
+  }
+}
+
+// Book a visit against an existing job, straight from the calendar (rather than
+// opening that job's Schedule tab). Same write the job page does — createSession
+// + the job's scheduledStart/End re-sync — and the same collision check, so a
+// double-booking is caught here too. The clash is a warning, not a block: a
+// tradesperson may legitimately want two things in one window.
+const savingSession = ref(false);
+async function addSessionFromCalendar(payload: {
+  jobId: string;
+  start: Date;
+  end: Date;
+  note: string;
+}) {
+  if (!auth.fbUser || savingSession.value) return;
+  const job = jobs.value.find((j) => j.id === payload.jobId);
+  if (!job) return;
+  savingSession.value = true;
+  try {
+    const clashes = await findCollisions(auth.fbUser.uid, payload.start, payload.end, {
+      excludeJobId: payload.jobId,
+    });
+    await createSession(payload.jobId, {
+      tradespersonId: auth.fbUser.uid,
+      clientId: job.clientId,
+      start: payload.start,
+      end: payload.end,
+      note: payload.note,
+    });
+    if (clashes.length) {
+      toast.warn(
+        "Added — but it overlaps",
+        `This clashes with ${clashes[0].label}. Check the day if that wasn't intended.`,
+      );
+    } else {
+      toast.success("Added to your calendar", job.title || "Visit booked");
+    }
+  } catch (e) {
+    toast.error("Couldn't add the time", humanizeError(e));
+  } finally {
+    savingSession.value = false;
   }
 }
 
@@ -522,9 +611,13 @@ const awaitingVerificationMessage = computed(() => {
         :jobs="jobs"
         :availability="tradie.weeklyAvailability"
         :blocks="bookings"
+        :sessions="sessions"
+        :schedulable-jobs="schedulableJobs"
+        :saving-session="savingSession"
         is-editable
         @remove-block="removeBlock"
         @block-day="blockDay"
+        @add-session="addSessionFromCalendar"
       />
       <!-- Applied: job-board applications. Independent of `tradie.isVisible`
          (an unverified tradie can't actually submit applications anyway, but

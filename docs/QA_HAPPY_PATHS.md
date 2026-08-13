@@ -382,6 +382,35 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 8. Mobile (375px): the month grid stays 7 columns and the day sheet fits without
    horizontal scroll.
 
+### 5.2 Book time against a job from the calendar
+
+1. As **Tradesperson** with at least one live job, open the dashboard
+   **Calendar** and tap a day → **Add time to a job**.
+2. **Expected:** a dialog with a **job picker** listing every LIVE job (accepted,
+   requested, quoted, awaiting upfront payment, in progress, on hold — each row
+   showing its status + client) and **Start** / **End** times pre-filled from
+   that day's working hours, plus an optional note.
+3. Pick a job, set 09:00–12:00, add a note, **Add to calendar**.
+4. **Expected:** a toast confirms it; the visit appears **on that day at those
+   hours** in the day sheet and as a time-prefixed chip in the month cell. Open
+   the job → **Schedule tab** → the same visit is listed there. It is a
+   **scheduled visit, not billable time**: the work order's time total and the
+   invoice are unchanged.
+5. **Clash warning.** Add a second visit overlapping an existing booking (or a
+   blocked day). **Expected:** it still saves, but the toast warns it overlaps
+   and names what it clashes with — a warning, not a block.
+6. **Validation.** Try End before Start → inline "The end time has to be after
+   the start."; try a junk time like `99:99` → "Enter times as HH:MM."; try
+   saving with no job picked → "Pick a job first."
+7. **One block per visit.** Book two short visits on the SAME job on different
+   days. **Expected:** two separate blocks at their own hours — not one bar
+   spanning the whole range.
+8. **Finished jobs excluded.** A complete / reviewed / cancelled job must NOT
+   appear in the picker.
+9. **Read-only calendars.** On a tradesperson's public profile and the PM
+   calendar (`/manage/calendar`), there is **no Add time to a job** button.
+10. Mobile (375px): the dialog fits, and the job picker is usable one-handed.
+
 ---
 
 ## 6. Payments (Stripe test mode) → help: `quotes-and-invoices`, `paying-for-a-job`, `getting-paid-out`

@@ -1170,7 +1170,14 @@ const faqs: FaqItem[] = [
   {
     question: "How do I schedule visits for a job?",
     answer:
-      "Open the job and go to the **Schedule tab**: it's a week/month calendar like your dashboard. Tap any day to book a visit (set a start and end time, plus an optional note like \"first fix\"), and add as many visits as the job needs, so multi-day work is easy to lay out. Tap a visit to edit or remove it. If one clashes with a block-off or another booked job we'll warn you first. Your booked visits show on your dashboard calendar, and the client sees them on their side too.",
+      "Two ways. From the job: open it, go to the **Schedule tab**, and tap any day to book a visit (start and end time, plus an optional note like \"first fix\"). Or straight from your **dashboard calendar**: tap a day, then **Add time to a job**, pick the job from the list and set the hours. Either way you can add as many visits as the job needs, so multi-day work is easy to lay out, and if one clashes with a block-off or another booked job we'll warn you. Every visit shows on your calendar at its real hours, and the client sees them on their side too. Booking a visit is scheduling, not timesheeting: it doesn't log billable hours (that's **Clock in**, or **Add time manually** on the work order).",
+    categoryId: "for-tradespeople",
+    audience: "tradesperson",
+  },
+  {
+    question: "Can I add time to a job straight from my calendar?",
+    answer:
+      "Yes. On your dashboard **Calendar**, tap the day you want and choose **Add time to a job**. Pick any live job (anything not finished or cancelled), set the start and end time, add an optional note, and it's booked. It's the same as scheduling from the job's Schedule tab, just without having to find the job first. Note this **schedules** work, it doesn't bill it: to record hours you've actually worked, use **Clock in** or **Add time manually** on the job's work order.",
     categoryId: "for-tradespeople",
     audience: "tradesperson",
   },

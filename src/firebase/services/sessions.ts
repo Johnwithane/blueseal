@@ -2,6 +2,7 @@ import {
   Timestamp,
   addDoc,
   collection,
+  collectionGroup,
   deleteDoc,
   doc,
   getDocs,
@@ -9,11 +10,15 @@ import {
   orderBy,
   query,
   updateDoc,
+  where,
   type FirestoreError,
 } from "firebase/firestore";
 import { db } from "@/firebase/config";
 import type { SessionDoc, WithId } from "@/firebase/interfaces";
 import { typedConverter } from "@/firebase/converters";
+
+/** A session plus the job it belongs to, recovered from the document path. */
+export type SessionWithJob = SessionDoc & { jobId: string };
 
 const sessionsCol = (jobId: string) =>
   collection(db, "jobs", jobId, "sessions").withConverter(typedConverter<SessionDoc>());
@@ -38,6 +43,53 @@ export function subscribeJobSessions(
     (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
     (err) => {
       console.warn(`[Firestore] jobs/${jobId}/sessions listener:`, err.code, err.message);
+      onError?.(err);
+    },
+  );
+}
+
+/**
+ * Every booked visit across ALL of a tradesperson's jobs, for the dashboard
+ * calendar — so it can draw each visit at its real hours instead of one bar per
+ * job spanning first-to-last visit.
+ *
+ * collectionGroup (not a per-job listener): the tradesperson has many jobs and
+ * we'd otherwise open one subscription each. Authorized by the
+ * `/{path=**}/sessions/{sessionId}` collection-group rule, which — like the
+ * timeEntries one — only permits rows where tradespersonId == uid, matching this
+ * filter exactly. Windowed by `start` so an established tradesperson isn't
+ * streaming years of history into the browser.
+ *
+ * The jobId isn't a field on the row, so it's recovered from the doc path
+ * (jobs/{jobId}/sessions/{id}) — the calendar needs it to open the job.
+ */
+export function subscribeTradieSessions(
+  tradespersonId: string,
+  fromDate: Date,
+  toDate: Date,
+  cb: (sessions: WithId<SessionWithJob>[]) => void,
+  onError?: (err: FirestoreError) => void,
+): () => void {
+  const q = query(
+    collectionGroup(db, "sessions").withConverter(typedConverter<SessionDoc>()),
+    where("tradespersonId", "==", tradespersonId),
+    where("start", ">=", Timestamp.fromDate(fromDate)),
+    where("start", "<=", Timestamp.fromDate(toDate)),
+    orderBy("start", "asc"),
+  );
+  return onSnapshot(
+    q,
+    (snap) =>
+      cb(
+        snap.docs.map((d) => ({
+          id: d.id,
+          // jobs/{jobId}/sessions/{sessionId} → parent.parent is the job doc.
+          jobId: d.ref.parent.parent?.id ?? "",
+          ...d.data(),
+        })),
+      ),
+    (err) => {
+      console.warn("[Firestore] sessions collectionGroup listener:", err.code, err.message);
       onError?.(err);
     },
   );
@@ -108,8 +160,7 @@ export function pickRepresentativeWindow(
     .filter((s) => s.end.toMillis() >= nowMs)
     .sort((a, b) => a.start.toMillis() - b.start.toMillis());
   const chosen =
-    upcoming[0] ??
-    [...sessions].sort((a, b) => b.start.toMillis() - a.start.toMillis())[0];
+    upcoming[0] ?? [...sessions].sort((a, b) => b.start.toMillis() - a.start.toMillis())[0];
   return { start: chosen.start, end: chosen.end };
 }
 

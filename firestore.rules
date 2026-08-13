@@ -1095,6 +1095,22 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ---------- sessions (collection group: every booked visit on the tradie's calendar) ----------
+    // The dashboard calendar runs collectionGroup('sessions') filtered by
+    // tradespersonId == uid to draw each booked VISIT at its real hours, across
+    // all of their jobs — the nested jobs/{jobId}/sessions rule does not
+    // authorize a collection-group query, only this recursive-wildcard rule
+    // does. Same shape (and same reasoning) as the timeEntries block above:
+    // scoped to the caller's own rows so a tradesperson can never enumerate
+    // anyone else's schedule. The CLIENT's per-job read and ALL writes stay on
+    // the nested rule; `write: if false` here is a no-op grant (rules OR across
+    // matching blocks), so it never blocks the nested create/update/delete.
+    match /{path=**}/sessions/{sessionId} {
+      allow read: if isAdmin()
+        || (resource != null && resource.data.tradespersonId == uid());
+      allow write: if false;
+    }
+
     // ---------- expenses (collection group: the tradie's business reports) ----------
     // listMyExpensesInRange runs collectionGroup('expenses') filtered by
     // tradespersonId == uid for the Pro reports + CSV export. The nested
