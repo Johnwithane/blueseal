@@ -63,6 +63,14 @@ export const createConnectAccount = onCall(
         transfers: { requested: true },
       },
       business_type: "individual",
+      // Hold each payout 7 days before Stripe sends it to the tradesperson's
+      // bank. We take destination charges, so Blue Seal is the merchant of
+      // record and a client chargeback hits the PLATFORM balance — the delay
+      // keeps the funds sitting in the connected account long enough to
+      // reverse the transfer instead of eating the loss. Tradespeople can't
+      // shorten it: Connect → Payouts → "Allow accounts to manage their payout
+      // schedule" is off at the platform level.
+      settings: { payouts: { schedule: { interval: "daily", delay_days: 7 } } },
       // uid round-trip for the webhook dispatcher.
       metadata: { tradespersonId: uid },
     });

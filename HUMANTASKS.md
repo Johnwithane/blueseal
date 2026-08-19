@@ -619,11 +619,11 @@ they're set, the Stripe callables throw "not configured" and the rest of the app
 
 ### Stage 0 — Sandbox account (do first; blocks the Pro 3 deploy)
 
-#### [ ] Create the Stripe account + enable Connect (test mode)
+#### [x] Create the Stripe account + enable Connect (test mode)
 - **What:** Sign up at [dashboard.stripe.com](https://dashboard.stripe.com) (country **Canada**). No activation/KYC needed yet — test mode works immediately. Then, in test mode: **Connect → Get started → Express**, accept the Platform & Connected Account agreements. (If you already created the prod account for the earlier Connect task, just stay in **Test mode** via the dashboard toggle.)
 - **Verify:** The dashboard shows Test mode; Connect → Settings is reachable.
 
-#### [ ] Hand the test keys to Claude (or set them yourself)
+#### [x] Hand the test keys to Claude (or set them yourself)
 - **What:** Dashboard → Developers → API keys (Test mode). Then:
   ```
   firebase functions:secrets:set STRIPE_SECRET_KEY        # paste sk_test_…
@@ -639,19 +639,20 @@ These are scripted, listed here so you know what's happening:
 2. Deploy the functions (this is the Pro 3 / Pro 5 deploy that un-comments the Stripe exports), then re-run the script with `WEBHOOK_URL=<deployed stripeWebhook URL>` → registers the **one** webhook endpoint with the full event set (Connect + payment-intent + charge/dispute/payout + `checkout.session.completed` + `customer.subscription.*` + `invoice.payment_failed`) and prints the signing secret → `firebase functions:secrets:set STRIPE_WEBHOOK_SECRET` → redeploy `stripeWebhook`.
 3. Run the existing `backfillPayoutsField` migration (see the Connect section above).
 
-#### [ ] Configure subscription lifecycle (dashboard-only — you do this once)
+#### [x] Configure subscription lifecycle (dashboard-only — you do this once) (done 2026-08-19, live account)
 - **What:** Dashboard → Settings → Billing → **Subscriptions and emails**: turn **Smart Retries** ON, and set "after all retries fail" → **Cancel subscription**. (This is what ends our `past_due` grace window — the resulting `customer.subscription.deleted` webhook flips the tradesperson out of Pro.) Optionally enable the trial-ending reminder email.
 - **Verify:** The retry schedule shows "then cancel".
 
 ### Stage 2 — Go live (only after the full sandbox matrix passes)
 
-#### [ ] Activate the Stripe account for live payments
-- **What:** Complete business details + KYC; add Blue Seal's bank account (this is where the service-fee + subscription revenue settles); set the platform **statement descriptor** to `BLUESEAL` (Settings → Business → Public details) so card statements read `BLUESEAL* <tradie>`. Complete the **live-mode** Connect platform profile + agreements.
+#### [x] Activate the Stripe account for live payments (done 2026-08-19)
+- **What:** Complete business details + KYC; add Blue Seal's bank account (this is where the service-fee + subscription revenue settles); set the platform **statement descriptor** to `BLUESEAL` (Settings → Business → Public details). Complete the **live-mode** Connect platform profile + agreements.
 - **Verify:** Dashboard shows "Payments: active" and Connect "Live: Yes".
+- **Note:** the statement descriptor is a bare `BLUESEAL` today. Nothing in `functions/src` sets `statement_descriptor_suffix`, so charges do NOT read `BLUESEAL* <tradesperson>` yet. Adding the tradesperson's business name as the suffix on invoice PaymentIntents is the cheapest chargeback reduction available — the client remembers "Smith Electric", not "Blue Seal".
 
-#### [ ] Swap to live keys + re-run the script in live mode
-- **What:** Hand Claude the live keys (`sk_live_…` → `STRIPE_SECRET_KEY` secret; `pk_live_…` → `.env.production` `VITE_STRIPE_PUBLISHABLE_KEY`). Claude re-runs `stripe-setup.mjs` against the live key (product/prices/portal/webhook) and sets the live env params + webhook secret, then deploys functions + hosting.
-- **Verify:** A small real card payment ($2–5 invoice) clears end-to-end and refunds from the dashboard; a real Pro checkout on your own card starts a trial ($0 charged) and cancels cleanly in the portal.
+#### [x] Swap to live keys + re-run the script in live mode (done 2026-08-19)
+- **What:** Hand Claude the live keys (`sk_live_…` → `STRIPE_SECRET_KEY` secret; `pk_live_…` → `VITE_STRIPE_PUBLISHABLE_KEY`). Claude re-runs `stripe-setup.mjs` against the live key (product/prices/portal/webhook) and sets the live env params + webhook secret, then deploys functions + hosting.
+- **Verify:** A small real card payment ($2–5 invoice) clears end-to-end and refunds from the dashboard; a real Pro checkout on your own card starts a trial ($0 charged) and cancels cleanly in the portal. **Still outstanding — see Stage 3 below.**
 
 #### [ ] Legal sign-off (gates public LAUNCH, not the code) — see PROFESSIONAL_TASKS / MONETIZATION.md Phase 0
 - GST/PST treatment of the service fee + the $29 subscription (BC: 5% GST + 7% PST — is the platform a marketplace facilitator obligated to collect?).
@@ -661,6 +662,29 @@ These are scripted, listed here so you know what's happening:
 #### [ ] Run the founding-member comp grants (after Pro 5 ships, before the AI gate in Pro 7)
 - **What:** Admin console → user search → each verified Okanagan tradesperson → **Blue Seal Pro (founding comp) → Grant 3 months**. (Backed by the `adminGrantFoundingPro` callable; sets `proCompUntil` with no Stripe involved.) Message them "Founding Tradesperson — 3 months of Blue Seal Pro on us." Do this BEFORE the AI gate deploys so nobody loses the assistant.
 - **Verify:** The granted tradesperson's `tradespeople/{uid}.isPro` is `true`; their AI assistant stays unlocked after Pro 7.
+
+### Stage 3 — What the live cutover actually did (2026-08-19)
+
+Record of the cutover, so nobody re-derives it later.
+
+**The sandbox was a separate Stripe account, not the live account in test mode.** The key account segments differ (`51ThLyDIcv5XLmJtV` test vs `51ThLy6EfjKnllaHj` live). Every `acct_` / `cus_` / `sub_` / `pi_` id written during sandbox testing therefore 404s against the live key. That is why the Firestore sweep below was mandatory rather than housekeeping.
+
+Done:
+- Live product + $29/mo + $290/yr CAD prices + Customer Portal config, via `stripe-setup.mjs`.
+- **Two** live webhook endpoints on one URL (platform + Connect scoped), signing secrets stored comma-separated in `STRIPE_WEBHOOK_SECRET`.
+- `sk_live_` in `STRIPE_SECRET_KEY`; `pk_live_` in both `.env` **and** `.github/workflows/deploy.yml` (the CI copy is hardcoded — miss it and the next hosting deploy silently reverts the live site to the test key).
+- All 16 Stripe-binding functions redeployed in batches of four. A single wide deploy trips the per-minute mutation quota, and the CLI needs `FUNCTIONS_DISCOVERY_TIMEOUT=180` on Windows or discovery times out at 10s.
+- **Connected-account payouts held 7 days** (`delay_days: 7` in `createConnectAccount`), with "Allow accounts to manage their payout schedule" turned OFF in the dashboard so a tradesperson can't shorten it. Destination charges make Blue Seal the merchant of record, so a late chargeback lands on the platform balance; the delay leaves a window to reverse the transfer. PM + rep accounts deliberately have no delay (their money is commission paid from Blue Seal's own balance on a monthly batch).
+- Firestore swept of sandbox ids: 4 tradesperson `payouts` blocks reset to `not_started`, 4 user `subscription` blocks reset to `none` (`proCompUntil` preserved, `everTrialedAt` cleared so live trials work), 1 stale `isPro` mirror flipped false, 1 unpaid job upfront-fee PaymentIntent cleared. The single paid invoice kept its history.
+- `QA_TOOLKIT_ENABLED=false`. `qaSetSelfPro` / `qaProvisionSelf*` are a billing bypass once real money moves. "Reset my data" still works (not env-gated).
+
+#### [ ] Verify live with a small real charge (~$10 of your own money)
+- **What:** Onboard yourself as a tradesperson through live Connect; confirm `payoutsEnabled` flips via `account.updated`. Send a $2–5 invoice, pay it with a real card, check the service-fee math, the invoice flipping paid, and the transfer to the connected account. Refund from the dashboard and confirm the reversal + cap give-back. Separately start a Pro checkout on your own card ($0 charged), then cancel in the Customer Portal.
+- **Verify:** every one of those leaves a `webhookEvents/{evt_…}` doc with `status: "processed"`.
+
+#### [ ] Roll both webhook signing secrets
+- **Why:** the two `whsec_` values were pasted into a chat transcript during setup. Not public, but they sit outside Stripe's vault, and anyone holding them can forge signed events — enough to mark an invoice paid or grant Pro.
+- **What:** Dashboard → Webhooks → each endpoint → Roll secret. Set both new values comma-separated into `STRIPE_WEBHOOK_SECRET`, then redeploy `stripeWebhook`.
 
 ---
 

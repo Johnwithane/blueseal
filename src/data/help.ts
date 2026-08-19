@@ -419,6 +419,8 @@ Always keep payments and agreements inside the job thread. It's your record if a
     keywords: ["payout", "payouts", "stripe", "get paid", "bank", "connect"],
     body: `To receive payments through Blue Seal, set up **Payouts** from your account. This connects a secure payouts account so funds from paid invoices reach your bank.
 
+When a client pays a card invoice, your share is set aside right away, then released to your bank about a week later (plus a business day or two for the transfer itself). That short hold is standard for marketplaces. It protects both sides if a payment is ever disputed.
+
 You can return to the **Payouts** screen any time to finish setup or open your payouts dashboard. Once it's set up, paid invoices flow through automatically, with no chasing cheques.`,
   },
   {

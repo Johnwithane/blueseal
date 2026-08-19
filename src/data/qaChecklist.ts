@@ -614,7 +614,12 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
             expected:
               "The picker lists every LIVE job (accepted / requested / quoted / awaiting upfront / in progress / on hold) with its status + client, and start/end default to that day's working hours; finished + cancelled jobs are absent. Saving puts the visit on the calendar at its real hours and it also shows on the job's Schedule tab. It is SCHEDULING, not timesheeting — the work order time total and the invoice do not change. An overlap still saves but warns and names the clash. Bad input is caught inline (end-before-start, HH:MM, no job). Two visits on one job draw as two separate blocks, not one long bar. Read-only calendars show no Add time button. Mobile 375px: dialog fits.",
           },
-          { id: "tradie-get-paid", title: "Get paid: invoice → card payment → Stripe payout" },
+          {
+            id: "tradie-get-paid",
+            title: "Get paid: invoice → card payment → Stripe payout",
+            expected:
+              "The invoice flips to paid on the webhook and the tradesperson nets the full invoice total (the client covered the service fee on top). In Stripe, the connected account's payout schedule reads a 7-day rolling delay set at account creation, and the tradesperson cannot shorten it from their Express dashboard.",
+          },
           { id: "tradie-pro", title: "Blue Seal Pro (toggle free vs Pro features)" },
           { id: "tradie-profile", title: "Profile + branding + vanity /u/<slug>" },
           {
