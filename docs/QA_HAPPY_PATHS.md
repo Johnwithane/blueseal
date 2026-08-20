@@ -663,7 +663,19 @@ connection, so it needs a size check, not just an eyeball check.
    appears in **My bug reports** (`/qa`) and in **admin triage** (`/admin/bug-reports`).
 5. **Error log** — trigger nothing special; just confirm `/qa` → _Error log_ lists
    recent captured errors and you can mark one **Resolved**.
-6. **Browse-area override (job board).** Provision yourself as a tradesperson,
+6. **Batched "your bug report is fixed" notice.** File two bugs from the floating
+   button, then (as an admin) open `/admin/bug-reports` and flip **both** to
+   **Fixed**, plus a third one to **Wontfix**. The digest is a scheduled sweep
+   (`scheduledBugFixNotices`, 09:00 America/Vancouver), so either wait for the
+   next run or trigger it from the Cloud Scheduler console / emulator shell.
+   **Expected:** the reporter gets **exactly one** in-app notification + email —
+   "2 of your bug reports are fixed", listing both titles, linking to
+   `/admin/bug-reports`. The **wontfix** report is **not** mentioned. Run the
+   sweep a second time: **no** new notification (each report carries
+   `fixNotifiedAt` once announced). Flip a fourth report to Fixed and re-run:
+   a fresh notice naming **only** that one. Check the bell at **375px** — the
+   row wraps rather than clipping.
+7. **Browse-area override (job board).** Provision yourself as a tradesperson,
    then open **Browse open jobs**. Use the QA-only **"QA: browse area"** dropdown
    (only the qa role sees it) to pick a preset city (e.g. Toronto).
    **Expected:** the feed re-centres on that city **without** changing your saved

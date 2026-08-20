@@ -700,6 +700,19 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
           { id: "admin-disputes", title: "Disputes handling" },
           { id: "admin-users", title: "User 360 / support" },
           { id: "admin-jobs-browse", title: "Jobs & postings browse (all regions)" },
+          {
+            id: "admin-bug-fix-digest",
+            title: "Batched \"your bug report is fixed\" notice",
+            steps: [
+              "File two bugs from the floating Report a bug button.",
+              "In /admin/bug-reports flip both to Fixed, and a third report to Wontfix.",
+              "Run scheduledBugFixNotices (Cloud Scheduler console, or wait for 09:00 America/Vancouver).",
+              "Run the sweep a second time without changing anything.",
+              "Flip a fourth report to Fixed and run the sweep again.",
+            ],
+            expected:
+              "One notification + email naming both fixed titles and linking to /admin/bug-reports; the wontfix report is never mentioned. The second sweep sends nothing (fixNotifiedAt is stamped). The third sweep names only the newly-fixed report. Bell row wraps cleanly at 375px.",
+          },
         ],
       },
     ],

@@ -2703,6 +2703,11 @@ export interface BugReportDoc {
   // Admin SDK (never by clients); absent until a report has been filed.
   githubIssueNumber?: number;
   githubIssueUrl?: string;
+  // Set by scheduledBugFixNotices once the reporter has been told this report
+  // is fixed, so the daily digest never re-announces it. Absent until then —
+  // the sweep filters on absence in code, since Firestore can't query for a
+  // missing field. Written only by that function (Admin SDK), never a client.
+  fixNotifiedAt?: Timestamp;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -2820,7 +2825,12 @@ export type NotificationType =
   // (were invoice_paid / invoice_payment_failed).
   | "quote_received"
   | "payout_paid"
-  | "payout_failed";
+  | "payout_failed"
+  // Daily batched digest to a bug reporter when one or more bugReports of
+  // theirs reach status "fixed" (scheduledBugFixNotices). One notice per
+  // reporter per sweep, listing the fixed titles; links to /admin/bug-reports.
+  // "wontfix" deliberately stays quiet.
+  | "bug_report_fixed";
 
 export interface NotificationDoc {
   userId: string;
