@@ -1258,6 +1258,13 @@ const faqs: FaqItem[] = [
     audience: "client",
   },
   {
+    question: "What will the charge look like on my bank statement?",
+    answer:
+      "It shows as **BLUESEAL** followed by your tradesperson's business name, for example `BLUESEAL* SMITH ELECTRIC`. Blue Seal handles the payment, so our name comes first. Long business names are shortened to fit the space your bank allows. If you ever see a Blue Seal charge you don't recognize, open the job thread: every card payment has a receipt there showing the invoice, the service fee, and the date.",
+    categoryId: "payments-invoices",
+    audience: "client",
+  },
+  {
     question: "Do I pay a fee if I use e-transfer or cash?",
     answer:
       "No. The service fee only applies to **card payments through Blue Seal**. Paying by e-transfer or cash is always fee-free: just arrange it with your tradesperson and they'll mark the invoice as paid. You'll still get a receipt in the job thread.",

@@ -428,11 +428,17 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 2. **Expected:** a **Blue Seal service fee** is shown at checkout (**5%, min $2,
    capped $99**) before you confirm; `4242…` succeeds; job → **Complete**.
 3. Try `4000 0000 0000 0002` → **Expected:** decline surfaced, job stays unpaid.
+4. In Stripe, open the PaymentIntent → **Expected:** its statement descriptor
+   reads `BLUESEAL* <tradesperson business name>`, clipped to 12 characters of
+   suffix. A tradesperson with no usable name falls back to a bare `BLUESEAL`
+   rather than failing the charge.
 
 ### 6.3 Pro fee waiver
 
-1. Make the tradesperson **Pro** (`/qa` → Enable Pro). As the client, pay their
-   invoice by card.
+1. Make the tradesperson **Pro**. NB: `/qa` → Enable Pro is **disabled in the
+   live project** (`QA_TOOLKIT_ENABLED=false` since the Stripe cutover), so
+   grant it from Admin → user search → **Blue Seal Pro (founding comp)**, or
+   run a real Pro checkout. As the client, pay their invoice by card.
 2. **Expected:** the service fee is **waived to $0**.
 
 ### 6.4 Offline payment (no fee)

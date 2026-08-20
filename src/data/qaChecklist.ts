@@ -618,7 +618,7 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
             id: "tradie-get-paid",
             title: "Get paid: invoice → card payment → Stripe payout",
             expected:
-              "The invoice flips to paid on the webhook and the tradesperson nets the full invoice total (the client covered the service fee on top). In Stripe, the connected account's payout schedule reads a 7-day rolling delay set at account creation, and the tradesperson cannot shorten it from their Express dashboard.",
+              "The invoice flips to paid on the webhook and the tradesperson nets the full invoice total (the client covered the service fee on top). In Stripe, the charge's statement descriptor reads BLUESEAL* <business name> (not a bare BLUESEAL), and the connected account's payout schedule reads a 7-day rolling delay set at account creation that the tradesperson cannot shorten from their Express dashboard.",
           },
           { id: "tradie-pro", title: "Blue Seal Pro (toggle free vs Pro features)" },
           { id: "tradie-profile", title: "Profile + branding + vanity /u/<slug>" },

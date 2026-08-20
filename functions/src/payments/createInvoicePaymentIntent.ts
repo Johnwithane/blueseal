@@ -24,6 +24,7 @@ import { requireAuth } from "../lib/auth";
 import { getSubscriptionState } from "../lib/subscription";
 import { assertTradieChargeable } from "./chargeable";
 import { computeServiceFee } from "./serviceFee";
+import { toStatementDescriptorSuffix } from "./statementDescriptor";
 import { STRIPE_SECRET_KEY, getStripe } from "./stripeClient";
 
 const Input = z.object({ invoiceId: z.string().min(1).max(128) });
@@ -83,7 +84,12 @@ export const createInvoicePaymentIntent = onCall(
     }
 
     // Tradesperson must be able to receive the destination charge.
-    const stripeAccountId = await assertTradieChargeable(inv.tradespersonId);
+    const { stripeAccountId, businessName } = await assertTradieChargeable(
+      inv.tradespersonId,
+    );
+    // "BLUESEAL* SMITH ELECTRIC" beats a bare "BLUESEAL" the client never
+    // hired. Omitted entirely when the name yields nothing Stripe-safe.
+    const statementSuffix = toStatementDescriptorSuffix(businessName);
 
     // Pro waiver (the tradesperson being Pro waives their clients' platform
     // fee) + the per-job cap already consumed by an upfront payment.
@@ -123,6 +129,7 @@ export const createInvoicePaymentIntent = onCall(
         const updated = await stripe.paymentIntents.update(paymentIntentId, {
           amount: fee.chargeTotalCents,
           application_fee_amount: fee.totalFeeCents,
+          ...(statementSuffix ? { statement_descriptor_suffix: statementSuffix } : {}),
           metadata,
         });
         clientSecret = updated.client_secret ?? clientSecret;
@@ -137,6 +144,7 @@ export const createInvoicePaymentIntent = onCall(
           application_fee_amount: fee.totalFeeCents,
           transfer_data: { destination: stripeAccountId },
           automatic_payment_methods: { enabled: true },
+          ...(statementSuffix ? { statement_descriptor_suffix: statementSuffix } : {}),
           description: `Blue Seal invoice ${inv.invoiceNumber}`,
           metadata,
         },

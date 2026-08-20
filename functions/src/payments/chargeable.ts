@@ -7,15 +7,25 @@ interface TradiePayouts {
   onboardingStatus?: "not_started" | "in_progress" | "restricted" | "enabled";
 }
 
+export interface ChargeableTradie {
+  stripeAccountId: string;
+  /** Business name for the statement descriptor suffix; null if unusable. */
+  businessName: string | null;
+}
+
 /**
  * Assert a tradesperson can receive a destination charge, returning their
- * Stripe connected-account id. Shared by the invoice + upfront-fee payment
- * callables. The error messages point the client at the fee-free offline path
- * (mark-as-paid) rather than dead-ending them.
+ * Stripe connected-account id plus the name to put on the client's card
+ * statement. Shared by the invoice + upfront-fee payment callables. The error
+ * messages point the client at the fee-free offline path (mark-as-paid) rather
+ * than dead-ending them.
  */
-export async function assertTradieChargeable(tradespersonId: string): Promise<string> {
+export async function assertTradieChargeable(
+  tradespersonId: string,
+): Promise<ChargeableTradie> {
   const snap = await db.doc(`tradespeople/${tradespersonId}`).get();
-  const payouts = (snap.data()?.payouts ?? {}) as TradiePayouts;
+  const data = snap.data() ?? {};
+  const payouts = (data.payouts ?? {}) as TradiePayouts;
   if (!payouts.payoutsEnabled || !payouts.stripeAccountId) {
     throw new HttpsError(
       "failed-precondition",
@@ -28,5 +38,13 @@ export async function assertTradieChargeable(tradespersonId: string): Promise<st
       "This tradesperson's payment account needs attention — pay by e-transfer or cash for now.",
     );
   }
-  return payouts.stripeAccountId;
+  // companyName is the registered business ("ABC Mechanical Ltd."); sole
+  // proprietors leave it null and the client only ever sees the display name,
+  // so that's the right fallback for what they'll recognize on a statement.
+  const companyName = typeof data.companyName === "string" ? data.companyName : null;
+  const displayName = typeof data.displayName === "string" ? data.displayName : null;
+  return {
+    stripeAccountId: payouts.stripeAccountId,
+    businessName: companyName ?? displayName,
+  };
 }

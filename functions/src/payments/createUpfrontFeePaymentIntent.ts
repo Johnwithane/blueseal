@@ -15,6 +15,7 @@ import { db } from "../lib/admin";
 import { requireAuth } from "../lib/auth";
 import { getSubscriptionState } from "../lib/subscription";
 import { assertTradieChargeable } from "./chargeable";
+import { toStatementDescriptorSuffix } from "./statementDescriptor";
 import { computeServiceFee } from "./serviceFee";
 import { STRIPE_SECRET_KEY, getStripe } from "./stripeClient";
 
@@ -72,7 +73,10 @@ export const createUpfrontFeePaymentIntent = onCall(
       throw new HttpsError("failed-precondition", "The upfront fee is already paid.");
     }
 
-    const stripeAccountId = await assertTradieChargeable(job.tradespersonId);
+    const { stripeAccountId, businessName } = await assertTradieChargeable(
+      job.tradespersonId,
+    );
+    const statementSuffix = toStatementDescriptorSuffix(businessName);
 
     const { isPro: waived } = await getSubscriptionState(job.tradespersonId);
     const capUsedCents = job.serviceFeeCapUsedCents ?? 0;
@@ -107,6 +111,7 @@ export const createUpfrontFeePaymentIntent = onCall(
         const updated = await stripe.paymentIntents.update(paymentIntentId, {
           amount: serviceFee.chargeTotalCents,
           application_fee_amount: serviceFee.totalFeeCents,
+          ...(statementSuffix ? { statement_descriptor_suffix: statementSuffix } : {}),
           metadata,
         });
         clientSecret = updated.client_secret ?? clientSecret;
@@ -121,6 +126,7 @@ export const createUpfrontFeePaymentIntent = onCall(
           application_fee_amount: serviceFee.totalFeeCents,
           transfer_data: { destination: stripeAccountId },
           automatic_payment_methods: { enabled: true },
+          ...(statementSuffix ? { statement_descriptor_suffix: statementSuffix } : {}),
           description: `Blue Seal upfront fee — job ${jobId}`,
           metadata,
         },
