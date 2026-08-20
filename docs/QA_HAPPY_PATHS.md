@@ -748,6 +748,29 @@ connection, so it needs a size check, not just an eyeball check.
 
 ---
 
+### 9.x Avatar dropdown fits narrow phones
+
+1. Sign in as an account that holds **several roles** (an admin who is also a
+   tradesperson, sales rep and project manager is the worst case — it produces
+   the longest labels, e.g. "Switch to Project manager view").
+2. At **375px** and **402px**, open the avatar dropdown in the header.
+   **Expected:** the popup sits **inside** the viewport with a visible gutter on
+   both sides — it must not run edge-to-edge or look cut off. Long labels
+   **wrap to a second line**; none is truncated, and the icon stays aligned with
+   the first line.
+3. Read **every** item end to end: Find a tradesperson · Post a job · Dashboard ·
+   Account · each "Switch to … view" · Help & support · Sign out. No ellipsis, no
+   text disappearing off the left edge.
+4. **No sideways scroll.** `<body>` is `overflow-x: clip`, so an over-wide popup
+   is clipped *silently* with no scrollbar to reveal it — that was the bug.
+   Confirm the page still doesn't scroll horizontally with the menu open.
+5. Same check with the **browser font size increased** (Settings → larger text),
+   which is what pushes a borderline label over the edge on a real device.
+6. Spot-check one other popup menu (a job's action menu on the jobs list) at
+   375px — the fix is global to `.p-menu`, so nothing else should have shifted.
+
+---
+
 ## 10. The QA toolkit itself → (no help article; internal)
 
 1. **Provision** yourself as a tradesperson on a given trade (`/qa`) → confirm you
