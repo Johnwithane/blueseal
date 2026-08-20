@@ -359,14 +359,15 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 
 1. As **Tradesperson**, `/dashboard/tradie?view=calendar`. **Expected:** it opens
    on **Month** (not Week); the Month/Week toggle is top-right with Month first.
-2. Month cells show up to two job chips **prefixed with the start time**
-   (e.g. `09:00 Boiler service`), then `+N more`. A blocked day is tinted red
+2. Month cells show up to two job chips **prefixed with the start time in
+   12-hour am/pm** (e.g. `9 a.m. · Boiler service`), then `+N more`. A blocked day is tinted red
    with a ban icon; a working day shows a small blue dot.
 3. **Tap any day cell.** **Expected:** a **day sheet** opens titled with the full
-   date, showing the day's **working hours**, then an **hour rail** with each
-   scheduled job drawn against the hours it occupies (title, `HH:MM – HH:MM`,
-   client). Tapping a job block closes the sheet and opens that job. An empty day
-   reads **Nothing scheduled**.
+   date, showing the day's **working hours** (`8:00 a.m.–5:00 p.m.`), then an
+   **hour rail** labelled in 12-hour am/pm (`7 a.m.`, `12 p.m.`, `1 p.m.`) with
+   each scheduled job drawn against the hours it occupies (title,
+   `9:00 a.m. – 11:30 a.m.`, client). Tapping a job block closes the sheet and
+   opens that job. An empty day reads **Nothing scheduled**.
 4. **Blocking moved into the sheet.** A bare tap on a month cell must **no longer
    block the day**. Instead the sheet's footer has **Block day** (future,
    unblocked days only) → confirm dialog → the day tints red. Re-open a blocked
@@ -379,8 +380,14 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    **no Block day / Unblock** control anywhere.
 7. **Week view** still works (toggle to it): day headers are tappable and open the
    same sheet; the per-day **Block day** button is unchanged.
-8. Mobile (375px): the month grid stays 7 columns and the day sheet fits without
-   horizontal scroll.
+8. **12-hour times everywhere (issue #17).** Sweep the whole calendar — month
+   chips, week chips, the day sheet's working-hours line, the hour gutter, every
+   job block label — and confirm **no 24-hour time** is left (no `13:30`, no
+   `17:00`, no `24:00`). Midnight reads `12:00 a.m.` and noon `12:00 p.m.`.
+   Stored data is unchanged: reload and the same times come back.
+9. Mobile (375px): the month grid stays 7 columns and the day sheet fits without
+   horizontal scroll. Check the hour gutter specifically — `12 p.m.` must fit the
+   rail rather than wrap or clip.
 
 ### 5.2 Book time against a job from the calendar
 
@@ -389,8 +396,9 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 2. **Expected:** a dialog with a **job picker** listing every LIVE job (accepted,
    requested, quoted, awaiting upfront payment, in progress, on hold — each row
    showing its status + client) and **Start** / **End** times pre-filled from
-   that day's working hours, plus an optional note.
-3. Pick a job, set 09:00–12:00, add a note, **Add to calendar**.
+   that day's working hours **in 12-hour form** (`8:00 a.m.` / `5:00 p.m.`, not
+   `08:00` / `17:00`), plus an optional note.
+3. Pick a job, set `9:00 am`–`12:00 pm`, add a note, **Add to calendar**.
 4. **Expected:** a toast confirms it; the visit appears **on that day at those
    hours** in the day sheet and as a time-prefixed chip in the month cell. Open
    the job → **Schedule tab** → the same visit is listed there. It is a
@@ -399,9 +407,13 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 5. **Clash warning.** Add a second visit overlapping an existing booking (or a
    blocked day). **Expected:** it still saves, but the toast warns it overlaps
    and names what it clashes with — a warning, not a block.
-6. **Validation.** Try End before Start → inline "The end time has to be after
-   the start."; try a junk time like `99:99` → "Enter times as HH:MM."; try
-   saving with no job picked → "Pick a job first."
+6. **Validation + what the fields accept.** Try End before Start → inline "The
+   end time has to be after the start."; try a junk time like `99:99` or `noon`
+   → "Enter times like 9:00 am (24-hour, e.g. 17:00, works too)."; try saving
+   with no job picked → "Pick a job first." Then confirm every shape the field
+   takes still books the right hours: `5pm`, `5 PM`, `5:00 p.m.` and the
+   old-habit `17:00` must all land the visit at **5:00 p.m.**, and `12 am` /
+   `12 pm` must not swap.
 7. **One block per visit.** Book two short visits on the SAME job on different
    days. **Expected:** two separate blocks at their own hours — not one bar
    spanning the whole range.
@@ -409,7 +421,15 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    appear in the picker.
 9. **Read-only calendars.** On a tradesperson's public profile and the PM
    calendar (`/manage/calendar`), there is **no Add time to a job** button.
-10. Mobile (375px): the dialog fits, and the job picker is usable one-handed.
+10. **Availability editor.** Profile → working hours. The `99:99` masked fields
+    still take a 24-hour `17:00` (that's the stored format), but each row now
+    carries a live 12-hour read-back beneath it — `9:00 a.m. – 5:00 p.m.` —
+    which updates as you type and stays blank while a value is half-entered.
+11. **Job Schedule tab + manual time entry.** Open a job → **Schedule** → add a
+    visit, and open the work order's **manual time entry** dialog. **Expected:**
+    both time pickers are am/pm (with an AM/PM toggle), not a 0–23 hour spinner.
+12. Mobile (375px): the dialog fits, the job picker is usable one-handed, and an
+    availability row (two time fields + delete) does **not** overflow sideways.
 
 ---
 
