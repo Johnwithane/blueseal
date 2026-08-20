@@ -468,6 +468,47 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 
 ---
 
+### 5.3 Jobs list — per-job action menu → issue #21
+
+> Tradesperson view only. The client's jobs list keeps the plain status chip.
+
+1. As **Tradesperson**, open `/dashboard/tradie` (Jobs). **Expected:** every job's
+   status chip now has a **chevron** and is tappable. The status text is
+   unchanged ("Quote needed", "In progress", …) — the ask was to make it
+   actionable, not to remove it.
+2. **Items follow the status machine.** Tap the chip on each of these and check
+   the menu:
+   - **Requested / Accepted / Quoted:** Open job · Quote (or **Revise quote** on
+     Quoted; no Quote item on Accepted) · Schedule · Invoice · **Cancel job** (red).
+   - **In progress:** Open job · Schedule · Invoice · **Complete job**. No Quote,
+     no Cancel.
+   - **Awaiting upfront / Awaiting approval / Awaiting payment / On hold:**
+     Open job · Schedule · Invoice only.
+   - **Complete / Reviewed / Cancelled** (View completed): **Open job** only.
+3. **Each action lands on the right surface.** Quote → the job's **Quote** tab;
+   Schedule → **Schedule** tab; Invoice → **Invoice** tab; Open job → the Brief.
+4. **Complete job confirms first.** Tap it on an in-progress job. **Expected:** a
+   dialog — "Complete this job? You'll finalize the invoice on the next screen"
+   — with **Cancel** / **Continue**. Continue opens the job with the **wrap-up
+   sheet already open** (the same FinishJobSheet as the Invoice tab; there is
+   only one implementation). Back out of the sheet, reload the job: the sheet
+   must **not** re-open (the `?finish=1` key is stripped after use).
+5. **Cancel job takes a reason.** Tap it on a Requested job. **Expected:** a
+   dialog warning the client is notified and it can't be undone, with a required
+   **reason** field. Submit empty -> toast "Add a reason so your client knows what
+   happened." and the dialog stays open. Add a reason -> **Cancel job** -> the job
+   moves to **Cancelled**, drops into the completed view, and the **client** gets
+   a `job_cancelled` notification carrying your reason.
+6. **Cancel is pre-commitment only.** Confirm there is **no** Cancel item on an
+   in-progress or awaiting-payment job — past commitment the other party has to
+   agree, and there is no tradesperson-side cancel-request loop.
+7. **Tapping the chip must not open the job.** The card itself is clickable;
+   tapping the status chip opens the menu and nothing else.
+8. Mobile (375px): the popup fits inside the viewport (no horizontal scroll), the
+   chip is at least a 44px tap target, and no menu label wraps or clips.
+
+---
+
 ## 6. Payments (Stripe test mode) → help: `quotes-and-invoices`, `paying-for-a-job`, `getting-paid-out`
 
 ### 6.1 Pay an upfront fee

@@ -629,6 +629,19 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
               "The picker lists every LIVE job (accepted / requested / quoted / awaiting upfront / in progress / on hold) with its status + client, and start/end default to that day's working hours; finished + cancelled jobs are absent. Saving puts the visit on the calendar at its real hours and it also shows on the job's Schedule tab. It is SCHEDULING, not timesheeting — the work order time total and the invoice do not change. An overlap still saves but warns and names the clash. Bad input is caught inline (end-before-start, HH:MM, no job). Two visits on one job draw as two separate blocks, not one long bar. Read-only calendars show no Add time button. Mobile 375px: dialog fits.",
           },
           {
+            id: "tradie-jobs-action-menu",
+            title: "Jobs list: per-job action menu (issue #21)",
+            steps: [
+              "Open /dashboard/tradie (Jobs) and tap the status chip on a Requested job.",
+              "Repeat on an In progress job, an Awaiting payment job, and a Complete job.",
+              "Tap Complete job on an in-progress job and follow it through.",
+              "Tap Cancel job on a Requested job; submit with an empty reason, then with one.",
+              "Tap a card body (not the chip) and confirm it opens the job.",
+            ],
+            expected:
+              "The chip keeps its status text and gains a chevron. Requested/Accepted/Quoted offer Quote + Cancel job; In progress offers Complete job and neither Quote nor Cancel; Awaiting-* offer navigation only; terminal jobs offer Open job only. Complete job confirms, then opens the job with the wrap-up sheet already up (and doesn't re-open on reload). Cancel job requires a reason, warns it can't be undone, and notifies the client. At 375px the popup fits with no horizontal scroll and the chip is a 44px target.",
+          },
+          {
             id: "tradie-quote-optional-tab",
             title: "Quoting is a tab, not a requirement (issues #19 + #22)",
             steps: [

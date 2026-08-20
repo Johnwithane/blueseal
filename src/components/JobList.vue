@@ -13,6 +13,11 @@ import { inviteTag, statusLabel, STATUS_SEVERITY } from "@/utils/jobStatus";
 import { tradeLabel } from "@/data/trades";
 import JobCounterparty from "@/components/JobCounterparty.vue";
 import JobNotificationsBell from "@/components/JobNotificationsBell.vue";
+import JobActionMenu from "@/components/JobActionMenu.vue";
+import Dialog from "primevue/dialog";
+import Textarea from "primevue/textarea";
+import { cancelJob } from "@/firebase/services/jobs";
+import { useConfirmAction } from "@/composables/useConfirmAction";
 
 const props = withDefaults(
   defineProps<{
@@ -36,6 +41,7 @@ const props = withDefaults(
 const router = useRouter();
 const { relativeTime, dateTime } = useFormatters();
 const toast = useToast();
+const { confirmDestructive } = useConfirmAction();
 
 // The tradie's single live clock session across all jobs — lets a card show
 // "Stop · 00:12:34" on the job they're clocked into and "Clock in" elsewhere.
@@ -74,6 +80,70 @@ async function onQuickClockOut(job: WithId<JobDoc>) {
     toast.error("Couldn't clock out", humanizeError(e));
   } finally {
     setClockBusy(job.id, false);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Per-job action menu (issue #21). The list only routes and confirms — the
+// work itself happens on the job's own surfaces, so there's one implementation
+// of each flow rather than a second copy living on the dashboard.
+// ---------------------------------------------------------------------------
+
+function onMenuOpen(payload: { jobId: string; tab?: string }) {
+  router.push({
+    name: "JobDetail",
+    params: { id: payload.jobId },
+    ...(payload.tab ? { query: { tab: payload.tab } } : {}),
+  });
+}
+
+// "Complete job" hands off to the job's wrap-up sheet (FinishJobSheet), where
+// the invoice is finalized — `?finish=1` pops it on arrival. Confirmed first
+// because finishing is the end of the job, and the confirm says what's next
+// rather than just asking "are you sure?".
+function onMenuFinish(jobId: string) {
+  confirmDestructive(
+    {
+      header: "Complete this job?",
+      message:
+        "You'll finalize the invoice on the next screen, then send it to your client. Nothing is sent until you do.",
+      acceptLabel: "Continue",
+    },
+    () => {
+      void router.push({ name: "JobDetail", params: { id: jobId }, query: { finish: "1" } });
+    },
+  );
+}
+
+// Cancelling takes a REASON, not just a confirmation — the client is notified
+// (onJobCancelled) and deserves to know why, exactly as the client's own
+// cancel dialog requires one of them.
+const cancelJobId = ref<string | null>(null);
+const cancelReason = ref("");
+const cancelling = ref(false);
+
+function onMenuCancel(jobId: string) {
+  cancelJobId.value = jobId;
+  cancelReason.value = "";
+}
+
+async function confirmCancelJob() {
+  const id = cancelJobId.value;
+  if (!id || cancelling.value) return;
+  const reason = cancelReason.value.trim();
+  if (!reason) {
+    toast.error("Add a reason so your client knows what happened.");
+    return;
+  }
+  cancelling.value = true;
+  try {
+    await cancelJob(id, reason);
+    toast.success("Job cancelled", "Your client has been notified.");
+    cancelJobId.value = null;
+  } catch (e) {
+    toast.error("Couldn't cancel", humanizeError(e));
+  } finally {
+    cancelling.value = false;
   }
 }
 
@@ -315,7 +385,19 @@ function counterpartyPhoto(job: WithId<JobDoc>): string | null | undefined {
                   :value="changeTag(job)!.label"
                   :severity="changeTag(job)!.severity"
                 />
+                <!-- Tradesperson: the status IS the action menu (issue #21).
+                     Clients keep the plain chip — none of these actions are
+                     theirs, and their own cancel/postpone loop lives on the
+                     job page where it can explain itself. -->
+                <JobActionMenu
+                  v-if="props.viewerRole === 'tradesperson'"
+                  :job="job"
+                  @open="onMenuOpen"
+                  @finish="onMenuFinish"
+                  @cancel="onMenuCancel"
+                />
                 <Tag
+                  v-else
                   :value="statusLabel(job.status, props.viewerRole)"
                   :severity="STATUS_SEVERITY[job.status]"
                 />
@@ -367,6 +449,51 @@ function counterpartyPhoto(job: WithId<JobDoc>): string | null | undefined {
         </ul>
       </section>
     </div>
+
+    <!-- Cancel takes a reason: the client is notified and deserves to know why
+         (same requirement as the client's own cancel dialog). -->
+    <Dialog
+      :visible="cancelJobId !== null"
+      modal
+      header="Cancel this job?"
+      :style="{ width: '28rem', maxWidth: '92vw' }"
+      @update:visible="(v) => { if (!v) cancelJobId = null; }"
+    >
+      <p class="mb-3 text-sm text-[color:var(--bs-text)]">
+        Your client is notified straight away. This can't be undone — the job moves to
+        Cancelled.
+      </p>
+      <label for="joblist-cancel-reason" class="mb-1 block text-xs font-medium">
+        Reason (your client sees this)
+      </label>
+      <Textarea
+        id="joblist-cancel-reason"
+        v-model="cancelReason"
+        rows="3"
+        maxlength="1000"
+        class="w-full"
+        placeholder="e.g. I'm no longer able to take this on"
+      />
+      <template #footer>
+        <div class="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button
+            label="Keep the job"
+            severity="secondary"
+            outlined
+            :disabled="cancelling"
+            class="w-full sm:w-auto"
+            @click="cancelJobId = null"
+          />
+          <Button
+            label="Cancel job"
+            severity="danger"
+            :loading="cancelling"
+            class="w-full sm:w-auto"
+            @click="confirmCancelJob"
+          />
+        </div>
+      </template>
+    </Dialog>
   </div>
 </template>
 
