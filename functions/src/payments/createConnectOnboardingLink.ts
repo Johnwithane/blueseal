@@ -19,6 +19,8 @@ import { logger } from "firebase-functions/v2";
 import { db } from "../lib/admin";
 import { requireRole } from "../lib/auth";
 import { STRIPE_SECRET_KEY, getStripe } from "./stripeClient";
+import { clearOrphanedAccount } from "./connectAccount";
+import { isMissingResource, stripeFailure } from "./connectErrors";
 
 function appBaseUrl(): string {
   const raw = process.env.APP_BASE_URL ?? "https://blueseal.app";
@@ -29,28 +31,35 @@ export const createConnectOnboardingLink = onCall(
   { ...CALLABLE_OPTS, secrets: [STRIPE_SECRET_KEY] },
   async (req) => {
     const uid = requireRole(req, "tradesperson");
+    const ctx = { fn: "createConnectOnboardingLink", uid };
 
-    const snap = await db.doc(`tradespeople/${uid}`).get();
-    const accountId = snap.data()?.payouts?.stripeAccountId as
-      | string
-      | undefined;
+    const tradieRef = db.doc(`tradespeople/${uid}`);
+    const snap = await tradieRef.get();
+    const accountId = snap.data()?.payouts?.stripeAccountId as string | undefined;
     if (!accountId) {
-      throw new HttpsError(
-        "failed-precondition",
-        "Create a Stripe Connect account first.",
-      );
+      throw new HttpsError("failed-precondition", "Create a Stripe Connect account first.");
     }
 
     const base = appBaseUrl();
     const stripe = getStripe();
-    const link = await stripe.accountLinks.create({
-      account: accountId,
-      type: "account_onboarding",
-      refresh_url: `${base}/payouts/refresh`,
-      return_url: `${base}/payouts/return`,
-    });
-
-    logger.info("createConnectOnboardingLink", { uid, accountId });
-    return { url: link.url, expiresAt: link.expires_at };
+    try {
+      const link = await stripe.accountLinks.create({
+        account: accountId,
+        type: "account_onboarding",
+        refresh_url: `${base}/payouts/refresh`,
+        return_url: `${base}/payouts/return`,
+      });
+      logger.info("createConnectOnboardingLink", { ...ctx, accountId });
+      return { url: link.url, expiresAt: link.expires_at };
+    } catch (err) {
+      // A stored id the current Stripe key can't see is an orphan from the
+      // pre-cutover sandbox account. Drop it so the panel falls back to
+      // "Start Stripe setup" and the next click mints a real live account,
+      // instead of the user re-hitting this same 404 forever.
+      if (isMissingResource(err)) {
+        await clearOrphanedAccount(tradieRef, "payouts", ctx);
+      }
+      throw stripeFailure(err, { ...ctx, accountId });
+    }
   },
 );

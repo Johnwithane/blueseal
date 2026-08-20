@@ -15,6 +15,8 @@ import { db } from "../lib/admin";
 import { requireRole } from "../lib/auth";
 import { requirePmActive, assertPmAgreementSigned } from "../lib/projectManager";
 import { STRIPE_SECRET_KEY, emptyPayoutsState, getStripe } from "./stripeClient";
+import { connectAccountExists } from "./connectAccount";
+import { callStripe } from "./connectErrors";
 
 interface ExistingPayouts {
   stripeAccountId?: string | null;
@@ -26,30 +28,42 @@ export const createPmConnectAccount = onCall(
     const uid = requireRole(req, "projectManager");
     assertPmAgreementSigned(await requirePmActive(uid));
 
+    const ctx = { fn: "createPmConnectAccount", uid };
+
     const pmRef = db.doc(`users/${uid}`);
     const snap = await pmRef.get();
     const existing = (snap.data()?.projectManager?.payouts ?? {}) as ExistingPayouts;
+    const stripe = getStripe();
     if (existing.stripeAccountId) {
-      logger.info("createPmConnectAccount: idempotent hit", {
-        uid,
-        stripeAccountId: existing.stripeAccountId,
+      const stored = existing.stripeAccountId;
+      // Verified, not assumed: an id the current Stripe key cannot see is an
+      // orphan from the pre-cutover sandbox account, and handing it back would
+      // dead-end onboarding on a 404 forever. See connectAccount.ts.
+      const alive = await callStripe(ctx, () => connectAccountExists(stripe, stored, ctx));
+      if (alive) {
+        logger.info("createPmConnectAccount: idempotent hit", { ...ctx, stripeAccountId: stored });
+        return { stripeAccountId: stored };
+      }
+      logger.warn("createPmConnectAccount: replacing orphaned account id", {
+        ...ctx,
+        orphanedAccountId: stored,
       });
-      return { stripeAccountId: existing.stripeAccountId };
     }
 
-    const stripe = getStripe();
-    const account = await stripe.accounts.create({
-      type: "express",
-      country: "CA",
-      default_currency: "cad",
-      capabilities: {
-        transfers: { requested: true },
-      },
-      business_type: "individual",
-      // pmId round-trip for the webhook dispatcher (distinguishes a PM account
-      // from a rep one (metadata.repId) or a tradesperson one).
-      metadata: { pmId: uid },
-    });
+    const account = await callStripe(ctx, () =>
+      stripe.accounts.create({
+        type: "express",
+        country: "CA",
+        default_currency: "cad",
+        capabilities: {
+          transfers: { requested: true },
+        },
+        business_type: "individual",
+        // pmId round-trip for the webhook dispatcher (distinguishes a PM account
+        // from a rep one (metadata.repId) or a tradesperson one).
+        metadata: { pmId: uid },
+      }),
+    );
 
     await pmRef.set(
       {
@@ -65,7 +79,7 @@ export const createPmConnectAccount = onCall(
       { merge: true },
     );
 
-    logger.info("createPmConnectAccount: created", { uid, stripeAccountId: account.id });
+    logger.info("createPmConnectAccount: created", { ...ctx, stripeAccountId: account.id });
     return { stripeAccountId: account.id };
   },
 );

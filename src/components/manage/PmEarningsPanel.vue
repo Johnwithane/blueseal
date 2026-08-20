@@ -60,7 +60,12 @@ const batchStatus: Record<string, { label: string; cls: string }> = {
 async function kickOff() {
   busy.value = "create";
   try {
-    if (!state.value?.stripeAccountId) await createPmConnectAccount();
+    // Always call the create callable — it is idempotent server-side AND it
+    // verifies the stored account still exists on the current Stripe key.
+    // Skipping it when the mirrored state has an id is what made a dead
+    // sandbox account id unrecoverable: the client never asked for a new
+    // account, so every click re-used the dead one.
+    await createPmConnectAccount();
     const { url } = await createPmConnectOnboardingLink();
     busy.value = "onboard";
     window.location.assign(url);
