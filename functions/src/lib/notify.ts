@@ -108,7 +108,10 @@ export type NotificationType =
   // src/firebase/interfaces.ts.
   | "quote_received"
   | "payout_paid"
-  | "payout_failed";
+  | "payout_failed"
+  // Daily batched digest to a bug reporter when reports of theirs reach
+  // status "fixed" (scheduledBugFixNotices). Links to /admin/bug-reports.
+  | "bug_report_fixed";
 
 /**
  * Channel routing per notification.
@@ -326,6 +329,7 @@ const CTA_BY_TYPE: Record<string, string> = {
   change_order_proposed: "Review the request",
   site_visit_proposed: "Respond on Blue Seal",
   insurance_expiry_reminder: "Renew your insurance",
+  bug_report_fixed: "Re-test the fix",
 };
 function ctaLabelForType(type: NotificationType): string {
   return CTA_BY_TYPE[type] ?? "Open Blue Seal";

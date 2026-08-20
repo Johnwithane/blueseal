@@ -10,6 +10,7 @@ import Message from "primevue/message";
 import Dialog from "primevue/dialog";
 import JobCounterparty from "@/components/JobCounterparty.vue";
 import { STATUS_LABEL } from "@/utils/jobStatus";
+import { formatTimeOfDay, parseTimeOfDay } from "@/composables/useFormatters";
 import type { SessionWithJob } from "@/firebase/services/sessions";
 import type { BookingDoc, JobDoc, WeeklyAvailability, WithId } from "@/firebase/interfaces";
 
@@ -346,12 +347,6 @@ interface DayEntry {
   lanes: number;
 }
 
-function hhmm(min: number): string {
-  const h = Math.floor(min / 60);
-  const m = Math.round(min % 60);
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-}
-
 // Entries placed on the hour rail. Anything with no end gets a nominal one-hour
 // block so it's still visible and clickable.
 const dayEntries = computed<DayEntry[]>(() => {
@@ -364,7 +359,8 @@ const dayEntries = computed<DayEntry[]>(() => {
       entry,
       startMin,
       endMin,
-      timeLabel: `${hhmm(startMin)} – ${hhmm(endMin)}`,
+      // Display-only (issue #17): the minutes behind it are unchanged.
+      timeLabel: `${formatTimeOfDay(startMin)} – ${formatTimeOfDay(endMin)}`,
       lane: 0,
       lanes: 1,
     };
@@ -408,6 +404,10 @@ const dayHours = computed(() =>
     (_, i) => dayWindow.value.from + i,
   ),
 );
+// Gutter label for one hour row — compact so "9 a.m." fits the narrow rail.
+function hourLabel(h: number): string {
+  return formatTimeOfDay(h * 60, { compact: true });
+}
 function entryStyle(e: DayEntry) {
   const top = ((e.startMin - dayWindow.value.from * 60) / 60) * HOUR_PX;
   const height = Math.max(24, ((e.endMin - e.startMin) / 60) * HOUR_PX - 2);
@@ -438,8 +438,10 @@ function openJob(jobId: string) {
 // the write, so this is purely the form.
 const showAdd = ref(false);
 const addJobId = ref<string | null>(null);
-const addStart = ref("09:00");
-const addEnd = ref("12:00");
+// Held as display text (12-hour), parsed back on submit. The availability
+// prefill below converts the stored "HH:mm" wire value into the same shape.
+const addStart = ref(formatTimeOfDay("09:00"));
+const addEnd = ref(formatTimeOfDay("12:00"));
 const addNote = ref("");
 const addError = ref("");
 
@@ -457,21 +459,20 @@ function openAddTime() {
   // Default to the start of their working hours for that day, so the common
   // case is "pick the job, tap save".
   const avail = props.availability[dayOfWeekKey(openDay.value)];
-  addStart.value = avail?.[0]?.start ?? "09:00";
-  addEnd.value = avail?.[0]?.end ?? "12:00";
+  addStart.value = formatTimeOfDay(avail?.[0]?.start ?? "09:00");
+  addEnd.value = formatTimeOfDay(avail?.[0]?.end ?? "12:00");
   addNote.value = "";
   addError.value = "";
   showAdd.value = true;
 }
 
-function timeToDate(day: Date, hhmmStr: string): Date | null {
-  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmmStr.trim());
-  if (!m) return null;
-  const h = Number(m[1]);
-  const min = Number(m[2]);
-  if (h > 23 || min > 59) return null;
+// Accepts either shape the field offers — "9:00 a.m." (what it now shows) or
+// the "17:00" a tradesperson may still type out of habit.
+function timeToDate(day: Date, text: string): Date | null {
+  const mins = parseTimeOfDay(text);
+  if (mins === null) return null;
   const d = new Date(day);
-  d.setHours(h, min, 0, 0);
+  d.setHours(Math.floor(mins / 60), mins % 60, 0, 0);
   return d;
 }
 
@@ -484,7 +485,7 @@ function submitAddTime() {
   const start = timeToDate(openDay.value, addStart.value);
   const end = timeToDate(openDay.value, addEnd.value);
   if (!start || !end) {
-    addError.value = "Enter times as HH:MM.";
+    addError.value = "Enter times like 9:00 am (24-hour, e.g. 17:00, works too).";
     return;
   }
   if (end <= start) {
@@ -501,11 +502,11 @@ function submitAddTime() {
   openDay.value = null;
 }
 
-// "09:00" for the month-cell chip. Blank on a continuation day of a multi-day
-// entry — it doesn't start at 09:00 on day two, it's just still running.
+// "9:00 a.m." for the month-cell chip. Blank on a continuation day of a
+// multi-day entry — it doesn't start at 9 on day two, it's just still running.
 function startTimeOn(e: CalEntry, d: Date): string {
   if (!isSameDay(e.start, d)) return "";
-  return `${String(e.start.getHours()).padStart(2, "0")}:${String(e.start.getMinutes()).padStart(2, "0")}`;
+  return formatTimeOfDay(e.start, { compact: true });
 }
 </script>
 
@@ -574,7 +575,7 @@ function startTimeOn(e: CalEntry, d: Date): string {
           :key="block.start + block.end"
           class="mb-1 rounded bg-[color:var(--bs-info-tint)] px-2 py-1 text-xs text-[color:var(--bs-info-text)]"
         >
-          {{ block.start }} – {{ block.end }}
+          {{ formatTimeOfDay(block.start) }} – {{ formatTimeOfDay(block.end) }}
         </div>
         <article
           v-for="b in blocksForDay(d)"
@@ -729,7 +730,7 @@ function startTimeOn(e: CalEntry, d: Date): string {
             v-for="(b, i) in openDayAvailability"
             :key="b.start + b.end"
             class="font-medium text-[color:var(--bs-text)]"
-            >{{ i ? ", " : " " }}{{ b.start }}–{{ b.end }}</span
+            >{{ i ? ", " : " " }}{{ formatTimeOfDay(b.start) }}–{{ formatTimeOfDay(b.end) }}</span
           >
         </template>
         <template v-else>Not a working day.</template>
@@ -738,13 +739,14 @@ function startTimeOn(e: CalEntry, d: Date): string {
       <!-- Hour rail. Each row is one hour; job blocks are absolutely placed
            over it so a 09:30–11:00 job reads as an hour and a half. -->
       <div class="flex max-h-[55vh] overflow-y-auto">
-        <div class="w-12 shrink-0">
+        <!-- w-16: "12 p.m." needs more rail than the old "12:00" did. -->
+        <div class="w-16 shrink-0">
           <div
             v-for="h in dayHours"
             :key="h"
-            class="h-[44px] pr-2 text-right text-[10px] text-[color:var(--bs-muted)]"
+            class="h-[44px] whitespace-nowrap pr-2 text-right text-[10px] text-[color:var(--bs-muted)]"
           >
-            {{ String(h).padStart(2, "0") }}:00
+            {{ hourLabel(h) }}
           </div>
         </div>
         <div class="relative flex-1 border-l border-[color:var(--bs-border)]">
@@ -832,11 +834,11 @@ function startTimeOn(e: CalEntry, d: Date): string {
       <div class="mt-3 grid grid-cols-2 gap-2">
         <div>
           <label class="mb-1 block text-xs font-medium">Start</label>
-          <InputText v-model="addStart" placeholder="09:00" maxlength="5" class="w-full" />
+          <InputText v-model="addStart" placeholder="9:00 am" maxlength="10" class="w-full" />
         </div>
         <div>
           <label class="mb-1 block text-xs font-medium">End</label>
-          <InputText v-model="addEnd" placeholder="12:00" maxlength="5" class="w-full" />
+          <InputText v-model="addEnd" placeholder="12:00 pm" maxlength="10" class="w-full" />
         </div>
       </div>
 
