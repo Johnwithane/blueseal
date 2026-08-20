@@ -154,6 +154,12 @@ jobs:
                 echo "targets=functions" >> "$GITHUB_OUTPUT"; exit 0;;
               functions/src/index.ts)
                 INDEX_CHANGED=1; continue;;
+              # Test-only sources deploy nothing. .test.ts files were already
+              # skipped, but their non-.test helpers (test/helpers/*) fell
+              # through to the "no index.ts export" fallback and forced a FULL
+              # ~200-function deploy — the exact quota trip this step exists to
+              # avoid — just for touching a unit-test double.
+              functions/test/*) continue;;
               *.test.ts) continue;;
               *.ts) ;;
               *) continue;;

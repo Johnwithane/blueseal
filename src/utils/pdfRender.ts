@@ -190,6 +190,121 @@ function inferImageFormat(dataUrl: string): string {
   return fmt === "JPG" ? "JPEG" : fmt;
 }
 
+// ---- Image resampling (keeps the PDF small) ----
+//
+// jsPDF embeds whatever pixels you hand it. An RGBA PNG can't go into a PDF
+// as-is, so it gets expanded into a raw RGB stream plus a separate alpha
+// SMask — for the 6250x1718 Blue Seal lockup that's ~43 MB of image data on a
+// one-page invoice. Two things keep that in check:
+//   1. `compress: true` on the jsPDF instance (Flate-encodes every stream),
+//   2. resampling each image down to the box it's actually drawn in, below.
+// (1) alone got a real invoice from 41 MB to 0.2 MB; (2) matters for the
+// tradesperson-uploaded logo/banner, where a phone-camera JPEG stays big even
+// Flate-compressed because photos don't compress losslessly.
+
+// Draw boxes, in points, shared by the resampler and the header renderer so
+// the two can't drift. 72pt = 1in.
+const BANNER_H = 70; // full-width Pro letterhead band
+const TRADIE_LOGO_PT = 38; // square logo slot in the brand band
+const LOCKUP_H = 34; // Blue Seal horizontal lockup height
+
+// Pixels per point to resample to. 3 → 216 DPI, comfortably past what any
+// printer resolves for a logo and ~1/400th of the pixels in the source asset.
+const PDF_IMAGE_DPI_SCALE = 3;
+
+// JPEG quality for opaque images. 0.82 is visually lossless at these sizes.
+const PDF_JPEG_QUALITY = 0.82;
+
+function loadImageElement(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Image failed to decode"));
+    img.src = src;
+  });
+}
+
+// True when every pixel is fully opaque — i.e. safe to re-encode as JPEG,
+// which has no alpha channel. A tainted canvas throws; treat that as "has
+// alpha" so we keep PNG rather than silently flattening transparency to black.
+function isFullyOpaque(ctx: CanvasRenderingContext2D, w: number, h: number): boolean {
+  try {
+    const { data } = ctx.getImageData(0, 0, w, h);
+    for (let i = 3; i < data.length; i += 4) {
+      if (data[i] < 255) return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Resample a data URL down to the `boxWpt` x `boxHpt` box it will be drawn in
+ * (points), at PDF_IMAGE_DPI_SCALE pixels per point. Opaque images come back
+ * as JPEG; anything with transparency stays PNG so the brand band shows
+ * through.
+ *
+ * `fit` has to match how the caller draws it, or the resample throws away
+ * resolution the page still shows:
+ *   • "contain" — the draw box preserves the source aspect ratio (the Blue
+ *     Seal lockup, whose width is computed from getImageProperties).
+ *   • "stretch" — the image is drawn to fixed width AND height regardless of
+ *     its own aspect (the square tradie logo slot, the full-width banner). The
+ *     aspect ratio is already discarded at draw time, so each axis is capped
+ *     independently and the result is exactly the pixels the page renders.
+ *
+ * Never throws — on any failure the original data URL is returned unchanged,
+ * and `compress: true` still bounds the damage.
+ *
+ * Exported only so the opaque-vs-transparent decision is directly testable:
+ * getting it wrong flattens a transparent logo onto black, which nothing else
+ * in the render path would catch.
+ */
+export async function downscaleForPdf(
+  dataUrl: string,
+  boxWpt: number,
+  boxHpt: number,
+  fit: "contain" | "stretch" = "contain",
+): Promise<string> {
+  try {
+    const img = await loadImageElement(dataUrl);
+    const nw = img.naturalWidth;
+    const nh = img.naturalHeight;
+    if (!nw || !nh) return dataUrl;
+
+    const maxW = boxWpt * PDF_IMAGE_DPI_SCALE;
+    const maxH = boxHpt * PDF_IMAGE_DPI_SCALE;
+    let w: number;
+    let h: number;
+    if (fit === "stretch") {
+      w = Math.min(nw, Math.round(maxW));
+      h = Math.min(nh, Math.round(maxH));
+    } else {
+      const scale = Math.min(1, maxW / nw, maxH / nh);
+      w = Math.round(nw * scale);
+      h = Math.round(nh * scale);
+    }
+    // Only ever shrink — upscaling a small logo would add bytes for no pixels.
+    if (w >= nw && h >= nh) return dataUrl;
+    w = Math.max(1, w);
+    h = Math.max(1, h);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return dataUrl;
+    ctx.drawImage(img, 0, 0, w, h);
+
+    return isFullyOpaque(ctx, w, h)
+      ? canvas.toDataURL("image/jpeg", PDF_JPEG_QUALITY)
+      : canvas.toDataURL("image/png");
+  } catch {
+    return dataUrl;
+  }
+}
+
 async function renderPdf(
   summary: DocSummary,
   party: PartyInfo,
@@ -202,14 +317,13 @@ async function renderPdf(
   // unset or the fetch fails.
   const tradieLogoUrl = party.tradesperson.companyLogoUrl;
   const bannerUrl = party.tradesperson.bannerUrl ?? null;
-  const [{ jsPDF }, autoTableMod, brandLockupDataUrl, tradieLogoDataUrl, bannerDataUrl] =
-    await Promise.all([
-      import("jspdf"),
-      import("jspdf-autotable"),
-      loadBrandLockupDataUrl(),
-      tradieLogoUrl ? loadRemoteImageAsDataUrl(tradieLogoUrl) : Promise.resolve(null),
-      bannerUrl ? loadRemoteImageAsDataUrl(bannerUrl) : Promise.resolve(null),
-    ]);
+  const [{ jsPDF }, autoTableMod, rawLockup, rawTradieLogo, rawBanner] = await Promise.all([
+    import("jspdf"),
+    import("jspdf-autotable"),
+    loadBrandLockupDataUrl(),
+    tradieLogoUrl ? loadRemoteImageAsDataUrl(tradieLogoUrl) : Promise.resolve(null),
+    bannerUrl ? loadRemoteImageAsDataUrl(bannerUrl) : Promise.resolve(null),
+  ]);
   const autoTable = autoTableMod.default;
 
   // Branding palette (Pro). brandColor is null server-side for non-Pro, so the
@@ -222,9 +336,24 @@ async function renderPdf(
   const titleColor: [number, number, number] = onBandDark ? [255, 255, 255] : [73, 76, 79];
   const subtitleColor: [number, number, number] = onBandDark ? [219, 228, 242] : [102, 98, 87];
 
-  const doc = new jsPDF({ unit: "pt", format: "letter" });
+  // compress: true Flate-encodes the content + image streams. Without it a
+  // single branded invoice ships tens of megabytes of raw bitmap (see the
+  // resampling note above) — this is not an optimization, it's the fix.
+  const doc = new jsPDF({ unit: "pt", format: "letter", compress: true });
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 48;
+
+  // Resample each image to its draw box before it reaches addImage. Done here
+  // rather than at fetch time because the banner's box depends on pageWidth.
+  const [brandLockupDataUrl, tradieLogoDataUrl, bannerDataUrl] = await Promise.all([
+    rawLockup ? downscaleForPdf(rawLockup, pageWidth, LOCKUP_H) : null,
+    // Both of these are drawn to a fixed box regardless of their own aspect
+    // ratio (see the addImage calls below), hence "stretch".
+    rawTradieLogo
+      ? downscaleForPdf(rawTradieLogo, TRADIE_LOGO_PT, TRADIE_LOGO_PT, "stretch")
+      : null,
+    rawBanner ? downscaleForPdf(rawBanner, pageWidth, BANNER_H, "stretch") : null,
+  ]);
 
   // ============== HEADER ==============
   // Default: a Blue Seal navy band with the logo + wordmark. Pro branding
@@ -232,7 +361,7 @@ async function renderPdf(
   // becomes a full-width letterhead with a slim doc-number strip beneath it.
   let headerBottom: number;
   if (bannerDataUrl) {
-    const bannerH = 70;
+    const bannerH = BANNER_H;
     const stripH = 38;
     try {
       doc.addImage(bannerDataUrl, inferImageFormat(bannerDataUrl), 0, 0, pageWidth, bannerH);
@@ -277,7 +406,7 @@ async function renderPdf(
     // Platform attribution always stays in the footer.
     const usingTradieLogo = tradieLogoDataUrl != null;
     if (usingTradieLogo) {
-      const logoSize = 38;
+      const logoSize = TRADIE_LOGO_PT;
       const logoX = margin;
       const logoY = 24;
       let textXAfterLogo = margin;
@@ -309,7 +438,7 @@ async function renderPdf(
       // Official Blue Seal lockup, scaled to a fixed height and vertically
       // centred in the band. getImageProperties keeps the true aspect ratio
       // regardless of the asset's internal padding.
-      const lockupH = 34;
+      const lockupH = LOCKUP_H;
       try {
         const props = doc.getImageProperties(brandLockupDataUrl);
         const lockupW = props.height ? lockupH * (props.width / props.height) : lockupH * 4;

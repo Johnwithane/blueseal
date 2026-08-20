@@ -33,6 +33,12 @@ const Input = z.object({
   extraLineItems: z.array(LineItemSchema).max(20).default([]),
   discount: DiscountSchema.nullable().default(null),
   noteToClient: z.string().max(500).default(""),
+  // Opt out of the client-approval round-trip. A tradesperson running the job
+  // end-to-end themselves (offline client, cash/e-transfer, no interest in the
+  // approve-then-pay dance) can finalize the invoice on the spot: the job goes
+  // straight to awaiting_payment and markJobPaid closes it out. Jobs with no
+  // client at all already behave this way regardless of the flag.
+  skipClientApproval: z.boolean().default(false),
 });
 
 interface UpfrontFeeOnJob {
@@ -132,7 +138,10 @@ function computeTotals(
  *      same write batch — partial writes can't leave entries stamped as
  *      billed without the line existing.
  *   8. Sets the job to "awaiting_client_approval" and stamps
- *      clientApprovalRequestedAt.
+ *      clientApprovalRequestedAt — unless the approval round-trip is skipped
+ *      (no client attached, or the tradesperson chose to finish it
+ *      themselves), in which case the invoice is already "sent" and the job
+ *      goes straight to "awaiting_payment".
  *   9. Posts a chat system message + notifies the client (high priority —
  *      the client has to act before the invoice is formally sent).
  *
@@ -145,7 +154,7 @@ export const submitJobForApproval = onCall(CALLABLE_OPTS, async (req) => {
   const uid = requireRole(req, "tradesperson");
   const parsed = Input.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);
-  const { jobId, extraLineItems, discount, noteToClient } = parsed.data;
+  const { jobId, extraLineItems, discount, noteToClient, skipClientApproval } = parsed.data;
 
   const jobRef = db.doc(`jobs/${jobId}`);
   const invoiceRef = db.doc(`invoices/${jobId}`);
@@ -300,11 +309,16 @@ export const submitJobForApproval = onCall(CALLABLE_OPTS, async (req) => {
     );
   }
 
-  // Solo (bring-your-own-client, unclaimed): there is no client to approve,
-  // so the approval round-trip is meaningless — the job goes straight to
-  // awaiting_payment and the invoice is immediately "sent". The tradesperson
-  // collects offline and records payment via the existing markJobPaid.
+  // Two ways the approval round-trip gets skipped:
+  //   • solo — bring-your-own-client, unclaimed: there is no client to ask, so
+  //     asking is meaningless.
+  //   • skipClientApproval — the tradesperson chose "finish it myself" on the
+  //     wrap-up sheet even though a client is attached.
+  // Either way the invoice is immediately "sent" (not "draft") and the job
+  // goes straight to awaiting_payment, where the existing markJobPaid closes
+  // it out once the money lands.
   const solo = job.clientId === null;
+  const selfComplete = solo || skipClientApproval;
 
   // ---------- atomic write ----------
   const batch = db.batch();
@@ -343,7 +357,7 @@ export const submitJobForApproval = onCall(CALLABLE_OPTS, async (req) => {
       clientId: job.clientId,
       jobId,
       invoiceNumber,
-      status: solo ? "sent" : "draft",
+      status: selfComplete ? "sent" : "draft",
       lineItems: mergedLines,
       subtotal: totals.subtotal,
       discount,
@@ -353,7 +367,7 @@ export const submitJobForApproval = onCall(CALLABLE_OPTS, async (req) => {
       currency: "CAD",
       issuedAt: FieldValue.serverTimestamp(),
       dueAt: null,
-      sentAt: solo ? FieldValue.serverTimestamp() : null,
+      sentAt: selfComplete ? FieldValue.serverTimestamp() : null,
       viewedAt: null,
       paidAt: null,
       pdfUrl: null,
@@ -378,8 +392,9 @@ export const submitJobForApproval = onCall(CALLABLE_OPTS, async (req) => {
       // Refresh the credit on re-submits so a quote-side change before
       // approval propagates. No-op when nothing changed.
       upfrontFeeCredit,
-      // Solo re-submit: there's no clientApproveJob to flip draft → sent.
-      ...(solo && existingStatus === "draft"
+      // Self-complete re-submit: there's no clientApproveJob to flip
+      // draft → sent, so do it here.
+      ...(selfComplete && existingStatus === "draft"
         ? { status: "sent", sentAt: FieldValue.serverTimestamp() }
         : {}),
     });
@@ -389,8 +404,8 @@ export const submitJobForApproval = onCall(CALLABLE_OPTS, async (req) => {
   }
 
   batch.update(jobRef, {
-    status: solo ? "awaiting_payment" : "awaiting_client_approval",
-    clientApprovalRequestedAt: solo ? null : FieldValue.serverTimestamp(),
+    status: selfComplete ? "awaiting_payment" : "awaiting_client_approval",
+    clientApprovalRequestedAt: selfComplete ? null : FieldValue.serverTimestamp(),
     clientApprovedAt: null,
     // Clear any prior "changes requested" signal so the tradesperson-side
     // banner / "Update invoice" CTA disappears once the revised wrap-up
@@ -403,10 +418,12 @@ export const submitJobForApproval = onCall(CALLABLE_OPTS, async (req) => {
 
   // ---------- chat + notification (best-effort, post-commit) ----------
   const tradieName = tradie.displayName?.trim() || "The tradesperson";
-  const messageParts = solo
+  const messageParts = selfComplete
     ? [
         `${tradieName} finalized the invoice ($${(totals.total / 100).toFixed(2)}).`,
-        "Solo job — no client approval step. Record payment when you've been paid.",
+        solo
+          ? "Solo job — no client approval step. Record payment when you've been paid."
+          : "No approval step — the invoice is final and payable now.",
       ]
     : [
         `${tradieName} marked the work as done.`,
@@ -418,12 +435,17 @@ export const submitJobForApproval = onCall(CALLABLE_OPTS, async (req) => {
     await postSystemMessage(job.chatId, messageParts.join("\n"));
   }
 
-  if (!solo) {
+  // Gate on the client existing rather than on `solo`: a self-completed job
+  // WITH a client still owes them the news — their invoice is final and due,
+  // they just weren't asked to approve it first.
+  if (job.clientId) {
     await notify({
       userId: job.clientId,
       type: "invoice_sent",
       title: `${tradieName} finished the work`,
-      body: `Review the wrap-up and approve to receive the invoice ($${(totals.total / 100).toFixed(2)}).`,
+      body: selfComplete
+        ? `Your invoice is ready ($${(totals.total / 100).toFixed(2)}) — tap to view and pay.`
+        : `Review the wrap-up and approve to receive the invoice ($${(totals.total / 100).toFixed(2)}).`,
       link: `/jobs/${jobId}`,
       actorUid: uid,
       jobId,

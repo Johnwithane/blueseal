@@ -1,5 +1,6 @@
 // Send an invoice to the client: render + store the PDF, email it with an
-// in-app pay link, flip the invoice to "sent", and notify.
+// in-app pay link, flip the invoice to "sent", advance an in-progress job to
+// "awaiting_payment", and notify.
 //
 // NOTE: this no longer talks to Stripe. The PaymentIntent (and the Blue Seal
 // service-fee calculation) is created at PAY time by createInvoicePaymentIntent
@@ -32,6 +33,7 @@ import { enqueueMail } from "../lib/mail";
 import { brandedEmailHtml } from "../lib/emailTemplate";
 import { breakdownHtml } from "../lib/emailBreakdown";
 import { notify } from "../lib/notify";
+import { postSystemMessage } from "../lib/chatSystemMessage";
 import { sendInviteClientJobEmail } from "../jobs/inviteHelpers";
 
 const Input = z.object({ invoiceId: z.string().min(1) });
@@ -210,10 +212,17 @@ export const sendInvoice = onCall(CALLABLE_OPTS, async (req) => {
     );
   }
 
-  const [tradieUser, clientUser] = await Promise.all([
+  const jobRef = db.doc(`jobs/${inv.jobId}`);
+  const [tradieUser, clientUser, jobSnap] = await Promise.all([
     db.doc(`users/${inv.tradespersonId}`).get(),
     db.doc(`users/${inv.clientId}`).get(),
+    jobRef.get(),
   ]);
+  const job = (jobSnap.data() ?? {}) as {
+    status?: string;
+    chatId?: string | null;
+    clientInvite?: { emailLower?: string; clientName?: string; status?: string };
+  };
   const tradieName =
     (tradieUser.data() as { displayName?: string })?.displayName ?? "Tradesperson";
   const clientName =
@@ -228,7 +237,12 @@ export const sendInvoice = onCall(CALLABLE_OPTS, async (req) => {
     expires: Date.now() + 1000 * 60 * 60 * 24 * 30,
   });
 
-  await invRef.set(
+  // The invoice flip and the job's status move go in one batch: an invoice
+  // that says "sent" while the job still says "in progress" is exactly the
+  // stuck state this is fixing, so they must not be able to diverge.
+  const batch = db.batch();
+  batch.set(
+    invRef,
     {
       status: "sent",
       sentAt: FieldValue.serverTimestamp(),
@@ -252,6 +266,34 @@ export const sendInvoice = onCall(CALLABLE_OPTS, async (req) => {
     },
     { merge: true },
   );
+
+  // The bill is out, so the job is now waiting on money rather than on work.
+  // This is what makes closing the job out reachable at all for an invoice
+  // written by hand on the Invoice tab: createManualInvoice deliberately
+  // leaves the job in "in_progress", and markJobPaid only accepts
+  // "awaiting_payment" — so before this, a hand-written invoice could be sent
+  // and paid but the job could never be completed without dragging the client
+  // through the wrap-up/approval flow.
+  //
+  // Guarded on "in_progress" so the wrap-up paths (which set the status
+  // themselves) and a re-send from "overdue" never rewind the job.
+  const advancedJob = job.status === "in_progress";
+  if (advancedJob) batch.update(jobRef, { status: "awaiting_payment" });
+  await batch.commit();
+
+  // Chat line, post-commit + best-effort: onJobUpdated suppresses its generic
+  // "Status changed to Awaiting payment" for this transition in favour of this
+  // one, which carries the invoice number and amount.
+  if (advancedJob && job.chatId) {
+    try {
+      await postSystemMessage(
+        job.chatId,
+        `${tradieName} sent invoice ${inv.invoiceNumber} — ${fmtMoney(inv.total, inv.currency)} due.`,
+      );
+    } catch (err) {
+      logger.warn("sendInvoice: chat line skipped", { invoiceId, jobId: inv.jobId, err });
+    }
+  }
 
   // Itemized breakdown shared by both delivery paths below (the claimed-client
   // transactional email and the unclaimed-invite magic-link email).
@@ -312,12 +354,7 @@ export const sendInvoice = onCall(CALLABLE_OPTS, async (req) => {
     // the invoice's clientId, so the pay page + receipt then work normally.
     // Best-effort — the tradesperson can still mark the invoice paid offline.
     try {
-      const jobSnap = await db.doc(`jobs/${inv.jobId}`).get();
-      const invite = (
-        jobSnap.data() as
-          | { clientInvite?: { emailLower?: string; clientName?: string; status?: string } }
-          | undefined
-      )?.clientInvite;
+      const invite = job.clientInvite;
       if (invite?.status === "invited" && invite.emailLower) {
         const inviteClientName = invite.clientName?.trim() || "there";
         await sendInviteClientJobEmail({
