@@ -198,6 +198,9 @@ export { setRecurringPlanState } from "./clients/setRecurringPlanState";
 
 // Invoicing
 export { onJobCompleted } from "./invoicing/onJobCompleted";
+// Write an invoice from scratch on the Invoice tab — no quote, no clocked
+// hours, no wrap-up sheet. Drafts the doc; the editor does the rest.
+export { createManualInvoice } from "./invoicing/createManualInvoice";
 export { setInvoiceNumbering } from "./billing/setInvoiceNumbering";
 // sendInvoice no longer binds STRIPE_SECRET_KEY — the PaymentIntent moved to
 // pay time (createInvoicePaymentIntent below), so sending is just PDF + email.

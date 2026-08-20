@@ -1,15 +1,20 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import Button from "primevue/button";
 import QuoteCard from "@/components/QuoteCard.vue";
 import InvoiceEditor from "@/components/InvoiceEditor.vue";
 import ClientInvoiceCard from "@/components/ClientInvoiceCard.vue";
-import type { JobDoc, WithId } from "@/firebase/interfaces";
+import type { InvoiceStatus, JobDoc, WithId } from "@/firebase/interfaces";
 
-defineProps<{
+const props = defineProps<{
   job: WithId<JobDoc>;
   isClient: boolean;
   isTradie: boolean;
   invoiceId: string | null;
+  /** Status of the invoice at `invoiceId`; null when there isn't one. */
+  invoiceStatus: InvoiceStatus | null;
+  /** Parent is minting a blank draft (createManualInvoice in flight). */
+  creatingInvoice: boolean;
   // True only when the invoice was sent through the Stripe Connect
   // pipeline (clientSecret available). Drives the link to the in-app
   // /invoices/:id/pay flow (card payment). When false the client gets
@@ -30,6 +35,8 @@ const emit = defineEmits<{
   "revise-quote": [];
   /** Tradie wants the wrap-up sheet (Create / Update invoice). */
   "create-invoice": [];
+  /** Tradie wants a blank invoice to write themselves. */
+  "create-manual-invoice": [];
   /** Approve / request-changes / paid landed — parent reloads the job. */
   decided: [];
   paid: [];
@@ -46,6 +53,25 @@ const lockedStatuses = new Set<JobDoc["status"]>([
   "reviewed",
   "cancelled",
 ]);
+
+// The tradesperson can start an invoice from scratch whenever the job is still
+// live and doesn't have one. Same gate the createManualInvoice callable
+// enforces: past `lockedStatuses` the editor is read-only, so minting a draft
+// there would hand them something they could never fill in.
+const canStartInvoice = computed(
+  () => props.isTradie && !props.invoiceId && !lockedStatuses.has(props.job.status),
+);
+
+// A draft invoice is the tradesperson's private working copy. The client sees
+// it only once it's been put in front of them — the job submitted for approval,
+// or the invoice actually sent. Before manual invoices existed, a draft always
+// meant "awaiting the client's approval" so the card could render on the mere
+// existence of an invoice; now a tradesperson can be quietly drafting mid-job.
+const clientCanSeeInvoice = computed(
+  () =>
+    !!props.invoiceId &&
+    (props.invoiceStatus !== "draft" || props.job.status === "awaiting_client_approval"),
+);
 </script>
 
 <template>
@@ -75,6 +101,32 @@ const lockedStatuses = new Set<JobDoc["status"]>([
         :icon="job.clientChangesRequestedAt ? 'pi pi-pencil' : 'pi pi-receipt'"
         class="w-full"
         @click="emit('create-invoice')"
+      />
+    </div>
+
+    <!-- Tradie: write an invoice from scratch. Sits alongside the wrap-up card
+         above (which bills what the job already tracked) for the jobs that
+         never produced any of that — a callout with no quote, no clocked
+         hours, no receipts. Creates a blank draft; the editor below takes over
+         immediately, so this card only shows while there's no invoice yet. -->
+    <div v-if="canStartInvoice" class="bs-card p-3">
+      <h3 class="font-semibold text-sm mb-1 flex items-center gap-2">
+        <i class="pi pi-file-edit text-[color:var(--bs-blue)]"></i>
+        {{ job.status === "in_progress" ? "Or write one yourself" : "Write an invoice" }}
+      </h3>
+      <p class="text-xs text-[color:var(--bs-muted)] mb-3">
+        Start a blank invoice and fill in your own lines — no quote or tracked
+        time needed. It stays a private draft you can edit right here until you
+        send it.
+      </p>
+      <Button
+        label="New invoice"
+        icon="pi pi-plus"
+        outlined
+        class="w-full"
+        :loading="creatingInvoice"
+        :disabled="creatingInvoice"
+        @click="emit('create-manual-invoice')"
       />
     </div>
 
@@ -127,7 +179,7 @@ const lockedStatuses = new Set<JobDoc["status"]>([
     <!-- CLIENT invoice view — top of the tab, same format as the quote
          below it. Owns approve & pay / request changes / pay / receipt. -->
     <ClientInvoiceCard
-      v-if="isClient && invoiceId"
+      v-if="isClient && invoiceId && clientCanSeeInvoice"
       :job="job"
       :invoice-id="invoiceId"
       :invoice-payable="invoicePayable"
@@ -163,7 +215,7 @@ const lockedStatuses = new Set<JobDoc["status"]>([
 
     <!-- No-invoice empty state for the client, only pre-invoice. -->
     <div
-      v-if="!invoiceId && !isTradie && (job.status === 'requested' || job.status === 'in_progress')"
+      v-if="!isTradie && !clientCanSeeInvoice && (job.status === 'requested' || job.status === 'in_progress')"
       class="bs-empty"
     >
       <i class="pi pi-receipt text-2xl mb-2 block text-[color:var(--bs-muted)]"></i>

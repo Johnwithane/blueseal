@@ -12,7 +12,7 @@ import ManualTimeEntryDialog from "@/components/ManualTimeEntryDialog.vue";
 import AddExpenseDialog from "@/components/AddExpenseDialog.vue";
 import InvoiceBreakdown from "@/components/InvoiceBreakdown.vue";
 import { submitJobForApproval } from "@/firebase/services/jobs";
-import { recomputeTotals } from "@/firebase/services/invoices";
+import { getInvoiceByJobId, recomputeTotals } from "@/firebase/services/invoices";
 import { getQuoteByJobId } from "@/firebase/services/quotes";
 import { draftInvoiceNoteWithAi } from "@/firebase/services/aiDrafts";
 import { subscribeJobTimeEntries, entryBillable } from "@/firebase/services/timeEntries";
@@ -102,7 +102,7 @@ const EXTRA_PRESETS = [
 // HOURLY quote rows are always EXCLUDED: that labour is billed from clocked time
 // via the time-tracker rollup, so surfacing the quote's estimated hours would
 // invite billing the estimate instead of the hours actually worked. The panel
-// stays visible on every wizard step. See hydrateFromQuote.
+// stays visible on every wizard step. See hydrateSheet.
 interface QuoteRefRow {
   description: string;
   amountDollars: number;
@@ -240,10 +240,38 @@ function detach() {
   expensesUnsub = null;
   ticker = null;
 }
-async function hydrateFromQuote() {
+async function hydrateSheet() {
   loadingQuote.value = true;
   try {
-    const q = await getQuoteByJobId(props.jobId);
+    const [inv, q] = await Promise.all([
+      getInvoiceByJobId(props.jobId),
+      getQuoteByJobId(props.jobId),
+    ]);
+
+    // Re-supply the invoice's FREE-FORM lines (no `id` — hand-written in the
+    // editor, started as a manual invoice, or added on a previous wrap-up) as
+    // editable extra rows. submitJobForApproval keeps only id-bearing rows
+    // (pulled time / expenses / change orders) and rebuilds the rest from what
+    // this sheet sends, so anything not re-supplied here is DROPPED from the
+    // invoice. That contract only held while the sheet was the sole author of
+    // free-form lines; a manually written invoice would otherwise lose every
+    // line the moment the tradesperson wrapped the job up.
+    const freeform = (inv?.lineItems ?? []).filter((li) => !li.id);
+    extraRows.value = freeform.map((li) => ({
+      description: li.description ?? "",
+      unitPriceDollars: ((li.quantity ?? 1) * (li.unitPrice ?? 0)) / 100,
+      taxRate: li.taxRate ?? 0,
+    }));
+    // The invoice's own discount is the live truth once one exists — carry it
+    // in so a re-submit doesn't silently drop it (the callable overwrites
+    // `discount` with whatever this sheet sends).
+    if (inv?.discount) {
+      discountMode.value = inv.discount.type;
+      discountValue.value =
+        inv.discount.type === "fixed" ? inv.discount.value / 100 : inv.discount.value;
+      discountLabel.value = inv.discount.label ?? "";
+    }
+
     if (!q?.lineItems?.length) {
       quoteRefRows.value = [];
       return;
@@ -251,7 +279,10 @@ async function hydrateFromQuote() {
     // Fixed-price job: the agreed quote IS the bill, so pre-add its rows. Hourly
     // job: keep them an opt-in reference (added only when tapped) — that labour
     // bills from clocked time, so auto-adding the estimate would double-charge.
-    const preAdd = props.billingType === "fixed";
+    // Skip the pre-add entirely when the invoice already carries free-form
+    // lines: those came back as extra rows above (on a fixed job they ARE the
+    // quote rows from the last submit), so pre-adding would bill them twice.
+    const preAdd = props.billingType === "fixed" && freeform.length === 0;
     // Skip hourly rows — they're billed from clocked time (the Time section
     // above / the server's time rollup), NOT the quote's estimate. Surfacing
     // them here would invite billing quoted hours and ignoring the tracked ones.
@@ -302,7 +333,7 @@ watch(
       noteToClient.value = "";
       wizardStep.value = 0;
       attach();
-      void hydrateFromQuote();
+      void hydrateSheet();
     } else {
       detach();
     }

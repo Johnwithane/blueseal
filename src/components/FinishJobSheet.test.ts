@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { beforeEach, describe, it, expect, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import FinishJobSheet from "./FinishJobSheet.vue";
 import type { JobExtraDoc, WithId } from "@/firebase/interfaces";
@@ -39,6 +39,15 @@ vi.mock("@/firebase/services/quotes", () => ({
   getQuoteByJobId: (id: string) => getQuoteByJobId(id),
 }));
 
+// The sheet re-reads the live invoice so it can re-supply its free-form lines
+// (see hydrateFromQuote). recomputeTotals is real math the preview depends on —
+// keep it, stub only the network read.
+const getInvoiceByJobId = vi.fn();
+vi.mock("@/firebase/services/invoices", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/firebase/services/invoices")>()),
+  getInvoiceByJobId: (id: string) => getInvoiceByJobId(id),
+}));
+
 const STUBS = {
   // Dialog renders its slots only when visible — mirrors PrimeVue's lazy body.
   Dialog: {
@@ -76,6 +85,13 @@ function mountSheet(visible = false, billingType: "fixed" | "hourly" = "fixed") 
 }
 
 describe("FinishJobSheet", () => {
+  beforeEach(() => {
+    getQuoteByJobId.mockReset();
+    getInvoiceByJobId.mockReset();
+    getQuoteByJobId.mockResolvedValue(null);
+    getInvoiceByJobId.mockResolvedValue(null);
+  });
+
   // Regression: FINISH_STEPS reads costTrackingOnly, and watch(FINISH_STEPS)
   // evaluates its source eagerly during setup. When costTrackingOnly was
   // declared ~200 lines later, that eager eval hit the temporal dead zone
@@ -179,5 +195,77 @@ describe("FinishJobSheet", () => {
     expect(w.text()).toContain("Add something to bill first");
     await w.find(".finish-sheet-quote-add").trigger("click");
     expect(w.text()).toContain("Send for approval");
+  });
+
+  // submitJobForApproval keeps only id-bearing lines (pulled time / expenses)
+  // and rebuilds the rest from this sheet's extraLineItems. A manually written
+  // invoice is ALL free-form lines, so without re-supplying them here, wrapping
+  // the job up wiped the invoice the tradesperson had just written.
+  it("re-supplies the invoice's hand-written lines so the wrap-up can't wipe them", async () => {
+    getInvoiceByJobId.mockResolvedValueOnce({
+      id: "job1",
+      lineItems: [
+        { description: "Emergency callout", quantity: 1, unitPrice: 12500, taxRate: 0 },
+        // id-bearing: pulled from a time entry, preserved server-side — the
+        // sheet must NOT re-supply it or it would be billed twice.
+        { id: "t1", description: "On-site labour", quantity: 2, unitPrice: 8000, taxRate: 0 },
+      ],
+      discount: null,
+    });
+    const w = mountSheet(false);
+    await w.setProps({ visible: true });
+    await flushPromises();
+
+    const skip = w.findAll("button").find((b) => b.text().includes("Skip"));
+    await skip!.trigger("click");
+    // Rows render into stubbed inputs, so assert on the preview total: the
+    // $125 free-form line is re-supplied, and the $160 id-bearing row is NOT
+    // (the server carries that one — re-supplying would bill it twice).
+    expect(w.text()).toContain("Send for approval");
+    expect(w.text()).toContain("$125.00");
+    expect(w.text()).not.toContain("$285.00");
+  });
+
+  it("carries an existing invoice discount into the wrap-up", async () => {
+    getInvoiceByJobId.mockResolvedValueOnce({
+      id: "job1",
+      lineItems: [{ description: "Emergency callout", quantity: 1, unitPrice: 12500, taxRate: 0 }],
+      discount: { type: "fixed", value: 2500, label: "Goodwill" },
+    });
+    const w = mountSheet(false);
+    await w.setProps({ visible: true });
+    await flushPromises();
+
+    const skip = w.findAll("button").find((b) => b.text().includes("Skip"));
+    await skip!.trigger("click");
+    // $125 − $25 = $100. Without the carry-over the callable would overwrite
+    // the invoice's discount with null and re-bill the full $125.
+    expect(w.text()).toContain("$100.00");
+  });
+
+  // Regression guard on the pre-add interaction: on a fixed job the quote rows
+  // land on the invoice as free-form lines at the first submit. On a re-submit
+  // they come back as extra rows, so pre-adding them again would double the bill.
+  it("doesn't re-add quote rows that are already on the invoice", async () => {
+    getQuoteByJobId.mockResolvedValueOnce({
+      id: "q1",
+      lineItems: [
+        { kind: "materials", description: "Install mixer", quantity: 1, unitPrice: 18000, taxRate: 0 },
+      ],
+    });
+    getInvoiceByJobId.mockResolvedValueOnce({
+      id: "job1",
+      lineItems: [{ description: "Install mixer", quantity: 1, unitPrice: 18000, taxRate: 0 }],
+      discount: null,
+    });
+    const w = mountSheet(false);
+    await w.setProps({ visible: true });
+    await flushPromises();
+
+    const skip = w.findAll("button").find((b) => b.text().includes("Skip"));
+    await skip!.trigger("click");
+    // $180 once, not $360.
+    expect(w.text()).toContain("$180.00");
+    expect(w.text()).not.toContain("$360.00");
   });
 });
