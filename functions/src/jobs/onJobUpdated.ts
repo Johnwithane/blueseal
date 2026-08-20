@@ -38,6 +38,10 @@ function isApprovalFlowTransition(before: string | undefined, after: string | un
   const pair = `${before}->${after}`;
   return (
     pair === "in_progress->awaiting_client_approval" ||
+    // Straight to awaiting_payment: either sendInvoice (hand-written invoice
+    // put in front of the client) or submitJobForApproval with the approval
+    // round-trip skipped. Both post their own line with the invoice + total.
+    pair === "in_progress->awaiting_payment" ||
     pair === "awaiting_client_approval->awaiting_payment" ||
     pair === "awaiting_client_approval->in_progress" ||
     pair === "awaiting_payment->complete" ||

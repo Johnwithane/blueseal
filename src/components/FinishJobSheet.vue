@@ -5,6 +5,7 @@ import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import NumberField from "@/components/NumberField.vue";
 import Textarea from "primevue/textarea";
+import Checkbox from "primevue/checkbox";
 import SelectButton from "primevue/selectbutton";
 import Message from "primevue/message";
 import Tag from "primevue/tag";
@@ -134,6 +135,14 @@ const discountModeOptions = [
 ];
 
 const noteToClient = ref("");
+
+// Opt out of the client-approval round-trip. Only meaningful when a client is
+// actually attached — a job with clientId === null has no one to approve and
+// the server treats it as self-completed regardless.
+const skipClientApproval = ref(false);
+const hasClient = computed(() => props.clientId !== null);
+// What actually happens on submit, from the tradesperson's point of view.
+const selfCompleting = computed(() => !hasClient.value || skipClientApproval.value);
 
 const submitting = ref(false);
 
@@ -331,6 +340,7 @@ watch(
       discountValue.value = 0;
       discountLabel.value = "";
       noteToClient.value = "";
+      skipClientApproval.value = false;
       wizardStep.value = 0;
       attach();
       void hydrateSheet();
@@ -638,13 +648,15 @@ async function onSubmit() {
       extraLineItems,
       discount: discountForCallable.value,
       noteToClient: noteToClient.value.trim(),
+      skipClientApproval: skipClientApproval.value,
     });
-    if (props.clientId === null) {
-      // Solo (bring-your-own-client): no approval round-trip — the invoice is
+    if (selfCompleting.value) {
+      // No approval round-trip — either there's no client to ask (solo,
+      // bring-your-own-client) or the tradesperson opted out. The invoice is
       // final immediately and the job is awaiting payment.
       toast.success(
         "Invoice finalized",
-        "The job is awaiting payment — record it once your client pays.",
+        "The job is awaiting payment — record it once you've been paid.",
       );
     } else {
       toast.success(
@@ -958,6 +970,41 @@ function close() {
         />
       </section>
 
+      <!-- Close the job out yourself. Default is the approval round-trip (the
+           client sees the wrap-up, approves, then the invoice is sent) — but a
+           tradesperson running the job end-to-end, collecting cash or
+           e-transfer, has no use for it and would otherwise be stuck waiting on
+           a client who is never going to tap anything. Ticking this finalizes
+           the invoice on the spot and drops the job into Awaiting payment,
+           where "Mark as paid" closes it out. The client is still told the
+           invoice is ready — they just aren't asked to approve it first.
+           Hidden with no client attached: that job is already self-completed. -->
+      <section
+        v-if="hasClient"
+        v-show="stepShown('wrapup')"
+        class="rounded-lg border border-[color:var(--bs-border)] p-3"
+      >
+        <label class="flex items-start gap-2 cursor-pointer">
+          <Checkbox v-model="skipClientApproval" binary input-id="finish-skip-approval" />
+          <span class="text-sm leading-snug">
+            <span class="font-semibold">Finish without client approval</span>
+            <span class="block text-xs text-[color:var(--bs-muted)] mt-0.5">
+              I'm running this one myself. Finalize the invoice now and move the
+              job straight to Awaiting payment, so I can mark it paid when the
+              money lands.
+            </span>
+          </span>
+        </label>
+        <p
+          v-if="skipClientApproval"
+          class="text-[11px] text-[color:var(--bs-muted)] mt-2 leading-snug"
+        >
+          Your client still gets the invoice and can pay it online — they just
+          won't be asked to approve the wrap-up first. Line items lock once you
+          finalize.
+        </p>
+      </section>
+
       <!-- The accepted quote — an ever-present panel, NOT a wizard step, so it
            stays visible on every step. On a fixed-price job its rows are
            pre-added (the agreed price is the bill); on an hourly job they're an
@@ -1137,7 +1184,7 @@ function close() {
             belowUpfrontFloor
               ? `Must cover the ${money(upfrontCredit)} upfront`
               : totals.total > 0
-                ? `${props.clientId === null ? 'Finalize invoice' : 'Send for approval'} — ${money(totals.total)}`
+                ? `${selfCompleting ? 'Finalize invoice' : 'Send for approval'} — ${money(totals.total)}`
                 : 'Add something to bill first'
           "
           icon="pi pi-send"
@@ -1180,7 +1227,12 @@ function close() {
     :style="{ width: '34rem', maxWidth: '94vw' }"
   >
     <p class="text-xs text-[color:var(--bs-muted)] mb-3">
-      This is exactly what your client will see when you send the invoice for approval.
+      <template v-if="selfCompleting">
+        This is exactly what your client will see on the finalized invoice.
+      </template>
+      <template v-else>
+        This is exactly what your client will see when you send the invoice for approval.
+      </template>
     </p>
     <InvoiceBreakdown :invoice="previewInvoice" />
     <div

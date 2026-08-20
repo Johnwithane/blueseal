@@ -1,7 +1,9 @@
 // Tiny in-memory Firestore double for unit-testing callables. Supports the
 // subset the callables actually use: db.doc(path).{get,set,update}, snapshot
-// .exists/.id/.data()/.ref, and db.runTransaction(tx => …) with
-// tx.{get,set,update,delete}. Server-timestamp / FieldValue sentinels are stored
+// .exists/.id/.data()/.ref, db.runTransaction(tx => …) with
+// tx.{get,set,update,delete}, db.batch() with batch.{set,update,delete,commit},
+// and collection(path).{add,doc,get} (including subcollections via
+// docRef.collection(name)). Server-timestamp / FieldValue sentinels are stored
 // verbatim (the firebase-admin/firestore mock returns string sentinels), so
 // assertions can check `update.field === "__serverTimestamp__"`.
 
@@ -12,6 +14,18 @@ export interface FakeSnap {
   id: string;
   ref: FakeDocRef;
   data(): Data | undefined;
+}
+
+export interface FakeQuerySnap {
+  docs: FakeSnap[];
+  empty: boolean;
+  size: number;
+}
+
+export interface FakeCollectionRef {
+  add(data: Data): Promise<{ id: string }>;
+  doc(id: string): FakeDocRef;
+  get(): Promise<FakeQuerySnap>;
 }
 
 function makeSnap(ref: FakeDocRef, raw: Data | undefined): FakeSnap {
@@ -77,6 +91,41 @@ export class FakeDocRef {
 
   async delete(): Promise<void> {
     this.fs._delete(this.path);
+  }
+
+  // Subcollection: jobs/{id}/timeEntries etc. Same ref type as a root
+  // collection — the store is flat and keyed by full path.
+  collection(name: string): FakeCollectionRef {
+    return this.fs.collection(`${this.path}/${name}`);
+  }
+}
+
+// A WriteBatch: queued ops applied on commit(). Same semantics as
+// FakeTransaction minus the reads.
+export class FakeBatch {
+  private readonly ops: Array<() => void> = [];
+  constructor(private readonly fs: FakeFirestore) {}
+
+  set(ref: FakeDocRef, data: Data, opts?: { merge?: boolean }): FakeBatch {
+    this.ops.push(() => {
+      const prev = this.fs._read(ref.path);
+      this.fs._write(ref.path, opts?.merge && prev ? { ...prev, ...data } : { ...data });
+    });
+    return this;
+  }
+  update(ref: FakeDocRef, data: Data): FakeBatch {
+    this.ops.push(() => {
+      const prev = this.fs._read(ref.path) ?? {};
+      this.fs._write(ref.path, applyUpdate(prev, data));
+    });
+    return this;
+  }
+  delete(ref: FakeDocRef): FakeBatch {
+    this.ops.push(() => this.fs._delete(ref.path));
+    return this;
+  }
+  async commit(): Promise<void> {
+    this.ops.forEach((op) => op());
   }
 }
 
@@ -148,10 +197,10 @@ export class FakeFirestore {
     return new FakeDocRef(this, path);
   }
 
-  // Minimal collection ref — enough for callables that do
-  // collection(path).add(data) (audit/mail/aiUsage/replies). Auto-ids are
-  // sequential so tests can assert deterministically.
-  collection(path: string): { add: (data: Data) => Promise<{ id: string }> } {
+  // Collection ref — add() for the write-only callers (audit/mail/aiUsage/
+  // replies; auto-ids are sequential so tests can assert deterministically),
+  // plus doc()/get() for the ones that read a subcollection back.
+  collection(path: string): FakeCollectionRef {
     return {
       add: async (data: Data) => {
         this.seq += 1;
@@ -159,7 +208,23 @@ export class FakeFirestore {
         this.store.set(`${path}/${id}`, { ...data });
         return { id };
       },
+      doc: (id: string) => this.doc(`${path}/${id}`),
+      // Direct children only — a nested subcollection under one of these docs
+      // is a different collection, same as real Firestore.
+      get: async () => {
+        const docs: FakeSnap[] = [];
+        for (const [key, raw] of this.store) {
+          if (!key.startsWith(`${path}/`)) continue;
+          if (key.slice(path.length + 1).includes("/")) continue;
+          docs.push(makeSnap(this.doc(key), raw));
+        }
+        return { docs, empty: docs.length === 0, size: docs.length };
+      },
     };
+  }
+
+  batch(): FakeBatch {
+    return new FakeBatch(this);
   }
 
   async runTransaction<T>(fn: (tx: FakeTransaction) => Promise<T>): Promise<T> {

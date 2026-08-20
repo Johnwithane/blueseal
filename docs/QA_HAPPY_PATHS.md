@@ -497,7 +497,10 @@ the wrap-up sheet.
    land back on the same draft.
 6. **Send** it (needs Stripe payouts set up — see 6.2). As the **Client**, reload
    the job. **Expected:** the invoice is now visible on the Invoice tab, payable
-   by card, with the same lines you typed.
+   by card, with the same lines you typed. Back on the tradesperson side the job
+   has moved to **Awaiting payment** (kanban column too), the chat carries a
+   *"sent invoice INV-… — $X due"* line, and the **Mark as paid** card is now
+   showing. Before this it stayed **In progress** with no way to close it out.
 7. **The wipe check.** On a *different* in-progress job, write two lines by hand
    in the Invoice tab, **Save**, then open the wrap-up sheet (**Create invoice**
    → *Finished the work?*). **Expected:** your hand-written lines are already
@@ -506,6 +509,65 @@ the wrap-up sheet.
    the approved total the client sees includes both lines exactly once.
 8. Mobile (375px): the create card, the editor's line-item table (scrolls
    horizontally) and the totals are all reachable and tappable.
+
+---
+
+### 6.7 Close a job out without the client → help: `quotes-and-invoices`
+
+The seam: a tradesperson running a job end-to-end must be able to reach
+**Complete** on their own. Previously a job with a client attached could only
+leave `awaiting_client_approval` when the client tapped approve, and
+`markJobPaid` only accepts `awaiting_payment` — so a client who never logs in
+left the job stuck forever.
+
+1. As the **Tradesperson**, on an in-progress job **with a claimed client**,
+   open the wrap-up sheet (**Create invoice** → *Finished the work?*) and go to
+   the **wrap-up** step. **Expected:** a **"Finish without client approval"**
+   tick-box under the note field, **off** by default, and the submit button
+   reads **Send for approval — $X**.
+2. Tick it. **Expected:** the button changes to **Finalize invoice — $X**, and
+   a line appears explaining the client still gets the invoice.
+3. Submit. **Expected:** the job goes straight to **Awaiting payment** (not
+   *Awaiting client approval*), the invoice is **sent** (not draft), and the
+   **Mark as paid** card is showing. The chat carries one line only — *"…
+   finalized the invoice"*, **not** a duplicate *"Status changed to Awaiting
+   payment"*.
+4. **As the Client** on that job: **Expected:** they were still notified and can
+   still view + pay the invoice — they were simply never asked to approve the
+   wrap-up. There's no approve / request-changes banner.
+5. Back as the tradesperson, tap **Mark as paid**. **Expected:** invoice →
+   **paid**, job → **Complete**, review prompt appears. The loop closed with no
+   client action at any point.
+6. **The control.** Repeat on another job leaving the box **unticked**.
+   **Expected:** unchanged behaviour — `awaiting_client_approval`, draft
+   invoice, client sees the approve banner.
+7. On a **solo job (no client)**: **Expected:** the tick-box isn't shown at all
+   (there's nobody to approve) and the button already reads **Finalize
+   invoice**.
+8. Mobile (375px): the tick-box, its explanation and the submit button all fit
+   without horizontal scroll.
+
+---
+
+### 6.8 Invoice / quote PDF file size → help: `quotes-and-invoices`
+
+A branded invoice PDF was shipping at ~45 MB: the Blue Seal lockup is a
+6250x1718 RGBA PNG, jsPDF expands RGBA into a raw RGB stream plus an alpha
+mask, and no stream compression was on. Unusable over email or a phone
+connection, so it needs a size check, not just an eyeball check.
+
+1. As the **Tradesperson**, on any job with an invoice, tap **View PDF**
+   (desktop) or **Download PDF** (mobile). Save the file.
+2. **Expected:** the file is **well under 1 MB** (a typical one-page invoice
+   lands in the low hundreds of KB). Anything in the tens of MB is the bug.
+3. Open it. **Expected:** the navy header band shows the Blue Seal lockup
+   crisply, with **no black box** behind it — the logo's transparency survived.
+   Text is sharp at 200% zoom.
+4. Repeat on a **quote** PDF (same renderer) and on a **Blue Seal Pro** account
+   with a **custom logo, brand colour and letterhead banner** set. **Expected:**
+   same size ceiling and same crispness, and a photo-heavy banner does **not**
+   blow the file up.
+5. Mobile (375px): the download lands in the OS viewer and opens.
 
 ---
 

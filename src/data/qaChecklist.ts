@@ -626,7 +626,32 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
               "On a separate in-progress job: hand-write two lines, Save, then open the wrap-up sheet (Create invoice → Finished the work?) and send for approval.",
             ],
             expected:
-              "New invoice mints a draft with the next number in your sequence and a $0 starter line, editable immediately, with NO job status change. Lines, tax and discount persist across a reload. The CLIENT sees nothing while it's a draft — the tab still reads 'No invoice yet', with no notification or email; a draft is the tradesperson's private copy. Tapping New invoice again returns the SAME draft and burns no second invoice number. Once sent, the client sees and can pay it. Crucially, the wrap-up sheet pre-loads the hand-written lines as Extras & charges rows (and carries the invoice's discount), so submitting for approval bills each line exactly once instead of silently wiping them. Mobile 375px: the create card + line-item table are reachable.",
+              "New invoice mints a draft with the next number in your sequence and a $0 starter line, editable immediately, with NO job status change. Lines, tax and discount persist across a reload. The CLIENT sees nothing while it's a draft — the tab still reads 'No invoice yet', with no notification or email; a draft is the tradesperson's private copy. Tapping New invoice again returns the SAME draft and burns no second invoice number. Once sent, the client sees and can pay it AND the job moves to Awaiting payment with a 'sent invoice INV-… — $X due' chat line, so Mark as paid is reachable (it used to stay In progress with no way to close the job out). Crucially, the wrap-up sheet pre-loads the hand-written lines as Extras & charges rows (and carries the invoice's discount), so submitting for approval bills each line exactly once instead of silently wiping them. Mobile 375px: the create card + line-item table are reachable.",
+          },
+          {
+            id: "tradie-self-complete-job",
+            title: "Close a job out without the client (skip the approval round-trip)",
+            steps: [
+              "On an in-progress job WITH a claimed client, open the wrap-up sheet (Create invoice → Finished the work?) and reach the wrap-up step.",
+              "Tick 'Finish without client approval' and watch the submit button, then submit.",
+              "Check the job status, the invoice status and the job chat.",
+              "As the CLIENT on that job, check for a notification and whether the invoice is payable.",
+              "Back as the tradesperson, tap Mark as paid.",
+              "Repeat on another job with the box left UNTICKED (the control), and open the sheet once on a solo job with no client.",
+            ],
+            expected:
+              "The tick-box sits under the note field and is OFF by default, with the button reading 'Send for approval — $X'; ticking it flips the button to 'Finalize invoice — $X'. Submitting sends the job STRAIGHT to Awaiting payment (not Awaiting client approval), leaves the invoice 'sent' (not draft), and shows the Mark as paid card. The chat has ONE line ('… finalized the invoice'), not a duplicate 'Status changed to Awaiting payment'. The client is STILL notified and can still view + pay — they just get no approve / request-changes banner. Mark as paid then closes the loop (invoice paid, job Complete, review prompt) with zero client action. The control job is unchanged: awaiting_client_approval + draft invoice + approve banner. On a solo job the tick-box is absent entirely and the button already reads Finalize invoice. Mobile 375px: tick-box, explainer and button fit.",
+          },
+          {
+            id: "tradie-invoice-pdf-size",
+            title: "Invoice / quote PDF downloads small and keeps its transparency",
+            steps: [
+              "On a job with an invoice, tap View PDF (desktop) or Download PDF (mobile) and save the file.",
+              "Check the file size on disk, then open it and zoom to 200%.",
+              "Repeat on a quote PDF, and on a Pro account with a custom logo, brand colour and letterhead banner set.",
+            ],
+            expected:
+              "The file is well under 1 MB (a one-page invoice lands in the low hundreds of KB) — tens of MB is the bug this guards: the Blue Seal lockup is a 6250x1718 RGBA PNG and jsPDF was embedding it raw and uncompressed. The navy band shows the lockup crisply with NO black box behind it (transparency survived the re-encode), and text stays sharp at 200%. A photo-heavy Pro banner does not blow the size up. Mobile 375px: the download opens in the OS viewer.",
           },
           {
             id: "tradie-get-paid",

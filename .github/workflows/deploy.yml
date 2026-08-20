@@ -139,6 +139,12 @@ jobs:
               firebase.json|functions/package.json|functions/package-lock.json|functions/tsconfig.json|functions/src/index.ts|functions/src/lib/*)
                 echo "shared: $f — full deploy"
                 echo "targets=functions" >> "$GITHUB_OUTPUT"; exit 0;;
+              # Test-only sources deploy nothing. .test.ts files were already
+              # skipped, but their non-.test helpers (test/helpers/*) fell
+              # through to the "no index.ts export" fallback and forced a FULL
+              # ~190-function deploy — the exact quota trip this step exists to
+              # avoid — just for touching a unit-test double.
+              functions/test/*) continue;;
               *.test.ts) continue;;
               *.ts) ;;
               *) continue;;

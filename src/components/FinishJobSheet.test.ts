@@ -48,6 +48,11 @@ vi.mock("@/firebase/services/invoices", async (importOriginal) => ({
   getInvoiceByJobId: (id: string) => getInvoiceByJobId(id),
 }));
 
+const submitJobForApproval = vi.fn();
+vi.mock("@/firebase/services/jobs", () => ({
+  submitJobForApproval: (input: unknown) => submitJobForApproval(input),
+}));
+
 const STUBS = {
   // Dialog renders its slots only when visible — mirrors PrimeVue's lazy body.
   Dialog: {
@@ -59,6 +64,14 @@ const STUBS = {
   Button: { props: ["label"], template: "<button>{{ label }}</button>" },
   InputText: true,
   Textarea: true,
+  // Real input, not a black-box stub — the skip-approval toggle's effect on
+  // the submit payload is the thing under test.
+  Checkbox: {
+    props: ["modelValue", "binary", "inputId"],
+    emits: ["update:modelValue"],
+    template:
+      '<input type="checkbox" :id="inputId" :checked="modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)" />',
+  },
   SelectButton: true,
   Message: true,
   Tag: true,
@@ -69,13 +82,17 @@ const STUBS = {
   AddExpenseDialog: true,
 };
 
-function mountSheet(visible = false, billingType: "fixed" | "hourly" = "fixed") {
+function mountSheet(
+  visible = false,
+  billingType: "fixed" | "hourly" = "fixed",
+  clientId: string | null = "c1",
+) {
   return mount(FinishJobSheet, {
     props: {
       visible,
       jobId: "job1",
       tradespersonId: "tp1",
-      clientId: "c1",
+      clientId,
       billingType,
       extras: [] as WithId<JobExtraDoc>[],
       upfrontFeePaidCents: 0,
@@ -88,6 +105,8 @@ describe("FinishJobSheet", () => {
   beforeEach(() => {
     getQuoteByJobId.mockReset();
     getInvoiceByJobId.mockReset();
+    submitJobForApproval.mockReset();
+    submitJobForApproval.mockResolvedValue({ ok: true, total: 0, lineItemsCount: 0 });
     getQuoteByJobId.mockResolvedValue(null);
     getInvoiceByJobId.mockResolvedValue(null);
   });
@@ -267,5 +286,65 @@ describe("FinishJobSheet", () => {
     // $180 once, not $360.
     expect(w.text()).toContain("$180.00");
     expect(w.text()).not.toContain("$360.00");
+  });
+  // A tradesperson running a job end-to-end (their own client, cash or
+  // e-transfer) has no use for the approve-then-pay round-trip, and would
+  // otherwise sit in awaiting_client_approval forever waiting on a tap that
+  // isn't coming. The opt-out sends skipClientApproval so the server finalizes
+  // the invoice and drops the job straight into awaiting_payment.
+  describe("finishing without client approval", () => {
+    // One hand-written invoice line so there's something to bill (canSubmit).
+    async function openAtReview(clientId: string | null = "c1") {
+      getInvoiceByJobId.mockResolvedValue({
+        id: "job1",
+        lineItems: [{ description: "Callout", quantity: 1, unitPrice: 12500, taxRate: 0 }],
+        discount: null,
+      });
+      const w = mountSheet(false, "fixed", clientId);
+      await w.setProps({ visible: true });
+      await flushPromises();
+      const skip = w.findAll("button").find((b) => b.text().includes("Skip"));
+      await skip!.trigger("click");
+      return w;
+    }
+
+    function submitButton(w: ReturnType<typeof mountSheet>) {
+      return w.findAll("button").find((b) => b.text().includes("$125.00"));
+    }
+
+    it("defaults to the approval round-trip", async () => {
+      const w = await openAtReview();
+      expect(submitButton(w)!.text()).toContain("Send for approval");
+
+      await submitButton(w)!.trigger("click");
+      await flushPromises();
+      expect(submitJobForApproval).toHaveBeenCalledWith(
+        expect.objectContaining({ jobId: "job1", skipClientApproval: false }),
+      );
+    });
+
+    it("sends skipClientApproval once the tradesperson opts out", async () => {
+      const w = await openAtReview();
+      const box = w.find('input[type="checkbox"]');
+      expect(box.exists()).toBe(true);
+
+      await box.setValue(true);
+      // The CTA has to stop promising an approval step it's no longer taking.
+      expect(submitButton(w)!.text()).toContain("Finalize invoice");
+
+      await submitButton(w)!.trigger("click");
+      await flushPromises();
+      expect(submitJobForApproval).toHaveBeenCalledWith(
+        expect.objectContaining({ jobId: "job1", skipClientApproval: true }),
+      );
+    });
+
+    it("hides the opt-out when there's no client to approve anyway", async () => {
+      const w = await openAtReview(null);
+      expect(w.find('input[type="checkbox"]').exists()).toBe(false);
+      // Server treats a clientless job as self-completed regardless, so the
+      // CTA already reads as final.
+      expect(submitButton(w)!.text()).toContain("Finalize invoice");
+    });
   });
 });

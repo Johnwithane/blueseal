@@ -439,6 +439,13 @@ export interface SubmitJobForApprovalInput {
   discount?: InvoiceDiscount | null;
   /** Short message rendered into the system chat line shown to the client. */
   noteToClient?: string;
+  /**
+   * Skip the client-approval round-trip and finalize the invoice on the spot:
+   * the job goes straight to `awaiting_payment` (where `markJobPaid` closes it
+   * out) instead of `awaiting_client_approval`. Jobs with no client attached
+   * already behave this way regardless of the flag.
+   */
+  skipClientApproval?: boolean;
 }
 
 export async function submitJobForApproval(

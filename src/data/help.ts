@@ -399,7 +399,9 @@ Your clients here are yours: adding a client or setting up recurring billing doe
 
 Everything is itemised, so there are no surprises: the client sees what they're paying for and the tradesperson has a clean record.
 
-**Not every job needs the full path.** A tradesperson can also write an invoice by hand from the job's **Invoice** tab — **New invoice** opens a blank one to fill in, with no quote or tracked time required. A hand-written invoice is a private draft until it's sent, and it's reviewed and paid exactly like any other.`,
+**Not every job needs the full path.** A tradesperson can also write an invoice by hand from the job's **Invoice** tab — **New invoice** opens a blank one to fill in, with no quote or tracked time required. A hand-written invoice is a private draft until it's sent, and it's reviewed and paid exactly like any other. Sending it moves the job to **Awaiting payment**, so the tradesperson can mark it paid and close the job out as soon as the money lands.
+
+**Skipping the approval step.** Step 3's approval round-trip is the default, not a requirement. On the **Finish job** wrap-up a tradesperson can tick **"Finish without client approval"** to finalize the invoice on the spot — useful when they've run the job end-to-end and are collecting by cash or e-transfer. The client still gets the invoice and can still pay it online; they just aren't asked to approve the wrap-up first.`,
   },
   {
     slug: "paying-for-a-job",
@@ -1347,6 +1349,13 @@ const faqs: FaqItem[] = [
     question: "How do I charge for travel?",
     answer:
       "Set a **travel rate** in your pricing (it can differ from your hourly rate). On an hourly job you can clock travel time separately and it bills at that rate. On a fixed-price job, travel can only be billed by proposing a change order the client approves.",
+    categoryId: "payments-invoices",
+    audience: "tradesperson",
+  },
+  {
+    question: "Can I complete a job without waiting on my client?",
+    answer:
+      "Yes. On the **Finish job** wrap-up, tick **\"Finish without client approval\"** and the invoice is finalized on the spot — the job moves straight to **Awaiting payment**, where **Mark as paid** closes it out. Sending a hand-written invoice from the **Invoice** tab does the same thing. Your client still receives the invoice and can still pay it online; they're just not asked to approve the wrap-up first. Leave the tick off and the normal approve-then-pay flow runs as before.",
     categoryId: "payments-invoices",
     audience: "tradesperson",
   },
