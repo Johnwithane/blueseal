@@ -446,6 +446,40 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 1. Mark an invoice paid by **e-transfer / cash** instead of card.
 2. **Expected:** **no service fee**; job completes.
 
+### 6.5 Write an invoice by hand (no quote, no tracked time)
+
+The money-path seam here is **draft privacy**: a hand-written invoice must stay
+invisible to the client until it's actually sent, and it must not be wiped by
+the wrap-up sheet.
+
+1. As the **Tradesperson**, open a job that has **no quote and no logged hours**
+   (a direct request still at **Requested**, or a solo job from 2.3). Go to the
+   **Invoice** tab and tap **New invoice**.
+2. **Expected:** an invoice appears with the next number in your sequence
+   (`INV-<year>-000N`), one $0 starter line named after the job, and it's
+   editable straight away. No job status change — the kanban column is unmoved.
+3. Add two lines (e.g. `Emergency callout` $125 @ 13%, `Parts` $40 @ 13%), set a
+   discount, and **Save**. Re-open the tab. **Expected:** the lines, tax and
+   discount all persisted, and the total matches subtotal − discount + tax.
+4. **As the Client on the same job**, open the **Invoice** tab.
+   **Expected:** **no invoice is shown** — the tab still reads *"No invoice
+   yet."* A draft is the tradesperson's private working copy. Check the client's
+   dashboard too: no invoice notification, no email.
+5. Tap **New invoice** again as the tradesperson (or double-tap it).
+   **Expected:** no second invoice and **no second invoice number burned** — you
+   land back on the same draft.
+6. **Send** it (needs Stripe payouts set up — see 6.2). As the **Client**, reload
+   the job. **Expected:** the invoice is now visible on the Invoice tab, payable
+   by card, with the same lines you typed.
+7. **The wipe check.** On a *different* in-progress job, write two lines by hand
+   in the Invoice tab, **Save**, then open the wrap-up sheet (**Create invoice**
+   → *Finished the work?*). **Expected:** your hand-written lines are already
+   there as **Extras & charges** rows (and any discount is carried in), so
+   sending for approval bills them — it does **not** silently drop them. Confirm
+   the approved total the client sees includes both lines exactly once.
+8. Mobile (375px): the create card, the editor's line-item table (scrolls
+   horizontally) and the totals are all reachable and tappable.
+
 ---
 
 ## 7. Reviews → help: `mutual-reviews`

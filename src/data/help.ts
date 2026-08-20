@@ -397,7 +397,9 @@ Your clients here are yours: adding a client or setting up recurring billing doe
 3. **Invoice:** when the work is done, the invoice is built from the agreed quote plus tracked time, materials, and any extra charges (travel, callout, tool rental, or changes that came up along the way). The client reviews and approves it, extras included, before paying.
 4. **Receipt:** once paid, both sides have a receipt in the job thread.
 
-Everything is itemised, so there are no surprises: the client sees what they're paying for and the tradesperson has a clean record.`,
+Everything is itemised, so there are no surprises: the client sees what they're paying for and the tradesperson has a clean record.
+
+**Not every job needs the full path.** A tradesperson can also write an invoice by hand from the job's **Invoice** tab — **New invoice** opens a blank one to fill in, with no quote or tracked time required. A hand-written invoice is a private draft until it's sent, and it's reviewed and paid exactly like any other.`,
   },
   {
     slug: "paying-for-a-job",
@@ -1288,7 +1290,7 @@ const faqs: FaqItem[] = [
   {
     question: "What does an invoice include?",
     answer:
-      "Itemised line items from the agreed quote, plus tracked time, materials, and any extra charges (travel, callout, tool rental, disposal, or changes that came up on the job), with totals and any applicable tax. On a fixed-price job the agreed price is filled in for you automatically, and the tradesperson can choose to apply a discount, which only ever lowers what you owe. You review and approve the whole invoice, extras included, before you pay, so nothing appears that you haven't agreed to.",
+      "Itemised line items, with totals and any applicable tax. They come from the agreed quote plus tracked time, materials, and any extra charges (travel, callout, tool rental, disposal, or changes that came up on the job) — or, on a job with no quote, lines your tradesperson wrote out themselves. On a fixed-price job the agreed price is filled in for you automatically, and the tradesperson can choose to apply a discount, which only ever lowers what you owe. You review and approve the whole invoice, extras included, before you pay, so nothing appears that you haven't agreed to.",
     categoryId: "payments-invoices",
     audience: "all",
   },
@@ -1298,6 +1300,13 @@ const faqs: FaqItem[] = [
       "Yes. A quote can include an optional upfront amount (for materials or to hold a booking). You'll always see exactly what you're agreeing to before you accept.",
     categoryId: "payments-invoices",
     audience: "client",
+  },
+  {
+    question: "Can I write an invoice myself, without a quote or tracked time?",
+    answer:
+      "Yes. Open the job's **Invoice** tab and tap **New invoice**. You get a blank invoice to fill in with your own lines, quantities, prices and tax, plus an optional discount. It doesn't need a quote, logged hours or uploaded receipts, so it works for a straight callout or anything you'd rather just type out. It stays a private draft only you can see and edit, on the same tab, until you tap **Send** (or wrap the job up for the client's approval). If time or expenses were tracked, **Pull from job** adds them to the same invoice.",
+    categoryId: "payments-invoices",
+    audience: "tradesperson",
   },
   {
     question: "How do I get paid as a tradesperson?",

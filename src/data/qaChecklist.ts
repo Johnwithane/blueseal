@@ -615,6 +615,20 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
               "The picker lists every LIVE job (accepted / requested / quoted / awaiting upfront / in progress / on hold) with its status + client, and start/end default to that day's working hours; finished + cancelled jobs are absent. Saving puts the visit on the calendar at its real hours and it also shows on the job's Schedule tab. It is SCHEDULING, not timesheeting — the work order time total and the invoice do not change. An overlap still saves but warns and names the clash. Bad input is caught inline (end-before-start, HH:MM, no job). Two visits on one job draw as two separate blocks, not one long bar. Read-only calendars show no Add time button. Mobile 375px: dialog fits.",
           },
           {
+            id: "tradie-manual-invoice",
+            title: "Write an invoice by hand (no quote, no logged hours)",
+            steps: [
+              "On a job with no quote and no tracked time (still Requested, or a solo job), open the Invoice tab and tap New invoice.",
+              "Add two priced lines with tax, apply a discount, Save, then re-open the tab.",
+              "As the CLIENT on that same job, open the Invoice tab and check the dashboard/email.",
+              "Back as the tradesperson, tap New invoice again (and double-tap it).",
+              "Send the invoice, then reload as the client.",
+              "On a separate in-progress job: hand-write two lines, Save, then open the wrap-up sheet (Create invoice → Finished the work?) and send for approval.",
+            ],
+            expected:
+              "New invoice mints a draft with the next number in your sequence and a $0 starter line, editable immediately, with NO job status change. Lines, tax and discount persist across a reload. The CLIENT sees nothing while it's a draft — the tab still reads 'No invoice yet', with no notification or email; a draft is the tradesperson's private copy. Tapping New invoice again returns the SAME draft and burns no second invoice number. Once sent, the client sees and can pay it. Crucially, the wrap-up sheet pre-loads the hand-written lines as Extras & charges rows (and carries the invoice's discount), so submitting for approval bills each line exactly once instead of silently wiping them. Mobile 375px: the create card + line-item table are reachable.",
+          },
+          {
             id: "tradie-get-paid",
             title: "Get paid: invoice → card payment → Stripe payout",
             expected:

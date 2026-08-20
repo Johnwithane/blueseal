@@ -207,6 +207,30 @@ export async function listClientInvoices(clientUid: string): Promise<WithId<Invo
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
+export interface CreateManualInvoiceResult {
+  invoiceId: string;
+  /** False when a draft already existed — the callable returns it rather than
+   *  minting a second one (and burning a second invoice number). */
+  created: boolean;
+  invoiceNumber?: string;
+}
+
+/**
+ * Start a blank draft invoice on a job, with no quote, tracked time or
+ * wrap-up sheet involved. Server-side because the invoice number comes off
+ * the tradesperson's `nextInvoiceNumber` counter, which has to be allocated
+ * transactionally. The job status is untouched — drafting is private to the
+ * tradesperson until they send it. Idempotent per job.
+ */
+export async function createManualInvoice(jobId: string): Promise<CreateManualInvoiceResult> {
+  const fn = httpsCallable<{ jobId: string }, CreateManualInvoiceResult>(
+    functions,
+    "createManualInvoice",
+  );
+  const res = await fn({ jobId });
+  return res.data;
+}
+
 export interface PullBillablesResult {
   added: number;
   lineItemsCount: number;

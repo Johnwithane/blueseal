@@ -34,7 +34,7 @@ import { getTradesperson } from "@/firebase/services/tradespeople";
 import { getInsuranceWaiver, signUninsuredWaiver } from "@/firebase/services/insuranceWaivers";
 import { findCollisions, type Collision } from "@/firebase/services/bookings";
 import { useConfirm } from "primevue/useconfirm";
-import { getInvoiceByJobId } from "@/firebase/services/invoices";
+import { createManualInvoice, getInvoiceByJobId } from "@/firebase/services/invoices";
 import { subscribeReviewPair } from "@/firebase/services/reviews";
 import { subscribeJobExtras } from "@/firebase/services/jobExtras";
 import { subscribeSiteVisit } from "@/firebase/services/siteVisits";
@@ -45,6 +45,7 @@ import type {
   JobExtraDoc,
   JobStatus,
   InsuranceWaiverDoc,
+  InvoiceStatus,
   ReviewPairDoc,
   SessionDoc,
   SiteVisitDoc,
@@ -161,6 +162,13 @@ let unsubscribeReviewPair: (() => void) | null = null;
 let unsubscribeJob: (() => void) | null = null;
 const intakeFields = ref<IntakeField[]>([]);
 const invoiceId = ref<string | null>(null);
+// Status of that invoice. Needed alongside the id because a DRAFT invoice is
+// the tradesperson's private working copy — with manual invoices they can be
+// drafting mid-job, so the client-facing card can no longer render on the mere
+// existence of an invoice doc.
+const invoiceStatus = ref<InvoiceStatus | null>(null);
+// createManualInvoice in flight (the Invoice tab's "New invoice" button).
+const creatingInvoice = ref(false);
 // True when the tradesperson can accept a card payment — i.e. their Connect
 // payouts are enabled. The PaymentIntent is now created at pay time (when the
 // client opens /invoices/:id/pay), so we can't key off clientSecret anymore;
@@ -686,6 +694,7 @@ async function loadJobDependents(j: WithId<JobDoc>) {
   const [remote, invoice] = await Promise.all([getIntakeSchema(j.trade), getInvoiceByJobId(j.id)]);
   intakeFields.value = remote?.fields ?? SEED_INTAKE_SCHEMAS[j.trade] ?? [];
   invoiceId.value = invoice?.id ?? null;
+  invoiceStatus.value = invoice?.status ?? null;
 
   // Private notes live in a tradie-only subdoc; the client can't read it
   // (rules deny it), so only fetch when the viewer is the tradesperson.
@@ -1031,6 +1040,29 @@ async function onMarkPaid() {
       }
     },
   });
+}
+
+// "New invoice" on the Invoice tab: mint a blank draft the tradesperson fills
+// in themselves. Deliberately no confirm dialog — it's a private draft, and the
+// callable is idempotent per job, so the worst case of a stray tap is an empty
+// invoice they can edit or ignore.
+async function onCreateManualInvoice() {
+  if (!job.value || creatingInvoice.value) return;
+  creatingInvoice.value = true;
+  try {
+    const res = await createManualInvoice(job.value.id);
+    invoiceId.value = res.invoiceId;
+    invoiceStatus.value = "draft";
+    toast.success(
+      res.created ? "Invoice started" : "Invoice already started",
+      "Add your lines below, then send it when you're ready.",
+    );
+    await load();
+  } catch (e) {
+    toast.error("Couldn't start the invoice", humanizeError(e));
+  } finally {
+    creatingInvoice.value = false;
+  }
 }
 
 async function onMarkUpfrontPaid() {
@@ -1585,6 +1617,8 @@ function onReturnToApplicants() {
           :is-client="isClient"
           :is-tradie="isTradie"
           :invoice-id="invoiceId"
+          :invoice-status="invoiceStatus"
+          :creating-invoice="creatingInvoice"
           :invoice-payable="invoicePayable"
           :marking-paid="markingPaid"
           :resolved-tradesperson-name="resolvedTradespersonName"
@@ -1592,6 +1626,7 @@ function onReturnToApplicants() {
           @mark-paid="onMarkPaid"
           @revise-quote="showQuoteSheet = true"
           @create-invoice="showFinishSheet = true"
+          @create-manual-invoice="onCreateManualInvoice"
           @decided="load"
           @paid="load"
         />
