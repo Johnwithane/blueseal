@@ -724,6 +724,18 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
       {
         title: "Console",
         items: [
+          {
+            id: "admin-avatar-menu-narrow",
+            title: "Avatar dropdown fits 375px / 402px on a multi-role account",
+            steps: [
+              "Sign in as an account holding several roles (admin + tradesperson + sales + PM).",
+              "At 375px and again at 402px, open the avatar dropdown in the header.",
+              "Read every item end to end, including each \"Switch to ... view\".",
+              "Repeat with the browser font size increased.",
+            ],
+            expected:
+              "The popup stays inside the viewport with a gutter on both sides — never edge-to-edge. Long labels wrap to a second line with the icon aligned to the first; nothing is truncated or pushed off-screen, and the page never scrolls sideways (body is overflow-x: clip, so an over-wide popup would be clipped silently).",
+          },
           { id: "admin-vetting", title: "Vetting queue: approve cert/ID/insurance" },
           { id: "admin-disputes", title: "Disputes handling" },
           { id: "admin-users", title: "User 360 / support" },
