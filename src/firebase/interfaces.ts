@@ -579,6 +579,14 @@ export interface PayoutsState {
   detailsSubmitted: boolean;
   disabledReason: string | null;
   pendingRequirements: string[];
+  /**
+   * Days Stripe holds a payout in the connected account before sending it to
+   * the bank, as applied at account creation. Null means the hold could not be
+   * applied and the account is on Stripe's default schedule — see
+   * functions/src/payments/connectAccount.ts. Tradespeople only; PM + rep
+   * accounts are deliberately undelayed.
+   */
+  payoutHoldDays?: number | null;
   lastSyncedAt: Timestamp | null;
 }
 

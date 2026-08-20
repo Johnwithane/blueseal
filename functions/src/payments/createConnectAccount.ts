@@ -11,6 +11,11 @@
 // The tradesperson's uid is stored on the Stripe account's `metadata` so
 // the webhook dispatcher can locate the Firestore doc to mirror state
 // onto without a query.
+//
+// "Idempotent" is now verified rather than assumed: a stored id that the
+// current Stripe key can't see is an orphan from the pre-cutover sandbox
+// account, and returning it would dead-end onboarding permanently. See
+// connectAccount.ts.
 
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { CALLABLE_OPTS } from "../lib/callable";
@@ -19,11 +24,9 @@ import { logger } from "firebase-functions/v2";
 
 import { db } from "../lib/admin";
 import { requireRole } from "../lib/auth";
-import {
-  STRIPE_SECRET_KEY,
-  emptyPayoutsState,
-  getStripe,
-} from "./stripeClient";
+import { STRIPE_SECRET_KEY, emptyPayoutsState, getStripe } from "./stripeClient";
+import { applyPayoutHold, connectAccountExists } from "./connectAccount";
+import { callStripe } from "./connectErrors";
 
 interface ExistingPayouts {
   stripeAccountId?: string | null;
@@ -34,6 +37,7 @@ export const createConnectAccount = onCall(
   { ...CALLABLE_OPTS, secrets: [STRIPE_SECRET_KEY] },
   async (req) => {
     const uid = requireRole(req, "tradesperson");
+    const ctx = { fn: "createConnectAccount", uid };
 
     const tradieRef = db.doc(`tradespeople/${uid}`);
     const snap = await tradieRef.get();
@@ -44,36 +48,45 @@ export const createConnectAccount = onCall(
       );
     }
 
+    const stripe = getStripe();
     const existing = (snap.data()?.payouts ?? {}) as ExistingPayouts;
     if (existing.stripeAccountId) {
-      logger.info("createConnectAccount: idempotent hit", {
-        uid,
-        stripeAccountId: existing.stripeAccountId,
+      const stored = existing.stripeAccountId;
+      const alive = await callStripe(ctx, () => connectAccountExists(stripe, stored, ctx));
+      if (alive) {
+        logger.info("createConnectAccount: idempotent hit", {
+          ...ctx,
+          stripeAccountId: stored,
+        });
+        return { stripeAccountId: stored };
+      }
+      // Orphan: the id points into a Stripe account this key can't reach, so
+      // there's no live account and no money behind it. Fall through and mint a
+      // real one rather than handing back an id every later call will 404 on.
+      logger.warn("createConnectAccount: replacing orphaned account id", {
+        ...ctx,
+        orphanedAccountId: stored,
       });
-      return { stripeAccountId: existing.stripeAccountId };
     }
 
-    const stripe = getStripe();
-    const account = await stripe.accounts.create({
-      type: "express",
-      country: "CA",
-      default_currency: "cad",
-      capabilities: {
-        card_payments: { requested: true },
-        transfers: { requested: true },
-      },
-      business_type: "individual",
-      // Hold each payout 7 days before Stripe sends it to the tradesperson's
-      // bank. We take destination charges, so Blue Seal is the merchant of
-      // record and a client chargeback hits the PLATFORM balance — the delay
-      // keeps the funds sitting in the connected account long enough to
-      // reverse the transfer instead of eating the loss. Tradespeople can't
-      // shorten it: Connect → Payouts → "Allow accounts to manage their payout
-      // schedule" is off at the platform level.
-      settings: { payouts: { schedule: { interval: "daily", delay_days: 7 } } },
-      // uid round-trip for the webhook dispatcher.
-      metadata: { tradespersonId: uid },
-    });
+    const account = await callStripe(ctx, () =>
+      stripe.accounts.create({
+        type: "express",
+        country: "CA",
+        default_currency: "cad",
+        capabilities: {
+          card_payments: { requested: true },
+          transfers: { requested: true },
+        },
+        business_type: "individual",
+        // uid round-trip for the webhook dispatcher.
+        metadata: { tradespersonId: uid },
+      }),
+    );
+
+    // Separate, non-blocking step — a rejected settings hash must never stop a
+    // tradesperson onboarding. See applyPayoutHold.
+    const payoutHoldDays = await applyPayoutHold(stripe, account.id, ctx);
 
     await tradieRef.set(
       {
@@ -81,6 +94,7 @@ export const createConnectAccount = onCall(
           ...emptyPayoutsState(),
           stripeAccountId: account.id,
           onboardingStatus: "in_progress",
+          payoutHoldDays,
           lastSyncedAt: FieldValue.serverTimestamp(),
         },
       },
@@ -88,8 +102,9 @@ export const createConnectAccount = onCall(
     );
 
     logger.info("createConnectAccount: created", {
-      uid,
+      ...ctx,
       stripeAccountId: account.id,
+      payoutHoldDays,
     });
     return { stripeAccountId: account.id };
   },

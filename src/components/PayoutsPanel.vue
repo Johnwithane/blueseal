@@ -89,9 +89,12 @@ const subhead = computed(() => {
 async function kickOff() {
   busy.value = "create";
   try {
-    if (!state.value?.stripeAccountId) {
-      await createConnectAccount();
-    }
+    // Always call the create callable — it is idempotent server-side AND it
+    // verifies the stored account still exists on the current Stripe key.
+    // Skipping it when the mirrored state has an id is what made a dead
+    // sandbox account id unrecoverable: the client never asked for a new
+    // account, so every click re-used the dead one.
+    await createConnectAccount();
     const { url } = await createConnectOnboardingLink();
     busy.value = "onboard";
     // Full-page nav (not router.push) — Stripe's hosted form is off-app.
@@ -250,9 +253,10 @@ function prettyRequirement(req: string): string {
         <li>
           You receive the <strong>full invoice amount</strong>. The Blue Seal
           service fee is added to the client's card payment at checkout — not
-          taken from your payout. Funds transfer to your connected bank account
-          on Stripe's standard schedule (typically 2 business days for Canadian
-          accounts).
+          taken from your payout. Your share is set aside as soon as the client
+          pays, then released to your bank about a week later (plus a business
+          day or two for the transfer). That short hold is standard for
+          marketplaces and protects both sides if a payment is ever disputed.
         </li>
         <li>
           Disputes, refunds, and tax docs are managed inside the Stripe

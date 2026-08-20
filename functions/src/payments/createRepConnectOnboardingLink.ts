@@ -14,6 +14,8 @@ import { db } from "../lib/admin";
 import { requireRole } from "../lib/auth";
 import { requireRepActive } from "../lib/salesRep";
 import { STRIPE_SECRET_KEY, getStripe } from "./stripeClient";
+import { clearOrphanedAccount } from "./connectAccount";
+import { isMissingResource, stripeFailure } from "./connectErrors";
 
 function appBaseUrl(): string {
   const raw = process.env.APP_BASE_URL ?? "https://blueseal.app";
@@ -26,27 +28,33 @@ export const createRepConnectOnboardingLink = onCall(
     const uid = requireRole(req, "sales");
     await requireRepActive(uid);
 
-    const snap = await db.doc(`users/${uid}`).get();
-    const accountId = snap.data()?.salesRep?.payouts?.stripeAccountId as
-      | string
-      | undefined;
+    const ctx = { fn: "createRepConnectOnboardingLink", uid };
+    const repRef = db.doc(`users/${uid}`);
+    const snap = await repRef.get();
+    const accountId = snap.data()?.salesRep?.payouts?.stripeAccountId as string | undefined;
     if (!accountId) {
-      throw new HttpsError(
-        "failed-precondition",
-        "Create a Stripe Connect account first.",
-      );
+      throw new HttpsError("failed-precondition", "Create a Stripe Connect account first.");
     }
 
     const base = appBaseUrl();
     const stripe = getStripe();
-    const link = await stripe.accountLinks.create({
-      account: accountId,
-      type: "account_onboarding",
-      refresh_url: `${base}/sales/payouts/refresh`,
-      return_url: `${base}/sales/payouts/return`,
-    });
-
-    logger.info("createRepConnectOnboardingLink", { uid, accountId });
-    return { url: link.url, expiresAt: link.expires_at };
+    try {
+      const link = await stripe.accountLinks.create({
+        account: accountId,
+        type: "account_onboarding",
+        refresh_url: `${base}/sales/payouts/refresh`,
+        return_url: `${base}/sales/payouts/return`,
+      });
+      logger.info("createRepConnectOnboardingLink", { ...ctx, accountId });
+      return { url: link.url, expiresAt: link.expires_at };
+    } catch (err) {
+      // A stored id the current Stripe key cannot see is an orphan from the
+      // pre-cutover sandbox account. Drop it so the next click starts a clean
+      // onboarding instead of re-hitting this same 404 forever.
+      if (isMissingResource(err)) {
+        await clearOrphanedAccount(repRef, "salesRep.payouts", ctx);
+      }
+      throw stripeFailure(err, { ...ctx, accountId });
+    }
   },
 );

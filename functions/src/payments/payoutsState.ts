@@ -15,6 +15,8 @@ export function emptyPayoutsState(): {
   detailsSubmitted: false;
   disabledReason: null;
   pendingRequirements: string[];
+  /** Payout hold applied at account creation; null = Stripe's default schedule. */
+  payoutHoldDays: null;
   lastSyncedAt: null;
 } {
   return {
@@ -25,6 +27,7 @@ export function emptyPayoutsState(): {
     detailsSubmitted: false,
     disabledReason: null,
     pendingRequirements: [],
+    payoutHoldDays: null,
     lastSyncedAt: null,
   };
 }
