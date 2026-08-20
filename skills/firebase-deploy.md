@@ -69,6 +69,10 @@ If you see anything other than `✔` for a target — **stop, fix, redeploy, the
 
 **A function disappeared from `functions/src/index.ts` exports** — the CLI prompts `The following functions are found in your project but do not exist in your local source code: <name>. Would you like to proceed with deletion?`. Read the prompt carefully — if the function is genuinely removed (and no client still calls it), answer yes. If you accidentally removed an import, answer no, fix the export, redeploy.
 
+**`Quota exceeded for total allowable CPU per project per region`** (Cloud Run health-check failure on the last functions in a batch) — you deployed too many functions at once. Past ~200 functions, `--only functions` exhausts the `us-central1` Cloud Run CPU allocation and the tail of the batch fails, even though the earlier ones deployed fine. Deploy the affected functions targeted (`--only functions:<name>`) once the quota frees up, or request a CPU quota increase for the region. CI avoids the whole class by resolving a targeted list — see below.
+
+**CI deployed nothing / deployed everything unexpectedly** — `.github/workflows/deploy.yml` resolves which functions a push actually changed and deploys only those. It widens to a full deploy on purpose for anything shared (`functions/src/lib/*`, `package.json`, `tsconfig.json`, `firebase.json`), for a source file with no matching `index.ts` export (an un-exported helper could affect anything), and when `index.ts` *drops or remaps* an export — only a full deploy prunes a function that no longer exists. Adding an export deploys just that function. Read the "Resolve changed functions" step log to see which branch it took.
+
 **Rules deploy succeeded but emulator and prod behave differently** — `tests/rules/` was run against the emulator; the deployed rules can still be wrong if rules tests have gaps. Add the missing test case, fix the rule, redeploy.
 
 ---

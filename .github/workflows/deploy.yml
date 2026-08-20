@@ -112,15 +112,27 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}
 
       # Deploy ONLY the functions whose source actually changed in this push.
-      # `--only functions` (all ~190) reliably trips the per-minute Functions
-      # mutation quota and fails the step — which used to take Hosting down with
-      # it, so a frontend fix couldn't ship because an unrelated function was
-      # rate-limited. Twice: runs 28974629400 and 31628627790.
+      # `--only functions` (all ~200) reliably fails: it trips the per-minute
+      # Functions mutation quota (runs 28974629400 and 31628627790) and, once
+      # the codebase passed ~200 functions, the us-central1 Cloud Run
+      # "total allowable CPU per project per region" quota as well — the last
+      # functions in the batch fail their health check (run 32394208550). That
+      # used to take Hosting down with it, so a frontend fix couldn't ship
+      # because an unrelated function was rate-limited.
       #
       # We map changed files under functions/src/**/<name>.ts to their exported
       # function name (file basename == export name, the convention across
-      # functions/src/index.ts). Anything shared (lib/, index.ts, package.json,
-      # tsconfig) can affect every function, so that falls back to a full deploy.
+      # functions/src/index.ts). Anything shared (lib/, package.json, tsconfig)
+      # can affect every function, so that falls back to a full deploy.
+      #
+      # index.ts is NOT treated as shared, because ADDING A FUNCTION ALWAYS
+      # EDITS IT — widening there meant every new callable forced a full deploy
+      # and a red release (that's exactly what run 32394208550 was). Instead we
+      # compare the set of exports before and after:
+      #   - an export was dropped or remapped -> full deploy, because only a
+      #     full deploy prunes a function that no longer exists;
+      #   - exports were only added -> deploy exactly those;
+      #   - nothing moved (a comment edit) -> index.ts contributes no targets.
       - name: Resolve changed functions
         if: steps.changes.outputs.functions == 'true'
         id: fns
@@ -134,11 +146,14 @@ jobs:
           CHANGED=$(git diff --name-only "$BASE" '${{ github.sha }}' -- functions/ firebase.json)
           echo "changed files:"; echo "$CHANGED"
           NAMES=""
+          INDEX_CHANGED=0
           for f in $CHANGED; do
             case "$f" in
-              firebase.json|functions/package.json|functions/package-lock.json|functions/tsconfig.json|functions/src/index.ts|functions/src/lib/*)
+              firebase.json|functions/package.json|functions/package-lock.json|functions/tsconfig.json|functions/src/lib/*)
                 echo "shared: $f — full deploy"
                 echo "targets=functions" >> "$GITHUB_OUTPUT"; exit 0;;
+              functions/src/index.ts)
+                INDEX_CHANGED=1; continue;;
               *.test.ts) continue;;
               *.ts) ;;
               *) continue;;
@@ -158,6 +173,36 @@ jobs:
             fi
             NAMES="$NAMES $FOUND"
           done
+          # index.ts: diff the exported-function SET rather than widening.
+          if [ "$INDEX_CHANGED" = "1" ]; then
+            if ! git show "$BASE:functions/src/index.ts" > /tmp/idx_base.ts 2>/dev/null; then
+              echo "index.ts absent at $BASE — full deploy"
+              echo "targets=functions" >> "$GITHUB_OUTPUT"; exit 0
+            fi
+            git show '${{ github.sha }}:functions/src/index.ts' > /tmp/idx_head.ts
+            # Fail SAFE, not silent: if the export parse breaks (an export form
+            # the regex doesn't know, a missing script), fall back to the old
+            # full-deploy behaviour rather than emitting an empty/short target
+            # list that would quietly skip deploying a function.
+            if ! node .github/scripts/index-exports.mjs /tmp/idx_base.ts > /tmp/exports_base.txt \
+               || ! node .github/scripts/index-exports.mjs /tmp/idx_head.ts > /tmp/exports_head.txt; then
+              echo "couldn't parse index.ts exports — full deploy"
+              echo "targets=functions" >> "$GITHUB_OUTPUT"; exit 0
+            fi
+            GONE=$(comm -23 /tmp/exports_base.txt /tmp/exports_head.txt)
+            if [ -n "$GONE" ]; then
+              echo "index.ts dropped or remapped an export — full deploy (only that prunes):"
+              echo "$GONE"
+              echo "targets=functions" >> "$GITHUB_OUTPUT"; exit 0
+            fi
+            ADDED=$(comm -13 /tmp/exports_base.txt /tmp/exports_head.txt | cut -f1)
+            if [ -n "$ADDED" ]; then
+              echo "index.ts added exports:"; echo "$ADDED"
+              NAMES="$NAMES $ADDED"
+            else
+              echo "index.ts changed but no export moved — nothing to add"
+            fi
+          fi
           NAMES=$(printf '%s' "$NAMES" | tr ' ' '\n' | grep -v '^$' | sort -u)
           if [ -z "$NAMES" ]; then
             echo "no function sources changed — skipping the functions deploy"
