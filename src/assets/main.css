@@ -157,6 +157,39 @@ html {
   }
 }
 
+/* Popup menus (.p-menu[data-p-popup], the avatar dropdown in AppHeader and any
+   other Menu popup) size to their widest item with no upper bound. Once the
+   longest label — "Switch to Project manager view" on a multi-role account —
+   is wider than the screen, PrimeVue pins the panel to the viewport edges and
+   the overflow is CLIPPED SILENTLY: <body> is `overflow-x: clip` (see the body
+   rule above), so nothing scrolls to reveal it, and the panel reads as a
+   cut-off sheet rather than a menu.
+
+   Three guards, so it can't happen at any label length:
+     - a hard max-width that always leaves a visible gutter, so the popup
+       reads as a panel and never touches both screen edges;
+     - labels wrap instead of forcing the panel wider (min-width:0 is what
+       actually lets a flex child shrink below its content; overflow-wrap
+       catches a long unbroken token);
+     - the icon column keeps its size and top-aligns, so a two-line label
+       doesn't drag the icon to the vertical middle of the row. */
+.p-menu {
+  max-width: calc(100vw - 1.5rem);
+}
+.p-menu .p-menu-item-link {
+  align-items: flex-start;
+}
+.p-menu .p-menu-item-icon {
+  flex: none;
+  /* Nudge back onto the first line's optical centre after the top-align. */
+  margin-top: 0.1rem;
+}
+.p-menu .p-menu-item-label {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 /* Google Places autocomplete suggestions (.pac-container) are appended to
    <body>, so inside a PrimeVue modal — e.g. the Search "Change location"
    dialog — they render *behind* the dialog overlay and can't be tapped. The
