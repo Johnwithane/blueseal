@@ -2699,6 +2699,10 @@ export interface BugReportDoc {
   status: BugStatus; // starts "open"
   triagedBy: string | null; // admin uid on triage
   notes: string; // admin triage notes ("" on create)
+  // Mirrored GitHub issue — written by `npm run bugs -- issue <id>` over the
+  // Admin SDK (never by clients); absent until a report has been filed.
+  githubIssueNumber?: number;
+  githubIssueUrl?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

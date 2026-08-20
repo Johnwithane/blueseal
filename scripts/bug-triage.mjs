@@ -16,6 +16,8 @@
 //   node scripts/bug-triage.mjs list [status]      # default status: open ("all" for every status)
 //   node scripts/bug-triage.mjs show <id>          # one report, full detail + screenshots
 //   node scripts/bug-triage.mjs triage <id> <status> [notes...]   # WRITE-BACK (only after the human OKs)
+//   node scripts/bug-triage.mjs issue <id> [--triage-file <md>] [--dry-run] [--force]
+//                                                  # file the report as a GitHub issue
 //
 // `list`/`show` are read-only and download screenshots to:
 //   c:\tmp\bug-triage\<id>\shot-N.<ext>   (+ a digest.md / report.md you can read)
@@ -26,7 +28,8 @@
 
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import { mkdir, writeFile, rm } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { mkdir, writeFile, rm, readFile } from "node:fs/promises";
 import path from "node:path";
 
 const PROJECT_ID = "blueseal-762af";
@@ -219,17 +222,213 @@ async function cmdTriage(id, status, notesParts) {
   console.log(`✔ bugReports/${id} → status="${status}"${notes ? `, notes set` : ""}`);
 }
 
+// --- GitHub issue flow ------------------------------------------------------
+// `issue <id>` mirrors a bug report into a GitHub issue on origin's repo so
+// triage lands where Johnny reviews. Privacy rule: bug docs carry reporter
+// identity + a device dump + prod screenshots, so if the repo is PUBLIC the
+// issue only gets title/severity/route/steps (+ triage notes) and points back
+// at /admin/bug-reports for the rest; a private repo gets the full report with
+// screenshots embedded via long-lived signed URLs.
+
+const GITHUB_API = "https://api.github.com";
+
+function repoSlug() {
+  try {
+    const url = execFileSync("git", ["remote", "get-url", "origin"], { encoding: "utf8" }).trim();
+    const m = url.match(/github\.com[/:]([^/]+\/.+?)(?:\.git)?$/);
+    if (m) return m[1];
+  } catch {
+    /* fall through to the hardcoded default */
+  }
+  return "Johnwithane/blueseal";
+}
+
+function githubToken() {
+  if (process.env.GITHUB_TOKEN) return process.env.GITHUB_TOKEN;
+  if (process.env.GH_TOKEN) return process.env.GH_TOKEN;
+  // Same token `git push` uses (Git Credential Manager on this box). Never pop
+  // an interactive login from a script.
+  try {
+    const out = execFileSync("git", ["credential", "fill"], {
+      input: "protocol=https\nhost=github.com\n\n",
+      encoding: "utf8",
+      env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GCM_INTERACTIVE: "never" },
+    });
+    const m = out.match(/^password=(.+)$/m);
+    if (m) return m[1].trim();
+  } catch {
+    /* no stored credential */
+  }
+  return null;
+}
+
+async function gh(token, method, apiPath, body) {
+  const res = await fetch(`${GITHUB_API}${apiPath}`, {
+    method,
+    headers: {
+      Authorization: `token ${token}`,
+      Accept: "application/vnd.github+json",
+      "User-Agent": "blueseal-bug-triage",
+      ...(body ? { "Content-Type": "application/json" } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const text = await res.text();
+  let json = null;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    /* non-JSON error body */
+  }
+  return { ok: res.ok, status: res.status, json, text };
+}
+
+function renderIssueBody(id, r, { repoIsPrivate, shotUrls, triageMd }) {
+  const L = [
+    `Bug report \`bugReports/${id}\` — severity **${r.severity ?? "—"}**` +
+      `${r.area ? ` · area \`${r.area}\`` : ""} · filed ${fmtTime(r.createdAt)}`,
+    "",
+    `Route: \`${r.route ?? "—"}\`${repoIsPrivate && r.url ? ` — ${r.url}` : ""}`,
+  ];
+  if (repoIsPrivate) L.push(`Reporter: ${r.reporterName ?? "—"} (${r.activeRole ?? "—"})`);
+  L.push("", "### Steps to reproduce", (r.stepsToReproduce || "—").trim(), "");
+  L.push("### Expected", (r.expected || "—").trim(), "");
+  L.push("### Actual", (r.actual || "—").trim(), "");
+  if (repoIsPrivate) {
+    L.push("### Device & environment", "```", (r.environment || "—").trim(), "```", "");
+    if (shotUrls.length) {
+      L.push("### Screenshots");
+      shotUrls.forEach((u, i) => L.push(`![shot-${i + 1}](${u})`));
+      L.push("");
+    }
+  } else {
+    L.push(
+      `_Repo is public, so reporter identity, device dump and screenshots stay out of the issue._`,
+      `_Full report: \`/admin/bug-reports\` or \`npm run bugs show ${id}\`._`,
+      "",
+    );
+  }
+  if (triageMd) L.push("## Triage", "", triageMd.trim(), "");
+  return L.join("\n");
+}
+
+async function cmdIssue(args) {
+  const flags = { dryRun: false, force: false, triageFile: null };
+  const positional = [];
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === "--dry-run") flags.dryRun = true;
+    else if (a === "--force") flags.force = true;
+    else if (a === "--triage-file") flags.triageFile = args[++i];
+    else positional.push(a);
+  }
+  const id = positional[0];
+  if (!id) {
+    console.error(
+      "✖ Usage: node scripts/bug-triage.mjs issue <id> [--triage-file <md>] [--dry-run] [--force]",
+    );
+    process.exit(1);
+  }
+
+  const ref = db.collection("bugReports").doc(id);
+  const doc = await ref.get();
+  if (!doc.exists) {
+    console.error(`✖ No bugReports/${id}`);
+    process.exit(1);
+  }
+  const r = doc.data();
+  if (r.githubIssueUrl && !flags.force) {
+    console.log(`✔ Already filed: ${r.githubIssueUrl}  (use --force to file another)`);
+    return;
+  }
+
+  const token = githubToken();
+  if (!token) {
+    console.error(
+      "✖ No GitHub token. Set GITHUB_TOKEN (or GH_TOKEN), or sign into GitHub in git so `git credential fill` has one.",
+    );
+    process.exit(1);
+  }
+  const slug = repoSlug();
+  const repo = await gh(token, "GET", `/repos/${slug}`);
+  if (!repo.ok) {
+    console.error(`✖ Could not read repo ${slug} (${repo.status}): ${repo.text.slice(0, 200)}`);
+    process.exit(1);
+  }
+  const repoIsPrivate = !!repo.json?.private;
+
+  const shotUrls = [];
+  if (repoIsPrivate && r.screenshotPaths?.length) {
+    for (const p of r.screenshotPaths) {
+      try {
+        const [u] = await bucket
+          .file(p)
+          .getSignedUrl({ action: "read", expires: Date.now() + 180 * 24 * 3600 * 1000 });
+        shotUrls.push(u);
+      } catch (e) {
+        console.error(`  ! could not sign ${p}: ${e.message}`);
+      }
+    }
+  }
+
+  const triageMd = flags.triageFile ? await readFile(flags.triageFile, "utf8") : "";
+  const title = (r.title || "(untitled bug report)").trim();
+  const body = renderIssueBody(id, r, { repoIsPrivate, shotUrls, triageMd });
+  const labels = ["bug", `sev:${r.severity || "medium"}`];
+
+  if (flags.dryRun) {
+    console.log(`— DRY RUN — would file on ${slug} (${repoIsPrivate ? "private" : "public"}):`);
+    console.log(`Title: ${title}`);
+    console.log(`Labels: ${labels.join(", ")}`);
+    console.log("");
+    console.log(body);
+    return;
+  }
+
+  let res = await gh(token, "POST", `/repos/${slug}/issues`, { title, body, labels });
+  // Labels need push access; if that's what 422'd, file without them.
+  if (!res.ok && res.status === 422) {
+    res = await gh(token, "POST", `/repos/${slug}/issues`, { title, body });
+  }
+  if (!res.ok) {
+    console.error(`✖ GitHub refused (${res.status}): ${res.text.slice(0, 300)}`);
+    process.exit(1);
+  }
+  await ref.update({
+    githubIssueNumber: res.json.number,
+    githubIssueUrl: res.json.html_url,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  console.log(`✔ Filed ${slug}#${res.json.number} → ${res.json.html_url}`);
+  if (!repoIsPrivate) {
+    console.log(
+      "  (public repo: reporter identity, env dump and screenshots omitted — they stay in /admin/bug-reports)",
+    );
+  }
+}
+
 const [cmd, ...rest] = process.argv.slice(2);
 try {
   if (cmd === "list") await cmdList(rest[0]);
   else if (cmd === "show") await cmdShow(rest[0]);
   else if (cmd === "triage") await cmdTriage(rest[0], rest[1], rest.slice(2));
+  else if (cmd === "issue") await cmdIssue(rest);
   else {
     console.error("Usage:");
     console.error("  node scripts/bug-triage.mjs list [status|all]   (default: open)");
     console.error("  node scripts/bug-triage.mjs show <id>");
     console.error("  node scripts/bug-triage.mjs triage <id> <status> [notes...]");
+    console.error(
+      "  node scripts/bug-triage.mjs issue <id> [--triage-file <md>] [--dry-run] [--force]",
+    );
     process.exit(1);
+  }
+  // Close gRPC channels before exiting — a hard exit with them open trips a
+  // libuv assertion on Windows (async.c) and reddens the exit code.
+  try {
+    await admin.app().delete();
+  } catch {
+    /* best effort */
   }
   process.exit(0);
 } catch (e) {

@@ -37,6 +37,8 @@ npm run bugs list triaged    # open | triaged | in_progress | fixed | wontfix
 npm run bugs show <id>       # one report, full detail
 # write-back — only after Johnny OKs the triage:
 npm run bugs triage <id> <status> "triage notes here"
+# mirror a report into a GitHub issue (repo from `git remote origin`):
+npm run bugs -- issue <id> [--triage-file <md>] [--dry-run] [--force]
 ```
 
 `list`/`show` write a digest to `c:\tmp\bug-triage\digest.md` (or
@@ -57,3 +59,25 @@ The output dir is wiped at the start of each `list` run so stale shots don't pil
 The `triage` write-back mirrors the admin UI's `setBugReportStatus` — it only
 touches `status`, `notes`, `triagedBy`, `updatedAt`, the same fields the
 `bugReports` update rule allows.
+
+## GitHub issues
+
+`npm run bugs -- issue <id>` files the report as a GitHub issue so triage lands
+where Johnny reviews (note the `--` so npm doesn't eat the flags):
+
+- **Auth:** `GITHUB_TOKEN` / `GH_TOKEN` env if set, else the token `git push`
+  already uses (Git Credential Manager via `git credential fill`). No setup on
+  Johnny's box.
+- **Privacy:** bug docs carry reporter identity, a device dump, and prod
+  screenshots. If the repo is **public** (it currently is), the issue gets only
+  title/severity/route/steps + your triage notes, and points back at
+  `/admin/bug-reports` for the rest. A **private** repo gets the full report
+  with screenshots embedded as ~180-day signed URLs.
+- **Triage notes:** write your root-cause/fix-plan Markdown to a file and pass
+  `--triage-file <path>` — it lands in the issue under a `## Triage` heading.
+- **Idempotent:** the issue number/URL are written back to the bug doc
+  (`githubIssueNumber`/`githubIssueUrl`), and a second `issue <id>` is a no-op
+  unless you pass `--force`. `--dry-run` prints the payload without filing.
+
+Filing an issue does NOT change the report's `status` — that's still the
+`triage` command, still gated on Johnny's OK.
