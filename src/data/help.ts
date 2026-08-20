@@ -1090,6 +1090,20 @@ const faqs: FaqItem[] = [
     audience: "tradesperson",
   },
   {
+    question: "Can I act on a job without opening it?",
+    answer:
+      "Yes. On your **Jobs** list, tap a job's status chip — it opens a short menu of what's possible for that job right now: **Quote**, **Schedule**, **Invoice**, **Complete job** and **Cancel job**. Actions that don't apply to the job's current stage aren't listed, so you can't start something the job isn't ready for. Complete and Cancel both ask you to confirm first.",
+    categoryId: "for-tradespeople",
+    audience: "tradesperson",
+  },
+  {
+    question: "Can I cancel a job I've taken on?",
+    answer:
+      "Before anything is agreed — while a job is **Requested**, **Accepted** or **Quoted** — yes: use **Cancel job** on the Jobs list or the job page, give a short reason, and your client is notified straight away. Once a quote has been accepted and the job is committed (awaiting an upfront fee, or in progress), you can't cancel unilaterally. Talk it through in the job chat and ask your client to raise a cancellation request, which you then accept.",
+    categoryId: "for-tradespeople",
+    audience: "tradesperson",
+  },
+  {
     question: "Why doesn't my solo job earn reviews?",
     answer:
       "Reviews only count for work a **verified client accepted in-app**. On a solo job (or one where you recorded the quote acceptance on your client's behalf), there's no verified counterparty, so no review is created in either direction. That gate is what keeps Blue Seal ratings meaningful, including yours.",
