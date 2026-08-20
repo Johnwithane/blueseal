@@ -225,6 +225,9 @@ export { aiDraftSupportReply } from "./ai/draftSupportReply";
 // Support desk — admin-sent ticket replies (branded email + in-app record).
 export { sendSupportTicketReply } from "./support/sendSupportTicketReply";
 
+// Bug log — daily batched "your reports are fixed" digest to QA reporters.
+export { scheduledBugFixNotices } from "./bugs/scheduledBugFixNotices";
+
 // Payments — Stripe Connect Express. Tradespeople onboard a connected account
 // (createConnect*); clients pay invoices by card via a destination charge
 // (createInvoicePaymentIntent) and the Blue Seal service fee rides on
