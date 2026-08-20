@@ -725,6 +725,22 @@ Done:
   We take destination charges, so that hold is what keeps a late chargeback
   reversible; don't leave it unapplied.
 
+#### [ ] Complete the Stripe Connect platform profile (BLOCKS all payout onboarding)
+
+- **Why:** with the error handling live, the real reason "Start Stripe setup"
+  fails finally surfaced in the functions log (2026-08-20 21:43 UTC,
+  `req_8IOiYaBOzrhRjA`): `StripeInvalidRequestError` — "You must complete your
+  platform profile to use Connect and create live connected accounts." The live
+  account (unlike the old sandbox) has never answered Stripe's Connect
+  questionnaire, so **every** connected-account creation 400s. No code change
+  can fix this; retrying is pointless until the questionnaire is done.
+- **What:** open https://dashboard.stripe.com/connect/accounts/overview on the
+  LIVE account and complete the platform-profile questionnaire (loss liability,
+  platform obligations, etc.). Takes a few minutes.
+- **Verify:** Payouts → Start Stripe setup as a tradesperson should now open
+  Stripe's hosted onboarding instead of the red toast. Bug report
+  `3RAxh6ASBmZs1WHn2Vqo` tracks the user-visible symptom.
+
 ---
 
 ## QuickBooks Online sync (Pro fast-follow — added 2026-06-11)
