@@ -629,6 +629,20 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
               "The picker lists every LIVE job (accepted / requested / quoted / awaiting upfront / in progress / on hold) with its status + client, and start/end default to that day's working hours; finished + cancelled jobs are absent. Saving puts the visit on the calendar at its real hours and it also shows on the job's Schedule tab. It is SCHEDULING, not timesheeting — the work order time total and the invoice do not change. An overlap still saves but warns and names the clash. Bad input is caught inline (end-before-start, HH:MM, no job). Two visits on one job draw as two separate blocks, not one long bar. Read-only calendars show no Add time button. Mobile 375px: dialog fits.",
           },
           {
+            id: "tradie-quote-optional-tab",
+            title: "Quoting is a tab, not a requirement (issues #19 + #22)",
+            steps: [
+              "Open a Requested direct job as the tradesperson.",
+              "Check the bottom of the page and the top-right corner before tapping anything.",
+              "Open the Quote tab and read the header.",
+              "Tap Skip the quote — invoice directly, then New invoice, and send it.",
+              "Open the same job as the client.",
+              "Check a job in Awaiting payment still has its sticky Mark as paid bar.",
+            ],
+            expected:
+              "No sticky \"Prepare quote\" bar and no \"Quote needed\" chip. Tabs read Brief · Schedule · Quote · Work order · Invoice, with a badge dot on Quote; the client sees no Quote tab. The tab header says quoting is optional. Skip lands on the Invoice tab and a blank invoice sends with no quote and no tracked time. The money CTAs (upfront received / mark as paid) are untouched. Five tabs fit 375px icon-only with no horizontal scroll.",
+          },
+          {
             id: "tradie-manual-invoice",
             title: "Write an invoice by hand (no quote, no logged hours)",
             steps: [

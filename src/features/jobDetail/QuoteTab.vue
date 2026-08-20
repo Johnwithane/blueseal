@@ -1,10 +1,16 @@
 <script setup lang="ts">
-// Dialog wrapper around QuoteComposer for the direct-request quote flow. Owns
-// fetching the tradesperson's rate + hydrating from an existing quote
-// (resend/edit), and calls submitQuote with the composer's payload. The
-// editor itself lives in QuoteComposer (shared with the marketplace apply form).
-import { computed, ref, watch } from "vue";
-import Dialog from "primevue/dialog";
+// The job's Quote tab. Owns fetching the tradesperson's rate + hydrating from
+// an existing quote (resend/edit), and calls submitQuote with the composer's
+// payload. The editor itself lives in QuoteComposer (shared with the
+// marketplace apply form).
+//
+// This was a modal (QuoteSheet) until issues #19 + #22: a full-width sticky
+// "Prepare quote" CTA plus a blocking dialog made quoting read as a required
+// step, when the backend has allowed invoicing with no quote at all since
+// PR #15. As a tab it sits beside Brief / Schedule / Work order / Invoice —
+// available, not demanded — and the "skip the quote" card below points at the
+// invoice-without-quote path the reporter couldn't find.
+import { computed, onMounted, ref, watch } from "vue";
 import Button from "primevue/button";
 import { submitQuote, getQuoteByJobId } from "@/firebase/services/quotes";
 import { getSiteVisit, proposeSiteVisit } from "@/firebase/services/siteVisits";
@@ -25,15 +31,21 @@ import type {
 } from "@/components/QuoteComposer.vue";
 import SiteVisitForm from "@/components/SiteVisitForm.vue";
 import type { SiteVisitFormState } from "@/components/SiteVisitForm.vue";
+import type { JobStatus } from "@/firebase/interfaces";
 
 const props = defineProps<{
-  visible: boolean;
   jobId: string;
+  /** Job status, so the tab can explain what state the quote is in. */
+  status: JobStatus;
+  /** An agreed site visit gets its fee pre-filled into the first quote. */
+  siteVisitAgreedNote?: string | null;
 }>();
 
 const emit = defineEmits<{
-  "update:visible": [v: boolean];
+  /** A quote or site-visit request went out — parent reloads the job. */
   submitted: [];
+  /** Jump to another tab (the "skip the quote" path). */
+  "go-tab": [key: string];
 }>();
 
 const { money } = useFormatters();
@@ -247,12 +259,11 @@ const submitLabel = computed(() => {
   return s?.hasIncompleteLine ? "Add a description to each line" : "Add a line to bill first";
 });
 
-// On open: fetch the rate + any existing quote, set the composer seed, THEN
-// mount the composer (gated on !loading) so it hydrates once with correct data.
-watch(
-  () => props.visible,
-  async (v) => {
-    if (!v) return;
+// Fetch the rate + any existing quote, set the composer seed, THEN mount the
+// composer (gated on !loading) so it hydrates once with correct data. As a tab
+// this runs on mount and again after a successful send (the job has moved on,
+// so the form should come back as a resend of what just went out).
+async function loadQuote() {
     loading.value = true;
     isResend.value = false;
     priorDeclinedReason.value = null;
@@ -319,8 +330,11 @@ watch(
     }
     wizardStep.value = null;
     loading.value = false;
-  },
-);
+}
+onMounted(loadQuote);
+// The tab is kept mounted across job reloads; if the parent swaps to a
+// different job, start over.
+watch(() => props.jobId, loadQuote);
 
 async function onSubmit() {
   if (mode.value === "site_visit") {
@@ -347,7 +361,8 @@ async function onSubmit() {
       "Your client has been notified.",
     );
     emit("submitted");
-    emit("update:visible", false);
+    // No dialog to close — reload so the tab shows what was just sent.
+    await loadQuote();
   } catch (e) {
     toast.error("Couldn't send quote", humanizeError(e));
   } finally {
@@ -371,7 +386,7 @@ async function onRequestVisit() {
     });
     toast.success("Site visit requested", "Your client has been notified to agree.");
     emit("submitted");
-    emit("update:visible", false);
+    await loadQuote();
   } catch (e) {
     toast.error("Couldn't request site visit", humanizeError(e));
   } finally {
@@ -379,23 +394,34 @@ async function onRequestVisit() {
   }
 }
 
-function close() {
-  if (submitting.value) return;
-  emit("update:visible", false);
-}
+// Whether a quote is still the natural next step. Past "quoted" the client has
+// already acted on it, so the tab explains rather than nags.
+const quoteIsOpen = computed(() => props.status === "requested" || props.status === "quoted");
 </script>
 
 <template>
-  <Dialog
-    :visible="props.visible"
-    modal
-    :closable="!submitting"
-    :dismissable-mask="false"
-    :draggable="false"
-    :header="isResend ? 'Revise quote' : 'Prepare quote'"
-    :pt="{ root: { class: 'quote-sheet-dialog' } }"
-    @update:visible="(v) => emit('update:visible', v)"
-  >
+  <section class="quote-tab">
+    <header class="mb-3">
+      <h3 class="font-semibold">{{ isResend ? "Revise quote" : "Prepare a quote" }}</h3>
+      <p class="mt-0.5 text-xs text-[color:var(--bs-muted)]">
+        <template v-if="quoteIsOpen">
+          Optional. You can send an invoice without ever quoting.
+        </template>
+        <template v-else>
+          This job is past the quoting stage — anything you send now replaces the quote on file.
+        </template>
+      </p>
+    </header>
+
+    <!-- Moved off the old sticky CTA bar: an agreed visit fee is pre-filled
+         into the first quote, which is only worth saying next to the form. -->
+    <p
+      v-if="siteVisitAgreedNote"
+      class="mb-3 rounded-lg bg-[color:var(--bs-info-tint)] px-3 py-2 text-xs text-[color:var(--bs-info-text)]"
+    >
+      <i class="pi pi-map-marker mr-1"></i>{{ siteVisitAgreedNote }}
+    </p>
+
     <div v-if="loading" class="py-10 text-center text-sm text-[color:var(--bs-muted)]">
       <i class="pi pi-spin pi-spinner text-xl block mb-2"></i>
       Loading…
@@ -551,13 +577,12 @@ function close() {
       </button>
     </template>
 
-    <template #footer>
-      <!-- Choosing an approach: nothing to send yet, so only Cancel. -->
-      <div v-if="quoteStyle === null && !loading" class="flex w-full">
-        <Button label="Cancel" text @click="close" />
-      </div>
+    <!-- Actions. On a tab these sit at the end of the flow rather than in a
+         dialog footer; the chooser step has nothing to send yet, so it has
+         no action row at all. -->
+    <div v-if="!loading && quoteStyle !== null" class="quote-tab__actions">
       <!-- Wizard: Back / Next. The send button only appears on the review form. -->
-      <div v-else-if="inWizard && !loading" class="flex w-full items-center gap-2">
+      <div v-if="inWizard" class="flex w-full items-center gap-2">
         <Button label="Back" icon="pi pi-arrow-left" text @click="wizardBack" />
         <span class="flex-1"></span>
         <Button
@@ -567,15 +592,7 @@ function close() {
           @click="wizardNext"
         />
       </div>
-      <div v-else class="flex flex-col-reverse gap-2 w-full sm:flex-row sm:items-center">
-        <Button
-          label="Cancel"
-          text
-          :disabled="submitting"
-          class="w-full sm:w-auto"
-          @click="close"
-        />
-        <span class="hidden flex-1 sm:block"></span>
+      <div v-else class="flex w-full">
         <Button
           :label="submitLabel"
           icon="pi pi-send"
@@ -585,8 +602,26 @@ function close() {
           @click="onSubmit"
         />
       </div>
-    </template>
-  </Dialog>
+    </div>
+
+    <!-- The reporter's actual ask (#19): make the no-quote path findable.
+         The backend has allowed it since PR #15 — nothing pointed at it. -->
+    <button
+      v-if="!loading && quoteIsOpen"
+      type="button"
+      class="quote-tab__skip"
+      @click="emit('go-tab', 'invoice')"
+    >
+      <i class="pi pi-receipt quote-tab__skip-icon"></i>
+      <span class="min-w-0 text-left">
+        <span class="block text-sm font-semibold">Skip the quote — invoice directly</span>
+        <span class="block text-xs leading-snug text-[color:var(--bs-muted)]">
+          No quote or tracked time needed. Write the invoice yourself on the Invoice tab.
+        </span>
+      </span>
+      <i class="pi pi-chevron-right text-xs opacity-50"></i>
+    </button>
+  </section>
 </template>
 
 <style>
@@ -624,30 +659,51 @@ function close() {
   font-size: 0.9rem;
 }
 
-.quote-sheet-dialog {
-  width: 100vw;
-  max-width: 640px;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-}
-.quote-sheet-dialog .p-dialog-content {
-  overflow-y: auto;
-  flex: 1 1 auto;
-}
-.quote-sheet-dialog .p-dialog-footer {
-  border-top: 1px solid var(--bs-border);
-  background: white;
-  padding: 0.75rem 1rem;
+/* Action row. Sticks to the bottom of the viewport on a phone the way the old
+   dialog footer did, so "Send quote" stays reachable in a long itemized form
+   without scrolling to the end. `bottom` clears the app's bottom nav. */
+.quote-tab__actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  margin-top: 1rem;
+  padding: 0.75rem 0;
   padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.04);
-  flex-shrink: 0;
+  border-top: 1px solid var(--bs-border);
+  background: var(--bs-surface);
 }
-@media (max-width: 639px) {
-  .quote-sheet-dialog {
-    height: 100dvh;
-    max-height: 100dvh;
-    border-radius: 0;
-  }
+
+/* "Skip the quote" — deliberately below the send action and quieter than the
+   approach cards: an escape hatch, not a competing primary path. */
+.quote-tab__skip {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding: 0.75rem;
+  text-align: left;
+  border: 1px dashed var(--bs-border);
+  border-radius: 0.75rem;
+  background: transparent;
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
+}
+.quote-tab__skip:hover,
+.quote-tab__skip:focus-visible {
+  border-color: var(--bs-blue);
+  background: var(--bs-surface-alt);
+}
+.quote-tab__skip-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
+  background: var(--bs-surface-alt);
+  color: var(--bs-muted);
+  font-size: 0.9rem;
 }
 </style>

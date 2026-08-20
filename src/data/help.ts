@@ -392,14 +392,14 @@ Your clients here are yours: adding a client or setting up recurring billing doe
     keywords: ["quote", "invoice", "receipt", "billing", "total", "tax", "line items"],
     body: `Money on a job follows a simple path:
 
-1. **Quote:** the tradesperson builds a quote with line items and totals. The client reviews and accepts it before any work starts.
+1. **Quote (optional):** the tradesperson builds a quote with line items and totals on the job's **Quote** tab, and the client reviews and accepts it before any work starts. Quoting isn't required — see below.
 2. **Work:** the job runs; time and expenses can be tracked against it.
 3. **Invoice:** when the work is done, the invoice is built from the agreed quote plus tracked time, materials, and any extra charges (travel, callout, tool rental, or changes that came up along the way). The client reviews and approves it, extras included, before paying.
 4. **Receipt:** once paid, both sides have a receipt in the job thread.
 
 Everything is itemised, so there are no surprises: the client sees what they're paying for and the tradesperson has a clean record.
 
-**Not every job needs the full path.** A tradesperson can also write an invoice by hand from the job's **Invoice** tab — **New invoice** opens a blank one to fill in, with no quote or tracked time required. A hand-written invoice is a private draft until it's sent, and it's reviewed and paid exactly like any other. Sending it moves the job to **Awaiting payment**, so the tradesperson can mark it paid and close the job out as soon as the money lands.
+**Not every job needs the full path.** Quoting is a tab, not a gate: a tradesperson can write an invoice by hand from the job's **Invoice** tab — **New invoice** opens a blank one to fill in, with no quote or tracked time required. The **Quote** tab links straight across to it (**Skip the quote — invoice directly**) for jobs that don't need pricing up front. A hand-written invoice is a private draft until it's sent, and it's reviewed and paid exactly like any other. Sending it moves the job to **Awaiting payment**, so the tradesperson can mark it paid and close the job out as soon as the money lands.
 
 **Skipping the approval step.** Step 3's approval round-trip is the default, not a requirement. On the **Finish job** wrap-up a tradesperson can tick **"Finish without client approval"** to finalize the invoice on the spot — useful when they've run the job end-to-end and are collecting by cash or e-transfer. The client still gets the invoice and can still pay it online; they just aren't asked to approve the wrap-up first.`,
   },
@@ -1085,7 +1085,7 @@ const faqs: FaqItem[] = [
   {
     question: "Do I have to build a full itemized quote every time?",
     answer:
-      "No. When you tap **Prepare quote** you pick how to price the job first. **Time & materials** is the quick path: your hourly rate plus an optional materials estimate, and you're ready to send. **Itemized quote** is the guided walkthrough for bigger jobs, with discounts, an upfront fee and terms. **Site visit first** asks to see the job before pricing it. You can switch between them without losing what you've typed.",
+      "No — and you don't have to quote at all. Open the job's **Quote** tab and you pick how to price it first. **Time & materials** is the quick path: your hourly rate plus an optional materials estimate, and you're ready to send. **Itemized quote** is the guided walkthrough for bigger jobs, with discounts, an upfront fee and terms. **Site visit first** asks to see the job before pricing it. You can switch between them without losing what you've typed, or use **Skip the quote — invoice directly** to go straight to the Invoice tab.",
     categoryId: "for-tradespeople",
     audience: "tradesperson",
   },
@@ -1113,7 +1113,7 @@ const faqs: FaqItem[] = [
   {
     question: "Can I require a site visit before I quote?",
     answer:
-      "Yes. On a direct request, open **Prepare quote** and switch to **Site visit first**; when applying to a posted job, toggle **Site visit first** on the apply form. Add a single visit fee, or leave it at **$0 for a free visit**, plus an optional proposed date and note. The client agrees with one tap (no signature). Once they agree (or, on a posted job, pick you) you do the visit, then send your full quote: the agreed visit fee is **pre-filled as a line item**, so you can keep it to charge on top or delete it to waive or credit it.",
+      "Yes. On a direct request, open the job's **Quote** tab and pick **Site visit first**; when applying to a posted job, toggle **Site visit first** on the apply form. Add a single visit fee, or leave it at **$0 for a free visit**, plus an optional proposed date and note. The client agrees with one tap (no signature). Once they agree (or, on a posted job, pick you) you do the visit, then send your full quote: the agreed visit fee is **pre-filled as a line item**, so you can keep it to charge on top or delete it to waive or credit it.",
     categoryId: "for-tradespeople",
     audience: "tradesperson",
   },
