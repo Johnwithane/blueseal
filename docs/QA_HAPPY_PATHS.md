@@ -272,9 +272,9 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 
 ### 3.5 Pick how to quote (time & materials vs itemized vs site visit)
 
-1. On a **Requested** direct job, tap **Prepare quote**. **Expected:** before any
+1. On a **Requested** direct job, open the **Quote** tab. **Expected:** before any
    form, three cards: **Time & materials**, **Itemized quote**, **Site visit
-   first**. Footer shows **Cancel** only (nothing to send yet).
+   first**. No action row yet (nothing to send).
 2. Choose **Time & materials**. **Expected:** the form opens pre-seeded with an
    **Hourly** line at your profile rate and a **Materials** line at $0 — set the
    hours, price or delete the materials line, and send. The optional money
@@ -289,10 +289,45 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    - Flat rate / + Materials** buttons sit **above** an **"On this quote (N)"\*\*
      block that holds the rows. Tapping one adds a row into that block below and
      focuses its description — the row must not appear above the add buttons.
-6. **Resend/revise an existing quote.** Open **Prepare quote** on an
+6. **Resend/revise an existing quote.** Open the **Quote** tab on an
    already-quoted job. **Expected:** no chooser — straight to the full form with
-   every section, hydrated from the sent quote.
-7. Mobile (375px): each card is a full-width tap target at least 64px tall.
+   every section, hydrated from the sent quote. Send it: you stay on the tab and
+   it reloads into the revise state (no dialog to dismiss).
+7. Mobile (375px): each card is a full-width tap target at least 64px tall, and
+   the **Send quote** action row stays pinned to the bottom of the viewport in a
+   long itemized form.
+
+### 3.6 Quoting is optional, not a gate → issues #19 + #22
+
+1. As **Tradesperson** on a **Requested** direct job, look at the job page before
+   touching anything. **Expected:** **no** full-width sticky "Prepare quote" bar
+   at the bottom, and **no** "Quote needed" chip in the top-right. The only
+   quote affordance is the **Quote** tab, carrying a red badge dot.
+2. **Tab list.** Brief · Schedule · **Quote** · Work order · Invoice, in that
+   order. As a **client** on the same job there is **no Quote tab** (the client
+   sees the quote itself on the Invoice tab).
+3. **The tab explains itself.** Open **Quote**. **Expected:** header reads
+   "Prepare a quote" with "Optional. You can send an invoice without ever
+   quoting."
+4. **The skip path is findable.** At the bottom of the Quote tab, tap **Skip the
+   quote — invoice directly**. **Expected:** you land on the **Invoice** tab,
+   where **New invoice** mints a blank invoice with no quote and no tracked time.
+   Send it → job moves to **Awaiting payment** → mark paid → job closes out.
+   This is the whole point of #19: the backend has allowed it since PR #15 and
+   nothing pointed at it.
+5. **Status is still readable.** On every status other than Requested, the
+   top-right status chip is still there for the tradesperson (only the "Quote
+   needed" case is hidden). The client's chip is unchanged on all statuses.
+6. **Money CTAs survive.** The sticky bottom bar must still appear for
+   **Awaiting upfront payment** ("Mark upfront received") and **Awaiting
+   payment** ("Mark as paid") — only the two quote CTAs were removed.
+7. **Revise from the Invoice tab.** On a quoted job, the Invoice tab's
+   **revise quote** action now switches to the **Quote** tab rather than opening
+   a modal.
+8. **Site-visit hint moved.** On a Requested job with an **agreed** site visit,
+   the "the fee will be pre-filled into your quote" line appears **inside the
+   Quote tab**, not on a sticky bar.
+9. Mobile (375px): five tabs fit the bar icon-only with no horizontal scroll.
 
 ---
 

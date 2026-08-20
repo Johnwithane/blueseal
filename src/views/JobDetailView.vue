@@ -59,7 +59,7 @@ import FinishJobSheet from "@/components/FinishJobSheet.vue";
 import ClientApprovalBanner from "@/components/ClientApprovalBanner.vue";
 import InviteStatusBanner from "@/components/InviteStatusBanner.vue";
 import RecordOfflineAcceptanceBanner from "@/components/RecordOfflineAcceptanceBanner.vue";
-import QuoteSheet from "@/components/QuoteSheet.vue";
+import QuoteTab from "@/features/jobDetail/QuoteTab.vue";
 import ClientQuoteApprovalBanner from "@/components/ClientQuoteApprovalBanner.vue";
 import UpfrontFeePaymentBanner from "@/components/UpfrontFeePaymentBanner.vue";
 import TradieChangesRequestedBanner from "@/components/TradieChangesRequestedBanner.vue";
@@ -220,7 +220,6 @@ const pendingSession = ref<{
 const showFinishSheet = ref(false);
 const markingPaid = ref(false);
 const markingUpfront = ref(false);
-const showQuoteSheet = ref(false);
 
 const isTradie = computed(() => auth.fbUser?.uid === job.value?.tradespersonId);
 const isClient = computed(() => auth.fbUser?.uid === job.value?.clientId);
@@ -512,6 +511,21 @@ const tabs = computed<JobTab[]>(() => {
       // isn't one yet.
       badge: isTradie.value && s === "in_progress" && !job.value.scheduledStart ? "dot" : undefined,
     },
+    // Tradesperson-only: quoting is their action, and the client already sees
+    // the quote itself on the Invoice tab. Sits before Work order because it
+    // comes before the work. Optional by design — see QuoteTab's header
+    // comment and issues #19 / #22.
+    ...(isTradie.value
+      ? [
+          {
+            key: "quote",
+            label: "Quote",
+            icon: "pi-file-edit",
+            // The nudge the removed "Quote needed" Tag used to carry.
+            badge: s === "requested" ? ("dot" as const) : undefined,
+          },
+        ]
+      : []),
     {
       key: "workorder",
       label: "Work order",
@@ -584,16 +598,27 @@ watch(
 // the bar gets thinner on mobile so the chat composer can sit comfortably
 // above it.
 // Every tradesperson-actionable step in the loop gets a sticky CTA so
-// "what's next" is never buried in a tab. Two intentional skips:
-// `awaiting_client_approval` (wait-state — the InvoiceTab explains it) and
-// `in_progress` (Create invoice lives ONLY in the Invoice tab now, so the
-// invoice gets made where invoices live).
+// "what's next" is never buried in a tab. The skips are all "this step has its
+// own home, and a full-width bar overstates it": `awaiting_client_approval`
+// (wait-state — the InvoiceTab explains it), `in_progress` (Create invoice
+// lives ONLY in the Invoice tab, so the invoice gets made where invoices
+// live), and `requested` / `quoted` — quoting lives on the Quote tab now. The
+// sticky "Prepare quote" bar was the single loudest reason quoting read as
+// mandatory (issues #19, #22), so the money steps keep the bar and the
+// optional one doesn't.
 const stickyCTAStatuses: ReadonlySet<JobStatus> = new Set([
-  "requested",
-  "quoted",
   "awaiting_upfront_payment",
   "awaiting_payment",
 ]);
+// Moved off the sticky bar with the quote CTAs: only meaningful next to the
+// quote form, which is where an agreed visit fee gets pre-filled.
+const siteVisitAgreedNote = computed(() => {
+  const v = siteVisit.value;
+  if (!isTradie.value || v?.status !== "agreed") return null;
+  const fee = v.fee.feeCents > 0 ? `${money(v.fee.feeCents)} fee` : "free visit";
+  return `Site visit agreed — the ${fee} will be pre-filled into your quote.`;
+});
+
 const showStickyCTA = computed(
   () => job.value != null && isTradie.value && stickyCTAStatuses.has(job.value.status),
 );
@@ -1177,8 +1202,13 @@ function onReturnToApplicants() {
         <span>Back</span>
       </button>
       <!-- Status on the right of the top bar; the title gets full width below. -->
+      <!-- Hidden for the tradesperson on `requested`, where this reads
+           "Quote needed" — a demand for a step that is optional (#22). The
+           Quote tab's badge dot carries that state now. Every other status
+           keeps its readout; losing the status entirely would be a
+           regression neither issue asked for. -->
       <Tag
-        v-if="job"
+        v-if="job && !(isTradie && job.status === 'requested')"
         :value="statusLabel(job.status, isClient ? 'client' : isTradie ? 'tradesperson' : null)"
         :severity="STATUS_SEVERITY[job.status]"
         class="shrink-0"
@@ -1611,6 +1641,14 @@ function onReturnToApplicants() {
           :extras="jobExtras"
           @create-invoice="showFinishSheet = true"
         />
+        <QuoteTab
+          v-else-if="activeTab === 'quote' && isTradie"
+          :job-id="job.id"
+          :status="job.status"
+          :site-visit-agreed-note="siteVisitAgreedNote"
+          @submitted="load"
+          @go-tab="onTabChange"
+        />
         <InvoiceTab
           v-else-if="activeTab === 'invoice'"
           :job="job"
@@ -1624,7 +1662,7 @@ function onReturnToApplicants() {
           :resolved-tradesperson-name="resolvedTradespersonName"
           :resolved-client-name="resolvedClientName"
           @mark-paid="onMarkPaid"
-          @revise-quote="showQuoteSheet = true"
+          @revise-quote="onTabChange('quote')"
           @create-invoice="showFinishSheet = true"
           @create-manual-invoice="onCreateManualInvoice"
           @decided="load"
@@ -1671,34 +1709,8 @@ function onReturnToApplicants() {
       style="left: var(--bs-content-left-offset, 0px)"
     >
       <div class="bs-container">
-        <!-- Tradie hint: an agreed site visit will be pre-filled into the quote. -->
-        <p
-          v-if="isTradie && job.status === 'requested' && siteVisit?.status === 'agreed'"
-          class="text-xs text-center text-[color:var(--bs-muted)] mb-2"
-        >
-          <i class="pi pi-map-marker mr-1"></i>Site visit agreed — the
-          {{ siteVisit.fee.feeCents > 0 ? money(siteVisit.fee.feeCents) + " fee" : "free visit" }}
-          will be pre-filled into your quote.
-        </p>
         <Button
-          v-if="job.status === 'requested'"
-          label="Prepare quote"
-          icon="pi pi-file"
-          class="w-full"
-          size="large"
-          @click="showQuoteSheet = true"
-        />
-        <Button
-          v-else-if="job.status === 'quoted'"
-          label="Edit & re-send quote"
-          icon="pi pi-pencil"
-          class="w-full"
-          size="large"
-          outlined
-          @click="showQuoteSheet = true"
-        />
-        <Button
-          v-else-if="job.status === 'awaiting_upfront_payment'"
+          v-if="job.status === 'awaiting_upfront_payment'"
           :label="
             job.upfrontFee
               ? `Mark upfront received — ${money(job.upfrontFee.amountCents)}`
@@ -1733,13 +1745,6 @@ function onReturnToApplicants() {
       :billing-type="jobBillingType(job)"
       :extras="jobExtras"
       :upfront-fee-paid-cents="job.upfrontFee?.paidAt ? job.upfrontFee.amountCents : 0"
-      @submitted="load"
-    />
-
-    <QuoteSheet
-      v-if="job && isTradie"
-      v-model:visible="showQuoteSheet"
-      :job-id="job.id"
       @submitted="load"
     />
 
