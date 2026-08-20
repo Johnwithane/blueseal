@@ -686,14 +686,25 @@ Done:
 - **Why:** the two `whsec_` values were pasted into a chat transcript during setup. Not public, but they sit outside Stripe's vault, and anyone holding them can forge signed events — enough to mark an invoice paid or grant Pro.
 - **What:** Dashboard → Webhooks → each endpoint → Roll secret. Set both new values comma-separated into `STRIPE_WEBHOOK_SECRET`, then redeploy `stripeWebhook`.
 
-#### [ ] Deploy the Connect onboarding fix (blocks the hosting deploy)
+#### [ ] Finish the Connect onboarding deploy (CI will try, and probably fall short)
+
 - **Why:** "Start Stripe setup" returned a bare `INTERNAL` after the cutover. The
   callables now catch Stripe errors (so the real reason reaches the log and a
   readable sentence reaches the user) and self-heal a `stripeAccountId` the live
-  key can't resolve. The client half of that fix ships with hosting, so the
-  functions must be live **first** or the fix is half-applied.
-- **What:** deploy these nine, in batches of four (a wide deploy trips the
-  per-minute mutation quota; `FUNCTIONS_DISCOVERY_TIMEOUT=180` on Windows):
+  key can't resolve. The client half ships with hosting; until the functions are
+  live the fix simply does nothing (it doesn't break anything either — the old
+  callables behave as before).
+- **What CI does on merge to `main`:** the deploy workflow resolves changed
+  function sources to export names via `functions/src/index.ts`. This change adds
+  two shared helpers (`payments/connectErrors.ts`, `payments/connectAccount.ts`)
+  and touches `payments/payoutsState.ts` — none of which `index.ts` exports — so
+  the resolver **widens to a full deploy of all ~190 functions**. That is the
+  case the workflow's own comment says "reliably trips the per-minute Functions
+  mutation quota and fails the step" (runs 28974629400, 31628627790). Hosting
+  still ships (`continue-on-error`), and the run goes **red**.
+- **So: check the Actions run.** If "Deploy Cloud Functions" failed, deploy the
+  nine affected callables yourself, in batches of four (a wide deploy is what
+  trips the quota; `FUNCTIONS_DISCOVERY_TIMEOUT=180` on Windows):
   ```
   firebase deploy --only functions:createConnectAccount,functions:createConnectOnboardingLink,functions:createConnectLoginLink,functions:createPmConnectAccount
   firebase deploy --only functions:createPmConnectOnboardingLink,functions:createPmConnectLoginLink,functions:createRepConnectAccount,functions:createRepConnectOnboardingLink
