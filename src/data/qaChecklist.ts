@@ -601,6 +601,20 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
               "The calendar opens on Month (Month listed first in the toggle). Cells show job chips prefixed with the start time. Tapping a day opens a sheet with the day's working hours and an hour rail with each job drawn against the hours it occupies; tapping a job opens it. A bare tap no longer blocks the day — Block day lives in the sheet footer, and a blocked day shows an Unblock bar. A multi-day job appears on every day it spans. Read-only viewers get the sheet but NO block/unblock controls. 375px: no horizontal scroll.",
           },
           {
+            id: "tradie-calendar-12h",
+            title: "Calendar reads in 12-hour am/pm (issue #17)",
+            steps: [
+              "Open /dashboard/tradie?view=calendar and sweep Month, Week and the day sheet.",
+              "Open a day sheet and read the working-hours line, the hour gutter and each job block.",
+              "Tap Add time to a job — check the prefilled Start/End.",
+              "Type each of 5pm, 5 PM, 5:00 p.m. and 17:00 into Start and save.",
+              "Profile → working hours: read the caption under each availability row.",
+              "Job → Schedule tab, and the work order's manual time entry dialog.",
+            ],
+            expected:
+              "No 24-hour time is left anywhere on the calendar — gutter reads 7 a.m. / 12 p.m. / 1 p.m., blocks read 9:00 a.m. – 11:30 a.m., working hours reads 8:00 a.m.–5:00 p.m. All four typed forms book 5:00 p.m.; junk gives \"Enter times like 9:00 am\". Availability fields still take 24-hour HH:MM but show a 12-hour read-back. Both date-time pickers are am/pm. Stored times are unchanged across a reload. At 375px nothing clips or scrolls sideways — including an availability row.",
+          },
+          {
             id: "tradie-calendar-add-time",
             title: "Book time against an existing job from the calendar",
             steps: [
@@ -714,6 +728,19 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
           { id: "admin-disputes", title: "Disputes handling" },
           { id: "admin-users", title: "User 360 / support" },
           { id: "admin-jobs-browse", title: "Jobs & postings browse (all regions)" },
+          {
+            id: "admin-bug-fix-digest",
+            title: "Batched \"your bug report is fixed\" notice",
+            steps: [
+              "File two bugs from the floating Report a bug button.",
+              "In /admin/bug-reports flip both to Fixed, and a third report to Wontfix.",
+              "Run scheduledBugFixNotices (Cloud Scheduler console, or wait for 09:00 America/Vancouver).",
+              "Run the sweep a second time without changing anything.",
+              "Flip a fourth report to Fixed and run the sweep again.",
+            ],
+            expected:
+              "One notification + email naming both fixed titles and linking to /admin/bug-reports; the wontfix report is never mentioned. The second sweep sends nothing (fixNotifiedAt is stamped). The third sweep names only the newly-fixed report. Bell row wraps cleanly at 375px.",
+          },
         ],
       },
     ],

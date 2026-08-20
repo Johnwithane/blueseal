@@ -95,6 +95,7 @@ const ICON: Record<NotificationType, string> = {
   commission_paid: "pi pi-dollar",
   commission_reversed: "pi pi-replay",
   project_jobs_added: "pi pi-plus-circle",
+  bug_report_fixed: "pi pi-check-square",
 };
 
 function iconFor(type: NotificationType): string {

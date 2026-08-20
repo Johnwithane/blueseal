@@ -22,9 +22,18 @@ export interface FakeQuerySnap {
   size: number;
 }
 
-export interface FakeCollectionRef {
+export interface FakeCollectionRef extends FakeQueryRef {
   add(data: Data): Promise<{ id: string }>;
   doc(id: string): FakeDocRef;
+}
+
+// The chainable read surface: collection(…).where(…).limit(…).get(). Only
+// "==" is supported — that's all the scheduled sweeps and callables use, and
+// a fake that silently mis-handles a range operator is worse than one that
+// throws on it.
+export interface FakeQueryRef {
+  where(field: string, op: "==", value: unknown): FakeQueryRef;
+  limit(n: number): FakeQueryRef;
   get(): Promise<FakeQuerySnap>;
 }
 
@@ -197,10 +206,47 @@ export class FakeFirestore {
     return new FakeDocRef(this, path);
   }
 
+  // Every doc directly under `path` (a nested subcollection under one of them
+  // is a different collection, same as real Firestore), in insertion order.
+  private _children(path: string): FakeSnap[] {
+    const docs: FakeSnap[] = [];
+    for (const [key, raw] of this.store) {
+      if (!key.startsWith(`${path}/`)) continue;
+      if (key.slice(path.length + 1).includes("/")) continue;
+      docs.push(makeSnap(this.doc(key), raw));
+    }
+    return docs;
+  }
+
+  // Chainable query over a collection. Filters/limit accumulate immutably so
+  // a ref can be branched, like the real SDK's Query.
+  private _query(
+    path: string,
+    filters: Array<[string, unknown]>,
+    max: number | null,
+  ): FakeQueryRef {
+    return {
+      where: (field: string, op: "==", value: unknown) => {
+        if (op !== "==") throw new Error(`fakeFirestore: unsupported operator "${op}"`);
+        return this._query(path, [...filters, [field, value]], max);
+      },
+      limit: (n: number) => this._query(path, filters, n),
+      get: async () => {
+        let docs = this._children(path).filter((snap) => {
+          const raw = snap.data() ?? {};
+          return filters.every(([field, value]) => raw[field] === value);
+        });
+        if (max !== null) docs = docs.slice(0, max);
+        return { docs, empty: docs.length === 0, size: docs.length };
+      },
+    };
+  }
+
   // Collection ref — add() for the write-only callers (audit/mail/aiUsage/
   // replies; auto-ids are sequential so tests can assert deterministically),
-  // plus doc()/get() for the ones that read a subcollection back.
+  // plus doc()/get()/where()/limit() for the ones that read a collection back.
   collection(path: string): FakeCollectionRef {
+    const query = this._query(path, [], null);
     return {
       add: async (data: Data) => {
         this.seq += 1;
@@ -209,17 +255,9 @@ export class FakeFirestore {
         return { id };
       },
       doc: (id: string) => this.doc(`${path}/${id}`),
-      // Direct children only — a nested subcollection under one of these docs
-      // is a different collection, same as real Firestore.
-      get: async () => {
-        const docs: FakeSnap[] = [];
-        for (const [key, raw] of this.store) {
-          if (!key.startsWith(`${path}/`)) continue;
-          if (key.slice(path.length + 1).includes("/")) continue;
-          docs.push(makeSnap(this.doc(key), raw));
-        }
-        return { docs, empty: docs.length === 0, size: docs.length };
-      },
+      where: query.where,
+      limit: query.limit,
+      get: query.get,
     };
   }
 
