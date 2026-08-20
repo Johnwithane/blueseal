@@ -686,7 +686,7 @@ Done:
 - **Why:** the two `whsec_` values were pasted into a chat transcript during setup. Not public, but they sit outside Stripe's vault, and anyone holding them can forge signed events — enough to mark an invoice paid or grant Pro.
 - **What:** Dashboard → Webhooks → each endpoint → Roll secret. Set both new values comma-separated into `STRIPE_WEBHOOK_SECRET`, then redeploy `stripeWebhook`.
 
-#### [ ] Finish the Connect onboarding deploy (CI will try, and probably fall short)
+#### [x] Deploy the Connect onboarding fix (done 2026-08-20, run 32387593791)
 
 - **Why:** "Start Stripe setup" returned a bare `INTERNAL` after the cutover. The
   callables now catch Stripe errors (so the real reason reaches the log and a
@@ -702,9 +702,16 @@ Done:
   case the workflow's own comment says "reliably trips the per-minute Functions
   mutation quota and fails the step" (runs 28974629400, 31628627790). Hosting
   still ships (`continue-on-error`), and the run goes **red**.
-- **So: check the Actions run.** If "Deploy Cloud Functions" failed, deploy the
-  nine affected callables yourself, in batches of four (a wide deploy is what
-  trips the quota; `FUNCTIONS_DISCOVERY_TIMEOUT=180` on Windows):
+- **What actually happened:** the full deploy ran and **all nine Connect
+  callables updated successfully**. The quota did bite, but it claimed exactly
+  one unrelated function — `sendApplicationMessage`, "Quota Exceeded" on update
+  — which failed the run and left it red. Its source is unchanged since
+  `6aee0fc`, so the failed update just left the identical existing revision
+  running; nothing is stale. Re-run the job to clear the red if you want it
+  green. Hosting shipped.
+- **If a future wide deploy loses the Connect functions instead**, deploy them
+  in batches of four (a wide deploy is what trips the quota;
+  `FUNCTIONS_DISCOVERY_TIMEOUT=180` on Windows):
   ```
   firebase deploy --only functions:createConnectAccount,functions:createConnectOnboardingLink,functions:createConnectLoginLink,functions:createPmConnectAccount
   firebase deploy --only functions:createPmConnectOnboardingLink,functions:createPmConnectLoginLink,functions:createRepConnectAccount,functions:createRepConnectOnboardingLink
