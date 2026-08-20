@@ -173,7 +173,7 @@ function close() {
             v-model="started"
             input-id="manual-start"
             show-time
-            hour-format="24"
+            hour-format="12"
             class="w-full"
             placeholder="Start"
           />
@@ -184,7 +184,7 @@ function close() {
             v-model="ended"
             input-id="manual-end"
             show-time
-            hour-format="24"
+            hour-format="12"
             class="w-full"
             placeholder="End"
           />

@@ -259,7 +259,7 @@ function removeSession() {
               v-model="formStart"
               input-id="session-start"
               time-only
-              hour-format="24"
+              hour-format="12"
               class="w-full"
               placeholder="Start"
             />
@@ -270,7 +270,7 @@ function removeSession() {
               v-model="formEnd"
               input-id="session-end"
               time-only
-              hour-format="24"
+              hour-format="12"
               class="w-full"
               placeholder="End"
             />
