@@ -446,6 +446,33 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 1. Mark an invoice paid by **e-transfer / cash** instead of card.
 2. **Expected:** **no service fee**; job completes.
 
+### 6.5 Payout setup survives a Stripe account change
+
+The live cutover (2026-08-19) moved Blue Seal to a **different** Stripe account,
+not just a different mode, so every `acct_` minted during sandbox testing 404s
+against the live key. A tradesperson whose saved account id is one of those used
+to be stuck: "Start Stripe setup" returned a bare `INTERNAL` on every click.
+
+1. As a tradesperson, open **Account → Payouts** and click **Start Stripe
+   setup**. **Expected:** you reach Stripe's hosted onboarding form.
+2. Simulate an orphaned id: in Firestore, set
+   `tradespeople/{uid}.payouts.stripeAccountId` to a made-up `acct_xxx` (leave
+   the rest of the block alone). Reload and click **Start Stripe setup**.
+3. **Expected:** you are NOT dead-ended. The server notices the id doesn't
+   resolve, discards it, creates a fresh account, and you land on Stripe's form.
+   If the error toast does appear it reads a real sentence ("Your payout account
+   couldn't be found at Stripe…"), never `INTERNAL`, and a **second** click gets
+   through. The Cloud Functions log carries Stripe's own `code` + `requestId`.
+4. Repeat for the **project manager** (`/manage` → Earnings) and **sales rep**
+   (`/sales/payouts`) panels — same recovery, their payouts blocks were never
+   swept at cutover.
+5. **Expected (money control):** a freshly created *tradesperson* account records
+   `payouts.payoutHoldDays: 7`. If it reads `null`, the 7-day chargeback hold did
+   NOT apply — onboarding deliberately continues, but the miss is logged at
+   error level and needs fixing in Stripe. PM + rep accounts are undelayed by
+   design and always read `null`.
+6. Mobile (375px): the Payouts panel and its error toast fit without scroll.
+
 ---
 
 ## 7. Reviews → help: `mutual-reviews`
@@ -964,6 +991,7 @@ through the normal paywall → trial → Stripe, no "add the tradesperson role" 
 - [ ] 6.3 Pro fee waiver
 - [ ] 6.4 Offline payment (no fee)
 - [ ] 7 Mutual reviews
+- [ ] 6.5 Payout setup recovers from an orphaned Stripe account id
 - [ ] 8.1 Pro trial (Stripe)
 - [ ] 8.2 AI paywall + receipt OCR free
 - [ ] 8.3 Recurring billing drafts (never auto-sends)

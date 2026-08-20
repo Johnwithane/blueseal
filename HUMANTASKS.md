@@ -686,6 +686,27 @@ Done:
 - **Why:** the two `whsec_` values were pasted into a chat transcript during setup. Not public, but they sit outside Stripe's vault, and anyone holding them can forge signed events — enough to mark an invoice paid or grant Pro.
 - **What:** Dashboard → Webhooks → each endpoint → Roll secret. Set both new values comma-separated into `STRIPE_WEBHOOK_SECRET`, then redeploy `stripeWebhook`.
 
+#### [ ] Deploy the Connect onboarding fix (blocks the hosting deploy)
+- **Why:** "Start Stripe setup" returned a bare `INTERNAL` after the cutover. The
+  callables now catch Stripe errors (so the real reason reaches the log and a
+  readable sentence reaches the user) and self-heal a `stripeAccountId` the live
+  key can't resolve. The client half of that fix ships with hosting, so the
+  functions must be live **first** or the fix is half-applied.
+- **What:** deploy these nine, in batches of four (a wide deploy trips the
+  per-minute mutation quota; `FUNCTIONS_DISCOVERY_TIMEOUT=180` on Windows):
+  ```
+  firebase deploy --only functions:createConnectAccount,functions:createConnectOnboardingLink,functions:createConnectLoginLink,functions:createPmConnectAccount
+  firebase deploy --only functions:createPmConnectOnboardingLink,functions:createPmConnectLoginLink,functions:createRepConnectAccount,functions:createRepConnectOnboardingLink
+  firebase deploy --only functions:createRepConnectLoginLink
+  ```
+- **Verify:** run QA_HAPPY_PATHS 6.5. Onboard yourself as a tradesperson and
+  confirm `tradespeople/{uid}.payouts.payoutHoldDays` reads `7`.
+- **If it reads `null`:** the account exists and onboarding worked, but the
+  7-day chargeback hold did NOT apply — search the functions log for
+  `failed to apply the payout hold` and take Stripe's `code` to the dashboard.
+  We take destination charges, so that hold is what keeps a late chargeback
+  reversible; don't leave it unapplied.
+
 ---
 
 ## QuickBooks Online sync (Pro fast-follow — added 2026-06-11)

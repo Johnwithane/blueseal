@@ -14,21 +14,22 @@ import { logger } from "firebase-functions/v2";
 import { db } from "../lib/admin";
 import { requireRole } from "../lib/auth";
 import { STRIPE_SECRET_KEY, getStripe } from "./stripeClient";
+import { clearOrphanedAccount } from "./connectAccount";
+import { isMissingResource, stripeFailure } from "./connectErrors";
 
 export const createConnectLoginLink = onCall(
   { ...CALLABLE_OPTS, secrets: [STRIPE_SECRET_KEY] },
   async (req) => {
     const uid = requireRole(req, "tradesperson");
+    const ctx = { fn: "createConnectLoginLink", uid };
 
-    const snap = await db.doc(`tradespeople/${uid}`).get();
+    const tradieRef = db.doc(`tradespeople/${uid}`);
+    const snap = await tradieRef.get();
     const payouts = snap.data()?.payouts as
       | { stripeAccountId?: string; detailsSubmitted?: boolean }
       | undefined;
     if (!payouts?.stripeAccountId) {
-      throw new HttpsError(
-        "failed-precondition",
-        "Create a Stripe Connect account first.",
-      );
+      throw new HttpsError("failed-precondition", "Create a Stripe Connect account first.");
     }
     if (!payouts.detailsSubmitted) {
       throw new HttpsError(
@@ -37,13 +38,17 @@ export const createConnectLoginLink = onCall(
       );
     }
 
+    const accountId = payouts.stripeAccountId;
     const stripe = getStripe();
-    const link = await stripe.accounts.createLoginLink(payouts.stripeAccountId);
-
-    logger.info("createConnectLoginLink", {
-      uid,
-      accountId: payouts.stripeAccountId,
-    });
-    return { url: link.url };
+    try {
+      const link = await stripe.accounts.createLoginLink(accountId);
+      logger.info("createConnectLoginLink", { ...ctx, accountId });
+      return { url: link.url };
+    } catch (err) {
+      if (isMissingResource(err)) {
+        await clearOrphanedAccount(tradieRef, "payouts", ctx);
+      }
+      throw stripeFailure(err, { ...ctx, accountId });
+    }
   },
 );

@@ -620,6 +620,18 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
             expected:
               "The invoice flips to paid on the webhook and the tradesperson nets the full invoice total (the client covered the service fee on top). In Stripe, the charge's statement descriptor reads BLUESEAL* <business name> (not a bare BLUESEAL), and the connected account's payout schedule reads a 7-day rolling delay set at account creation that the tradesperson cannot shorten from their Express dashboard.",
           },
+          {
+            id: "tradie-payout-setup-recovers",
+            title: "Payout setup recovers from an orphaned Stripe account id",
+            steps: [
+              "Account → Payouts → Start Stripe setup. You should reach Stripe's hosted form.",
+              "In Firestore, set tradespeople/{uid}.payouts.stripeAccountId to a made-up acct_xxx (leave the rest of the block alone), reload, and click Start Stripe setup again.",
+              "Check the tradesperson doc after a fresh account is created.",
+              "Repeat on the PM panel (/manage → Earnings) and the rep panel (/sales/payouts).",
+            ],
+            expected:
+              "You are never dead-ended. The server notices the stored id does not resolve against the live Stripe key, discards it, creates a fresh account, and you land on Stripe's form. Any error toast reads a real sentence (\"Your payout account couldn't be found at Stripe…\"), NEVER a bare INTERNAL, and a second click gets through; the Cloud Functions log carries Stripe's own code + requestId. A freshly created tradesperson account records payouts.payoutHoldDays: 7 — null means the 7-day chargeback hold did not apply (onboarding still continues by design, but it is logged at error level and needs fixing in Stripe). PM + rep accounts are undelayed by design and always read null. Mobile 375px: panel + toast fit without scroll.",
+          },
           { id: "tradie-pro", title: "Blue Seal Pro (toggle free vs Pro features)" },
           { id: "tradie-profile", title: "Profile + branding + vanity /u/<slug>" },
           {

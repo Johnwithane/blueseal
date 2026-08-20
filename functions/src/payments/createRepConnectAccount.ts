@@ -18,6 +18,8 @@ import { db } from "../lib/admin";
 import { requireRole } from "../lib/auth";
 import { requireRepActive } from "../lib/salesRep";
 import { STRIPE_SECRET_KEY, emptyPayoutsState, getStripe } from "./stripeClient";
+import { connectAccountExists } from "./connectAccount";
+import { callStripe } from "./connectErrors";
 
 interface ExistingPayouts {
   stripeAccountId?: string | null;
@@ -29,30 +31,42 @@ export const createRepConnectAccount = onCall(
     const uid = requireRole(req, "sales");
     await requireRepActive(uid);
 
+    const ctx = { fn: "createRepConnectAccount", uid };
+
     const repRef = db.doc(`users/${uid}`);
     const snap = await repRef.get();
     const existing = (snap.data()?.salesRep?.payouts ?? {}) as ExistingPayouts;
+    const stripe = getStripe();
     if (existing.stripeAccountId) {
-      logger.info("createRepConnectAccount: idempotent hit", {
-        uid,
-        stripeAccountId: existing.stripeAccountId,
+      const stored = existing.stripeAccountId;
+      // Verified, not assumed: an id the current Stripe key cannot see is an
+      // orphan from the pre-cutover sandbox account, and handing it back would
+      // dead-end onboarding on a 404 forever. See connectAccount.ts.
+      const alive = await callStripe(ctx, () => connectAccountExists(stripe, stored, ctx));
+      if (alive) {
+        logger.info("createRepConnectAccount: idempotent hit", { ...ctx, stripeAccountId: stored });
+        return { stripeAccountId: stored };
+      }
+      logger.warn("createRepConnectAccount: replacing orphaned account id", {
+        ...ctx,
+        orphanedAccountId: stored,
       });
-      return { stripeAccountId: existing.stripeAccountId };
     }
 
-    const stripe = getStripe();
-    const account = await stripe.accounts.create({
-      type: "express",
-      country: "CA",
-      default_currency: "cad",
-      capabilities: {
-        transfers: { requested: true },
-      },
-      business_type: "individual",
-      // repId round-trip for the webhook dispatcher (distinguishes a rep account
-      // from a tradesperson one, which carries metadata.tradespersonId).
-      metadata: { repId: uid },
-    });
+    const account = await callStripe(ctx, () =>
+      stripe.accounts.create({
+        type: "express",
+        country: "CA",
+        default_currency: "cad",
+        capabilities: {
+          transfers: { requested: true },
+        },
+        business_type: "individual",
+        // repId round-trip for the webhook dispatcher (distinguishes a rep account
+        // from a tradesperson one, which carries metadata.tradespersonId).
+        metadata: { repId: uid },
+      }),
+    );
 
     await repRef.set(
       {
@@ -68,10 +82,7 @@ export const createRepConnectAccount = onCall(
       { merge: true },
     );
 
-    logger.info("createRepConnectAccount: created", {
-      uid,
-      stripeAccountId: account.id,
-    });
+    logger.info("createRepConnectAccount: created", { ...ctx, stripeAccountId: account.id });
     return { stripeAccountId: account.id };
   },
 );

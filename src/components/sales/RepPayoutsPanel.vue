@@ -70,9 +70,12 @@ const pendingItems = computed(() => state.value?.pendingRequirements ?? []);
 async function kickOff() {
   busy.value = "create";
   try {
-    if (!state.value?.stripeAccountId) {
-      await createRepConnectAccount();
-    }
+    // Always call the create callable — it is idempotent server-side AND it
+    // verifies the stored account still exists on the current Stripe key.
+    // Skipping it when the mirrored state has an id is what made a dead
+    // sandbox account id unrecoverable: the client never asked for a new
+    // account, so every click re-used the dead one.
+    await createRepConnectAccount();
     const { url } = await createRepConnectOnboardingLink();
     busy.value = "onboard";
     window.location.assign(url);
