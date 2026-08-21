@@ -90,6 +90,35 @@ If a deploy goes bad on a Friday afternoon and the rollback isn't obvious, **rol
 
 ---
 
+## The `functions/src/lib/*` full-deploy landmine
+
+`.github/workflows/deploy.yml` deploys only the functions whose source changed —
+EXCEPT that anything under `functions/src/lib/*` is treated as shared and falls
+back to deploying all ~200. That fallback reliably fails: Cloud Run's
+`total allowable CPU per project per region` quota saturates partway through and
+the last functions can't roll a healthy revision (runs 32394208550 and, on
+2026-08-20, 32429901599).
+
+The trap: **adding a `NotificationType` edits `functions/src/lib/notify.ts`**, so
+a one-line type addition triggers the full deploy. It is easy to think you shipped
+one small scheduled function and find 200 revisions rolling.
+
+If you're about to touch `functions/src/lib/`, know that you're signing up for a
+full deploy, and expect a handful of functions to need a targeted follow-up:
+
+```
+firebase deploy --only functions:<name1>,functions:<name2>
+```
+
+Read the run log for the `Failed to update function <name>` lines — that list is
+exactly what still needs deploying. Hosting ships independently and is unaffected,
+and a failed revision never takes the previous one out of service, so a partial
+failure here degrades nothing; it just leaves those functions on older code.
+
+See HUMANTASKS.md for the open decision on fixing this properly.
+
+---
+
 ## What NOT to do
 
 - **`firebase deploy` with no `--only`.** Deploys *everything* — rules, indexes, functions, AND hosting. For a one-file rule tweak this means a full hosting push, which busts CDN caches and shows users a fresh client on next load. Always scope with `--only`.
