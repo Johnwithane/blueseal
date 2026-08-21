@@ -1390,6 +1390,13 @@ const faqs: FaqItem[] = [
     audience: "all",
   },
   {
+    question: "How do I refund a client? (tradespeople)",
+    answer:
+      "Open the job's **Invoice** tab and use **Refund**. You can return the whole payment or part of it. A **full refund** sends your client everything back, including the Blue Seal service fee. A **partial refund** comes out of your share, so the service fee isn't returned. Refunds land back on your client's original card, usually within 5–10 business days. If a client is unhappy, refunding them directly is almost always better than letting it become a bank dispute — it's faster for them and it keeps your payment record clean.",
+    categoryId: "payments-invoices",
+    audience: "tradesperson",
+  },
+  {
     question: "Is there a limit on paying by card?",
     answer:
       "Yes. Single card payments through Blue Seal are capped, with a lower cap while a tradesperson is new to the platform. It's a fraud and chargeback protection for both sides, and it lifts on its own as they build a payment history. Bigger jobs aren't a problem — pay by e-transfer or cash and record it on the job. That's fee-free, so it's usually the cheaper option at that size anyway, and you still get the invoice, receipt and full job record.",

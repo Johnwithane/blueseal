@@ -3,13 +3,16 @@ import { mount } from "@vue/test-utils";
 import InvoiceTab from "./InvoiceTab.vue";
 import type { InvoiceStatus, JobDoc, JobStatus, WithId } from "@/firebase/interfaces";
 
-// The tab is pure presentation over three heavy children (the editor, the
-// client card, the quote card) — stub them and assert on which surfaces the
-// gating computeds expose. Button renders its label so the CTAs are findable.
+// The tab is pure presentation over four heavy children (the editor, the
+// client card, the refund card, the quote card) — stub them and assert on which
+// surfaces the gating computeds expose. Button renders its label so the CTAs
+// are findable. The refund card self-subscribes to Firestore and needs a
+// PrimeVue Toast provider, so it must be stubbed like the rest.
 const STUBS = {
   Button: { props: ["label"], template: "<button>{{ label }}</button>" },
   InvoiceEditor: { props: ["canEdit"], template: '<div class="stub-editor" />' },
   ClientInvoiceCard: { template: '<div class="stub-client-card" />' },
+  RefundInvoiceCard: { template: '<div class="stub-refund-card" />' },
   QuoteCard: true,
 };
 

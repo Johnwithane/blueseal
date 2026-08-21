@@ -750,6 +750,43 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
             expected:
               "You are never dead-ended. The server notices the stored id does not resolve against the live Stripe key, discards it, creates a fresh account, and you land on Stripe's form. Any error toast reads a real sentence (\"Your payout account couldn't be found at Stripe…\"), NEVER a bare INTERNAL, and a second click gets through; the Cloud Functions log carries Stripe's own code + requestId. A freshly created tradesperson account records payouts.payoutHoldDays: 7 — null means the 7-day chargeback hold did not apply (onboarding still continues by design, but it is logged at error level and needs fixing in Stripe). PM + rep accounts are undelayed by design and always read null. Mobile 375px: panel + toast fit without scroll.",
           },
+          {
+            id: "tradie-refund-invoice",
+            title: "Refund a card payment (full and partial)",
+            steps: [
+              "As the tradesperson on a card-PAID job, open the Invoice tab. A \"Refund this payment\" card is there.",
+              "Refund part of it — try an amount ABOVE your share of the payment first (the invoice total, not what the client paid), then a valid smaller amount.",
+              "Wait for the charge.refunded webhook, then check the invoice doc and the Stripe dashboard.",
+              "On a second paid job, refund in full.",
+              "Check Stripe's balance for BOTH: the connected account and the platform.",
+            ],
+            expected:
+              "Over-share partial is refused with a sentence naming the limit, not a bare error. A valid PARTIAL comes entirely out of the tradesperson's balance — Blue Seal's application fee is untouched and the platform is not out of pocket (this is why the partial path reverses the transfer explicitly instead of using Stripe's proportional reverse_transfer). A FULL refund returns the service fee to the client too, and unwinds the transfer proportionally. Invoice flips to partially_refunded / refunded via the webhook (never written by the callable), and any rep/PM commission reverses in the same proportion. Mobile 375px: the dialog fits and the amount field is usable.",
+          },
+          {
+            id: "tradie-card-payment-ceiling",
+            title: "Card-payment ceiling (new vs established tradesperson)",
+            steps: [
+              "As a tradesperson with fewer than 3 paid jobs (or approved under 30 days ago), send an invoice over $2,500 and have the client try to pay by card.",
+              "Repeat with an established tradesperson at over $10,000.",
+              "Then pay each of those jobs offline (e-transfer) and confirm the flow completes.",
+            ],
+            expected:
+              "Card payment is refused with a sentence that names the limit AND points at the fee-free e-transfer path — never a dead end, and never a bare INTERNAL. The offline path completes normally and the job closes out. An established tradesperson under $10,000 is unaffected.",
+          },
+          {
+            id: "tradie-card-payments-paused",
+            title: "Admin can pause a tradesperson's card payments",
+            steps: [
+              "As admin: user detail → Trades, Blue Seal Pro & payments → Pause card payments (add a reason).",
+              "As a client on that tradesperson's job, try to pay an invoice by card.",
+              "Confirm the tradesperson can still use the rest of the app (edit profile, chat, get marked paid offline).",
+              "As the tradesperson, try to clear tradespeople/{uid}.payments from the client (browser console / rules test).",
+              "Resume from the same admin panel.",
+            ],
+            expected:
+              "Card payment is refused with a neutral message — the client never sees the internal reason. Everything else about the account keeps working, including offline payment: this is a payments control, not an account suspension. The tradesperson CANNOT clear the pause themselves (payments is server-only in rules). Resuming restores card payment immediately.",
+          },
           { id: "tradie-pro", title: "Blue Seal Pro (toggle free vs Pro features)" },
           { id: "tradie-profile", title: "Profile + branding + vanity /u/<slug>" },
           {
@@ -789,6 +826,19 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
           },
           { id: "admin-vetting", title: "Vetting queue: approve cert/ID/insurance" },
           { id: "admin-disputes", title: "Disputes handling" },
+          {
+            id: "admin-dispute-recovery-evidence",
+            title: "Dispute holds back the payout and drafts evidence",
+            steps: [
+              "Trigger a dispute on a card-paid job — pay with Stripe's disputed test card 4000 0000 0000 0259, which charges normally then opens a fraudulent dispute.",
+              "Open /admin/disputes/{id} and read the Funds panel.",
+              "In Stripe, check the connected account's balance and the dispute's evidence tab.",
+              "Use Rebuild draft, then Submit evidence (confirm the warning appears first).",
+              "Close the dispute as WON in Stripe and re-check the Funds panel and the connected account.",
+            ],
+            expected:
+              "On open: the tradesperson's transfer is reversed for the disputed amount (capped at what they actually received, since the client also paid the service fee), the Funds panel says how much was held back, and Stripe's evidence tab already holds a DRAFT built from the job — signed quote acceptance, chat transcript, timeline, invoice lines. It is NOT auto-submitted. Submit is behind a confirm that says it's one-shot. The tradesperson's notification says action IS needed (not the old \"no action needed\") and that the payout is held. On WON: the held amount is transferred back and the panel flips to restored. If the reversal FAILED (tradesperson already paid out), the panel says so in red and frames it as a debt to recover — never a silent Blue Seal loss.",
+          },
           { id: "admin-users", title: "User 360 / support" },
           { id: "admin-jobs-browse", title: "Jobs & postings browse (all regions)" },
           {

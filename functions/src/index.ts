@@ -245,6 +245,7 @@ export { createRepConnectLoginLink } from "./payments/createRepConnectLoginLink"
 export { stripeWebhook } from "./payments/stripeWebhook";
 export { adminSubmitDisputeEvidence } from "./payments/adminSubmitDisputeEvidence";
 export { adminSetCardPayments } from "./payments/adminSetCardPayments";
+export { refundInvoicePayment } from "./payments/refundInvoicePayment";
 export { createInvoicePaymentIntent } from "./payments/createInvoicePaymentIntent";
 export { createUpfrontFeePaymentIntent } from "./payments/createUpfrontFeePaymentIntent";
 // Blue Seal Pro subscription (Stripe Billing).
