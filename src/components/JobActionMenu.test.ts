@@ -130,8 +130,8 @@ describe("JobActionMenu — the trigger still reads as a status", () => {
       props: { job: job("requested") },
       global: { stubs: STUBS },
     });
-    expect(w.find(".stub-tag").text()).toBe("Quote needed");
-    expect(w.find("button").attributes("aria-label")).toBe("Quote needed — job actions");
+    expect(w.find(".stub-tag").text()).toBe("New job");
+    expect(w.find("button").attributes("aria-label")).toBe("New job — job actions");
   });
 
   it("labels every status it can show", () => {

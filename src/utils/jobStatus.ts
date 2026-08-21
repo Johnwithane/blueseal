@@ -31,7 +31,10 @@ const CLIENT_STATUS_LABEL: Partial<Record<JobStatus, string>> = {
 
 const TRADIE_STATUS_LABEL: Partial<Record<JobStatus, string>> = {
   accepted: "Awaiting brief",
-  requested: "Quote needed",
+  // "New job", not "Quote needed": quoting is optional (#19/#22), so naming
+  // the status after a step the tradesperson may never take read as a demand
+  // (bugReports/j7NnkWrCYHCjagGE8yB9).
+  requested: "New job",
   quoted: "Quote sent",
   awaiting_upfront_payment: "Upfront due",
   awaiting_client_approval: "Awaiting approval",

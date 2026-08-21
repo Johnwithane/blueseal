@@ -189,7 +189,7 @@ Tradesperson verification has three independent documents — **ID**, **certific
 4. **Quoting (optional):** leave **"Quote already agreed — skip straight to the
    work"** OFF for the standard flow. Submit.
 5. **Expected:** returns a copyable **invite link** + emails a magic sign-in link
-   to the client. Job appears in your kanban at **Quote needed** (client not yet
+   to the client. Job appears in your kanban at **New job** (client not yet
    attached), and any photos you attached show as the job's intake photos. This
    flow is **free** (no Pro needed). Mobile (375px): the photo grid is 3-up and the
    form is single-column.
@@ -474,7 +474,7 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 
 1. As **Tradesperson**, open `/dashboard/tradie` (Jobs). **Expected:** every job's
    status chip now has a **chevron** and is tappable. The status text is
-   unchanged ("Quote needed", "In progress", …) — the ask was to make it
+   unchanged ("New job", "In progress", …) — the ask was to make it
    actionable, not to remove it.
 2. **Items follow the status machine.** Tap the chip on each of these and check
    the menu:

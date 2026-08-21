@@ -520,7 +520,7 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
               "Leave 'Quote already agreed — skip straight to the work' OFF for this run. Submit.",
             ],
             expected:
-              "A copyable invite link is shown and a branded magic sign-in link is emailed to the client. The job lands in your kanban at 'Quote needed' (client not yet attached) with your attached photos as its intake photos. Flow is free (no Pro). Mobile 375px: single-column form, 3-up photo grid.",
+              "A copyable invite link is shown and a branded magic sign-in link is emailed to the client. The job lands in your kanban at 'New job' (client not yet attached) with your attached photos as its intake photos. Flow is free (no Pro). Mobile 375px: single-column form, 3-up photo grid.",
           },
           {
             id: "tradie-invite-job-skip-quote",
@@ -530,7 +530,7 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
               "Open the created job and check its status; try the money path (log time / add an expense, then finalize the invoice).",
             ],
             expected:
-              "The job opens directly at 'In progress' with NO quote step (billing is fixed, job-line tax 0%). There's nothing to quote or accept; you invoice from logged time + materials, same as a solo job whose acceptance was recorded offline. Leaving the toggle off still enters at 'Quote needed'.",
+              "The job opens directly at 'In progress' with NO quote step (billing is fixed, job-line tax 0%). There's nothing to quote or accept; you invoice from logged time + materials, same as a solo job whose acceptance was recorded offline. Leaving the toggle off still enters at 'New job'.",
           },
           {
             id: "tradie-invite-job-onetap-link",
