@@ -1475,6 +1475,8 @@ function onReturnToApplicants() {
         v-if="isTradie && job.clientId === null"
         :job-id="job.id"
         :invite="job.clientInvite ?? null"
+        :job-status="job.status"
+        :accepted-offline="job.acceptedOffline === true"
         class="mb-4"
         @changed="load"
       />

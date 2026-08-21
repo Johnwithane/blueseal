@@ -16,7 +16,12 @@ import Tag from "primevue/tag";
 import type { MenuItem } from "primevue/menuitem";
 import type { JobDoc, JobStatus, WithId } from "@/firebase/interfaces";
 import { statusLabel, STATUS_SEVERITY } from "@/utils/jobStatus";
-import { canTradieFinishJob, INSTANT_CANCEL_STATUSES } from "@/firebase/services/jobs";
+import {
+  canTradieFinishJob,
+  canTradieHoldJob,
+  canTradieStartJob,
+  INSTANT_CANCEL_STATUSES,
+} from "@/firebase/services/jobs";
 
 const props = defineProps<{
   job: WithId<JobDoc>;
@@ -29,6 +34,10 @@ const emit = defineEmits<{
   finish: [jobId: string];
   /** Open the cancel-with-reason dialog for this job. */
   cancel: [jobId: string];
+  /** Manual solo transitions (issue #29) — the caller runs the mutation. */
+  start: [jobId: string];
+  hold: [jobId: string];
+  resume: [jobId: string];
 }>();
 
 const menu = useTemplateRef<InstanceType<typeof Menu>>("menu");
@@ -74,6 +83,33 @@ const items = computed<MenuItem[]>(() => {
       command: () => emit("open", { jobId: props.job.id, tab: "invoice" }),
     },
   );
+
+  // Manual solo transitions (issue #29): a job with no client attached is the
+  // tradesperson's own bookkeeping, so they can move it by hand. Clientful
+  // jobs move through the pipeline (quote accept / postpone consent) and get
+  // none of these. Resume is the exception — resumeJob lets either party
+  // resume any held job by design, so it shows on clientful holds too.
+  if (canTradieStartJob(props.job)) {
+    out.push({
+      label: "Start work",
+      icon: "pi pi-play",
+      command: () => emit("start", props.job.id),
+    });
+  }
+  if (canTradieHoldJob(props.job)) {
+    out.push({
+      label: "Put on hold",
+      icon: "pi pi-pause",
+      command: () => emit("hold", props.job.id),
+    });
+  }
+  if (s === "on_hold") {
+    out.push({
+      label: "Resume",
+      icon: "pi pi-play",
+      command: () => emit("resume", props.job.id),
+    });
+  }
 
   // A running job can always be finished; a solo job (no client attached) can
   // be closed out from any live status — submitJobForApproval accepts both

@@ -55,6 +55,10 @@ export async function isInviteEmailSuppressed(email: string): Promise<boolean> {
  * free text (CASL truthfulness + injection surface), every interpolation is
  * escaped, and it only sends when the CASL mailing address is configured.
  * Returns false (not sent) when gated.
+ *
+ * variant "review": the job is already complete and the tradesperson is
+ * asking the client to sign in and leave a review (issue #29 follow-up) —
+ * same magic-link mechanics and CASL footer, review-framed copy.
  */
 export async function sendInviteEmail(args: {
   toEmail: string;
@@ -63,6 +67,7 @@ export async function sendInviteEmail(args: {
   tradeName: string;
   signinLink: string;
   jobId: string;
+  variant?: "review";
 }): Promise<boolean> {
   const address = caslMailingAddress();
   if (!address) return false; // no compliant footer → don't send
@@ -85,13 +90,19 @@ export async function sendInviteEmail(args: {
     `${escapeHtml(sender)}<br/>${escapeHtml(address)}<br/>` +
     `${escapeHtml(basis)} <a href="${escapeHtml(unsubUrl)}" style="color:#374C76;text-decoration:underline;">Unsubscribe</a>.</p>`;
 
+  const review = args.variant === "review";
+  const subject = review
+    ? `How did ${args.tradieName} do? Leave a review on Blue Seal`
+    : `${args.tradieName} set up your job on Blue Seal`;
+  const bodyLine = review
+    ? `Hi ${args.clientName}, ${args.tradieName} (${args.tradeName}) wrapped up your job on Blue Seal. Tap through to see the finished job and leave a review.`
+    : `Hi ${args.clientName}, ${args.tradieName} (${args.tradeName}) is using Blue Seal to manage your job: quotes, schedule, and invoices in one place.`;
+
   await enqueueMail({
     to: args.toEmail,
-    subject: `${args.tradieName} set up your job on Blue Seal`,
+    subject,
     text:
-      `Hi ${args.clientName},\n\n` +
-      `${args.tradieName} (${args.tradeName}) is using Blue Seal to manage your job: ` +
-      `quotes, schedule, and invoices in one place.\n\n` +
+      `${bodyLine}\n\n` +
       `One click signs you in (no password needed):\n${args.signinLink}\n\n` +
       `${sender}\n${address}\n` +
       `${basis} Unsubscribe: ${unsubUrl}\n`,
@@ -99,14 +110,13 @@ export async function sendInviteEmail(args: {
     // and project-manager welcome emails — the client's first impression of
     // Blue Seal should match, not a plainer one-off template.
     html: brandedEmailHtml({
-      title: "Welcome to Blue Seal",
-      bodyLines: [
-        `Hi ${args.clientName}, ${args.tradieName} (${args.tradeName}) is using Blue Seal to manage your job: quotes, schedule, and invoices in one place.`,
-        "One click signs you in. No password needed.",
-      ],
-      ctaLabel: "View your job",
+      title: review ? "How did it go?" : "Welcome to Blue Seal",
+      bodyLines: [bodyLine, "One click signs you in. No password needed."],
+      ctaLabel: review ? "Leave a review" : "View your job",
       ctaUrl: args.signinLink,
-      preheader: `${args.tradieName} set up your job on Blue Seal.`,
+      preheader: review
+        ? `${args.tradieName} finished the job. Leave a review on Blue Seal.`
+        : `${args.tradieName} set up your job on Blue Seal.`,
       footerHtml,
     }),
   });

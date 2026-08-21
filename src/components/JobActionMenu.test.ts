@@ -72,6 +72,26 @@ describe("JobActionMenu — items derived from the status machine", () => {
     }
   });
 
+  it("offers manual transitions on solo jobs only (#29)", () => {
+    // Start work: solo pre-work statuses.
+    for (const s of ["requested", "quoted", "accepted"] as JobStatus[]) {
+      expect(itemsFor(s, null)).toContain("Start work");
+      expect(itemsFor(s)).not.toContain("Start work"); // clientful: pipeline-driven
+    }
+    expect(itemsFor("in_progress", null)).not.toContain("Start work");
+
+    // Put on hold: any live solo status.
+    for (const s of ["requested", "quoted", "accepted", "in_progress"] as JobStatus[]) {
+      expect(itemsFor(s, null)).toContain("Put on hold");
+      expect(itemsFor(s)).not.toContain("Put on hold");
+    }
+    expect(itemsFor("awaiting_payment", null)).not.toContain("Put on hold");
+
+    // Resume: any held job — resumeJob lets either party resume by design.
+    expect(itemsFor("on_hold", null)).toContain("Resume");
+    expect(itemsFor("on_hold")).toContain("Resume");
+  });
+
   it("offers Complete job from any live status on a solo job (#28)", () => {
     // No client attached (bring-your-own-client / unclaimed invite): the work
     // may have happened entirely off-app, so the close-out has to be reachable

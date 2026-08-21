@@ -57,6 +57,10 @@ function isApprovalFlowTransition(before: string | undefined, after: string | un
     // quote_accepted/scheduled gates and jump straight to active).
     after === "quoted" ||
     pair === "quoted->in_progress" ||
+    // Manual solo starts (setSoloJobStatus, issue #29) — the callable posts
+    // its own "Work started" line. quoted->in_progress is already covered.
+    pair === "requested->in_progress" ||
+    pair === "accepted->in_progress" ||
     // Upfront fee flow — both transitions carry richer messages from the
     // respective callables (clientAcceptQuote / markUpfrontFeePaid /
     // clientMarkUpfrontFeePaid). Generic line would just double up.

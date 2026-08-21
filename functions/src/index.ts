@@ -153,6 +153,7 @@ export { requestJobChange } from "./jobs/requestJobChange";
 export { respondJobChange } from "./jobs/respondJobChange";
 export { withdrawJobChange } from "./jobs/withdrawJobChange";
 export { resumeJob } from "./jobs/resumeJob";
+export { setSoloJobStatus } from "./jobs/setSoloJobStatus";
 // Mid-job change-order loop (tradesperson proposes, client approves up front).
 export { proposeExtra } from "./jobs/proposeExtra";
 export { respondExtra } from "./jobs/respondExtra";

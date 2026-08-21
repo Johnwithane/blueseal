@@ -42,6 +42,7 @@ interface JobData {
   chatId: string;
   title?: string;
   trade?: string;
+  status?: string;
   tradespersonName?: string | null;
   acceptedOffline?: boolean;
   clientInvite?: InviteData | null;
@@ -114,7 +115,14 @@ export const claimJobInvite = onCall(CALLABLE_OPTS, async (req) => {
   const displayName = typeof user.displayName === "string" ? user.displayName.trim() : "";
   const photoURL = typeof user.photoURL === "string" ? user.photoURL : null;
 
-  const claimedJobs: Array<{ jobId: string; tradespersonId: string; title: string; chatId: string }> = [];
+  const claimedJobs: Array<{
+    jobId: string;
+    tradespersonId: string;
+    title: string;
+    chatId: string;
+    status: string;
+    acceptedOffline: boolean;
+  }> = [];
   for (const jobDoc of candidates) {
     try {
       const result = await db.runTransaction(async (tx) => {
@@ -164,6 +172,8 @@ export const claimJobInvite = onCall(CALLABLE_OPTS, async (req) => {
           tradespersonId: job.tradespersonId,
           title: job.title ?? "your job",
           chatId: job.chatId,
+          status: job.status ?? "",
+          acceptedOffline: job.acceptedOffline === true,
         };
       });
       if (result) claimedJobs.push(result);
@@ -202,5 +212,14 @@ export const claimJobInvite = onCall(CALLABLE_OPTS, async (req) => {
     status: "claimed" as const,
     claimed: claimedJobs.length,
     jobIds: claimedJobs.map((j) => j.jobId),
+    // Per-job detail so the landing page can route a client who claimed a
+    // COMPLETED job straight into the review prompt (?review=1) — except on
+    // offline-accepted jobs, which never produce public reviews (the
+    // reputation firewall in firestore.rules).
+    jobs: claimedJobs.map((j) => ({
+      jobId: j.jobId,
+      status: j.status,
+      acceptedOffline: j.acceptedOffline,
+    })),
   };
 });

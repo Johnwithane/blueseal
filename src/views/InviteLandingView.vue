@@ -38,7 +38,16 @@ onMounted(() => {
 async function claimAndGo(): Promise<boolean> {
   const res = await claimJobInvite(true);
   if (res.status === "claimed" && res.jobIds.length > 0) {
-    await router.push(`/jobs/${res.jobIds[0]}`);
+    // A claim on an already-finished job is a review ask (the tradesperson
+    // sent the link from the completed job's banner) — land them on the
+    // review prompt, not a generic job view. Offline-accepted jobs are
+    // excluded: the rules never allow public reviews there.
+    const first = res.jobs?.[0];
+    const review =
+      first &&
+      (first.status === "complete" || first.status === "reviewed") &&
+      !first.acceptedOffline;
+    await router.push(`/jobs/${res.jobIds[0]}${review ? "?review=1" : ""}`);
     return true;
   }
   return false;

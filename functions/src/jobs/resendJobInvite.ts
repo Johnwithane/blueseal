@@ -25,6 +25,9 @@ const Input = z.object({
   // (would 400 the fix-and-resend flow). Both are consumed null-safely below.
   newEmail: z.string().trim().toLowerCase().email().max(200).nullable().optional(),
   newClientName: z.string().trim().min(1).max(80).nullable().optional(),
+  // "review": the job is complete and this send asks the client to sign in
+  // and leave a review — same link + limits, review-framed email copy.
+  context: z.enum(["review"]).nullable().optional(),
 });
 
 const INVITE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -51,7 +54,7 @@ export const resendJobInvite = onCall(CALLABLE_OPTS, async (req) => {
   const uid = requireRole(req, "tradesperson");
   const parsed = Input.safeParse(req.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.message);
-  const { jobId, channel, newEmail, newClientName } = parsed.data;
+  const { jobId, channel, newEmail, newClientName, context } = parsed.data;
 
   try {
     await enforceRateLimit(uid, "invite_resend", RESEND_DAILY_CAP);
@@ -155,6 +158,7 @@ export const resendJobInvite = onCall(CALLABLE_OPTS, async (req) => {
           tradeName: job.trade,
           signinLink,
           jobId,
+          variant: context === "review" ? "review" : undefined,
         });
       }
     }

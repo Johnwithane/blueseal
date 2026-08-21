@@ -153,6 +153,8 @@ export async function resendJobInvite(input: {
   channel: "email" | "link";
   newEmail?: string;
   newClientName?: string;
+  /** "review": the job is complete — the email asks for a review instead of introducing the job. */
+  context?: "review";
 }): Promise<{ inviteLink: string; emailed: boolean }> {
   const fn = httpsCallable<typeof input, { inviteLink: string; emailed: boolean }>(
     functions,
@@ -189,11 +191,19 @@ export interface InvitePreview {
   acceptedOffline: boolean;
 }
 
+export interface ClaimedJobInfo {
+  jobId: string;
+  status: JobStatus | "";
+  acceptedOffline: boolean;
+}
+
 export type ClaimJobInviteResult =
   | { status: "needs_verification" }
   | { status: "none"; invites: [] }
   | { status: "preview"; invites: InvitePreview[] }
-  | { status: "claimed"; claimed: number; jobIds: string[] };
+  // `jobs` is optional only for a stale deployed function during a rollout —
+  // the current callable always returns it.
+  | { status: "claimed"; claimed: number; jobIds: string[]; jobs?: ClaimedJobInfo[] };
 
 // Two-phase: confirm:false previews the invites matching the signed-in
 // user's verified email; confirm:true attaches them as the jobs' client.
@@ -268,6 +278,40 @@ export const SOLO_FINISH_STATUSES: readonly JobStatus[] = [
 export function canTradieFinishJob(job: Pick<JobDoc, "status" | "clientId">): boolean {
   if (job.status === "in_progress") return true;
   return job.clientId === null && SOLO_FINISH_STATUSES.includes(job.status);
+}
+
+// Manual solo status control (issue #29) — mirrors the transition sets in
+// functions/src/jobs/setSoloJobStatus.ts. Solo only: with a client attached
+// the pipeline moves through quote acceptance / postpone consent.
+const SOLO_START_STATUSES: readonly JobStatus[] = ["requested", "quoted", "accepted"] as const;
+const SOLO_HOLD_STATUSES: readonly JobStatus[] = [
+  "requested",
+  "quoted",
+  "accepted",
+  "in_progress",
+] as const;
+
+/** Solo job the tradesperson can manually move to in_progress ("Start work"). */
+export function canTradieStartJob(job: Pick<JobDoc, "status" | "clientId">): boolean {
+  return job.clientId === null && SOLO_START_STATUSES.includes(job.status);
+}
+
+/** Solo job the tradesperson can manually put on hold. */
+export function canTradieHoldJob(job: Pick<JobDoc, "status" | "clientId">): boolean {
+  return job.clientId === null && SOLO_HOLD_STATUSES.includes(job.status);
+}
+
+/** Move a SOLO job by hand: start work (→ in_progress) or put it on hold. */
+export async function setSoloJobStatus(
+  jobId: string,
+  target: "in_progress" | "on_hold",
+): Promise<{ ok: true }> {
+  const fn = httpsCallable<{ jobId: string; target: string }, { ok: true }>(
+    functions,
+    "setSoloJobStatus",
+  );
+  const res = await fn({ jobId, target });
+  return res.data;
 }
 
 /**

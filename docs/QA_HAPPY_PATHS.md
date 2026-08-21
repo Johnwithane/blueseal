@@ -679,6 +679,56 @@ connection, so it needs a size check, not just an eyeball check.
 
 ---
 
+### 6.9 Manual status control on solo jobs → help: `quotes-and-invoices`
+
+Issue #29: a job with no client attached is the tradesperson's own
+bookkeeping, so they can move it by hand from the jobs-list status menu.
+Clientful jobs must NOT get these — their pipeline involves the other party.
+
+1. As the **Tradesperson**, on a solo job at **New job** (requested), open the
+   status chip menu. **Expected:** **Start work** and **Put on hold** are
+   listed (plus Complete job per 6.7 step 9).
+2. Tap **Start work**. **Expected:** the row flips to **In progress** live (no
+   reload), a toast confirms, and the job chat has ONE "Work started" line —
+   no duplicate "Status changed to In progress".
+3. Tap **Put on hold**. **Expected:** row flips to **On hold**; menu now
+   offers **Resume**; resuming returns it to **In progress** (a hold from
+   `quoted` must resume back to `quoted` — the hold remembers where it was).
+4. **The control:** a job **with a claimed client** at the same statuses shows
+   none of Start work / Put on hold (Resume still shows on a clientful hold —
+   either party may resume). Calling the callable directly for a clientful
+   job is rejected (`failed-precondition`).
+5. Mobile (375px): the menu items are tappable, rows repaint in place.
+
+### 6.10 Review link on a finished solo job → help: `mutual-reviews`
+
+The ask from the "Add complete job option" report: the tradesperson finished
+a job the client never joined, and wants a link the client can use to leave a
+review. The invite link IS the review link once the job is complete.
+
+1. As the **Tradesperson**, complete a solo job that has an **unclaimed
+   invite** (client email on file). **Expected:** the invite banner on the job
+   now reads **"Job's done. Ask ... for a review"** with **Copy review link**
+   and **Email review invite** actions.
+2. Tap **Copy review link** and open it in a fresh browser/incognito as the
+   client. **Expected:** one tap signs them in, claims the job, and lands on
+   the job with the **review dialog auto-opened**.
+3. Submit the review. **Expected:** it saves (the claimed client is a real
+   verified party) and the mutual-blind reveal rules apply as usual.
+4. **Email review invite** sends the review-framed email ("How did ... do?")
+   to the invited address — subject and body ask for a review, not "follow
+   your job".
+5. **The firewall control:** on a completed job where quote acceptance was
+   recorded **offline** (`acceptedOffline`), the banner shows NO review ask
+   (plain solo copy instead), and a claimed client's review attempt is
+   rejected by rules. Reviews stay impossible on offline-accepted jobs.
+6. A solo job with **no invite** shows **"Invite for a review"** — adding the
+   client's email from the dialog sends the review-framed invite.
+7. Mobile (375px): banner buttons wrap, the claimed client's review dialog
+   fits.
+
+---
+
 ## 7. Reviews → help: `mutual-reviews`
 
 1. On a **Complete** job: as the **Client**, leave a public review (overall +

@@ -697,6 +697,31 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
               "The solo job offers Complete job in the status menu AND shows the wrap-up card on the Invoice tab despite never being In progress; either path finalizes the invoice ('sent') and moves the job straight to Awaiting payment. No 'Set up Stripe payouts' blocker appears on the solo job and Send is enabled without any Connect onboarding; sending advances the job the same way, and Mark as paid closes it out (invoice paid, job Complete). The hand-written lines survive whichever path is used. The clientful control job offers NO Complete job at a pre-work status and still shows the payouts blocker with Send disabled. Mobile 375px: menu + wrap-up card reachable.",
           },
           {
+            id: "tradie-solo-status-menu",
+            title: "Move a solo job by hand: Start work / Put on hold / Resume (issue #29)",
+            steps: [
+              "On a solo job at New job (requested), open the jobs-list status chip menu.",
+              "Tap Start work, then re-open the menu and tap Put on hold, then Resume.",
+              "Hold a job from Quote sent (quoted) and resume it.",
+              "The control: open the menu on a job WITH a claimed client at the same statuses.",
+            ],
+            expected:
+              "Start work and Put on hold show on the solo job; each action repaints the row live with a toast and posts ONE chat line (no duplicate generic status line). Resume restores the exact pre-hold status (a hold from quoted resumes to quoted, not in_progress). The clientful control shows neither Start work nor Put on hold (Resume still shows on a clientful hold). Mobile 375px: menu usable, rows repaint in place.",
+          },
+          {
+            id: "tradie-review-link",
+            title: "Send a review link after finishing a solo job",
+            steps: [
+              "Complete a solo job that has an unclaimed invite (client email on file).",
+              "On the job, find the invite banner and tap Copy review link; open it in incognito as the client.",
+              "Submit the review as the client.",
+              "Back as the tradesperson, try Email review invite on another finished solo job.",
+              "The firewall control: check a completed job with offline-recorded quote acceptance.",
+            ],
+            expected:
+              "The banner reads 'Job's done. Ask ... for a review' with Copy review link + Email review invite. The link signs the client in with one tap, claims the job, and auto-opens the review dialog; the review saves and follows the mutual-blind reveal. The email variant asks for a review ('How did ... do?'), not 'follow your job'. On an offline-accepted job the banner shows NO review ask and rules still block the review. A no-invite solo job offers 'Invite for a review' instead. Mobile 375px: banner buttons wrap cleanly.",
+          },
+          {
             id: "tradie-invoice-pdf-size",
             title: "Invoice / quote PDF downloads small and keeps its transparency",
             steps: [

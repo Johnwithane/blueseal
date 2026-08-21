@@ -16,7 +16,7 @@ import JobNotificationsBell from "@/components/JobNotificationsBell.vue";
 import JobActionMenu from "@/components/JobActionMenu.vue";
 import Dialog from "primevue/dialog";
 import Textarea from "primevue/textarea";
-import { cancelJob } from "@/firebase/services/jobs";
+import { cancelJob, resumeJob, setSoloJobStatus } from "@/firebase/services/jobs";
 import { useConfirmAction } from "@/composables/useConfirmAction";
 
 const props = withDefaults(
@@ -113,6 +113,36 @@ function onMenuFinish(jobId: string) {
       void router.push({ name: "JobDetail", params: { id: jobId }, query: { finish: "1" } });
     },
   );
+}
+
+// Manual solo transitions (issue #29). No confirm dialogs: start and hold are
+// low-stakes and reversible (hold remembers the prior status, resume restores
+// it), and the live subscription repaints the row the moment the write lands.
+const statusBusyJobId = ref<string | null>(null);
+
+async function runStatusAction(jobId: string, action: () => Promise<unknown>, done: string) {
+  if (statusBusyJobId.value) return;
+  statusBusyJobId.value = jobId;
+  try {
+    await action();
+    toast.success(done);
+  } catch (e) {
+    toast.error("Couldn't update the job", humanizeError(e));
+  } finally {
+    statusBusyJobId.value = null;
+  }
+}
+
+function onMenuStart(jobId: string) {
+  void runStatusAction(jobId, () => setSoloJobStatus(jobId, "in_progress"), "Work started");
+}
+
+function onMenuHold(jobId: string) {
+  void runStatusAction(jobId, () => setSoloJobStatus(jobId, "on_hold"), "Job on hold");
+}
+
+function onMenuResume(jobId: string) {
+  void runStatusAction(jobId, () => resumeJob(jobId), "Job resumed");
 }
 
 // Cancelling takes a REASON, not just a confirmation — the client is notified
@@ -395,6 +425,9 @@ function counterpartyPhoto(job: WithId<JobDoc>): string | null | undefined {
                   @open="onMenuOpen"
                   @finish="onMenuFinish"
                   @cancel="onMenuCancel"
+                  @start="onMenuStart"
+                  @hold="onMenuHold"
+                  @resume="onMenuResume"
                 />
                 <Tag
                   v-else

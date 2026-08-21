@@ -403,7 +403,7 @@ Everything is itemised, so there are no surprises: the client sees what they're 
 
 **Skipping the approval step.** Step 3's approval round-trip is the default, not a requirement. On the **Finish job** wrap-up a tradesperson can tick **"Finish without client approval"** to finalize the invoice on the spot — useful when they've run the job end-to-end and are collecting by cash or e-transfer. The client still gets the invoice and can still pay it online; they just aren't asked to approve the wrap-up first.
 
-**Jobs that never went through the app.** On a job with no client attached (you invited one who hasn't joined yet, or you're keeping the client off-app), you can close the job out from any status. The jobs list offers **Complete job** and the Invoice tab shows the wrap-up card even if the job was never started in the app, so work that happened entirely offline can still be invoiced and completed. Sending an invoice on one of these jobs also doesn't require Stripe payouts to be set up, since you're collecting the money yourself and recording it with **Mark as paid**.`,
+**Jobs that never went through the app.** On a job with no client attached (you invited one who hasn't joined yet, or you're keeping the client off-app), you can close the job out from any status. The jobs list offers **Complete job** and the Invoice tab shows the wrap-up card even if the job was never started in the app, so work that happened entirely offline can still be invoiced and completed. Sending an invoice on one of these jobs also doesn't require Stripe payouts to be set up, since you're collecting the money yourself and recording it with **Mark as paid**. The same status menu also lets you move these jobs by hand: **Start work**, **Put on hold** and **Resume**. And once the job is done, the banner on the job offers a **review link** to send your client, so they can sign in with one tap and leave you a review.`,
   },
   {
     slug: "paying-for-a-job",
@@ -1108,7 +1108,14 @@ const faqs: FaqItem[] = [
   {
     question: "Why doesn't my solo job earn reviews?",
     answer:
-      "Reviews only count for work a **verified client accepted in-app**. On a solo job (or one where you recorded the quote acceptance on your client's behalf), there's no verified counterparty, so no review is created in either direction. That gate is what keeps Blue Seal ratings meaningful, including yours.",
+      "Reviews need a **verified client** on the job. If you recorded the quote acceptance on your client's behalf (offline acceptance), no public review is created in either direction: there's no verified counterparty, and that gate is what keeps Blue Seal ratings meaningful, including yours. But a client who joins through your invite link IS verified. On a finished job with no client attached, the banner at the top offers a **review link**: send it to your client and one tap signs them in to see the job and leave you a review. It works even after the job is complete.",
+    categoryId: "for-tradespeople",
+    audience: "tradesperson",
+  },
+  {
+    question: "Can I move a job's status myself?",
+    answer:
+      "On a job with **no client attached** (a solo job, or one where your invited client hasn't joined yet), yes. Open the status chip menu on your jobs list: **Start work** moves it to In progress, **Put on hold** pauses it (Resume brings it back exactly where it was), and **Complete job** wraps it up. Once a client has joined, the job moves through the normal steps instead, since quotes and approvals involve them.",
     categoryId: "for-tradespeople",
     audience: "tradesperson",
   },
