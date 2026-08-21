@@ -25,6 +25,18 @@
  * client, or Blue Seal is left short.
  */
 
+/**
+ * Stripe dispute statuses that mean the bank has finished deciding. Mirrored in
+ * src/components/RefundInvoiceCard.vue — a live dispute blocks a refund, a
+ * resolved one must not block it forever (`payment.disputeId` stays set after
+ * closure).
+ */
+export const RESOLVED_DISPUTE_STATUSES = ["won", "lost", "warning_closed"];
+
+export function isDisputeResolved(disputeStatus: string | null): boolean {
+  return disputeStatus !== null && RESOLVED_DISPUTE_STATUSES.includes(disputeStatus);
+}
+
 export interface RefundPlan {
   /** Cents to refund to the client. */
   amountCents: number;

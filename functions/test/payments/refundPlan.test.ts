@@ -3,7 +3,7 @@
 // never received — neither shows up as an error anywhere.
 
 import { describe, it, expect } from "vitest";
-import { planRefund } from "../../src/payments/refundPlan";
+import { isDisputeResolved, planRefund } from "../../src/payments/refundPlan";
 
 // A $480 invoice: the client paid $505.36, the tradesperson received $480.00,
 // Blue Seal kept $25.36 of service fee.
@@ -113,6 +113,28 @@ describe("planRefund — partial refund", () => {
     expect(d.ok).toBe(false);
     if (d.ok) return;
     expect(d.reason).toBe("amount_not_positive");
+  });
+});
+
+describe("isDisputeResolved", () => {
+  // `payment.disputeId` stays set forever once a dispute has existed, so
+  // gating a refund on the id alone would permanently block a tradesperson
+  // who WON — the case where they're holding the money and may still want to
+  // refund the client themselves.
+  it("treats a live dispute as unresolved", () => {
+    for (const s of ["needs_response", "under_review", "warning_needs_response"]) {
+      expect(isDisputeResolved(s)).toBe(false);
+    }
+  });
+
+  it("treats a closed dispute as resolved", () => {
+    for (const s of ["won", "lost", "warning_closed"]) {
+      expect(isDisputeResolved(s)).toBe(true);
+    }
+  });
+
+  it("treats a missing status as unresolved (fail closed)", () => {
+    expect(isDisputeResolved(null)).toBe(false);
   });
 });
 

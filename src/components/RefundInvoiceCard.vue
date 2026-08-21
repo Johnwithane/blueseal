@@ -57,19 +57,29 @@ const remaining = computed(() => Math.max(0, chargeTotal.value - refunded.value)
 /** A partial refund comes out of the tradesperson's share (ToS § 8.1). */
 const partialMax = computed(() => Math.max(0, baseAmount.value - refunded.value));
 
-// Only card payments can be refunded here, and never while the bank is
-// deciding a dispute — refunding alongside one can pay the client twice.
+// Mirrors RESOLVED_DISPUTE_STATUSES in functions/src/payments/refundPlan.ts.
+const RESOLVED_DISPUTE_STATUSES = ["won", "lost", "warning_closed"];
+
+/**
+ * A LIVE dispute blocks refunding — the bank is deciding, and refunding
+ * alongside it can pay the client twice. A RESOLVED one must not block
+ * forever: `disputeId` stays set after closure, and a won dispute returns the
+ * invoice to `paid` with the tradesperson holding the money.
+ */
+const disputeLive = computed(() => {
+  const p = payment.value;
+  if (!p?.disputeId || !p.paymentIntentId) return false;
+  return !RESOLVED_DISPUTE_STATUSES.includes(p.disputeStatus ?? "");
+});
+
+// Only card payments can be refunded here.
 const canRefund = computed(() => {
   const inv = invoice.value;
   if (!inv || !payment.value?.paymentIntentId) return false;
-  if (payment.value.disputeId) return false;
+  if (disputeLive.value) return false;
   if (!["paid", "partially_refunded"].includes(inv.status)) return false;
   return remaining.value > 0;
 });
-
-const disputed = computed(
-  () => !!payment.value?.disputeId && !!payment.value?.paymentIntentId,
-);
 
 // --- Dialog ---------------------------------------------------------------
 const open = ref(false);
@@ -127,13 +137,13 @@ async function submit() {
 </script>
 
 <template>
-  <div v-if="canRefund || disputed" class="bs-card p-3">
+  <div v-if="canRefund || disputeLive" class="bs-card p-3">
     <h3 class="font-semibold text-sm mb-1 flex items-center gap-2">
       <i class="pi pi-replay text-[color:var(--bs-muted)]"></i>
       Refund this payment
     </h3>
 
-    <template v-if="disputed">
+    <template v-if="disputeLive">
       <p class="text-xs text-[color:var(--bs-muted)]">
         This payment is being disputed through the client's bank. The bank
         decides the outcome, so it can't be refunded from here.

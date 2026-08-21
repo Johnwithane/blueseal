@@ -25,7 +25,7 @@ import { CALLABLE_OPTS } from "../lib/callable";
 import { db } from "../lib/admin";
 import { requireAuth } from "../lib/auth";
 import { logAdminAction } from "../lib/audit";
-import { planRefund, type RefundRefusal } from "./refundPlan";
+import { isDisputeResolved, planRefund, type RefundRefusal } from "./refundPlan";
 import { STRIPE_SECRET_KEY, getStripe } from "./stripeClient";
 import { stripeFailure } from "./connectErrors";
 
@@ -62,6 +62,7 @@ interface InvoiceData {
     transferId?: string | null;
     refundedAmount?: number | null;
     disputeId?: string | null;
+    disputeStatus?: string | null;
     serviceFee?: { chargeTotalCents?: number; baseAmountCents?: number } | null;
   } | null;
 }
@@ -97,9 +98,13 @@ export const refundInvoicePayment = onCall(
         `A ${inv.status} invoice can't be refunded.`,
       );
     }
-    // A disputed charge is the bank's to decide; refunding alongside a live
-    // dispute can pay the client twice.
-    if (inv.payment?.disputeId) {
+    // A LIVE dispute is the bank's to decide; refunding alongside one can pay
+    // the client twice. A resolved one must not block forever though: `disputeId`
+    // stays set after closure, and a WON dispute returns the invoice to `paid`
+    // with the tradesperson holding the money — they can still choose to refund.
+    // (A lost dispute leaves the invoice `disputed`, so the status gate above
+    // already covers it.)
+    if (inv.payment?.disputeId && !isDisputeResolved(inv.payment.disputeStatus ?? null)) {
       throw new HttpsError(
         "failed-precondition",
         "This payment is under dispute — the outcome is decided by the client's bank, so it can't be refunded here.",
