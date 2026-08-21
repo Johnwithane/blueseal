@@ -897,6 +897,26 @@ record; only App Check enforcement (and the optional `ping` cleanup) remain.
 - **What:** indexes → rules+functions → Admin dashboard **"Migrate tradesperson location"**. ✅ deployed + migrated (scanned 4, migrated 4, skipped 0). The new `geohashPublic` indexes were deployed (the legacy `geohash` index was intentionally left in place, not deleted).
 - **Verify:** Search returns nearby tradies; open a public tradie profile while logged out → no street address shown; as the tradie, the profile + onboarding editors still show your saved address/pin.
 
+### [ ] Re-deploy 3 Cloud Functions the 2026-08-20 release left on their old revision
+
+- **Why:** The deploy for PR #23 fell back to a **full ~200-function deploy** (see the landmine below) and tripped Cloud Run's `Quota exceeded for total allowable CPU per project per region`. Three functions couldn't roll their new revision:
+  `acceptApplication`, `requestProspectOutreach`, `startGoogleBusinessConnect`.
+- **Impact right now: none.** Cloud Run keeps serving the previous healthy revision, and PR #23's only change to shared code was one extra entry in `CTA_BY_TYPE` (used solely by the new `bug_report_fixed` notification), so those three behave identically on the old revision. Nothing was deleted — the deploy logged *"Deploys failed. Skipping deletes."* The rest of the release is live: hosting shipped, and `scheduledBugFixNotices` was created successfully.
+- **What:** a targeted redeploy of just those three (far under quota — a full re-run would push ~200 new revisions again and can trip the same limit):
+  ```
+  firebase deploy --only functions:acceptApplication,functions:requestProspectOutreach,functions:startGoogleBusinessConnect
+  ```
+- **Verify:** `firebase functions:list` shows all three updated today, and the Cloud Run console shows their latest revision serving 100% traffic.
+
+### [ ] Decide how to handle "a new notification type forces a full deploy"
+
+- **Why (the landmine that caused the task above):** every new `NotificationType` has to be added to `functions/src/lib/notify.ts`. `.github/workflows/deploy.yml`'s "Resolve changed functions" step classifies **anything** under `functions/src/lib/*` as shared and falls back to deploying all ~200 functions — which the workflow's own comment records as reliably failing on the Cloud Run CPU quota. So **every future notification type repeats this failure.** It is not a one-off.
+- **Options, roughly cheapest first:**
+  1. **Batch the fallback deploy** — chunk the full deploy into groups of ~40 with a pause, so the per-region CPU quota is never saturated. Keeps the safety of the shared-path rule.
+  2. **Split the type union out of `notify.ts`** into e.g. `functions/src/lib/notificationTypes.ts` and treat that one file as non-shared (it is type-only; it cannot change runtime behaviour). Narrow and surgical, but relies on the file staying type-only.
+  3. **Raise the Cloud Run CPU quota** for `us-central1` in the Google Cloud console.
+- **Not decided here** — it changes release infrastructure, so it wants a deliberate call rather than a drive-by fix.
+
 ### [ ] Turn on App Check (wiring is DONE — only the key + flip remain)
 
 - **Why:** Every callable was `enforceAppCheck: false`. The AI rate limit is a stopgap; App Check is the real bot/replay/abuse guard. Flagged by the audit as "the single biggest pre-launch fix."
