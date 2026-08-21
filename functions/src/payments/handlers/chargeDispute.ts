@@ -50,6 +50,15 @@ function paymentIntentId(d: StripeDispute): string | null {
     : d.payment_intent.id;
 }
 
+/** The recovery status already recorded on a dispute doc, if any. */
+function existingRecoveryOf(
+  snap: FirebaseFirestore.DocumentSnapshot,
+): string | null {
+  if (!snap.exists) return null;
+  const rec = snap.data()?.recovery as { status?: unknown } | undefined;
+  return typeof rec?.status === "string" ? rec.status : null;
+}
+
 async function listAdminUids(): Promise<string[]> {
   // Admins are sparse (a handful at most) and dispute events are rare, so
   // the query cost is fine. Caching across function invocations would be
@@ -144,28 +153,46 @@ export async function handleChargeDisputeCreated(
   // Claw the tradesperson's transfer back to the platform balance while the
   // dispute is decided. Guarded: a recovery failure is a debt to chase, and
   // must never stop the dispute from being recorded and surfaced to admins.
+  //
+  // Skip entirely if we've already recovered. Stripe's idempotency key stops a
+  // replayed `dispute.created` from double-reversing, but the RECORD is the
+  // fragile part: on a replay the transfer reads as already-reversed, so a
+  // second run would compute 0 and overwrite `reversed`/N with
+  // `nothing_to_reverse`/0 — throwing away the amount the won-dispute restore
+  // path below depends on.
   const stripe = getStripe();
-  const recovery = await reverseTransferForDispute(stripe, {
-    disputeId: dispute.id,
-    chargeId: cid,
-    disputeAmountCents: dispute.amount,
-  });
-  await disputeRef.set(
-    {
-      recovery: {
-        status: recovery.status,
-        transferId: recovery.transferId,
-        reversalId: recovery.reversalId,
-        reversedCents: recovery.reversedCents,
-        destinationAccountId: recovery.destinationAccountId,
-        restoreTransferId: null,
-        restoredCents: 0,
-        failureMessage: recovery.failureMessage,
-        updatedAt: FieldValue.serverTimestamp(),
+  const priorRecovery = existingRecoveryOf(await disputeRef.get());
+  const alreadyRecovered = priorRecovery === "reversed" || priorRecovery === "restored";
+  const recovery = alreadyRecovered
+    ? null
+    : await reverseTransferForDispute(stripe, {
+        disputeId: dispute.id,
+        chargeId: cid,
+        disputeAmountCents: dispute.amount,
+      });
+  if (recovery) {
+    await disputeRef.set(
+      {
+        recovery: {
+          status: recovery.status,
+          transferId: recovery.transferId,
+          reversalId: recovery.reversalId,
+          reversedCents: recovery.reversedCents,
+          destinationAccountId: recovery.destinationAccountId,
+          restoreTransferId: null,
+          restoredCents: 0,
+          failureMessage: recovery.failureMessage,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
       },
-    },
-    { merge: true },
-  );
+      { merge: true },
+    );
+  } else {
+    logger.info("dispute_created: funds already recovered, skipping", {
+      disputeId: dispute.id,
+      priorRecovery,
+    });
+  }
 
   // ── Evidence staging ─────────────────────────────────────────────────────
   // Draft only — an admin reviews and submits from the dispute detail view.
@@ -192,8 +219,8 @@ export async function handleChargeDisputeCreated(
       status: dispute.status,
       amount: dispute.amount,
       currency: dispute.currency,
-      recoveryStatus: recovery.status,
-      recoveredCents: recovery.reversedCents,
+      recoveryStatus: recovery?.status ?? priorRecovery ?? "skipped",
+      recoveredCents: recovery?.reversedCents ?? 0,
     },
   });
 
@@ -208,11 +235,13 @@ export async function handleChargeDisputeCreated(
       // a human today (the funds already left, so it's a debt to chase), and
       // burying that under generic dispute copy is how it gets missed.
       const recoveryLine =
-        recovery.status === "reversed"
-          ? `Held back ${dispute.currency.toUpperCase()} ${(recovery.reversedCents / 100).toFixed(2)} from the tradesperson's payout.`
-          : recovery.status === "failed"
-            ? `⚠ Could not hold back the tradesperson's payout — this is a recoverable debt, not an automatic loss.`
-            : `No transfer to hold back on this charge.`;
+        recovery === null
+          ? "Funds were already held back for this dispute."
+          : recovery.status === "reversed"
+            ? `Held back ${dispute.currency.toUpperCase()} ${(recovery.reversedCents / 100).toFixed(2)} from the tradesperson's payout.`
+            : recovery.status === "failed"
+              ? `⚠ Could not hold back the tradesperson's payout — this is a recoverable debt, not an automatic loss.`
+              : `No transfer to hold back on this charge.`;
       await notifyMany(adminUids, {
         type: "dispute_opened",
         title: `Dispute opened on ${dispute.currency.toUpperCase()} ${(dispute.amount / 100).toFixed(2)}`,
