@@ -934,3 +934,15 @@ record; only App Check enforcement (and the optional `ping` cleanup) remain.
 - **What:** Add `VITE_UNSPLASH_ACCESS_KEY` to the CI build env. Per `.github/workflows/deploy.yml`, public `VITE_*` config is inlined as literals (it ships in the browser bundle) — add the Unsplash **Access Key** there the same way (read-only Search/Download API; never the Secret Key). Then redeploy hosting.
 - **Compliance note (Unsplash API Guidelines):** we trigger the required download endpoint on selection and credit the photographer in the picker, and we re-host the chosen image to our own Storage rather than hot-linking. Persistent on-profile attribution + any hotlink-vs-rehost decision should get a quick review before heavy use. Production apps also need Unsplash to approve the app beyond the 50 req/hr demo limit.
 - **Verify:** In prod, open a tradesperson's profile as the owner → Edit → the banner / portfolio image controls show a "Choose from Unsplash" button; searching returns results and picking one sets the image.
+
+### [ ] Create the GitHub token for the bug-report → GitHub Issues bridge
+
+- **Why:** Every in-app bug report now auto-files as a GitHub issue (`onBugReportCreated`), and closing an issue writes the triage state back to Firestore (`scheduledBugIssueSync`, every 6h) — this is what lets a REMOTE Claude session (claude.ai/code) see, triage and close out the bug queue with nothing but repo access. Both functions are deployed but idle: the `BUGS_GITHUB_TOKEN` secret currently holds the placeholder `UNSET`, so they log a warning and skip.
+- **What:**
+  1. GitHub → Settings → Developer settings → **Fine-grained personal access tokens** → Generate new token. Resource owner `Johnwithane`, repository access: **only `Johnwithane/blueseal`**, permissions: **Issues → Read and write** (nothing else). Expiry: 1 year is fine — it's scoped to issues on one repo.
+  2. Put the token in the secret (paste it in place of `<TOKEN>`):
+     `printf '<TOKEN>' | npx firebase-tools functions:secrets:set BUGS_GITHUB_TOKEN --project blueseal-762af --data-file -`
+  3. Re-deploy so the functions pick up the new secret version:
+     `firebase deploy --only functions:onBugReportCreated,functions:scheduledBugIssueSync`
+     (or ask a Claude session to run steps 2–3 with the token you hand it).
+- **Verify:** File a test bug via the in-app **Report a bug** button → within a minute an issue labeled `bug` appears on the repo (redacted — no reporter identity/env/screenshots, repo is public) and the report doc gains `githubIssueUrl`. Close the issue → after the next 6h sync the report shows `fixed` in `/admin/bug-reports`.

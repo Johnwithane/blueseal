@@ -15,6 +15,7 @@ Before writing any code in a new session:
 3. ✅ Check `git log -10` to see what's been done recently
 4. ✅ Confirm which build phase + which feature you're working on
 5. ✅ If a relevant `skills/*.md` exists for what you're about to do, read it first
+6. ✅ Bug pulse: run `npm run bugs -- list open` (local sessions; remote sessions use `gh issue list --label bug --state open`). If anything's open, surface it to Johnny before diving into other work — he decides whether it jumps the queue.
 
 If any of those reveal that context has shifted from what the user just said, ask — don't assume.
 
@@ -392,6 +393,10 @@ Which Claude model to use when on this repo, plus pre-built cheap subagents so t
 - [`docs/MODEL_STRATEGY.md`](./docs/MODEL_STRATEGY.md) — the four-tier playbook (Opus 4.8 is the default; reserve Fable; hand off to a cheap subagent for search/tests/QA). The Opus default is set globally at user level, so this repo already inherits it.
 - [`.claude/agents/`](./.claude/agents/) — `scout` (Haiku, read-only research), `test-writer` (Sonnet, Vitest + `tests/rules/`), `qa-runner` (Sonnet, Playwright QA). Each pins its own model.
 - [`docs/QA_PLAYWRIGHT.md`](./docs/QA_PLAYWRIGHT.md) — the runbook `qa-runner` drives (emulators + seeded roles, per-role route sweeps, mobile 375px).
+
+### Bug triage
+
+In-app bug reports land in `bugReports/{id}` AND are auto-mirrored to GitHub issues (`onBugReportCreated`). When Johnny asks "how are the bugs" (or any variant), follow the **`/bugs` skill** ([`.claude/skills/bugs/SKILL.md`](./.claude/skills/bugs/SKILL.md)): pull the queue (`npm run bugs -- list open` locally; GitHub issues labeled `bug` remotely), read the screenshots, diagnose against recent commits before assuming a report is new, write statuses back with root-cause notes, and fix what's fixable. Closing an issue syncs back to Firestore (`scheduledBugIssueSync`) and queues the reporter's "fixed" notice — so only close/flip to fixed when the fix is actually live.
 
 ### Help Center & FAQ upkeep
 

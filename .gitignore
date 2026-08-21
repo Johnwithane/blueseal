@@ -30,7 +30,10 @@ e2e/.artifacts/
 functions/lib/
 functions/node_modules/
 .cache/
-.claude/
+# Local-only Claude Code state. Agents + skills ARE tracked — remote sessions
+# (claude.ai/code) only get what's committed, and the /bugs triage skill and
+# the scout/test-writer/qa-runner agents are part of how this repo is worked.
+.claude/settings.local.json
 *.tsbuildinfo
 functions/set-admin.mjs
 

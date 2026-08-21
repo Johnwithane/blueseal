@@ -227,6 +227,7 @@ export { sendSupportTicketReply } from "./support/sendSupportTicketReply";
 
 // Bug log — daily batched "your reports are fixed" digest to QA reporters.
 export { scheduledBugFixNotices } from "./bugs/scheduledBugFixNotices";
+export { onBugReportCreated, scheduledBugIssueSync } from "./bugs/bugIssueSync";
 
 // Payments — Stripe Connect Express. Tradespeople onboard a connected account
 // (createConnect*); clients pay invoices by card via a destination charge
