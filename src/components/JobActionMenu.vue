@@ -16,7 +16,7 @@ import Tag from "primevue/tag";
 import type { MenuItem } from "primevue/menuitem";
 import type { JobDoc, JobStatus, WithId } from "@/firebase/interfaces";
 import { statusLabel, STATUS_SEVERITY } from "@/utils/jobStatus";
-import { INSTANT_CANCEL_STATUSES } from "@/firebase/services/jobs";
+import { canTradieFinishJob, INSTANT_CANCEL_STATUSES } from "@/firebase/services/jobs";
 
 const props = defineProps<{
   job: WithId<JobDoc>;
@@ -75,9 +75,10 @@ const items = computed<MenuItem[]>(() => {
     },
   );
 
-  // Only a running job can be finished — submitJobForApproval rejects every
-  // other status ("Job must be in progress to finish").
-  if (s === "in_progress") {
+  // A running job can always be finished; a solo job (no client attached) can
+  // be closed out from any live status — submitJobForApproval accepts both
+  // (#28) and rejects everything else.
+  if (canTradieFinishJob(props.job)) {
     out.push({ separator: true }, {
       label: "Complete job",
       icon: "pi pi-check-circle",

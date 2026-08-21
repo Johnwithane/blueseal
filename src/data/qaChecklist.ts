@@ -684,6 +684,19 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
               "The tick-box sits under the note field and is OFF by default, with the button reading 'Send for approval — $X'; ticking it flips the button to 'Finalize invoice — $X'. Submitting sends the job STRAIGHT to Awaiting payment (not Awaiting client approval), leaves the invoice 'sent' (not draft), and shows the Mark as paid card. The chat has ONE line ('… finalized the invoice'), not a duplicate 'Status changed to Awaiting payment'. The client is STILL notified and can still view + pay — they just get no approve / request-changes banner. Mark as paid then closes the loop (invoice paid, job Complete, review prompt) with zero client action. The control job is unchanged: awaiting_client_approval + draft invoice + approve banner. On a solo job the tick-box is absent entirely and the button already reads Finalize invoice. Mobile 375px: tick-box, explainer and button fit.",
           },
           {
+            id: "tradie-solo-prework-complete",
+            title: "Complete a solo job that never started in the app (issue #28)",
+            steps: [
+              "As a tradesperson with NO Stripe payouts set up, take a solo job (invited client who hasn't joined, or no client at all) still at Requested or Quoted.",
+              "On the jobs list, open the status chip menu and look for Complete job; open the job's Invoice tab and look for the 'Finished the work?' wrap-up card.",
+              "Hand-write a draft invoice (New invoice), add a line, Save, and check for a payouts blocker above Send.",
+              "Send the invoice, then Mark as paid.",
+              "The control: open a job WITH a claimed client at the same pre-work status and re-check the menu and the Send button.",
+            ],
+            expected:
+              "The solo job offers Complete job in the status menu AND shows the wrap-up card on the Invoice tab despite never being In progress; either path finalizes the invoice ('sent') and moves the job straight to Awaiting payment. No 'Set up Stripe payouts' blocker appears on the solo job and Send is enabled without any Connect onboarding; sending advances the job the same way, and Mark as paid closes it out (invoice paid, job Complete). The hand-written lines survive whichever path is used. The clientful control job offers NO Complete job at a pre-work status and still shows the payouts blocker with Send disabled. Mobile 375px: menu + wrap-up card reachable.",
+          },
+          {
             id: "tradie-invoice-pdf-size",
             title: "Invoice / quote PDF downloads small and keeps its transparency",
             steps: [

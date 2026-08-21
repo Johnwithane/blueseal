@@ -5,6 +5,7 @@ import QuoteCard from "@/components/QuoteCard.vue";
 import InvoiceEditor from "@/components/InvoiceEditor.vue";
 import ClientInvoiceCard from "@/components/ClientInvoiceCard.vue";
 import type { InvoiceStatus, JobDoc, WithId } from "@/firebase/interfaces";
+import { canTradieFinishJob } from "@/firebase/services/jobs";
 
 const props = defineProps<{
   job: WithId<JobDoc>;
@@ -72,6 +73,10 @@ const clientCanSeeInvoice = computed(
     !!props.invoiceId &&
     (props.invoiceStatus !== "draft" || props.job.status === "awaiting_client_approval"),
 );
+
+// The wrap-up card. Any running job, plus solo jobs from any live status —
+// mirrors what submitJobForApproval will actually accept (#28).
+const canFinish = computed(() => props.isTradie && canTradieFinishJob(props.job));
 </script>
 
 <template>
@@ -79,10 +84,7 @@ const clientCanSeeInvoice = computed(
     <!-- Tradie: create / update the invoice. This is the ONLY place the
          action lives (it used to share the page-bottom sticky CTA) — the
          invoice gets made where invoices live. -->
-    <div
-      v-if="isTradie && job.status === 'in_progress'"
-      class="bs-card p-3 border-l-4 border-l-[color:var(--bs-blue)]"
-    >
+    <div v-if="canFinish" class="bs-card p-3 border-l-4 border-l-[color:var(--bs-blue)]">
       <h3 class="font-semibold text-sm mb-1 flex items-center gap-2">
         <i class="pi pi-receipt text-[color:var(--bs-blue)]"></i>
         {{ job.clientChangesRequestedAt ? "Update the invoice" : "Finished the work?" }}
@@ -90,6 +92,11 @@ const clientCanSeeInvoice = computed(
       <p class="text-xs text-[color:var(--bs-muted)] mb-3">
         <template v-if="job.clientChangesRequestedAt">
           The client asked for changes — adjust the wrap-up and re-send it for approval.
+        </template>
+        <template v-else-if="job.clientId === null">
+          Build the invoice from your tracked time, expenses and change orders,
+          then finalize it. Record the payment once you're paid and the job
+          closes out.
         </template>
         <template v-else>
           Build the invoice from your tracked time, expenses and change orders,
@@ -112,7 +119,7 @@ const clientCanSeeInvoice = computed(
     <div v-if="canStartInvoice" class="bs-card p-3">
       <h3 class="font-semibold text-sm mb-1 flex items-center gap-2">
         <i class="pi pi-file-edit text-[color:var(--bs-blue)]"></i>
-        {{ job.status === "in_progress" ? "Or write one yourself" : "Write an invoice" }}
+        {{ canFinish ? "Or write one yourself" : "Write an invoice" }}
       </h3>
       <p class="text-xs text-[color:var(--bs-muted)] mb-3">
         Start a blank invoice and fill in your own lines — no quote or tracked

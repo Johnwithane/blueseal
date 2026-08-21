@@ -31,12 +31,12 @@ const fakeDb = db as unknown as FakeFirestore;
 const JOB = "job1";
 const TRADIE = "tradie1";
 
-function seed(clientId: string | null): void {
+function seed(clientId: string | null, status = "in_progress"): void {
   fakeDb.seed(`jobs/${JOB}`, {
     tradespersonId: TRADIE,
     clientId,
     title: "Kitchen tap",
-    status: "in_progress",
+    status,
     chatId: "chat1",
     billingType: "fixed",
     defaultTaxRate: 0,
@@ -111,5 +111,24 @@ describe("submitJobForApproval → skipClientApproval", () => {
     expect(fakeDb.peek(`invoices/${JOB}`)?.status).toBe("sent");
     // Nobody to notify.
     expect(notify).not.toHaveBeenCalled();
+  });
+
+  it("lets a solo job finish from a pre-work status (#28)", async () => {
+    // The job never went through quote/accept/start — the work happened
+    // off-app and only the paperwork lands here at the end.
+    seed(null, "requested");
+    await callFn(submitJobForApproval, req(false));
+
+    expect(fakeDb.peek(`jobs/${JOB}`)?.status).toBe("awaiting_payment");
+    expect(fakeDb.peek(`invoices/${JOB}`)?.status).toBe("sent");
+  });
+
+  it("still requires in_progress when a client is attached", async () => {
+    // The approval/payment pipeline is a contract with the other party — a
+    // clientful job can't be wrapped up before the work has started, even
+    // with the opt-out flag set.
+    seed("client1", "requested");
+    await expect(callFn(submitJobForApproval, req(true))).rejects.toThrow(/must be in progress/);
+    expect(fakeDb.peek(`jobs/${JOB}`)?.status).toBe("requested");
   });
 });

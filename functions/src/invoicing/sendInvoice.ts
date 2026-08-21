@@ -197,19 +197,29 @@ export const sendInvoice = onCall(CALLABLE_OPTS, async (req) => {
   // Payouts must be live before we promise a card pay link — the client's
   // pay page calls createInvoicePaymentIntent, which needs the connected
   // account. The Connect onboarding UI (/payouts) is the actionable next step.
+  //
+  // EXCEPT on a solo invoice (clientId null — bring-your-own-client /
+  // unclaimed invite): there is no platform client to card-pay it, collection
+  // is offline (e-transfer/cash) and markJobPaid closes the loop, so Stripe
+  // onboarding isn't a prerequisite (#28). The wrap-up path
+  // (submitJobForApproval) already finalizes solo invoices with no payouts
+  // check — this keeps the hand-written invoice path consistent with it.
+  const solo = inv.clientId === null;
   const tradieSnap = await db.doc(`tradespeople/${uid}`).get();
   const payouts = (tradieSnap.data()?.payouts ?? {}) as TradiePayouts;
-  if (!payouts.payoutsEnabled || !payouts.stripeAccountId) {
-    throw new HttpsError(
-      "failed-precondition",
-      "Finish Stripe Connect onboarding at /payouts before sending invoices.",
-    );
-  }
-  if (payouts.onboardingStatus === "restricted") {
-    throw new HttpsError(
-      "failed-precondition",
-      "Stripe needs more info on your account before you can collect payments. Open /payouts to see what's outstanding.",
-    );
+  if (!solo) {
+    if (!payouts.payoutsEnabled || !payouts.stripeAccountId) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Finish Stripe Connect onboarding at /payouts before sending invoices.",
+      );
+    }
+    if (payouts.onboardingStatus === "restricted") {
+      throw new HttpsError(
+        "failed-precondition",
+        "Stripe needs more info on your account before you can collect payments. Open /payouts to see what's outstanding.",
+      );
+    }
   }
 
   const jobRef = db.doc(`jobs/${inv.jobId}`);
@@ -256,7 +266,9 @@ export const sendInvoice = onCall(CALLABLE_OPTS, async (req) => {
         chargeId: inv.payment?.chargeId ?? null,
         serviceFee: inv.payment?.serviceFee ?? null,
         transferId: inv.payment?.transferId ?? null,
-        transferDestination: payouts.stripeAccountId,
+        // Solo invoices can be sent before Connect onboarding (see above), so
+        // there may be no connected account yet to route a card payment to.
+        transferDestination: payouts.stripeAccountId ?? null,
         refundedAmount: inv.payment?.refundedAmount ?? 0,
         refunds: inv.payment?.refunds ?? [],
         disputeId: inv.payment?.disputeId ?? null,
@@ -277,7 +289,17 @@ export const sendInvoice = onCall(CALLABLE_OPTS, async (req) => {
   //
   // Guarded on "in_progress" so the wrap-up paths (which set the status
   // themselves) and a re-send from "overdue" never rewind the job.
-  const advancedJob = job.status === "in_progress";
+  //
+  // Solo jobs additionally advance from any live pre-work status: with no
+  // client attached, the pipeline's intermediate stops (quote, acceptance)
+  // are the tradesperson's own bookkeeping, and a sent invoice means the job
+  // is now about money, not work (#28). Same status set as
+  // submitJobForApproval's SOLO_FINISH_STATUSES, minus in_progress (covered
+  // for everyone above).
+  const SOLO_ADVANCE_STATUSES = ["requested", "quoted", "accepted", "on_hold"];
+  const advancedJob =
+    job.status === "in_progress" ||
+    (solo && SOLO_ADVANCE_STATUSES.includes(job.status ?? ""));
   if (advancedJob) batch.update(jobRef, { status: "awaiting_payment" });
   await batch.commit();
 

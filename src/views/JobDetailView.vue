@@ -12,6 +12,7 @@ import {
   INSTANT_CANCEL_STATUSES,
   REQUEST_CANCEL_STATUSES,
   POSTPONABLE_STATUSES,
+  canTradieFinishJob,
   cancelJob,
   requestJobChange,
   subscribeJob,
@@ -574,9 +575,9 @@ watch(
 // Wrap-up deep link. The jobs-list action menu's "Complete job" (issue #21)
 // routes here with `?finish=1` rather than reimplementing the flow on the
 // dashboard, so there stays one wrap-up sheet. Same shape as `?chat=open`
-// above: gated on isTradie + in_progress so a stale/hand-typed link can't pop
-// a sheet that submitJobForApproval would reject anyway, and the key is
-// stripped so a back-navigation doesn't re-open it.
+// above: gated on isTradie + canTradieFinishJob so a stale/hand-typed link
+// can't pop a sheet that submitJobForApproval would reject anyway, and the
+// key is stripped so a back-navigation doesn't re-open it.
 watch(
   [() => route.query.finish, () => job.value?.status],
   ([v, status]) => {
@@ -585,7 +586,7 @@ watch(
     // Stripping the key there would eat the deep link before it could fire —
     // wait for the job, then decide.
     if (!status) return;
-    if (isTradie.value && status === "in_progress") showFinishSheet.value = true;
+    if (isTradie.value && job.value && canTradieFinishJob(job.value)) showFinishSheet.value = true;
     const next = { ...route.query };
     delete next.finish;
     router.replace({ query: next });

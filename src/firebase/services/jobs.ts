@@ -249,6 +249,27 @@ export const REQUEST_CANCEL_STATUSES: readonly JobStatus[] = [
 // nothing to pause.
 export const POSTPONABLE_STATUSES: readonly JobStatus[] = ["in_progress"] as const;
 
+// Statuses a TRADESPERSON can wrap a SOLO job up from (FinishJobSheet →
+// submitJobForApproval). With a client attached the job must actually be
+// running — the approval/payment pipeline is a contract with the other party.
+// A solo job (clientId null: bring-your-own-client, unclaimed invite) has no
+// other party, so it can be closed out from any live pre-payment status — the
+// work often happens entirely off-app and only gets recorded at the end
+// (issue #28). Mirrors the guard in functions/src/jobs/submitJobForApproval.ts.
+export const SOLO_FINISH_STATUSES: readonly JobStatus[] = [
+  "requested",
+  "quoted",
+  "accepted",
+  "on_hold",
+  "in_progress",
+] as const;
+
+/** Can the tradesperson open the wrap-up sheet / finish this job right now? */
+export function canTradieFinishJob(job: Pick<JobDoc, "status" | "clientId">): boolean {
+  if (job.status === "in_progress") return true;
+  return job.clientId === null && SOLO_FINISH_STATUSES.includes(job.status);
+}
+
 /**
  * Instantly cancel a PRE-COMMITMENT job and record who did it + why. The
  * onJobCancelled trigger notifies the opposite party. Only valid from

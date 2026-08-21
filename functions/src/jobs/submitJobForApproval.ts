@@ -178,7 +178,18 @@ export const submitJobForApproval = onCall(CALLABLE_OPTS, async (req) => {
   if (job.tradespersonId !== uid) {
     throw new HttpsError("permission-denied", "Not your job.");
   }
-  if (job.status !== "in_progress") {
+  // With a client attached the job must actually be running — the approval /
+  // payment pipeline is a contract with the other party. A solo job (clientId
+  // null: bring-your-own-client, unclaimed invite) has no other party, so the
+  // tradesperson can close it out from any live pre-payment status — the work
+  // often happens entirely off-app and only gets recorded at the end (#28).
+  // Mirrors SOLO_FINISH_STATUSES in src/firebase/services/jobs.ts; kept local
+  // (not in lib/) so this stays a targeted single-function deploy.
+  const SOLO_FINISH_STATUSES = ["requested", "quoted", "accepted", "on_hold", "in_progress"];
+  const canFinish =
+    job.status === "in_progress" ||
+    (job.clientId === null && SOLO_FINISH_STATUSES.includes(job.status));
+  if (!canFinish) {
     throw new HttpsError(
       "failed-precondition",
       `Job must be in progress to finish. Current status: ${job.status}.`,

@@ -40,7 +40,10 @@ const fakeDb = db as unknown as FakeFirestore;
 const JOB = "job1";
 const TRADIE = "tradie1";
 
-function seed(jobStatus: string, over: { invoice?: Record<string, unknown> } = {}): void {
+function seed(
+  jobStatus: string,
+  over: { invoice?: Record<string, unknown>; job?: Record<string, unknown> } = {},
+): void {
   fakeDb.seed(`invoices/${JOB}`, {
     invoiceNumber: "INV-2026-0001",
     tradespersonId: TRADIE,
@@ -60,6 +63,7 @@ function seed(jobStatus: string, over: { invoice?: Record<string, unknown> } = {
     clientId: "client1",
     status: jobStatus,
     chatId: "chat1",
+    ...over.job,
   });
   fakeDb.seed(`tradespeople/${TRADIE}`, {
     payouts: { stripeAccountId: "acct_1", payoutsEnabled: true, onboardingStatus: "enabled" },
@@ -115,5 +119,49 @@ describe("sendInvoice → job status", () => {
     await callFn(sendInvoice, req);
     expect(fakeDb.peek(`invoices/${JOB}`)?.status).toBe("sent");
     expect(enqueueMail).toHaveBeenCalled();
+  });
+
+  it("advances a solo job from a pre-work status (#28)", async () => {
+    // Hand-written invoice on a solo job that never went through
+    // quote/accept/start — sending it is the moment the job becomes about
+    // money, so it jumps straight to awaiting_payment.
+    seed("requested", { invoice: { clientId: null }, job: { clientId: null } });
+    await callFn(sendInvoice, req);
+
+    expect(fakeDb.peek(`jobs/${JOB}`)?.status).toBe("awaiting_payment");
+    expect(fakeDb.peek(`invoices/${JOB}`)?.status).toBe("sent");
+  });
+
+  it("skips the payouts precondition for a solo invoice (#28)", async () => {
+    // No platform client to card-pay a solo invoice — collection is offline,
+    // so Stripe onboarding isn't a prerequisite for sending it.
+    seed("requested", { invoice: { clientId: null }, job: { clientId: null } });
+    fakeDb.seed(`tradespeople/${TRADIE}`, {});
+
+    await callFn(sendInvoice, req);
+    const inv = fakeDb.peek(`invoices/${JOB}`) as {
+      status?: string;
+      payment?: { transferDestination?: string | null };
+    };
+    expect(inv.status).toBe("sent");
+    // No connected account yet — nothing to route a future card payment to.
+    expect(inv.payment?.transferDestination).toBeNull();
+  });
+
+  it("still requires payouts when a client is attached", async () => {
+    seed("in_progress");
+    fakeDb.seed(`tradespeople/${TRADIE}`, {});
+    await expect(callFn(sendInvoice, req)).rejects.toThrow(/Stripe Connect/);
+    expect(fakeDb.peek(`invoices/${JOB}`)?.status).toBe("draft");
+  });
+
+  it("doesn't advance a clientful job from a pre-work status", async () => {
+    // A clientful job's pipeline stops mean something to the other party —
+    // only solo jobs get to fast-forward.
+    seed("requested");
+    await callFn(sendInvoice, req);
+
+    expect(fakeDb.peek(`jobs/${JOB}`)?.status).toBe("requested");
+    expect(fakeDb.peek(`invoices/${JOB}`)?.status).toBe("sent");
   });
 });

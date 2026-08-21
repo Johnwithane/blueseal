@@ -289,7 +289,15 @@ watch(
 
 onBeforeUnmount(() => unsubPayouts?.());
 
+// Solo invoices (clientId null — bring-your-own-client / unclaimed invite)
+// collect offline: Send just finalizes the invoice and advances the job, and
+// sendInvoice skips its Stripe payouts precondition for them (#28). Requiring
+// Connect onboarding here would dead-end tradespeople who never take card
+// payments.
+const payoutsRequired = computed(() => invoice.value?.clientId !== null);
+
 const payoutsReady = computed(() => {
+  if (!payoutsRequired.value) return true;
   if (!payoutsLoaded.value) return true; // optimistic: don't flash a warning
   const s = payoutsState.value;
   if (!s) return false;

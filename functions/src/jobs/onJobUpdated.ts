@@ -41,7 +41,13 @@ function isApprovalFlowTransition(before: string | undefined, after: string | un
     // Straight to awaiting_payment: either sendInvoice (hand-written invoice
     // put in front of the client) or submitJobForApproval with the approval
     // round-trip skipped. Both post their own line with the invoice + total.
+    // Solo jobs (#28) can take that jump from any live pre-work status, not
+    // just in_progress — same two callables, same richer line.
     pair === "in_progress->awaiting_payment" ||
+    pair === "requested->awaiting_payment" ||
+    pair === "quoted->awaiting_payment" ||
+    pair === "accepted->awaiting_payment" ||
+    pair === "on_hold->awaiting_payment" ||
     pair === "awaiting_client_approval->awaiting_payment" ||
     pair === "awaiting_client_approval->in_progress" ||
     pair === "awaiting_payment->complete" ||

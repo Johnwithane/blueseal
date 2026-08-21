@@ -28,19 +28,22 @@ const STUBS = {
   Tag: { props: ["value", "severity"], template: "<span class=\"stub-tag\">{{ value }}</span>" },
 };
 
-function job(status: JobStatus): WithId<JobDoc> {
+function job(status: JobStatus, clientId: string | null = "c1"): WithId<JobDoc> {
   return {
     id: "job1",
     status,
     title: "Leaky tap",
     trade: "plumbing",
-    clientId: "c1",
+    clientId,
     tradespersonId: "tp1",
   } as unknown as WithId<JobDoc>;
 }
 
-function itemsFor(status: JobStatus): string[] {
-  const w = mount(JobActionMenu, { props: { job: job(status) }, global: { stubs: STUBS } });
+function itemsFor(status: JobStatus, clientId: string | null = "c1"): string[] {
+  const w = mount(JobActionMenu, {
+    props: { job: job(status, clientId) },
+    global: { stubs: STUBS },
+  });
   const model = w.findComponent(MenuStub).props("model") ?? [];
   return model.filter((i) => !i.separator).map((i) => i.label as string);
 }
@@ -54,7 +57,7 @@ describe("JobActionMenu — items derived from the status machine", () => {
     }
   });
 
-  it("offers Complete job only on a running job", () => {
+  it("offers Complete job only on a running job when a client is attached", () => {
     expect(itemsFor("in_progress")).toContain("Complete job");
     for (const s of [
       "requested",
@@ -66,6 +69,19 @@ describe("JobActionMenu — items derived from the status machine", () => {
       "awaiting_payment",
     ] as JobStatus[]) {
       expect(itemsFor(s)).not.toContain("Complete job");
+    }
+  });
+
+  it("offers Complete job from any live status on a solo job (#28)", () => {
+    // No client attached (bring-your-own-client / unclaimed invite): the work
+    // may have happened entirely off-app, so the close-out has to be reachable
+    // without marching through quote → accept → start.
+    for (const s of ["requested", "quoted", "accepted", "on_hold", "in_progress"] as JobStatus[]) {
+      expect(itemsFor(s, null)).toContain("Complete job");
+    }
+    // But never once the job is already about money or done.
+    for (const s of ["awaiting_payment", "complete", "cancelled"] as JobStatus[]) {
+      expect(itemsFor(s, null)).not.toContain("Complete job");
     }
   });
 

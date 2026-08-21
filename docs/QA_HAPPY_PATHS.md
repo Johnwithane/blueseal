@@ -642,6 +642,18 @@ left the job stuck forever.
    invoice**.
 8. Mobile (375px): the tick-box, its explanation and the submit button all fit
    without horizontal scroll.
+9. **Solo job that never started (issue #28).** On a solo job still at a
+   pre-work status (`requested` / `quoted` — the work happened off-app):
+   **Expected:** the jobs-list status menu offers **Complete job**, and the
+   Invoice tab shows the *Finished the work?* wrap-up card. Finishing works
+   exactly as in step 3 — job → **Awaiting payment**, invoice **sent**. A job
+   **with a client** at the same status must NOT offer Complete job.
+10. **Hand-written invoice on a solo job, no Stripe payouts.** As a
+    tradesperson who has NOT set up payouts, hand-write a draft invoice
+    (**New invoice**) on a solo pre-work job. **Expected:** no payouts
+    blocker card and **Send** is enabled (a job with a claimed client still
+    shows the blocker). Send it: invoice → **sent**, job → **Awaiting
+    payment**, then **Mark as paid** → **Complete**.
 
 ---
 

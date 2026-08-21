@@ -401,7 +401,9 @@ Everything is itemised, so there are no surprises: the client sees what they're 
 
 **Not every job needs the full path.** Quoting is a tab, not a gate: a tradesperson can write an invoice by hand from the job's **Invoice** tab — **New invoice** opens a blank one to fill in, with no quote or tracked time required. The **Quote** tab links straight across to it (**Skip the quote — invoice directly**) for jobs that don't need pricing up front. A hand-written invoice is a private draft until it's sent, and it's reviewed and paid exactly like any other. Sending it moves the job to **Awaiting payment**, so the tradesperson can mark it paid and close the job out as soon as the money lands.
 
-**Skipping the approval step.** Step 3's approval round-trip is the default, not a requirement. On the **Finish job** wrap-up a tradesperson can tick **"Finish without client approval"** to finalize the invoice on the spot — useful when they've run the job end-to-end and are collecting by cash or e-transfer. The client still gets the invoice and can still pay it online; they just aren't asked to approve the wrap-up first.`,
+**Skipping the approval step.** Step 3's approval round-trip is the default, not a requirement. On the **Finish job** wrap-up a tradesperson can tick **"Finish without client approval"** to finalize the invoice on the spot — useful when they've run the job end-to-end and are collecting by cash or e-transfer. The client still gets the invoice and can still pay it online; they just aren't asked to approve the wrap-up first.
+
+**Jobs that never went through the app.** On a job with no client attached (you invited one who hasn't joined yet, or you're keeping the client off-app), you can close the job out from any status. The jobs list offers **Complete job** and the Invoice tab shows the wrap-up card even if the job was never started in the app, so work that happened entirely offline can still be invoiced and completed. Sending an invoice on one of these jobs also doesn't require Stripe payouts to be set up, since you're collecting the money yourself and recording it with **Mark as paid**.`,
   },
   {
     slug: "paying-for-a-job",
@@ -1369,7 +1371,7 @@ const faqs: FaqItem[] = [
   {
     question: "Can I complete a job without waiting on my client?",
     answer:
-      "Yes. On the **Finish job** wrap-up, tick **\"Finish without client approval\"** and the invoice is finalized on the spot — the job moves straight to **Awaiting payment**, where **Mark as paid** closes it out. Sending a hand-written invoice from the **Invoice** tab does the same thing. Your client still receives the invoice and can still pay it online; they're just not asked to approve the wrap-up first. Leave the tick off and the normal approve-then-pay flow runs as before.",
+      "Yes. On the **Finish job** wrap-up, tick **\"Finish without client approval\"** and the invoice is finalized on the spot — the job moves straight to **Awaiting payment**, where **Mark as paid** closes it out. Sending a hand-written invoice from the **Invoice** tab does the same thing. Your client still receives the invoice and can still pay it online; they're just not asked to approve the wrap-up first. Leave the tick off and the normal approve-then-pay flow runs as before. On a job with no client attached this works from any status, even one that never left Requested, and sending the invoice doesn't require Stripe payouts to be set up.",
     categoryId: "payments-invoices",
     audience: "tradesperson",
   },
