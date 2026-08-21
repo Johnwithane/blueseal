@@ -286,6 +286,11 @@ service cloud.firestore {
         // touch the field don't.
         && request.resource.data.get('payouts', null)
              == resource.data.get('payouts', null)
+        // Card-payment risk state (the admin pause switch behind ToS § 7.7).
+        // Owner-writable would make the kill switch decorative — a paused
+        // tradesperson could simply clear it and keep taking cards.
+        && request.resource.data.get('payments', null)
+             == resource.data.get('payments', null)
         && request.resource.data.get('paidJobsCount', null)
              == resource.data.get('paidJobsCount', null)
         && request.resource.data.get('paidLifetimeCents', null)

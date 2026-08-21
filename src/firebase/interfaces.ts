@@ -571,6 +571,21 @@ export interface RatingDimension {
 // ---------------------------------------------------------------------------
 export type ConnectOnboardingStatus = "not_started" | "in_progress" | "restricted" | "enabled";
 
+/**
+ * Admin kill switch for a tradesperson's card payments (ToS § 7.7).
+ *
+ * Narrow by design: a pause blocks NEW card payments only. The account, jobs,
+ * chat and the fee-free offline payment path all keep working, so risk can be
+ * contained without stopping legitimate work in flight.
+ */
+export interface TradespersonPaymentsState {
+  /** Non-null = paused. Set by adminSetCardPayments. */
+  cardPaymentsPausedAt: Timestamp | null;
+  /** Internal risk note — never shown to clients. */
+  cardPaymentsPausedReason: string | null;
+  cardPaymentsPausedBy: string | null;
+}
+
 export interface PayoutsState {
   stripeAccountId: string | null;
   onboardingStatus: ConnectOnboardingStatus;
@@ -806,6 +821,10 @@ export interface TradespersonDoc {
   // every doc has it. Service code reading this should still default-handle
   // undefined for safety.
   payouts?: PayoutsState;
+  // Card-payment risk state. Absent on every tradesperson until an admin first
+  // pauses them. SERVER-MANAGED (adminSetCardPayments) and locked in
+  // firestore.rules — owner-writable would make the switch decorative.
+  payments?: TradespersonPaymentsState;
   // Public "verified earnings" stats — server-incremented in the
   // `payment_intent.succeeded` webhook. Drives a social-proof badge on the
   // public profile ("$50k+ paid through Blue Seal"). Optional because

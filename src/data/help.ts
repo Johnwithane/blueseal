@@ -1389,6 +1389,20 @@ const faqs: FaqItem[] = [
     categoryId: "payments-invoices",
     audience: "all",
   },
+  {
+    question: "Is there a limit on paying by card?",
+    answer:
+      "Yes. Single card payments through Blue Seal are capped, with a lower cap while a tradesperson is new to the platform. It's a fraud and chargeback protection for both sides, and it lifts on its own as they build a payment history. Bigger jobs aren't a problem — pay by e-transfer or cash and record it on the job. That's fee-free, so it's usually the cheaper option at that size anyway, and you still get the invoice, receipt and full job record.",
+    categoryId: "payments-invoices",
+    audience: "all",
+  },
+  {
+    question: "Why was I asked to verify a card payment with my bank?",
+    answer:
+      "Larger card payments ask for your bank's own verification step (often a code or an approval in your banking app). It's an extra check that the payment is really you, which protects you from someone else using your card and protects the tradesperson from losing a payment to fraud. Follow the prompt from your bank and the payment completes as normal.",
+    categoryId: "payments-invoices",
+    audience: "client",
+  },
 
   // ── Account & app ─────────────────────────────────────────────────────────
   {

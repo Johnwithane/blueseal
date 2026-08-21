@@ -24,6 +24,7 @@ import { requireAuth } from "../lib/auth";
 import { getSubscriptionState } from "../lib/subscription";
 import { assertTradieChargeable } from "./chargeable";
 import { computeServiceFee } from "./serviceFee";
+import { threeDSecurePreference } from "./paymentRisk";
 import { toStatementDescriptorSuffix } from "./statementDescriptor";
 import { STRIPE_SECRET_KEY, getStripe } from "./stripeClient";
 
@@ -83,9 +84,12 @@ export const createInvoicePaymentIntent = onCall(
       throw new HttpsError("failed-precondition", "Online payment is only available in CAD.");
     }
 
-    // Tradesperson must be able to receive the destination charge.
+    // Tradesperson must be able to receive a destination charge of this size:
+    // onboarding complete, card payments not paused, amount within their
+    // ceiling. See chargeable.ts.
     const { stripeAccountId, businessName } = await assertTradieChargeable(
       inv.tradespersonId,
+      inv.total,
     );
     // "BLUESEAL* SMITH ELECTRIC" beats a bare "BLUESEAL" the client never
     // hired. Omitted entirely when the name yields nothing Stripe-safe.
@@ -114,6 +118,13 @@ export const createInvoicePaymentIntent = onCall(
       waived: String(fee.waived),
     };
 
+    // 3-D Secure is the only lever that actually moves fraud-chargeback
+    // liability off Blue Seal and onto the card issuer, so we ask for it on
+    // every payment and insist above the threshold. See paymentRisk.ts.
+    const paymentMethodOptions = {
+      card: { request_three_d_secure: threeDSecurePreference(fee.chargeTotalCents) },
+    } as const;
+
     let paymentIntentId = inv.payment?.paymentIntentId ?? null;
     let clientSecret = inv.payment?.clientSecret ?? null;
 
@@ -129,6 +140,10 @@ export const createInvoicePaymentIntent = onCall(
         const updated = await stripe.paymentIntents.update(paymentIntentId, {
           amount: fee.chargeTotalCents,
           application_fee_amount: fee.totalFeeCents,
+          // Re-priced intents cross the 3DS threshold in both directions, so
+          // the preference is recomputed here rather than left at whatever the
+          // original amount implied.
+          payment_method_options: paymentMethodOptions,
           ...(statementSuffix ? { statement_descriptor_suffix: statementSuffix } : {}),
           metadata,
         });
@@ -144,6 +159,7 @@ export const createInvoicePaymentIntent = onCall(
           application_fee_amount: fee.totalFeeCents,
           transfer_data: { destination: stripeAccountId },
           automatic_payment_methods: { enabled: true },
+          payment_method_options: paymentMethodOptions,
           ...(statementSuffix ? { statement_descriptor_suffix: statementSuffix } : {}),
           description: `Blue Seal invoice ${inv.invoiceNumber}`,
           metadata,

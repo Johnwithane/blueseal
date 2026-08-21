@@ -9,7 +9,7 @@ import {
   assertSucceeds,
   type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
-import { GeoPoint, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { GeoPoint, Timestamp, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 
 import {
   ADMIN_CLAIMS,
@@ -88,12 +88,12 @@ const baselineTradie = {
   approvedAt: null,
 };
 
-async function seedTradie() {
+async function seedTradie(overrides: Record<string, unknown> = {}) {
   await env.withSecurityRulesDisabled(async (ctx) => {
-    await setDoc(
-      doc(ctx.firestore(), "tradespeople", TRADIE_UID),
-      baselineTradie,
-    );
+    await setDoc(doc(ctx.firestore(), "tradespeople", TRADIE_UID), {
+      ...baselineTradie,
+      ...overrides,
+    });
   });
 }
 
@@ -124,6 +124,69 @@ describe("tradespeople — server-managed field locks", () => {
           lastSyncedAt: null,
         },
       }),
+    );
+  });
+
+  // The card-payments kill switch (ToS § 7.7) is only worth anything if the
+  // tradesperson it's aimed at can't clear it. Both directions are covered:
+  // they can't lift a pause, and they can't invent the field either.
+  it("owner cannot clear an admin card-payments pause", async () => {
+    await seedTradie({
+      payments: {
+        cardPaymentsPausedAt: Timestamp.fromMillis(1_700_000_000_000),
+        cardPaymentsPausedReason: "chargeback pattern",
+        cardPaymentsPausedBy: ADMIN_UID,
+      },
+    });
+    const fs = env.authenticatedContext(TRADIE_UID, TRADIE_CLAIMS).firestore();
+    await assertFails(
+      updateDoc(doc(fs, "tradespeople", TRADIE_UID), {
+        payments: {
+          cardPaymentsPausedAt: null,
+          cardPaymentsPausedReason: null,
+          cardPaymentsPausedBy: null,
+        },
+      }),
+    );
+  });
+
+  it("owner cannot self-set a payments block", async () => {
+    await seedTradie();
+    const fs = env.authenticatedContext(TRADIE_UID, TRADIE_CLAIMS).firestore();
+    await assertFails(
+      updateDoc(doc(fs, "tradespeople", TRADIE_UID), {
+        payments: { cardPaymentsPausedAt: null },
+      }),
+    );
+  });
+
+  it("admin can pause card payments", async () => {
+    await seedTradie();
+    const fs = env.authenticatedContext(ADMIN_UID, ADMIN_CLAIMS).firestore();
+    await assertSucceeds(
+      updateDoc(doc(fs, "tradespeople", TRADIE_UID), {
+        payments: {
+          cardPaymentsPausedAt: Timestamp.fromMillis(1_700_000_000_000),
+          cardPaymentsPausedReason: "chargeback pattern",
+          cardPaymentsPausedBy: ADMIN_UID,
+        },
+      }),
+    );
+  });
+
+  it("owner can still edit their bio while paused", async () => {
+    // A pause must not brick the rest of the profile — it's a payments
+    // control, not an account suspension.
+    await seedTradie({
+      payments: {
+        cardPaymentsPausedAt: Timestamp.fromMillis(1_700_000_000_000),
+        cardPaymentsPausedReason: "chargeback pattern",
+        cardPaymentsPausedBy: ADMIN_UID,
+      },
+    });
+    const fs = env.authenticatedContext(TRADIE_UID, TRADIE_CLAIMS).firestore();
+    await assertSucceeds(
+      updateDoc(doc(fs, "tradespeople", TRADIE_UID), { bio: "still plumbing" }),
     );
   });
 

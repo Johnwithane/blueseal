@@ -17,6 +17,7 @@ import { getSubscriptionState } from "../lib/subscription";
 import { assertTradieChargeable } from "./chargeable";
 import { toStatementDescriptorSuffix } from "./statementDescriptor";
 import { computeServiceFee } from "./serviceFee";
+import { threeDSecurePreference } from "./paymentRisk";
 import { STRIPE_SECRET_KEY, getStripe } from "./stripeClient";
 
 const Input = z.object({ jobId: z.string().min(1).max(128) });
@@ -75,6 +76,7 @@ export const createUpfrontFeePaymentIntent = onCall(
 
     const { stripeAccountId, businessName } = await assertTradieChargeable(
       job.tradespersonId,
+      fee.amountCents,
     );
     const statementSuffix = toStatementDescriptorSuffix(businessName);
 
@@ -99,6 +101,12 @@ export const createUpfrontFeePaymentIntent = onCall(
       waived: String(serviceFee.waived),
     };
 
+    // See createInvoicePaymentIntent — 3DS shifts fraud-chargeback liability
+    // to the issuer; both card paths request it identically.
+    const paymentMethodOptions = {
+      card: { request_three_d_secure: threeDSecurePreference(serviceFee.chargeTotalCents) },
+    } as const;
+
     let paymentIntentId = fee.payment?.paymentIntentId ?? null;
     let clientSecret = fee.payment?.clientSecret ?? null;
 
@@ -111,6 +119,7 @@ export const createUpfrontFeePaymentIntent = onCall(
         const updated = await stripe.paymentIntents.update(paymentIntentId, {
           amount: serviceFee.chargeTotalCents,
           application_fee_amount: serviceFee.totalFeeCents,
+          payment_method_options: paymentMethodOptions,
           ...(statementSuffix ? { statement_descriptor_suffix: statementSuffix } : {}),
           metadata,
         });
@@ -126,6 +135,7 @@ export const createUpfrontFeePaymentIntent = onCall(
           application_fee_amount: serviceFee.totalFeeCents,
           transfer_data: { destination: stripeAccountId },
           automatic_payment_methods: { enabled: true },
+          payment_method_options: paymentMethodOptions,
           ...(statementSuffix ? { statement_descriptor_suffix: statementSuffix } : {}),
           description: `Blue Seal upfront fee — job ${jobId}`,
           metadata,
