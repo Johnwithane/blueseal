@@ -948,6 +948,17 @@ record; only App Check enforcement (and the optional `ping` cleanup) remain.
 
 ### [ ] Create the GitHub token for the bug-report → GitHub Issues bridge
 
+> **⚠ ESCALATED 2026-08-21 — this now blocks EVERY Cloud Functions deploy, and
+> hosting ships without them.** Step 4 below (the Owner-granted IAM) is no
+> longer just "CI shows red". `firebase deploy` resolves the secrets of ALL
+> functions during "Loading and analyzing source code", *before* it applies
+> `--only`, so the 403 kills a **targeted** deploy just as dead as a full one.
+> Deploy run 32530535805 is the proof: rules deployed ✔, functions died on the
+> 403, and hosting then shipped anyway (it runs with `if: always()`), putting a
+> frontend in production that calls callables which do not exist. Until the IAM
+> grant lands, **every functions change must be deployed locally** — CI cannot
+> do it at all.
+
 - **Why:** Every in-app bug report now auto-files as a GitHub issue (`onBugReportCreated`), and closing an issue writes the triage state back to Firestore (`scheduledBugIssueSync`, every 6h) — this is what lets a REMOTE Claude session (claude.ai/code) see, triage and close out the bug queue with nothing but repo access. Both functions are deployed but idle: the `BUGS_GITHUB_TOKEN` secret currently holds the placeholder `UNSET`, so they log a warning and skip.
 - **What:**
   1. GitHub → Settings → Developer settings → **Fine-grained personal access tokens** → Generate new token. Resource owner `Johnwithane`, repository access: **only `Johnwithane/blueseal`**, permissions: **Issues → Read and write** (nothing else). Expiry: 1 year is fine — it's scoped to issues on one repo.
@@ -1029,3 +1040,28 @@ login and can't be done from a session.
   (Cloud Functions logs: "over the card-payment ceiling") and decide whether to
   raise it. It's a one-line constant change.
 - **Verify:** N/A — a judgement call to revisit, not a fix.
+
+### [ ] Deploy the payment-risk functions (blocked on the IAM grant above)
+
+- **Why:** Deploy run 32530535805 (2026-08-21) shipped `firestore.rules` and
+  **hosting** but not the Cloud Functions — the `BUGS_GITHUB_TOKEN` 403 above
+  killed the functions step. So production is currently running the NEW
+  frontend against the OLD functions.
+- **What's actually affected** (existing payment flows are fine — the old
+  `createInvoicePaymentIntent` / `createUpfrontFeePaymentIntent` /
+  `stripeWebhook` are still serving, just without the new protections):
+  - `refundInvoicePayment` — **user-visible.** The Refund card now renders for
+    a tradesperson on a card-paid invoice and will error when tapped.
+  - `adminSubmitDisputeEvidence`, `adminSetCardPayments` — admin-only buttons,
+    will error when tapped.
+  - No 3-D Secure, no card-payment ceilings, no dispute fund recovery and no
+    auto-drafted evidence until the deploy lands.
+- **What:** from a machine with Firebase credentials (this is quota-safe — six
+  targeted functions, not the ~200 a full deploy would push):
+  ```
+  firebase deploy --only functions:adminSetCardPayments,functions:adminSubmitDisputeEvidence,functions:createInvoicePaymentIntent,functions:createUpfrontFeePaymentIntent,functions:refundInvoicePayment,functions:stripeWebhook --project blueseal-762af
+  ```
+- **Verify:** `firebase functions:list` shows all six updated today. Then, as a
+  tradesperson on a card-paid job, the Invoice tab's **Refund** opens its dialog
+  and a full refund succeeds; and a test card payment over CAD $1,000 now asks
+  for the 3-D Secure step.
