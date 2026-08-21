@@ -2245,8 +2245,10 @@ export interface InvoiceDoc {
 // hitting the Stripe API every time the admin queue renders) so the queue
 // is a single Firestore query and parties can subscribe in real time.
 // `evidenceDueBy` is sourced from Stripe's `evidence_details.due_by` so the
-// admin queue can sort by urgency. Evidence submission itself happens in
-// the Stripe Dashboard — Blue Seal's role is awareness + coordination.
+// admin queue can sort by urgency. Evidence is DRAFTED automatically from the
+// job record when the dispute opens (functions/src/payments/disputeEvidence.ts)
+// and submitted by an admin from the dispute detail view — Stripe allows only
+// one submission, so it is never automatic.
 // ---------------------------------------------------------------------------
 export interface DisputeDoc {
   invoiceId: string;
@@ -2267,6 +2269,31 @@ export interface DisputeDoc {
   evidenceDueBy: Timestamp | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+  // Fund recovery (ToS § 8.4). We take destination charges, so a chargeback
+  // debits the PLATFORM balance, not the tradesperson's connected account —
+  // the webhook reverses their transfer when the dispute opens so the loss
+  // sits where the Terms put it. Absent on disputes recorded before this
+  // shipped. See functions/src/payments/disputeRecovery.ts.
+  recovery?: DisputeRecoveryState;
+}
+
+export interface DisputeRecoveryState {
+  // reversed          — the tradesperson's transfer was clawed back
+  // restored          — the dispute was won and the funds were returned
+  // nothing_to_reverse— no transfer on the charge (nothing to claw back)
+  // failed            — the reversal failed (usually: already paid out with
+  //                     no balance left). This is a DEBT TO CHASE, not an
+  //                     automatic Blue Seal loss — surface it to an admin.
+  status: "reversed" | "restored" | "nothing_to_reverse" | "failed";
+  transferId: string | null;
+  reversalId: string | null;
+  reversedCents: number;
+  /** Connected account the funds came from; used to transfer them back on a win. */
+  destinationAccountId: string | null;
+  restoreTransferId: string | null;
+  restoredCents: number;
+  failureMessage: string | null;
+  updatedAt: Timestamp | null;
 }
 
 // ---------------------------------------------------------------------------

@@ -174,8 +174,19 @@ jobs:
             FOUND=$(grep -oE "export \{[^}]+\} from \"\./${REL}\"" functions/src/index.ts \
               | sed -E 's/export \{([^}]*)\}.*/\1/' | tr ',' '\n' | tr -d ' ')
             if [ -z "$FOUND" ]; then
-              echo "no index.ts export maps to $f — full deploy"
-              echo "targets=functions" >> "$GITHUB_OUTPUT"; exit 0
+              # No direct export entry. That's every module a function IMPORTS
+              # rather than IS: the webhook handlers, shared payment helpers.
+              # Widening those to a full deploy is what the targeted-deploy
+              # logic exists to avoid, so resolve their real dependents from
+              # the import graph instead (chargeDispute.ts -> stripeWebhook).
+              # The script exits non-zero on anything it can't resolve, and we
+              # fall back to the old full-deploy behaviour there.
+              if FOUND=$(node .github/scripts/dependents.mjs functions/src/index.ts "$f"); then
+                echo "$f is imported by: $(echo "$FOUND" | tr '\n' ' ')"
+              else
+                echo "couldn't resolve dependents of $f — full deploy"
+                echo "targets=functions" >> "$GITHUB_OUTPUT"; exit 0
+              fi
             fi
             NAMES="$NAMES $FOUND"
           done

@@ -10,8 +10,17 @@
 // on `closed`. The `payment.disputeId` + `payment.disputeStatus` mirror
 // on the invoice gives the existing invoice rules + UI a single field to
 // read; the full dispute record lives in /disputes for the admin queue
-// and party-visible detail views. Evidence submission itself happens in
-// the Stripe Dashboard — Blue Seal's role is awareness + coordination.
+// and party-visible detail views.
+//
+// TWO THINGS HAPPEN ON `created` BEYOND RECORD-KEEPING:
+//   1. Fund recovery (disputeRecovery.ts) — we reverse the tradesperson's
+//      transfer so the disputed money sits on the platform balance instead of
+//      Blue Seal absorbing a loss that ToS § 8.4 puts on the tradesperson.
+//      Reversed on `won`, kept on `lost`.
+//   2. Evidence staging (disputeEvidence.ts) — we assemble the job's signed
+//      quote, chat, photos and completion record into Stripe's evidence fields
+//      as a DRAFT. An admin reviews and submits; we never auto-submit, because
+//      submission is one-shot and closes the window to add anything better.
 //
 // Idempotency: per-dispute `lastWebhookEventId` short-circuits replays.
 // The global webhookEvents sentinel is the first line; this is belt +
@@ -25,6 +34,9 @@ import { logAdminAction } from "../../lib/audit";
 import { notify, notifyMany } from "../../lib/notify";
 import { reverseCommission } from "../../lib/commissionAccrual";
 import { reversePmServiceFee } from "../../lib/pmCommission";
+import { getStripe } from "../stripeClient";
+import { reverseTransferForDispute, restoreTransferForDispute } from "../disputeRecovery";
+import { stageDisputeEvidence } from "../disputeEvidence";
 import type { StripeDispute } from "./shared";
 
 function chargeId(d: StripeDispute): string {
@@ -128,6 +140,44 @@ export async function handleChargeDisputeCreated(
     );
   }
 
+  // ── Fund recovery (ToS § 8.4) ────────────────────────────────────────────
+  // Claw the tradesperson's transfer back to the platform balance while the
+  // dispute is decided. Guarded: a recovery failure is a debt to chase, and
+  // must never stop the dispute from being recorded and surfaced to admins.
+  const stripe = getStripe();
+  const recovery = await reverseTransferForDispute(stripe, {
+    disputeId: dispute.id,
+    chargeId: cid,
+    disputeAmountCents: dispute.amount,
+  });
+  await disputeRef.set(
+    {
+      recovery: {
+        status: recovery.status,
+        transferId: recovery.transferId,
+        reversalId: recovery.reversalId,
+        reversedCents: recovery.reversedCents,
+        destinationAccountId: recovery.destinationAccountId,
+        restoreTransferId: null,
+        restoredCents: 0,
+        failureMessage: recovery.failureMessage,
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+    },
+    { merge: true },
+  );
+
+  // ── Evidence staging ─────────────────────────────────────────────────────
+  // Draft only — an admin reviews and submits from the dispute detail view.
+  try {
+    await stageDisputeEvidence(stripe, { disputeId: dispute.id, submit: false });
+  } catch (err) {
+    logger.error("dispute_created: evidence staging failed", {
+      disputeId: dispute.id,
+      err: err instanceof Error ? err.message : String(err),
+    });
+  }
+
   // Audit log — disputes are the highest-impact thing that can happen
   // post-payment; we want a permanent record.
   await logAdminAction({
@@ -142,6 +192,8 @@ export async function handleChargeDisputeCreated(
       status: dispute.status,
       amount: dispute.amount,
       currency: dispute.currency,
+      recoveryStatus: recovery.status,
+      recoveredCents: recovery.reversedCents,
     },
   });
 
@@ -152,10 +204,19 @@ export async function handleChargeDisputeCreated(
   try {
     const adminUids = await listAdminUids();
     if (adminUids.length > 0) {
+      // Lead with the recovery result: a FAILED reversal is the one that needs
+      // a human today (the funds already left, so it's a debt to chase), and
+      // burying that under generic dispute copy is how it gets missed.
+      const recoveryLine =
+        recovery.status === "reversed"
+          ? `Held back ${dispute.currency.toUpperCase()} ${(recovery.reversedCents / 100).toFixed(2)} from the tradesperson's payout.`
+          : recovery.status === "failed"
+            ? `⚠ Could not hold back the tradesperson's payout — this is a recoverable debt, not an automatic loss.`
+            : `No transfer to hold back on this charge.`;
       await notifyMany(adminUids, {
         type: "dispute_opened",
         title: `Dispute opened on ${dispute.currency.toUpperCase()} ${(dispute.amount / 100).toFixed(2)}`,
-        body: `Reason: ${dispute.reason.replace(/_/g, " ")}. Open the disputes queue to coordinate evidence.`,
+        body: `Reason: ${dispute.reason.replace(/_/g, " ")}. ${recoveryLine} Evidence has been drafted — review and submit it from the disputes queue.`,
         link: `/admin/disputes/${dispute.id}`,
         actorUid: null,
         recipientRole: "admin",
@@ -174,15 +235,20 @@ export async function handleChargeDisputeCreated(
   }
 
   if (invData.tradespersonId) {
+    // The old copy said "no action needed from you". That was never true and
+    // now contradicts the Terms (§ 8.2): the tradesperson owes cooperation on
+    // evidence, and the disputed amount is held back from them meanwhile.
+    // Telling them otherwise loses winnable disputes and blindsides them when
+    // the payout is short.
     await notify({
       userId: invData.tradespersonId as string,
       type: "dispute_opened",
-      title: `Heads up: a payment is being disputed`,
-      body: `Invoice ${(invData.invoiceNumber as string) ?? ""} is under dispute (reason: ${dispute.reason.replace(/_/g, " ")}). Our team is handling it — no action needed from you.`,
+      title: `Action needed: a payment is being disputed`,
+      body: `Invoice ${(invData.invoiceNumber as string) ?? ""} is under dispute (reason: ${dispute.reason.replace(/_/g, " ")}). The disputed amount is held back from your payout until the bank decides. We've drafted a response from your job records — send us anything else that proves the work (photos, messages, sign-off) as soon as you can.`,
       link: invData.jobId ? `/jobs/${invData.jobId}` : null,
       actorUid: null,
       recipientRole: "tradesperson",
-      priority: "normal",
+      priority: "high",
     });
   }
 }
@@ -214,6 +280,51 @@ export async function handleChargeDisputeClosed(
       { merge: true },
     );
   });
+
+  // ── Give the money back on a WON dispute ─────────────────────────────────
+  // We clawed the tradesperson's transfer back when the dispute opened; a win
+  // means those funds are ours to return, so re-transfer them. On a LOSS the
+  // clawback stands — that is the tradesperson absorbing it (ToS § 8.2) — and
+  // there is nothing further to do here.
+  const won = dispute.status === "won" || dispute.status === "warning_closed";
+  if (won) {
+    const dSnap = await disputeRef.get();
+    const rec = (dSnap.data()?.recovery ?? {}) as {
+      status?: string;
+      reversedCents?: number;
+      restoredCents?: number;
+      destinationAccountId?: string | null;
+    };
+    const owed = (rec.reversedCents ?? 0) - (rec.restoredCents ?? 0);
+    if (rec.status === "reversed" && owed > 0) {
+      const acct = rec.destinationAccountId ?? null;
+      if (acct) {
+        const restore = await restoreTransferForDispute(getStripe(), {
+          disputeId: dispute.id,
+          destinationAccountId: acct,
+          amountCents: owed,
+          currency: dispute.currency,
+        });
+        await disputeRef.set(
+          {
+            recovery: {
+              status: restore.status === "restored" ? "restored" : rec.status,
+              restoreTransferId: restore.transferId,
+              restoredCents: (rec.restoredCents ?? 0) + restore.restoredCents,
+              failureMessage: restore.failureMessage,
+              updatedAt: FieldValue.serverTimestamp(),
+            },
+          },
+          { merge: true },
+        );
+      } else {
+        logger.error("disputeClosed: won but no destination account to restore to", {
+          disputeId: dispute.id,
+          owed,
+        });
+      }
+    }
+  }
 
   // Mirror back onto the invoice. Status: lost → stay `disputed` (the
   // money has actually left); won → restore to `paid` (funds returned);

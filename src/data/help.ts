@@ -1478,6 +1478,13 @@ const faqs: FaqItem[] = [
     audience: "all",
   },
   {
+    question: "What happens if a client disputes a card payment?",
+    answer:
+      "A client can ask their bank to reverse a card payment. When that happens we let you know, and the disputed amount is held back from your payout until the bank decides — it isn't lost yet. We automatically put together a response from your job records (the quote the client signed, your messages, photos and the completion timeline), so keeping everything in the job thread genuinely helps here. Send us anything else that proves the work as soon as you can, because banks set a tight deadline. If the bank decides in your favour the held amount is released to you; if it decides against you, the payment is reversed. Their decision is final — it isn't made by Blue Seal or by Stripe.",
+    categoryId: "safety-disputes",
+    audience: "tradesperson",
+  },
+  {
     question: "What should I do if someone asks me to pay off-platform?",
     answer:
       "Be cautious. Keeping payment in the job thread protects you with a clear record and lets us help if there's a dispute. If someone pushes you off-platform or asks for payment in an unusual way, pause and contact support.",
