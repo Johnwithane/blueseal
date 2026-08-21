@@ -958,3 +958,74 @@ record; only App Check enforcement (and the optional `ping` cleanup) remain.
      (or ask a Claude session to run steps 2–3 with the token you hand it).
   4. **Grant the CI deploy account access to the secret** — without this, any CI functions deploy that includes these two functions fails at "Loading and analyzing source code" with `403 secretmanager.secrets.get` (exactly the 2026-06-08/06-12 episode with the Google + Stripe secrets; deploy run 32510339390 on 2026-08-21 is this failure — hosting still shipped, and the functions were already live from a local deploy, so nothing is currently broken in prod). Neither locally-authed account (`johnnyajansen@gmail.com`, `marketing@wishboneltd.com`) can grant it — `secretmanager.secrets.getIamPolicy` denied — so it needs whoever holds Owner, in the console: **Security → Secret Manager → `BUGS_GITHUB_TOKEN` → Permissions → Grant access** to `blueseal-ci@blueseal-762af.iam.gserviceaccount.com` with role **Secret Manager Admin** (resource-scoped on this one secret, same as the four existing secret grants).
 - **Verify:** File a test bug via the in-app **Report a bug** button → within a minute an issue labeled `bug` appears on the repo (redacted — no reporter identity/env/screenshots, repo is public) and the report doc gains `githubIssueUrl`. Close the issue → after the next 6h sync the report shows `fixed` in `/admin/bug-reports`.
+
+## Payment risk hardening — Stripe Dashboard config (added 2026-08-21)
+
+The code side of the chargeback/fraud work is in the repo (dispute fund
+recovery, auto-drafted evidence, 3-D Secure, card-payment ceilings, the
+per-tradesperson card pause, and in-app refunds). These four need your Stripe
+login and can't be done from a session.
+
+### [ ] Turn on Radar rules (fraud screening)
+
+- **Why:** Stripe's Connect platform terms put loss liability for seller fraud
+  and negative balances on Blue Seal. Radar Standard is already billed per
+  screened transaction on the platform profile (CA$0.07/transaction +
+  CA$1.50/connected account), so the screening is being paid for either way —
+  the rules are what make it act.
+- **What:** Stripe Dashboard → Radar → Rules:
+  1. **Block** if `:risk_level: = 'highest'`.
+  2. **Request 3D Secure** if `:risk_level: = 'elevated'`. (The app already
+     requests 3DS on every card payment and forces it above CAD $1,000 —
+     `functions/src/payments/paymentRisk.ts` — so this only widens it to
+     smaller suspicious payments.)
+  3. Optional, revisit after some volume: **Block** if a single card is used on
+     more than N distinct connected accounts in a day — the classic
+     card-testing-through-a-marketplace pattern.
+- **Verify:** Radar → Rules shows the rules enabled; a test payment with
+  `4100 0000 0000 0019` (always blocked as fraudulent) is refused, and the app
+  surfaces a real sentence rather than a bare error.
+
+### [ ] Turn on dispute + fraud email alerts
+
+- **Why:** Disputes have a hard evidence deadline (usually 7 days). In-app
+  notifications now go to admins and to the tradesperson, but nobody is
+  guaranteed to be in the app.
+- **What:** Stripe Dashboard → Settings → Team and security → your user →
+  Email preferences: enable **Disputes** and **Radar/fraud** notifications.
+  Do this for every account that should be able to act, not just the owner.
+- **Verify:** Pay a job with the disputed test card `4000 0000 0000 0259` in
+  test mode; the dispute email arrives and `/admin/disputes/{id}` shows the
+  drafted evidence + the funds held back.
+
+### [ ] Confirm the payout hold actually applied on existing tradespeople
+
+- **Why:** The 7-day payout hold is what makes dispute fund recovery work — it
+  keeps the money in the connected account long enough to reverse the transfer
+  when a chargeback lands. `applyPayoutHold` deliberately does NOT fail
+  onboarding if Stripe rejects the settings hash; it logs at error level and
+  records `payouts.payoutHoldDays: null`. Anyone onboarded during such a window
+  is silently on Stripe's default schedule.
+- **What:** In Firestore, list `tradespeople` where `payouts.stripeAccountId`
+  is set and `payouts.payoutHoldDays` is null or missing. For each, either
+  re-run onboarding or set the schedule directly in Stripe (Connect → the
+  account → Settings → Payouts → 7-day rolling delay). Also confirm
+  Connect → Payouts → **"Allow accounts to manage their payout schedule"** is
+  still **off** at the platform level — with it on, a tradesperson can shorten
+  their own hold and defeat the recovery path.
+- **Verify:** Every connected tradesperson account reads a 7-day delay in
+  Stripe, and `payouts.payoutHoldDays` is 7 on their doc.
+
+### [ ] Review the card-payment ceilings against real job sizes
+
+- **Why:** `functions/src/payments/paymentRisk.ts` caps a single card payment
+  at CAD $10,000, and CAD $2,500 while a tradesperson is new (under 3 paid jobs
+  or under 30 days since vetting approval). The reasoning: the service fee caps
+  at $99/job, so above roughly a $2,000 invoice Blue Seal earns nothing further
+  while chargeback exposure keeps climbing. Refusals point at the fee-free
+  e-transfer path, so nothing is blocked from being paid — but if a lot of real
+  jobs land above the line, the friction is real.
+- **What:** After some volume, check how often the ceiling actually fires
+  (Cloud Functions logs: "over the card-payment ceiling") and decide whether to
+  raise it. It's a one-line constant change.
+- **Verify:** N/A — a judgement call to revisit, not a fix.
