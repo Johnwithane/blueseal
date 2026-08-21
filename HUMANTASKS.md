@@ -725,7 +725,18 @@ Done:
   We take destination charges, so that hold is what keeps a late chargeback
   reversible; don't leave it unapplied.
 
-#### [ ] Complete the Stripe Connect platform profile (BLOCKS all payout onboarding)
+#### [x] Complete the Stripe Connect platform profile (done 2026-08-21)
+
+- **Resolution:** the questionnaire was buried behind Setup guide → Go live →
+  "Confirm your integration choices" (every advertised entry point — the
+  `connect/accounts/overview` banner, Platform profile → "View onboarding" —
+  just looped back to the overview page). Confirmed elections: buyers purchase
+  from the platform / sellers paid individually (destination charges), Stripe-
+  hosted onboarding, Express dashboard, platform liable for refunds +
+  chargebacks. Verified live: an API `accounts.create` mirroring
+  `createConnectAccount` succeeded (probe account deleted immediately).
+  Radar Standard fees now apply: CA$0.07 per screened transaction,
+  CA$1.50 per connected account.
 
 - **Why:** with the error handling live, the real reason "Start Stripe setup"
   fails finally surfaced in the functions log (2026-08-20 21:43 UTC,
