@@ -1,7 +1,7 @@
 # Blue Seal — Terms of Service
 
 **Effective date:** 2026-05-21
-**Last updated:** 2026-06-16
+**Last updated:** 2026-08-21
 
 These Terms of Service ("**Terms**") are a binding agreement between you and **Blue Seal**, a sole proprietorship operated by **James Jansen** in British Columbia, Canada ("**Blue Seal**", "**we**", "**us**", "**our**"). They govern your access to and use of the Blue Seal progressive web application, websites under https://blueseal.app, and related services (together, the "**Service**").
 
@@ -238,6 +238,15 @@ A Client whose card is declined or whose payment otherwise fails remains liable 
 
 The Service is not a money-services business, a deposit-taking institution, an investment dealer, a lender, or any other regulated financial institution. Blue Seal does not provide financial, tax, accounting, or legal advice through the Service.
 
+### 7.7 Payment compliance and prohibited payment activity
+
+If you accept card payments through the Service as a Tradesperson, you additionally agree that:
+
+- you will use in-app payments **only** to collect payment for genuine trade work performed (or genuinely contracted, in the case of an upfront deposit) for the paying Client under a job recorded in the Service — never to process payments on behalf of any other person or business, to test cards, to pay yourself or an associate, or to move money for any other purpose;
+- your business does not fall within, and you will not use in-app payments in connection with, any category prohibited by [Stripe's Restricted Businesses list](https://stripe.com/en-ca/legal/restricted-businesses) or by card-network rules, and you will tell us promptly at contact@blueseal.app if that changes;
+- you will comply with the CAA, applicable card-network rules, and applicable anti-money-laundering, anti-terrorist-financing, and sanctions laws; and
+- we may decline a payment, or suspend or withdraw your access to in-app payments (without necessarily affecting the rest of your account), where we reasonably believe doing so is required by our own obligations to Stripe, the card networks, or the law, or to manage fraud, chargeback, or credit risk on the platform.
+
 ---
 
 ## 8. Refunds, disputes, and chargebacks
@@ -248,14 +257,30 @@ A Tradesperson may issue a full or partial refund on a paid invoice through Stri
 
 ### 8.2 Card disputes and chargebacks
 
-A Client who paid by card may dispute a charge with their card issuer (a "**chargeback**"). When a chargeback is opened, Stripe withdraws the disputed amount from the Tradesperson's connected Stripe account pending the outcome, and Blue Seal mirrors the dispute status onto the affected invoice so the parties and Blue Seal administrators can see it. **Evidence and the response to the chargeback are submitted to Stripe by the Tradesperson** (Blue Seal may, where Stripe permits and at our sole discretion, supplement that evidence). The card issuer — **not Blue Seal, and not Stripe** — decides the outcome.
+A Client who paid by card may dispute a charge with their card issuer (a "**chargeback**"). Because in-app payments run through Blue Seal's Stripe platform account (§ 7.4), when a chargeback is opened the disputed amount — together with Stripe's per-dispute fee — is initially withdrawn at the platform level pending the outcome, and Blue Seal mirrors the dispute status onto the affected invoice so the parties and Blue Seal administrators can see it. **As between the Tradesperson and Blue Seal, financial responsibility for a chargeback on a payment for the Tradesperson's work rests with the Tradesperson** (see § 8.4); Blue Seal's role in the mechanics of a dispute does not make the chargeback Blue Seal's loss.
 
-- If the chargeback is **won**, the disputed amount is returned to the Tradesperson's connected Stripe account and the invoice returns to its paid status.
-- If the chargeback is **lost**, the disputed amount is retained by the Client (or refunded to them by their issuer) through their connected Stripe account. **The Tradesperson absorbs the loss. Blue Seal does not indemnify the Tradesperson for lost chargebacks**, and the Tradesperson's commercial recourse against the Client (if any) is between them and the Client.
+**Duty to cooperate on evidence.** The Tradesperson must cooperate promptly and in good faith in responding to a chargeback, including providing — within the response deadline shown on the dispute — any evidence in their control (quotes, signatures, photos, chat records, completion records, and correspondence). Blue Seal may assemble and submit the response to Stripe using records held in the Service together with what the Tradesperson provides, but does not guarantee any outcome, and a Tradesperson's failure to cooperate does not shift responsibility for the result to Blue Seal. The card issuer — **not Blue Seal, and not Stripe** — decides the outcome.
+
+- If the chargeback is **won**, the disputed amount is returned and the invoice returns to its paid status. Stripe's per-dispute fee may still apply under Stripe's pricing.
+- If the chargeback is **lost**, the disputed amount is retained by the Client (or refunded to them by their issuer). **The Tradesperson absorbs the loss. Blue Seal does not indemnify the Tradesperson for lost chargebacks.** The disputed amount, the per-dispute fee, and any related fine or penalty are Payment Losses that Blue Seal may recover from the Tradesperson under § 8.4, and the Tradesperson's commercial recourse against the Client (if any) is between them and the Client.
 
 ### 8.3 Fraud and third-party loss
 
 To the maximum extent permitted by law, **Blue Seal is not liable to any User for losses caused by**: payment fraud or attempted fraud; identity theft; mistaken or duplicate payments; banking errors; outages, throttling, or downtime affecting Stripe or any card network; account freezes, reserves, or terminations imposed by Stripe under the CAA; or any other act or omission of Stripe, a card issuer, an acquiring bank, or any other financial-services provider. Recourse for any such loss is between the User and the relevant third party.
+
+### 8.4 Payment Losses — your responsibility, recovery, set-off, and payout holds
+
+"**Payment Losses**" means any amount that Blue Seal (including its Stripe platform account) is debited, charged, fined, or otherwise required to bear that is attributable to payments for your work or to your use of in-app payments, including: chargebacks that are lost, and Stripe's per-dispute fees; refunds of amounts you received; payment reversals; negative balances on your connected Stripe account; and any fine, penalty, or assessment imposed by Stripe, a card network, a financial institution, or a regulator because of your transactions, your breach of these Terms or the CAA, or fraud connected to your account or your jobs.
+
+**To the maximum extent permitted by law, Payment Losses are the responsibility of the Tradesperson whose payments or conduct gave rise to them — not Blue Seal's.** Any Payment Loss that Blue Seal bears is a debt you owe Blue Seal, due on demand. Without limiting any other remedy, you authorize Blue Seal to recover a Payment Loss by any lawful combination of the following, and you agree to give any confirmation Stripe requires to put this authorization into effect:
+
+- **reversing transfers / debiting your connected account** — reversing, in whole or in part, the Stripe transfer(s) associated with the underlying payment(s), or otherwise debiting your connected Stripe account, to the extent the CAA and Stripe's tooling permit;
+- **set-off** — deducting the amount from anything Blue Seal owes or later owes you, including referral commissions and any other amount payable to you by Blue Seal; and
+- **direct invoice** — invoicing you for any remaining balance, which you agree to pay within 30 days of the invoice date.
+
+**Payout holds and reserves.** Where we reasonably believe there is an elevated risk of Payment Losses — for example, an unusual pattern of disputes or refunds, a suspected fraudulent or prohibited transaction (§ 7.7), a serious problem reported on a job, or a requirement imposed on us by Stripe or a card network — we may, to the extent the CAA and Stripe's tooling permit, delay, pause, or withhold transfers or payouts connected to the affected payments, or require a reserve, until the risk is resolved. We will tell you when we do this unless law, Stripe's rules, or an active fraud investigation prevents it. Stripe may separately impose its own reserves, holds, or account actions under the CAA; those are between you and Stripe.
+
+Nothing in this section makes Blue Seal liable for any Payment Loss in the first instance, obliges Blue Seal to pursue a Client or any third party for recovery, or limits §§ 8.3, 15, or 16. Nothing in this section limits any non-waivable right a Client has under applicable consumer-protection law.
 
 ---
 
@@ -380,6 +405,7 @@ You agree to defend, indemnify and hold harmless the Blue Seal Parties from and 
 - Your Content;
 - your use of (or inability to use) the Service;
 - your dealings with another User (including any job, payment, or dispute);
+- any Payment Loss (as defined in § 8.4) attributable to your payments or conduct;
 - a Tradesperson's actual or alleged failure to hold required licences, insurance, or permits; or
 - any injury, property damage, or other loss arising from work performed (or not performed) by a Tradesperson hired through the Service.
 

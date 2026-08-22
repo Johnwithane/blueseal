@@ -948,6 +948,17 @@ record; only App Check enforcement (and the optional `ping` cleanup) remain.
 
 ### [ ] Create the GitHub token for the bug-report → GitHub Issues bridge
 
+> **⚠ ESCALATED 2026-08-21 — this now blocks EVERY Cloud Functions deploy, and
+> hosting ships without them.** Step 4 below (the Owner-granted IAM) is no
+> longer just "CI shows red". `firebase deploy` resolves the secrets of ALL
+> functions during "Loading and analyzing source code", *before* it applies
+> `--only`, so the 403 kills a **targeted** deploy just as dead as a full one.
+> Deploy run 32530535805 is the proof: rules deployed ✔, functions died on the
+> 403, and hosting then shipped anyway (it runs with `if: always()`), putting a
+> frontend in production that calls callables which do not exist. Until the IAM
+> grant lands, **every functions change must be deployed locally** — CI cannot
+> do it at all.
+
 - **Why:** Every in-app bug report now auto-files as a GitHub issue (`onBugReportCreated`), and closing an issue writes the triage state back to Firestore (`scheduledBugIssueSync`, every 6h) — this is what lets a REMOTE Claude session (claude.ai/code) see, triage and close out the bug queue with nothing but repo access. Both functions are deployed but idle: the `BUGS_GITHUB_TOKEN` secret currently holds the placeholder `UNSET`, so they log a warning and skip.
 - **What:**
   1. GitHub → Settings → Developer settings → **Fine-grained personal access tokens** → Generate new token. Resource owner `Johnwithane`, repository access: **only `Johnwithane/blueseal`**, permissions: **Issues → Read and write** (nothing else). Expiry: 1 year is fine — it's scoped to issues on one repo.
@@ -970,3 +981,98 @@ record; only App Check enforcement (and the optional `ping` cleanup) remain.
 - **Why:** Firestore backups and PITR went live 2026-08-21, but **neither covers Firebase Authentication**. Losing the auth store means every client, tradesperson, PM and rep re-registers, and all their uid-keyed data (jobs, quotes, invoices, reviews, Stripe Connect links) orphans with no way to reattach it. This is now the largest uncovered failure mode on the project.
 - **What:** `firebase auth:export users.json --project blueseal-762af`. The file holds password hashes and every user's email, so it is a secret: keep it **out of the repo**, store it encrypted (password manager vault or an encrypted drive), and re-run it periodically. It is a point-in-time dump, not a schedule, so a stale export is worth roughly the day it was taken.
 - **Verify:** The export completes, `users.json` is non-empty, and it is stored somewhere that is neither the repo nor a plain sync folder.
+## Payment risk hardening — Stripe Dashboard config (added 2026-08-21)
+
+The code side of the chargeback/fraud work is in the repo (dispute fund
+recovery, auto-drafted evidence, 3-D Secure, card-payment ceilings, the
+per-tradesperson card pause, and in-app refunds). These four need your Stripe
+login and can't be done from a session.
+
+### [ ] Turn on Radar rules (fraud screening)
+
+- **Why:** Stripe's Connect platform terms put loss liability for seller fraud
+  and negative balances on Blue Seal. Radar Standard is already billed per
+  screened transaction on the platform profile (CA$0.07/transaction +
+  CA$1.50/connected account), so the screening is being paid for either way —
+  the rules are what make it act.
+- **What:** Stripe Dashboard → Radar → Rules:
+  1. **Block** if `:risk_level: = 'highest'`.
+  2. **Request 3D Secure** if `:risk_level: = 'elevated'`. (The app already
+     requests 3DS on every card payment and forces it above CAD $1,000 —
+     `functions/src/payments/paymentRisk.ts` — so this only widens it to
+     smaller suspicious payments.)
+  3. Optional, revisit after some volume: **Block** if a single card is used on
+     more than N distinct connected accounts in a day — the classic
+     card-testing-through-a-marketplace pattern.
+- **Verify:** Radar → Rules shows the rules enabled; a test payment with
+  `4100 0000 0000 0019` (always blocked as fraudulent) is refused, and the app
+  surfaces a real sentence rather than a bare error.
+
+### [ ] Turn on dispute + fraud email alerts
+
+- **Why:** Disputes have a hard evidence deadline (usually 7 days). In-app
+  notifications now go to admins and to the tradesperson, but nobody is
+  guaranteed to be in the app.
+- **What:** Stripe Dashboard → Settings → Team and security → your user →
+  Email preferences: enable **Disputes** and **Radar/fraud** notifications.
+  Do this for every account that should be able to act, not just the owner.
+- **Verify:** Pay a job with the disputed test card `4000 0000 0000 0259` in
+  test mode; the dispute email arrives and `/admin/disputes/{id}` shows the
+  drafted evidence + the funds held back.
+
+### [ ] Confirm the payout hold actually applied on existing tradespeople
+
+- **Why:** The 7-day payout hold is what makes dispute fund recovery work — it
+  keeps the money in the connected account long enough to reverse the transfer
+  when a chargeback lands. `applyPayoutHold` deliberately does NOT fail
+  onboarding if Stripe rejects the settings hash; it logs at error level and
+  records `payouts.payoutHoldDays: null`. Anyone onboarded during such a window
+  is silently on Stripe's default schedule.
+- **What:** In Firestore, list `tradespeople` where `payouts.stripeAccountId`
+  is set and `payouts.payoutHoldDays` is null or missing. For each, either
+  re-run onboarding or set the schedule directly in Stripe (Connect → the
+  account → Settings → Payouts → 7-day rolling delay). Also confirm
+  Connect → Payouts → **"Allow accounts to manage their payout schedule"** is
+  still **off** at the platform level — with it on, a tradesperson can shorten
+  their own hold and defeat the recovery path.
+- **Verify:** Every connected tradesperson account reads a 7-day delay in
+  Stripe, and `payouts.payoutHoldDays` is 7 on their doc.
+
+### [ ] Review the card-payment ceilings against real job sizes
+
+- **Why:** `functions/src/payments/paymentRisk.ts` caps a single card payment
+  at CAD $10,000, and CAD $2,500 while a tradesperson is new (under 3 paid jobs
+  or under 30 days since vetting approval). The reasoning: the service fee caps
+  at $99/job, so above roughly a $2,000 invoice Blue Seal earns nothing further
+  while chargeback exposure keeps climbing. Refusals point at the fee-free
+  e-transfer path, so nothing is blocked from being paid — but if a lot of real
+  jobs land above the line, the friction is real.
+- **What:** After some volume, check how often the ceiling actually fires
+  (Cloud Functions logs: "over the card-payment ceiling") and decide whether to
+  raise it. It's a one-line constant change.
+- **Verify:** N/A — a judgement call to revisit, not a fix.
+
+### [ ] Deploy the payment-risk functions (blocked on the IAM grant above)
+
+- **Why:** Deploy run 32530535805 (2026-08-21) shipped `firestore.rules` and
+  **hosting** but not the Cloud Functions — the `BUGS_GITHUB_TOKEN` 403 above
+  killed the functions step. So production is currently running the NEW
+  frontend against the OLD functions.
+- **What's actually affected** (existing payment flows are fine — the old
+  `createInvoicePaymentIntent` / `createUpfrontFeePaymentIntent` /
+  `stripeWebhook` are still serving, just without the new protections):
+  - `refundInvoicePayment` — **user-visible.** The Refund card now renders for
+    a tradesperson on a card-paid invoice and will error when tapped.
+  - `adminSubmitDisputeEvidence`, `adminSetCardPayments` — admin-only buttons,
+    will error when tapped.
+  - No 3-D Secure, no card-payment ceilings, no dispute fund recovery and no
+    auto-drafted evidence until the deploy lands.
+- **What:** from a machine with Firebase credentials (this is quota-safe — six
+  targeted functions, not the ~200 a full deploy would push):
+  ```
+  firebase deploy --only functions:adminSetCardPayments,functions:adminSubmitDisputeEvidence,functions:createInvoicePaymentIntent,functions:createUpfrontFeePaymentIntent,functions:refundInvoicePayment,functions:stripeWebhook --project blueseal-762af
+  ```
+- **Verify:** `firebase functions:list` shows all six updated today. Then, as a
+  tradesperson on a card-paid job, the Invoice tab's **Refund** opens its dialog
+  and a full refund succeeds; and a test card payment over CAD $1,000 now asks
+  for the 3-D Secure step.

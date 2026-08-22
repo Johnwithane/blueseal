@@ -222,6 +222,33 @@ export interface CreateManualInvoiceResult {
  * transactionally. The job status is untouched — drafting is private to the
  * tradesperson until they send it. Idempotent per job.
  */
+export interface RefundInvoiceResult {
+  ok: boolean;
+  amountCents: number;
+  isFull: boolean;
+}
+
+/**
+ * Refund a card-paid invoice. Omit `amountCents` for a full refund (which also
+ * returns the Blue Seal service fee to the client); pass it for a partial,
+ * which comes out of the tradesperson's share only (ToS § 8.1).
+ *
+ * The invoice doc is updated by the `charge.refunded` webhook, not by this
+ * call — so a subscribed view reflects it a moment later.
+ */
+export async function refundInvoicePayment(input: {
+  invoiceId: string;
+  amountCents?: number;
+  reason?: string;
+}): Promise<RefundInvoiceResult> {
+  const fn = httpsCallable<typeof input, RefundInvoiceResult>(
+    functions,
+    "refundInvoicePayment",
+  );
+  const res = await fn(input);
+  return res.data;
+}
+
 export async function createManualInvoice(jobId: string): Promise<CreateManualInvoiceResult> {
   const fn = httpsCallable<{ jobId: string }, CreateManualInvoiceResult>(
     functions,

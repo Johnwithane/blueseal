@@ -43,6 +43,12 @@
 | `4000 0000 0000 0002` | Card declined                      |
 | `4000 0000 0000 9995` | Declined — insufficient funds      |
 | `4000 0027 6000 3184` | 3-D Secure challenge (complete it) |
+| `4000 0000 0000 0259` | Succeeds, then opens a **fraudulent dispute** |
+
+> Blue Seal now asks for 3-D Secure on every card payment and **insists above
+> CAD $1,000**, so expect a challenge step on larger test payments even with
+> `4242…`. That's the point: an authenticated payment shifts fraud-chargeback
+> liability to the card issuer.
 
 ### Logging bugs
 
@@ -541,6 +547,87 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
 
 1. Mark an invoice paid by **e-transfer / cash** instead of card.
 2. **Expected:** **no service fee**; job completes.
+
+### 6.4a Refund a card payment (tradesperson)
+
+The **Refund this payment** card sits on the tradesperson's **Invoice** tab of
+any card-paid job. Who bears what follows ToS § 8.1, and the two cases behave
+genuinely differently under the hood:
+
+1. **Partial refund.** Try an amount above your *share* first — that's the
+   invoice total, **not** what the client paid (they also paid the service fee).
+   - **Expected:** refused with a sentence naming the limit.
+2. Now a valid partial amount.
+   - **Expected:** the whole refunded amount comes out of the **tradesperson's**
+     Stripe balance. Blue Seal's application fee is untouched and the platform
+     balance is **not** out of pocket. (This is why the partial path reverses the
+     transfer explicitly rather than using Stripe's proportional
+     `reverse_transfer`, which would leave Blue Seal funding the fee slice.)
+3. **Full refund** on a second paid job.
+   - **Expected:** the client gets **everything** back including the service fee.
+4. Both cases: the invoice flips to `partially_refunded` / `refunded` **via the
+   `charge.refunded` webhook** — never written by the callable — and any rep/PM
+   commission reverses in the same proportion.
+5. A payment that is **under dispute** offers no refund button at all, and says
+   why.
+6. **Mobile 375px:** the dialog fits; the amount field is usable.
+
+### 6.4b Card-payment ceilings
+
+1. As a tradesperson with **fewer than 3 paid jobs** (or approved under 30 days
+   ago), have a client try to pay an invoice **over $2,500** by card.
+2. As an **established** tradesperson, try **over $10,000**.
+   - **Expected (both):** refused with a sentence that names the limit *and*
+     points at the fee-free e-transfer path. Never a dead end, never a bare
+     `INTERNAL`.
+3. Pay those same jobs **offline** instead.
+   - **Expected:** completes normally and the job closes out. The ceiling steers
+     large jobs off cards; it never blocks the work getting paid for.
+
+Why it exists: the service fee caps at **$99/job**, so above roughly a $2,000
+invoice Blue Seal earns nothing more while chargeback exposure keeps climbing —
+and on a destination charge that exposure lands on the platform balance first.
+
+### 6.4c Dispute: funds held back + evidence drafted
+
+1. Pay a job with the **disputed** test card `4000 0000 0000 0259`.
+2. Open `/admin/disputes/{id}` and read the **Funds** panel; check the connected
+   account's balance in Stripe.
+   - **Expected:** the tradesperson's transfer is reversed for the disputed
+     amount (capped at what they actually received). The 7-day payout hold is
+     what makes this possible — the money is normally still there.
+3. Open the dispute's **evidence** tab in Stripe.
+   - **Expected:** a **draft** is already staged, built from the job — signed
+     quote acceptance, chat transcript, timeline, invoice lines. **Not**
+     submitted: Stripe allows one submission and we never spend it automatically.
+4. Check the tradesperson's notification.
+   - **Expected:** it says action **is** needed and that the payout is held —
+     the old "no action needed from you" was wrong and contradicted ToS § 8.2.
+5. Use **Rebuild draft**, then **Submit evidence**.
+   - **Expected:** submit is behind a confirm that says it is one-shot.
+6. Close the dispute as **won** in Stripe.
+   - **Expected:** the held amount is transferred back and the panel reads
+     *restored*. If the reversal had **failed** (tradesperson already paid out),
+     the panel says so in red and frames it as a debt to recover — never a
+     silent Blue Seal loss.
+
+### 6.4d Admin pauses a tradesperson's card payments
+
+1. Admin → user detail → **Trades, Blue Seal Pro & payments** → **Pause card
+   payments**, with a reason.
+2. As a client, try to pay that tradesperson's invoice by card.
+   - **Expected:** refused with a **neutral** message — the client never sees the
+     internal reason.
+3. Confirm the tradesperson can still edit their profile, chat, and be marked
+   paid offline.
+   - **Expected:** all fine. This is a payments control, **not** an account
+     suspension.
+4. As the tradesperson, try to clear `tradespeople/{uid}.payments` from the
+   client.
+   - **Expected:** denied — the field is server-only, or the switch would be
+     decorative.
+5. **Resume** from the same panel.
+   - **Expected:** card payment works again immediately.
 
 ### 6.5 Payout setup survives a Stripe account change
 

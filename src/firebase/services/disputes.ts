@@ -1,6 +1,7 @@
-// Read-side wrappers around the /disputes collection. Writes are
-// server-only (via the Stripe webhook dispatcher) — there's nothing the
-// client can do here besides observe + render.
+// Read-side wrappers around the /disputes collection. Doc writes are
+// server-only (via the Stripe webhook dispatcher); the one action an admin can
+// take is pushing evidence to Stripe, which goes through a callable rather than
+// a Firestore write.
 
 import {
   collection,
@@ -12,7 +13,8 @@ import {
   query,
   where,
 } from "firebase/firestore";
-import { db } from "@/firebase/config";
+import { httpsCallable } from "firebase/functions";
+import { db, functions } from "@/firebase/config";
 import type { DisputeDoc, WithId } from "@/firebase/interfaces";
 import { typedConverter } from "@/firebase/converters";
 
@@ -67,4 +69,23 @@ export function subscribeDispute(
   return onSnapshot(disputeRef(id), (snap) =>
     cb(snap.exists() ? { id: snap.id, ...snap.data() } : null),
   );
+}
+
+/**
+ * Rebuild the Stripe evidence draft from the job's current records, and
+ * optionally submit it.
+ *
+ * `submit: true` is FINAL — Stripe accepts one submission per dispute and locks
+ * the evidence afterwards, so the caller must confirm before passing it.
+ */
+export async function submitDisputeEvidence(
+  disputeId: string,
+  submit: boolean,
+): Promise<{ ok: boolean; submitted: boolean }> {
+  const fn = httpsCallable<
+    { disputeId: string; submit: boolean },
+    { ok: boolean; submitted: boolean }
+  >(functions, "adminSubmitDisputeEvidence");
+  const res = await fn({ disputeId, submit });
+  return res.data;
 }

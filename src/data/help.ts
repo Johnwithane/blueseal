@@ -1389,6 +1389,27 @@ const faqs: FaqItem[] = [
     categoryId: "payments-invoices",
     audience: "all",
   },
+  {
+    question: "How do I refund a client? (tradespeople)",
+    answer:
+      "Open the job's **Invoice** tab and use **Refund**. You can return the whole payment or part of it. A **full refund** sends your client everything back, including the Blue Seal service fee. A **partial refund** comes out of your share, so the service fee isn't returned. Refunds land back on your client's original card, usually within 5–10 business days. If a client is unhappy, refunding them directly is almost always better than letting it become a bank dispute — it's faster for them and it keeps your payment record clean.",
+    categoryId: "payments-invoices",
+    audience: "tradesperson",
+  },
+  {
+    question: "Is there a limit on paying by card?",
+    answer:
+      "Yes. Single card payments through Blue Seal are capped, with a lower cap while a tradesperson is new to the platform. It's a fraud and chargeback protection for both sides, and it lifts on its own as they build a payment history. Bigger jobs aren't a problem — pay by e-transfer or cash and record it on the job. That's fee-free, so it's usually the cheaper option at that size anyway, and you still get the invoice, receipt and full job record.",
+    categoryId: "payments-invoices",
+    audience: "all",
+  },
+  {
+    question: "Why was I asked to verify a card payment with my bank?",
+    answer:
+      "Larger card payments ask for your bank's own verification step (often a code or an approval in your banking app). It's an extra check that the payment is really you, which protects you from someone else using your card and protects the tradesperson from losing a payment to fraud. Follow the prompt from your bank and the payment completes as normal.",
+    categoryId: "payments-invoices",
+    audience: "client",
+  },
 
   // ── Account & app ─────────────────────────────────────────────────────────
   {
@@ -1476,6 +1497,13 @@ const faqs: FaqItem[] = [
       "Contact support with the job link and a short description. We can review the thread and take action, and keeping the conversation on Blue Seal means there's always a record.",
     categoryId: "safety-disputes",
     audience: "all",
+  },
+  {
+    question: "What happens if a client disputes a card payment?",
+    answer:
+      "A client can ask their bank to reverse a card payment. When that happens we let you know, and the disputed amount is held back from your payout until the bank decides — it isn't lost yet. We automatically put together a response from your job records (the quote the client signed, your messages, photos and the completion timeline), so keeping everything in the job thread genuinely helps here. Send us anything else that proves the work as soon as you can, because banks set a tight deadline. If the bank decides in your favour the held amount is released to you; if it decides against you, the payment is reversed. Their decision is final — it isn't made by Blue Seal or by Stripe.",
+    categoryId: "safety-disputes",
+    audience: "tradesperson",
   },
   {
     question: "What should I do if someone asks me to pay off-platform?",

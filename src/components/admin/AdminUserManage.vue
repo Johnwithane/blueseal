@@ -1,16 +1,23 @@
 <script setup lang="ts">
 // Tradesperson-only admin tools shown in the expanded user detail: the trades
-// editor (also marks them verified) and the founding-member Blue Seal Pro comp.
-// Roles are edited separately via AdminRoleEditor (at the top of the user row),
-// so they aren't buried in here.
+// editor (also marks them verified), the founding-member Blue Seal Pro comp,
+// and the card-payments pause. Roles are edited separately via AdminRoleEditor
+// (at the top of the user row), so they aren't buried in here.
 import { computed, ref } from "vue";
 import Button from "primevue/button";
+import InputText from "primevue/inputtext";
 import MultiSelect from "primevue/multiselect";
 import Message from "primevue/message";
+import Tag from "primevue/tag";
 import { useToast } from "@/composables/useToast";
+import { useConfirmAction } from "@/composables/useConfirmAction";
 import { humanizeError } from "@/utils/errors";
 import { TRADES } from "@/data/trades";
-import { adminGrantFoundingPro, adminSetUserTrades } from "@/firebase/services/admin";
+import {
+  adminGrantFoundingPro,
+  adminSetCardPayments,
+  adminSetUserTrades,
+} from "@/firebase/services/admin";
 import type { TradespersonDoc, UserDoc, WithId } from "@/firebase/interfaces";
 
 const props = defineProps<{
@@ -23,6 +30,49 @@ const emit = defineEmits<{
 }>();
 
 const toast = useToast();
+const { confirmDestructive } = useConfirmAction();
+
+// --- Card payments (risk kill switch) -------------------------------------
+// ToS § 7.7 reserves the right to withdraw in-app payments to manage fraud or
+// chargeback risk; this is the button. Deliberately narrower than disabling the
+// account — the tradesperson keeps working and can still be paid by e-transfer
+// or cash, we just stop taking cards for them.
+const savingCards = ref(false);
+const cardsError = ref<string | null>(null);
+const cardsPaused = ref(!!props.tradie?.payments?.cardPaymentsPausedAt);
+const pauseReason = ref("");
+
+async function setCardPayments(paused: boolean) {
+  if (!props.tradie) return;
+  savingCards.value = true;
+  cardsError.value = null;
+  try {
+    const res = await adminSetCardPayments({
+      tradespersonId: props.tradie.id,
+      paused,
+      ...(paused && pauseReason.value.trim() ? { reason: pauseReason.value.trim() } : {}),
+    });
+    cardsPaused.value = res.data.paused;
+    if (!paused) pauseReason.value = "";
+    toast.success(paused ? "Card payments paused." : "Card payments resumed.");
+  } catch (e) {
+    cardsError.value = humanizeError(e);
+  } finally {
+    savingCards.value = false;
+  }
+}
+
+function confirmPause() {
+  confirmDestructive(
+    {
+      header: "Pause card payments?",
+      message:
+        "Clients won't be able to pay this tradesperson by card. Their account, jobs and chat keep working, and they can still be paid by e-transfer or cash.",
+      acceptLabel: "Pause card payments",
+    },
+    () => setCardPayments(true),
+  );
+}
 
 // --- Trades editor --------------------------------------------------------
 const selectedTrades = ref<string[]>([...(props.tradie?.trades ?? [])]);
@@ -115,7 +165,7 @@ async function revokePro() {
 <template>
   <section class="space-y-4">
     <h3 class="text-xs font-semibold uppercase tracking-wide text-[color:var(--bs-muted)]">
-      Trades &amp; Blue Seal Pro
+      Trades, Blue Seal Pro &amp; payments
     </h3>
 
     <!-- Trades -->
@@ -185,6 +235,62 @@ async function revokePro() {
           @click="revokePro"
         />
       </div>
+    </div>
+
+    <!-- Card payments (risk) -->
+    <div v-if="tradie" class="rounded border border-[color:var(--bs-border)] p-3">
+      <div class="flex items-center gap-2 mb-1">
+        <p class="text-sm font-medium">Card payments</p>
+        <Tag
+          :severity="cardsPaused ? 'danger' : 'success'"
+          :value="cardsPaused ? 'Paused' : 'Active'"
+        />
+      </div>
+      <p class="text-xs text-[color:var(--bs-muted)]">
+        Pausing stops new card payments to this tradesperson. Their account,
+        jobs and chat keep working, and clients can still pay by e-transfer or
+        cash. Use for fraud or chargeback risk — it's narrower than disabling
+        the account.
+      </p>
+      <Message v-if="cardsError" severity="error" :closable="false" class="mt-2">
+        {{ cardsError }}
+      </Message>
+      <template v-if="!cardsPaused">
+        <InputText
+          v-model="pauseReason"
+          placeholder="Reason (internal note, optional)"
+          class="w-full mt-2"
+          :disabled="savingCards"
+        />
+        <div class="mt-2">
+          <Button
+            label="Pause card payments"
+            icon="pi pi-ban"
+            severity="danger"
+            outlined
+            size="small"
+            :loading="savingCards"
+            @click="confirmPause"
+          />
+        </div>
+      </template>
+      <template v-else>
+        <p
+          v-if="tradie.payments?.cardPaymentsPausedReason"
+          class="mt-2 text-xs text-[color:var(--bs-muted)]"
+        >
+          Reason: {{ tradie.payments.cardPaymentsPausedReason }}
+        </p>
+        <div class="mt-2">
+          <Button
+            label="Resume card payments"
+            icon="pi pi-check"
+            size="small"
+            :loading="savingCards"
+            @click="setCardPayments(false)"
+          />
+        </div>
+      </template>
     </div>
   </section>
 </template>

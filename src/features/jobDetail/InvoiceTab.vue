@@ -4,6 +4,7 @@ import Button from "primevue/button";
 import QuoteCard from "@/components/QuoteCard.vue";
 import InvoiceEditor from "@/components/InvoiceEditor.vue";
 import ClientInvoiceCard from "@/components/ClientInvoiceCard.vue";
+import RefundInvoiceCard from "@/components/RefundInvoiceCard.vue";
 import type { InvoiceStatus, JobDoc, WithId } from "@/firebase/interfaces";
 import { canTradieFinishJob } from "@/firebase/services/jobs";
 
@@ -182,6 +183,10 @@ const canFinish = computed(() => props.isTradie && canTradieFinishJob(props.job)
         changes — you'll get a notification either way.
       </p>
     </div>
+
+    <!-- Tradie: refund a card payment. Renders itself only when there's a
+         card payment with something left to refund, so no status gate here. -->
+    <RefundInvoiceCard v-if="isTradie && invoiceId" :invoice-id="invoiceId" />
 
     <!-- CLIENT invoice view — top of the tab, same format as the quote
          below it. Owns approve & pay / request changes / pay / receipt. -->

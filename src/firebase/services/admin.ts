@@ -90,6 +90,16 @@ export const adminSetUserDisabled = httpsCallable<
   { ok: boolean; disabled: boolean }
 >(functions, "adminSetUserDisabled");
 
+/**
+ * Pause or resume a single tradesperson's card payments (ToS § 7.7). Narrower
+ * than disabling the account: their jobs, chat and the fee-free offline payment
+ * path keep working, only new card payments are refused.
+ */
+export const adminSetCardPayments = httpsCallable<
+  { tradespersonId: string; paused: boolean; reason?: string },
+  { ok: boolean; paused: boolean }
+>(functions, "adminSetCardPayments");
+
 export const adminUpdateUserContact = httpsCallable<
   { targetUid: string; displayName?: string; phone?: string | null; email?: string },
   { ok: boolean; emailChanged: boolean }
