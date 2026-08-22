@@ -11,9 +11,8 @@ Before 2026-08-21 this project had **no** Firestore backup and **no** point-in-t
 recovery. The version retention window was Firestore's floor of 1 hour. Nothing
 covered:
 
-- a Cloud Function writing bad data across a whole collection (`scheduledIdRetention`
-  deletes Storage objects and clears `idVerifications/{uid}` every night;
-  `scheduledRecurringInvoices` creates real invoices every night),
+- a Cloud Function writing bad data across a whole collection (there are 15 scheduled
+  sweeps, two of which delete data outright),
 - an accidental mass delete from `/admin`,
 - a bad `firestore.rules` deploy that lets something destructive through,
 - credential compromise on an owner account.
@@ -22,37 +21,34 @@ Firestore has no undo. Without backups those are unrecoverable, permanently.
 
 ---
 
-## ⚠️ gcloud does not work on this project from Johnny's machine
+## Running these commands
 
-This bit is load-bearing, so read it before you copy a command out of the Firestore
-docs.
+**Run gcloud from PowerShell, not bash.** Backslash line continuations (`\`) are a
+bash-ism and a parse error in PowerShell, so keep each command on one line.
 
-`gcloud` on this machine has two stored accounts, and the credential filed under
-`johnnyajansen@gmail.com` **is actually a `marketing@wishboneltd.com` token**. You can
-see it in the error text: asking for `blueseal-762af` as `johnnyajansen@gmail.com`
-returns *"marketing@wishboneltd.com does not have storage.buckets.get access"*.
-`gcloud projects list` for that account returns Wishbone's projects, not Johnny's.
+**Always pass `--project=blueseal-762af --account=johnnyajansen@gmail.com` explicitly.**
+This machine has two gcloud accounts and the active configuration is `[wishbone]` with
+its project set to `bettertour`, so a bare command will silently act on the wrong
+project. Johnny holds `roles/owner` on `blueseal-762af`.
 
-So **every `gcloud ... --project=blueseal-762af` command fails with PERMISSION_DENIED**,
-and that failure means nothing about the account's real access. Two working paths:
+> **Historical note, in case you find a stale reference to it.** Until 2026-08-21 the
+> gcloud credential stored as `johnnyajansen@gmail.com` was actually a
+> `marketing@wishboneltd.com` token, so *every* call against this project returned
+> PERMISSION_DENIED regardless of the `--account` flag. Re-authenticated and fixed. That
+> artifact produced at least one wrong conclusion in `HUMANTASKS.md` (a Secret Manager
+> grant recorded as "needs whoever holds Owner" when Johnny *is* Owner), so treat any
+> older "we don't have permission for that" note on this project as suspect until
+> re-tested.
 
-1. **Firebase CLI** (logged in as `johnnyajansen@gmail.com`, and it genuinely is that
-   account). This covers all of Firestore backup/restore. Preferred.
-2. **Application Default Credentials** for anything the Firebase CLI does not wrap
-   (Cloud Storage policies, Cloud Scheduler, Secret Manager). ADC on this machine
-   *is* correctly `johnnyajansen@gmail.com` and has real access. Use it to mint a
-   token and call the REST API directly:
+Two alternates, both correctly authenticated as Johnny, useful if gcloud ever drifts
+again:
 
-   ```powershell
-   $t = gcloud auth application-default print-access-token
-   Invoke-RestMethod -Headers @{Authorization="Bearer $t"} "https://storage.googleapis.com/storage/v1/b/blueseal-762af.firebasestorage.app"
-   ```
-
-   (`gcloud auth application-default print-access-token` reads the ADC file directly
-   and does not go through the broken account store, which is why it works.)
-
-Fixing gcloud properly is a `gcloud auth login` for the real `johnnyajansen@gmail.com`.
-Tracked in [HUMANTASKS.md](../HUMANTASKS.md).
+- **Firebase CLI**, which wraps all of Firestore backup/restore
+  (`firebase firestore:databases:get`, `:backups:schedules:list`, `:databases:restore`).
+- **ADC** for raw REST:
+  `$t = gcloud auth application-default print-access-token`, then
+  `Invoke-RestMethod -Headers @{Authorization="Bearer $t"} <url>`. ADC reads its own
+  credential file and bypasses the gcloud account store entirely.
 
 ---
 
@@ -67,50 +63,51 @@ Four mechanisms, covering different failure shapes. All enabled 2026-08-21.
 | Firestore delete protection | `DELETE_PROTECTION_ENABLED` | someone deletes the database itself |
 | Storage soft delete | 30 days on the media bucket | an overwritten or deleted job photo / receipt / ID |
 
-Verify the whole posture (PowerShell, one line each):
+Verify the whole posture (one line each):
 
 ```powershell
-# PITR + delete protection. Expect ENABLED, ENABLED, 604800s.
-firebase firestore:databases:get "(default)" --project blueseal-762af
+# PITR + delete protection. Expect: nam5, ENABLED, ENABLED, 604800s.
+gcloud firestore databases describe --database='(default)' --project=blueseal-762af --account=johnnyajansen@gmail.com --format='value(locationId,deleteProtectionState,pointInTimeRecoveryEnablement,versionRetentionPeriod)'
 
-# Daily schedule. Expect one entry, DAILY, retention 8467200s.
-firebase firestore:backups:schedules:list --project blueseal-762af
+# Daily schedule. Expect one entry, dailyRecurrence, retention 8467200s = 14w.
+gcloud firestore backups schedules list --database='(default)' --project=blueseal-762af --account=johnnyajansen@gmail.com
 
-# Actual backups. NOTE the location is the DATABASE's location, nam5.
-# The first snapshot appears within 24h of the schedule being created.
-firebase firestore:backups:list --location nam5 --project blueseal-762af
+# Actual backups. NOTE the location is the DATABASE's location, nam5, NOT us-central1
+# and NOT the media bucket's US-EAST1. First snapshot appears within 24h of the
+# schedule being created, so "Listed 0 items" on day one is expected.
+gcloud firestore backups list --location=nam5 --project=blueseal-762af --account=johnnyajansen@gmail.com
 
 # Storage soft delete. Expect 2592000.
-$t = gcloud auth application-default print-access-token
-(Invoke-RestMethod -Headers @{Authorization="Bearer $t"} "https://storage.googleapis.com/storage/v1/b/blueseal-762af.firebasestorage.app").softDeletePolicy
+gcloud storage buckets describe gs://blueseal-762af.firebasestorage.app --project=blueseal-762af --account=johnnyajansen@gmail.com --format='value(soft_delete_policy.retentionDurationSeconds)'
 ```
 
-**Bucket coverage.** Only the media bucket (`blueseal-762af.firebasestorage.app`, the
-one `VITE_FIREBASE_STORAGE_BUCKET` points at) was raised to 30 days. The other four
-buckets in the project keep GCS's 7-day default on purpose: `gcf-v2-sources-*` and
+**Bucket coverage.** Only the media bucket (`blueseal-762af.firebasestorage.app`, the one
+`VITE_FIREBASE_STORAGE_BUCKET` points at) was raised to 30 days. The other four buckets
+in the project keep GCS's 7-day default on purpose: `gcf-v2-sources-*` and
 `gcf-v2-uploads-*` are function build artifacts, and `blueseal-762af.appspot.com` /
-`staging.blueseal-762af.appspot.com` are legacy App Engine buckets that hold no user
-data. If anything ever starts writing user data to one of those, raise it too.
+`staging.blueseal-762af.appspot.com` are legacy App Engine buckets holding no user data.
+If anything ever starts writing user data to one of those, raise it too.
 
-**Why soft delete and not Object Versioning:** soft delete retains overwritten objects
-as well as deleted ones, and expires them automatically, so the bill is bounded.
-Versioning keeps every historical version forever unless you pair it with a lifecycle
-rule. For a bucket that takes user uploads on every job, bounded is the right default.
+**Why soft delete and not Object Versioning:** soft delete retains overwritten objects as
+well as deleted ones and expires them automatically, so the bill is bounded. Versioning
+keeps every historical version forever unless you pair it with a lifecycle rule expiring
+noncurrent versions. For a bucket taking user uploads on every job, bounded is the right
+default.
 
 ---
 
 ## Restore
 
-⚠️ A Firestore restore creates a **NEW database**. It does not overwrite `(default)`
-in place. That is a feature: it lets you inspect before cutting over, and it means
-restoring is never itself destructive.
+⚠️ A Firestore restore creates a **NEW database**. It does not overwrite `(default)` in
+place. That is a feature: it lets you inspect before cutting over, and it means restoring
+is never itself destructive.
 
 ```powershell
 # 1. Find the backup (nam5, not us-central1)
-firebase firestore:backups:list --location nam5 --project blueseal-762af
+gcloud firestore backups list --location=nam5 --project=blueseal-762af --account=johnnyajansen@gmail.com
 
 # 2. Restore it into a NEW database id
-firebase firestore:databases:restore --backup projects/blueseal-762af/locations/nam5/backups/<BACKUP_ID> --database restore-YYYYMMDD --project blueseal-762af
+gcloud firestore databases restore --source-backup=projects/blueseal-762af/locations/nam5/backups/<BACKUP_ID> --destination-database='restore-YYYYMMDD' --project=blueseal-762af --account=johnnyajansen@gmail.com
 
 # 3. Inspect the restored copy BEFORE any cutover.
 ```
@@ -118,94 +115,118 @@ firebase firestore:databases:restore --backup projects/blueseal-762af/locations/
 Then choose:
 
 - **Targeted repair (usual case).** Only some docs are wrong. Read the good docs out of
-  the restored database with the Admin SDK under ADC and write them back into
-  `(default)` with a one-off script in `scripts/`. Dry-run first, dump what you are
-  about to overwrite to a local JSON file, then write. This is almost always the right
-  answer: it keeps every legitimate write that happened after the incident.
+  the restored database with the Admin SDK under ADC and write them back into `(default)`
+  with a one-off script in `scripts/`. Dry-run first, dump what you are about to
+  overwrite to a local JSON file, then write. This is almost always the right answer: it
+  keeps every legitimate write that happened after the incident.
 - **Full cutover (rare).** The whole database is unusable. Repoint the app and the
-  functions at the restored database id. Every write since the backup is lost, so this
-  is a last resort, and see the Stripe warning below before you even consider it.
+  functions at the restored database id. Every write since the backup is lost, so this is
+  a last resort, and read both warnings below first.
 
-PITR reads work the same way but with a timestamp instead of a backup id, within the
-7-day window. Firestore also supports cloning a database as of a PITR timestamp
-(`firebase firestore:databases:clone`), which is the cheapest way to get a "what did
-this look like at 14:05" copy without waiting on a nightly snapshot.
+PITR reads work the same way but with a timestamp instead of a backup id
+(`--snapshot-time`), within the 7-day window. Firestore also supports cloning a database
+as of a PITR timestamp, which is the cheapest way to get a "what did this look like at
+14:05" copy without waiting on a nightly snapshot.
 
-### ⚠️ Stripe is live and a restore does not roll it back
+### ⚠️ Warning 1: a restore can resurrect data we are legally required to have deleted
 
-This is the blueseal-specific trap. Stripe has been live since 2026-08-19. A Firestore
-restore rewinds **our** record of invoices, payments, Connect payouts and Pro
-subscriptions. It does not rewind a single thing on Stripe's side. After any restore
-touching `invoices`, `payments`, `jobs`, `subscriptions` or the commission collections:
+`scheduledHardDelete` is the PIPEDA right-to-erasure sweep. Daily at 03:00 it finds users
+whose `deletedAt` is more than 30 days old and wipes `users/{uid}`, `tradespeople/{uid}`,
+their certifications, ID / insurance / WSIB verifications, bookings, notifications, their
+Storage prefixes, **and their Firebase Auth account**.
 
-- **Stripe is the system of record for money, not Firestore.** Reconcile our docs
-  against the Stripe dashboard, not the other way around.
-- A restored-away `paymentIntent` still charged the client's card. A restored-away
-  payout still moved money.
-- Rewinding a doc that a Stripe webhook already processed can make that webhook's work
+A restore rewinds Firestore to a point where that personal data still existed. Restoring
+wholesale therefore **undoes a completed erasure request**, which is a compliance
+incident, not just a data-quality one. After any restore touching `users` or
+`tradespeople`:
+
+- Re-check for docs with `deletedAt` set and let the sweep re-run, or re-delete by hand.
+- The restored copy also contains the personal data of people who have since exercised
+  erasure. Delete the temporary `restore-*` database once you are done with it. Do not
+  leave it sitting around as a convenience copy.
+
+See [skills/pipeda.md](../skills/pipeda.md) for the erasure contract itself.
+
+### ⚠️ Warning 2: Stripe is live and a restore does not roll it back
+
+Stripe has been live since 2026-08-19. A Firestore restore rewinds **our** record of
+invoices, payments, Connect payouts and Pro subscriptions. It does not rewind a single
+thing on Stripe's side. After any restore touching `invoices`, `payments`, `jobs`,
+subscriptions or the commission collections:
+
+- **Stripe is the system of record for money, not Firestore.** Reconcile our docs against
+  the Stripe dashboard, not the other way around.
+- A restored-away `paymentIntent` still charged the client's card. A restored-away payout
+  still moved money.
+- Rewinding a doc a Stripe webhook already processed can make that webhook's work
   invisible while Stripe considers the event delivered. Re-drive it from the Stripe
   dashboard (Developers → Events → resend) rather than hand-patching Firestore.
 
-If money-path collections are in the blast radius, do targeted repair, never a cutover.
+If money-path or personal-data collections are in the blast radius, do targeted repair,
+never a cutover.
 
 ---
 
 ## When data looks wrong: triage order
 
 1. **Stop the bleeding.** If a scheduled function is writing bad data, pause it before
-   anything else or it will overwrite your repair. `gcloud scheduler jobs pause` will
-   not work here (see the gcloud section), so use the Cloud Scheduler REST API under
-   ADC. Firebase names v2 scheduler jobs `firebase-schedule-<functionName>-<region>`:
+   anything else or it will overwrite your repair. All 15 live in `us-central1` and are
+   named `firebase-schedule-<functionName>-us-central1`:
 
    ```powershell
-   $t = gcloud auth application-default print-access-token
-   # list them
-   Invoke-RestMethod -Headers @{Authorization="Bearer $t"} "https://cloudscheduler.googleapis.com/v1/projects/blueseal-762af/locations/us-central1/jobs" | % jobs | % name
-   # pause one
-   Invoke-RestMethod -Method Post -Headers @{Authorization="Bearer $t"} "https://cloudscheduler.googleapis.com/v1/projects/blueseal-762af/locations/us-central1/jobs/firebase-schedule-<NAME>-us-central1:pause"
+   gcloud scheduler jobs list --location=us-central1 --project=blueseal-762af --account=johnnyajansen@gmail.com
+   gcloud scheduler jobs pause firebase-schedule-<functionName>-us-central1 --location=us-central1 --project=blueseal-762af --account=johnnyajansen@gmail.com
+   # and afterwards
+   gcloud scheduler jobs resume firebase-schedule-<functionName>-us-central1 --location=us-central1 --project=blueseal-762af --account=johnnyajansen@gmail.com
    ```
 
-   The nightly sweeps worth knowing about, in rough order of destructiveness:
+   The ones worth knowing about, in rough order of destructiveness:
 
    | Function | When | What it touches |
    |---|---|---|
+   | `scheduledHardDelete` | 03:00 | **irreversible.** PIPEDA erasure: deletes user + tradesperson docs, verifications, bookings, notifications, Storage prefixes **and the Firebase Auth account**, 30 days after a deletion request. Not recoverable from any backup we hold. |
    | `scheduledIdRetention` | 03:00 America/Toronto | **deletes** ID files from Storage and clears `idVerifications/{uid}` for tradespeople approved 90+ days ago |
+   | `scheduledRepCommissionPayouts` | 03:30 on the 1st | moves real money via Stripe Connect |
    | `scheduledRecurringInvoices` | 04:00 | creates real invoices from recurring templates |
-   | `scheduledRepCommissionPayouts` | 03:30 on the 1st | moves money via Stripe Connect |
-   | `scheduledProCompExpiry`, `scheduledProspectExpiry`, `scheduledJobPostExpiry` | 03:00-03:30 | bulk status flips across their collections |
    | `scheduledGoogleReviewsSync` | 04:00 | overwrites synced review data on tradesperson docs |
-   | `scheduledBugIssueSync` | every 6h | writes triage state back from GitHub |
+   | `scheduledProCompExpiry`, `scheduledProspectExpiry`, `scheduledJobPostExpiry` | 03:00-03:30 | bulk status flips across their collections |
+   | `markInvoiceOverdue`, `scheduledInsuranceExpiry`, `nudgeReviewPairs`, `scheduledBugFixNotices` | 09:00 | status flips plus outbound notifications, so a bad run emails real users |
+   | `scheduledBugIssueSync`, `recomputePlatformStats` | every 6h | writes triage state back from GitHub; recomputes aggregate stats |
 
-   Stripe webhooks and Firestore triggers are *not* pausable this way. If a trigger is
+   Stripe webhooks and Firestore triggers are **not** pausable this way. If a trigger is
    the culprit, the lever is redeploying it as a no-op or deleting it.
 2. **Establish the blast radius.** How many docs, which collections, since when? Check
    the function's structured logs in Cloud Logging for the run that did it.
 3. **Check the cheap sources first.** If a one-off script caused this, its own dry-run
    dump may already hold exactly what you need, and it is far faster than a restore.
 4. **Restore + targeted repair** per above.
-5. **Write down what happened** here or in the relevant doc, so the next person
-   inherits the lesson rather than the surprise.
+5. **Write down what happened** here or in the relevant doc, so the next person inherits
+   the lesson rather than the surprise.
 
 ---
 
 ## What is NOT covered
 
 - **Firebase Authentication users.** Not included in a Firestore backup, and still
-  uncovered. Losing the auth store means everyone re-registers and their uid-keyed
-  data (jobs, quotes, invoices, reviews, Stripe Connect account links) orphans. Export
-  with `firebase auth:export users.json --project blueseal-762af`. The file contains
-  password hashes and every user's email, so treat it as a secret: keep it out of the
-  repo, store it somewhere encrypted, and re-export periodically since it is a
-  point-in-time dump, not a schedule. Tracked in [HUMANTASKS.md](../HUMANTASKS.md).
-- **Cloud Storage objects older than 30 days.** Soft delete covers deletes and
-  overwrites for 30 days only. There is no long-tail media backup. Note this interacts
-  with `scheduledIdRetention` by design: deleted ID documents becoming permanently
-  unrecoverable after 30 days is the compliance outcome we want, not a gap.
+  uncovered. Losing the auth store means every user re-registers and their uid-keyed data
+  (jobs, quotes, invoices, reviews, Stripe Connect links) orphans. Export with
+  `firebase auth:export users.json --project blueseal-762af`. The file holds password
+  hashes and every user's email, so treat it as a secret: keep it out of the repo, store
+  it encrypted, and re-export periodically since it is a point-in-time dump, not a
+  schedule. **Note the PIPEDA interaction:** an old export restored wholesale would
+  resurrect auth accounts that `scheduledHardDelete` erased on request, so an export is
+  a recovery input to be filtered, never replayed blind. Tracked in
+  [HUMANTASKS.md](../HUMANTASKS.md).
+- **Cloud Storage objects older than 30 days.** Soft delete covers deletes and overwrites
+  for 30 days only. There is no long-tail media backup. This interacts with
+  `scheduledIdRetention` and `scheduledHardDelete` by design: deleted ID documents
+  becoming permanently unrecoverable is the compliance outcome we want, not a gap.
 - **Secret Manager values.** Keep the recovery values in a password manager. A deleted
   secret version is not recoverable from Firestore.
-- **Stripe-side state.** Covered by Stripe, not by us. See the warning above.
+- **Stripe-side state.** Covered by Stripe, not by us. See Warning 2.
 
 ## Related
 
 - [CLAUDE.md](../CLAUDE.md) → Firebase deployment discipline.
 - [skills/firebase-deploy.md](../skills/firebase-deploy.md) → deploy failure modes and rollback.
+- [skills/pipeda.md](../skills/pipeda.md) → the erasure contract a restore can violate.
