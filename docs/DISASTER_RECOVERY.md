@@ -207,16 +207,32 @@ never a cutover.
 
 ## What is NOT covered
 
-- **Firebase Authentication users.** Not included in a Firestore backup, and still
-  uncovered. Losing the auth store means every user re-registers and their uid-keyed data
-  (jobs, quotes, invoices, reviews, Stripe Connect links) orphans. Export with
-  `firebase auth:export users.json --project blueseal-762af`. The file holds password
-  hashes and every user's email, so treat it as a secret: keep it out of the repo, store
-  it encrypted, and re-export periodically since it is a point-in-time dump, not a
-  schedule. **Note the PIPEDA interaction:** an old export restored wholesale would
-  resurrect auth accounts that `scheduledHardDelete` erased on request, so an export is
-  a recovery input to be filtered, never replayed blind. Tracked in
-  [HUMANTASKS.md](../HUMANTASKS.md).
+- **Firebase Authentication users: covered manually, not automatically.** Auth is not
+  included in a Firestore backup. Losing the auth store means every user re-registers and
+  their uid-keyed data (jobs, quotes, invoices, reviews, Stripe Connect links) orphans.
+  A first export was taken 2026-08-21 (31 accounts, 25 with password hashes) and lives
+  **outside this repo** at `C:\Users\Johnny\blueseal-backups\`, alongside a
+  `README-RESTORE.md` with the import command.
+
+  Three things to know, because the naive version of this does not work:
+  1. **The export alone cannot restore passwords.** `auth:import` also needs the
+     project's SCRYPT hash parameters (signer key, salt separator, rounds, memory cost),
+     which are *not* in the export file. They are captured in that README, and can be
+     re-fetched from the Identity Platform admin API or the Firebase console
+     (Authentication → Users → three-dot menu → "Password hash parameters").
+  2. **The whole folder is a secret** — every user's email plus password hashes plus the
+     signer key. Never commit it, never sync it unencrypted. It belongs in a password
+     manager vault or an encrypted drive.
+  3. **Never replay it blind (PIPEDA).** An old export restored wholesale resurrects auth
+     accounts `scheduledHardDelete` erased on request. Filter out any `localId` whose
+     `users/{uid}` doc carries `deletedAt` before importing.
+
+  It is a point-in-time dump, not a schedule, so it is worth roughly the day it was
+  taken. Re-export periodically. Tracked in [HUMANTASKS.md](../HUMANTASKS.md).
+
+  Worth knowing for a restore: `customAttributes` in the export carries the **role
+  claims** that drive every Firestore rule. A user restored without their claim silently
+  loses access to their own data, so verify roles after any import.
 - **Cloud Storage objects older than 30 days.** Soft delete covers deletes and overwrites
   for 30 days only. There is no long-tail media backup. This interacts with
   `scheduledIdRetention` and `scheduledHardDelete` by design: deleted ID documents
