@@ -163,6 +163,29 @@ describe("clients — create requires owner + Pro", () => {
     );
   });
 
+  it("admin can create in their own book without a Pro mirror", async () => {
+    // ClientsPanel lets an admin past the Pro gate screen, so the create rule
+    // has to admit admin too — otherwise the tab renders Add/Import and every
+    // write 403s (bug sZSWiYecsP0H7iAWAoyw).
+    const admin = env.authenticatedContext(ADMIN_UID, ADMIN_CLAIMS).firestore();
+    await assertSucceeds(
+      setDoc(
+        doc(admin, "clients", "new_client"),
+        createPayload({ tradespersonId: ADMIN_UID }),
+      ),
+    );
+  });
+
+  it("admin still cannot seed a contact into another tradie's book", async () => {
+    const admin = env.authenticatedContext(ADMIN_UID, ADMIN_CLAIMS).firestore();
+    await assertFails(
+      setDoc(
+        doc(admin, "clients", "new_client"),
+        createPayload({ tradespersonId: OTHER_TRADIE_UID }),
+      ),
+    );
+  });
+
   it("cannot create with an empty displayName", async () => {
     await seedTradiePro(TRADIE_UID, true);
     const tradie = env.authenticatedContext(TRADIE_UID, TRADIE_CLAIMS).firestore();

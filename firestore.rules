@@ -537,7 +537,14 @@ service cloud.firestore {
         return isSignedIn() && resource.data.tradespersonId == uid();
       }
       allow read: if ownsExisting() || isAdmin();
-      allow create: if isProTradesperson()
+      // Admin is allowed alongside Pro (as it already is on read/update/delete).
+      // ClientsPanel deliberately lets an admin past the Pro gate screen, so an
+      // admin who is also a tradesperson saw the full tab — Add, Import — and
+      // every write came back "You don't have permission to do that." because
+      // this create rule was the only one in the collection that didn't admit
+      // admin. The tradespersonId pin stays for everyone: an admin can only add
+      // to their OWN book from the client SDK, never seed another tradie's.
+      allow create: if (isProTradesperson() || isAdmin())
         && request.resource.data.tradespersonId == uid()
         && request.resource.data.displayName is string
         && request.resource.data.displayName.size() >= 1
