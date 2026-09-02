@@ -41,9 +41,13 @@ npm run bugs triage <id> <status> "triage notes here"
 npm run bugs -- issue <id> [--triage-file <md>] [--dry-run] [--force]
 ```
 
-`list`/`show` write a digest to `c:\tmp\bug-triage\digest.md` (or
-`…\<id>\report.md`) and download screenshots to `c:\tmp\bug-triage\<id>\shot-N.<ext>`.
+`list`/`show` write a digest to `c:\tmp\blueseal-bug-triage\digest.md` (or
+`…\<id>\report.md`) and download screenshots to
+`c:\tmp\blueseal-bug-triage\<id>\shot-N.<ext>`.
 The output dir is wiped at the start of each `list` run so stale shots don't pile up.
+It's project-scoped deliberately: another repo's triage script on this machine
+writes to (and clears) the generic `c:\tmp\bug-triage`, and a parallel session
+once wiped a freshly-downloaded set of Blue Seal screenshots mid-triage.
 
 ## The triage loop (how Claude should use it)
 

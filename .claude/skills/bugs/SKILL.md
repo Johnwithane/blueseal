@@ -22,7 +22,7 @@ visible from anywhere. Two workflows, depending on where you're running:
 
 1. **Pull the queue:** `npm run bugs -- list open` (statuses: `open | triaged |
    in_progress | fixed | wontfix`, or `all`). It prints a digest and downloads
-   screenshots to `c:\tmp\bug-triage\<id>\` — **Read the screenshots**, they
+   screenshots to `c:\tmp\blueseal-bug-triage\<id>\` — **Read the screenshots**, they
    usually carry the real context.
 2. **Diagnose before touching anything.** Check `git log` / recent PRs first —
    reports are often already fixed by work that just shipped, or duplicates of

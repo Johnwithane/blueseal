@@ -20,7 +20,7 @@
 //                                                  # file the report as a GitHub issue
 //
 // `list`/`show` are read-only and download screenshots to:
-//   c:\tmp\bug-triage\<id>\shot-N.<ext>   (+ a digest.md / report.md you can read)
+//   c:\tmp\blueseal-bug-triage\<id>\shot-N.<ext>   (+ a digest.md / report.md you can read)
 // Valid statuses: open | triaged | in_progress | fixed | wontfix
 //
 // Prereqs: `gcloud auth application-default login` (already done on this box)
@@ -34,7 +34,11 @@ import path from "node:path";
 
 const PROJECT_ID = "blueseal-762af";
 const STORAGE_BUCKET = "blueseal-762af.firebasestorage.app";
-const OUT_ROOT = "c:\\tmp\\bug-triage";
+// Project-scoped on purpose. This used to be the generic c:\tmp\bug-triage,
+// which another repo's triage script on this machine also writes to and clears:
+// a parallel session wiped a freshly-downloaded set of Blue Seal screenshots
+// out from under a triage run mid-session.
+const OUT_ROOT = "c:\\tmp\\blueseal-bug-triage";
 const VALID_STATUSES = ["open", "triaged", "in_progress", "fixed", "wontfix"];
 
 // Resolve firebase-admin from functions/node_modules (not present at repo root).
