@@ -1148,6 +1148,13 @@ const faqs: FaqItem[] = [
     audience: "tradesperson",
   },
   {
+    question: "Can I see the quote before I send it, or send it as a PDF?",
+    answer:
+      "Yes. Once your quote has a total, a **Preview** button appears beside **Send quote** (on a phone it reads **Download PDF**). It renders the exact PDF your client would get, so you can check the wording and the numbers before it goes out. Nothing is saved when you preview: no quote reaches your client, and your quote numbering isn't used up, so a preview of a brand-new quote is marked **DRAFT**. On a phone it downloads to your Files app, so you can text it to a client who prefers that. Once you've actually sent the quote, the final numbered PDF is on the job's **Invoice** tab, under the quote card.",
+    categoryId: "for-tradespeople",
+    audience: "tradesperson",
+  },
+  {
     question: "How many trades can I list?",
     answer:
       "You can list a primary trade plus a few secondary trades you're qualified for. List the ones you actually hold certification for, since they affect which jobs you're matched to.",

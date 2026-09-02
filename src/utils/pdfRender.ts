@@ -799,15 +799,21 @@ export async function renderInvoicePdfBlob(
   return { blob, filename: `${invoice.invoiceNumber}.pdf` };
 }
 
+/**
+ * `opts` exists for the pre-send preview (QuoteTab): the same renderer draws a
+ * quote that hasn't been submitted yet, so it must not claim to have been
+ * "Sent" and must not land in downloads as `DRAFT.pdf`.
+ */
 export async function renderQuotePdfBlob(
   quote: WithId<QuoteDoc>,
   party: PartyInfo,
+  opts: { issuedLabel?: string; filename?: string } = {},
 ): Promise<{ blob: Blob; filename: string }> {
   const blob = await renderPdf(
     {
       kind: "Quote",
       number: quote.quoteNumber,
-      issuedLabel: "Sent",
+      issuedLabel: opts.issuedLabel ?? "Sent",
       issuedDate: fmtDate(quote.sentAt ?? quote.issuedAt),
       validUntil: quote.validUntil ? fmtDate(quote.validUntil) : null,
       noteToClient: quote.noteToClient,
@@ -824,5 +830,5 @@ export async function renderQuotePdfBlob(
       currency: quote.currency || "CAD",
     },
   );
-  return { blob, filename: `${quote.quoteNumber}.pdf` };
+  return { blob, filename: opts.filename ?? `${quote.quoteNumber}.pdf` };
 }

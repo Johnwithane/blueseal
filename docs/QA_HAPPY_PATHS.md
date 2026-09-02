@@ -303,6 +303,28 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    the **Send quote** action row stays pinned to the bottom of the viewport in a
    long itemized form.
 
+### 3.5b Preview the quote PDF before sending
+
+1. Build a quote until the send button shows a total. **Expected:** a
+   **Preview** button appears beside **Send quote** (on a phone it reads
+   **Download PDF**). It is absent while the quote still has blocking issues.
+2. Tap it. **Expected:** the client's actual quote PDF, with the same line
+   items, discount, tax and total as the form, and a **valid until** date
+   matching the **Valid for** days. The header reads **Prepared**, never
+   **Sent**.
+3. **Nothing is written.** Close the preview without sending, then re-open the
+   job. **Expected:** still no quote on the job, the client was not notified,
+   and your next real quote number has **not** been used up — a first-time
+   preview is numbered **DRAFT** and downloads as `quote-draft.pdf`.
+4. **Resend.** Send the quote, then open the **Quote** tab again and preview.
+   **Expected:** the preview now carries the **real** quote number (the one on
+   the sent quote), and downloads as `<number>-draft.pdf`.
+5. The sent quote's final, numbered PDF stays where it was: **Invoice** tab →
+   the quote card → **View PDF** / **Download PDF**.
+6. Mobile (375px): the button reads **Download PDF**, sits full-width under
+   **Send quote**, and the file opens in the phone's own PDF viewer so it can be
+   texted to the client.
+
 ### 3.6 Quoting is optional, not a gate → issues #19 + #22
 
 1. As **Tradesperson** on a **Requested** direct job, look at the job page before

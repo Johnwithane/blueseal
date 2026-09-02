@@ -12,7 +12,9 @@
 // invoice-without-quote path the reporter couldn't find.
 import { computed, onMounted, ref, watch } from "vue";
 import Button from "primevue/button";
+import { Timestamp } from "firebase/firestore";
 import { submitQuote, getQuoteByJobId } from "@/firebase/services/quotes";
+import { getInvoicePartyInfo } from "@/firebase/services/jobs";
 import { getSiteVisit, proposeSiteVisit } from "@/firebase/services/siteVisits";
 import { getTradesperson } from "@/firebase/services/tradespeople";
 import { draftQuoteWithAi } from "@/firebase/services/aiDrafts";
@@ -22,7 +24,9 @@ import { useFormatters } from "@/composables/useFormatters";
 import { useToast } from "@/composables/useToast";
 import { useConfirmAction } from "@/composables/useConfirmAction";
 import { useInsuranceGate } from "@/composables/useInsuranceGate";
+import { usePdfDocument } from "@/composables/usePdfDocument";
 import { humanizeError } from "@/utils/errors";
+import PdfPreviewDialog from "@/components/PdfPreviewDialog.vue";
 import QuoteComposer from "@/components/QuoteComposer.vue";
 import type {
   QuoteComposerInitial,
@@ -31,7 +35,7 @@ import type {
 } from "@/components/QuoteComposer.vue";
 import SiteVisitForm from "@/components/SiteVisitForm.vue";
 import type { SiteVisitFormState } from "@/components/SiteVisitForm.vue";
-import type { JobStatus } from "@/firebase/interfaces";
+import type { JobStatus, QuoteDoc, WithId } from "@/firebase/interfaces";
 
 const props = defineProps<{
   jobId: string;
@@ -57,6 +61,11 @@ const insuranceGate = useInsuranceGate();
 const submitting = ref(false);
 const loading = ref(false);
 const isResend = ref(false);
+// The real quote number, known only on a resend. A fresh quote has none yet:
+// submitQuote assigns it server-side from tradespeople/{uid}.nextQuoteNumber,
+// so the preview labels itself DRAFT rather than guessing a number that a
+// concurrent send could take.
+const existingQuoteNumber = ref<string | null>(null);
 const priorDeclinedReason = ref<string | null>(null);
 const hourlyRateCents = ref<number | null>(null);
 const initial = ref<QuoteComposerInitial | null>(null);
@@ -266,6 +275,7 @@ const submitLabel = computed(() => {
 async function loadQuote() {
     loading.value = true;
     isResend.value = false;
+    existingQuoteNumber.value = null;
     priorDeclinedReason.value = null;
     initial.value = null;
     composer.value = null;
@@ -304,6 +314,7 @@ async function loadQuote() {
         : undefined;
     if (existing) {
       isResend.value = true;
+      existingQuoteNumber.value = existing.quoteNumber ?? null;
       priorDeclinedReason.value = existing.declinedReason ?? null;
       initial.value = {
         lineItems: existing.lineItems ?? [],
@@ -335,6 +346,74 @@ onMounted(loadQuote);
 // The tab is kept mounted across job reloads; if the parent swaps to a
 // different job, start over.
 watch(() => props.jobId, loadQuote);
+
+// ---- Preview before sending ----------------------------------------------
+// Renders the client's actual quote PDF from the UNSAVED composer state, so
+// the tradesperson can check what lands before committing to a send. Nothing
+// is written: no quote doc, no quote number burned, no client notified.
+// usePdfDocument previews inline on desktop and downloads on touch, which is
+// also the "download it and text it" path the reporter asked for.
+const { renderingPdf, pdfBlob, pdfFilename, showPdfPreview, downloadMode, present } =
+  usePdfDocument();
+
+// A quote is only previewable once it would be sendable — same bar as submit,
+// so the preview can never disagree with what the client would receive.
+const canPreview = computed(() => mode.value === "quote" && !!composer.value?.payload);
+
+function onPreview() {
+  const s = composer.value;
+  if (!s?.payload) {
+    attempted.value = true;
+    toast.error(
+      "Nothing to preview yet",
+      s?.issues[0] ?? "Add at least one line item with an amount.",
+    );
+    return;
+  }
+  const p = s.payload;
+  const t = s.totals;
+  // The renderer takes a QuoteDoc; build the one this send WOULD produce.
+  // validUntil mirrors submitQuote (now + validUntilDays) so the date on the
+  // preview is the date the client will see.
+  const draft: WithId<QuoteDoc> = {
+    id: props.jobId,
+    tradespersonId: auth.fbUser?.uid ?? "",
+    clientId: null,
+    jobId: props.jobId,
+    quoteNumber: existingQuoteNumber.value ?? "DRAFT",
+    status: "draft",
+    lineItems: p.lineItems,
+    subtotal: t.subtotal,
+    discount: p.discount,
+    discountAmount: t.discountAmount,
+    taxTotal: t.taxTotal,
+    total: t.total,
+    currency: "CAD",
+    estimatedHours: p.estimatedHours,
+    validUntil: Timestamp.fromMillis(Date.now() + p.validUntilDays * 24 * 60 * 60 * 1000),
+    terms: p.terms,
+    noteToClient: p.noteToClient,
+    declinedReason: null,
+    issuedAt: Timestamp.now(),
+    sentAt: null,
+    viewedAt: null,
+    acceptedAt: null,
+    declinedAt: null,
+    pdfUrl: null,
+  };
+  void present(async () => {
+    const [{ renderQuotePdfBlob }, party] = await Promise.all([
+      import("@/utils/pdfRender"),
+      getInvoicePartyInfo(props.jobId),
+    ]);
+    return renderQuotePdfBlob(draft, party, {
+      issuedLabel: "Prepared",
+      filename: existingQuoteNumber.value
+        ? `${existingQuoteNumber.value}-draft.pdf`
+        : "quote-draft.pdf",
+    });
+  });
+}
 
 async function onSubmit() {
   if (mode.value === "site_visit") {
@@ -592,7 +671,7 @@ const quoteIsOpen = computed(() => props.status === "requested" || props.status 
           @click="wizardNext"
         />
       </div>
-      <div v-else class="flex w-full">
+      <div v-else class="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
         <Button
           :label="submitLabel"
           icon="pi pi-send"
@@ -601,8 +680,28 @@ const quoteIsOpen = computed(() => props.status === "requested" || props.status 
           class="w-full sm:w-auto"
           @click="onSubmit"
         />
+        <!-- Secondary to Send, but before it in reading order on desktop would
+             compete; keep it quiet and after. On touch this downloads the PDF,
+             which is the "text it to my client" path. -->
+        <Button
+          v-if="canPreview"
+          :label="downloadMode ? 'Download PDF' : 'Preview'"
+          :icon="downloadMode ? 'pi pi-download' : 'pi pi-eye'"
+          severity="secondary"
+          outlined
+          :loading="renderingPdf"
+          :disabled="renderingPdf || submitting"
+          class="w-full sm:w-auto"
+          @click="onPreview"
+        />
       </div>
     </div>
+
+    <PdfPreviewDialog
+      v-model:visible="showPdfPreview"
+      :blob="pdfBlob"
+      :filename="pdfFilename"
+    />
 
     <!-- The reporter's actual ask (#19): make the no-quote path findable.
          The backend has allowed it since PR #15 — nothing pointed at it. -->

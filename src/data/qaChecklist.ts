@@ -589,6 +589,18 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
               "A fresh quote opens on three cards (Time & materials / Itemized quote / Site visit first) with only Cancel in the footer. Time & materials pre-seeds an Hourly line at your profile rate plus a Materials line, and hides discount/upfront/validity/terms behind 'Show every option'. Switching approaches keeps everything you've typed. Back on step 1 returns to the cards, not a dead end. In Scope of work the +Hourly/+Flat rate/+Materials buttons sit ABOVE an 'On this quote (N)' block that holds the rows. A resend skips the chooser and opens the full form. Mobile 375px: cards are full-width, 64px+ tall.",
           },
           {
+            id: "tradie-quote-preview-pdf",
+            title: "Preview the quote PDF before sending (nothing is written)",
+            steps: [
+              "On a job with no quote yet, build a quote until the Send button shows a total, then tap Preview (desktop) or Download PDF (phone).",
+              "Check the header, the totals and the valid-until date against the form, then close the preview WITHOUT sending.",
+              "Re-open the Quote tab, and check the client side of the job too.",
+              "Send the quote, then re-open the Quote tab as a resend and preview again.",
+            ],
+            expected:
+              "The PDF shows the same line items, discount, tax and total as the form, and a valid-until date matching the Valid for days. It reads 'Prepared', never 'Sent'. A first-time quote is numbered DRAFT and downloads as quote-draft.pdf; no quote appears on the job, the client is not notified, and your next real quote number is NOT used up. On a resend the preview carries the real quote number. Mobile 375px: the button reads Download PDF, full-width under Send, and the file opens in the phone's PDF viewer so it can be texted.",
+          },
+          {
             id: "tradie-calendar-day-detail",
             title: "Calendar opens on Month; tapping a day shows its hours + jobs",
             steps: [
