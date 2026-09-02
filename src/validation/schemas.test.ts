@@ -4,6 +4,7 @@ import {
   proposeSiteVisitSchema,
   submitApplicationSchema,
   sendJobReferralSchema,
+  jobEditSchema,
 } from "./schemas";
 
 const validLine = { description: "Replace tap", quantity: 1, unitPrice: 12000, taxRate: 0 };
@@ -27,6 +28,33 @@ describe("siteVisitFeeSchema", () => {
 
   it("rejects an empty description", () => {
     expect(siteVisitFeeSchema.safeParse({ description: "  ", feeCents: 0, taxRate: 0 }).success).toBe(false);
+  });
+});
+
+describe("jobEditSchema", () => {
+  it("accepts a title on its own (description omitted when a client has joined)", () => {
+    const r = jobEditSchema.safeParse({ title: "Relocate hot water tank" });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.description).toBeUndefined();
+  });
+
+  it("accepts a title plus a rewritten description", () => {
+    const r = jobEditSchema.safeParse({ title: "Relocate tank", description: "Move it and re-run the gas line." });
+    expect(r.success).toBe(true);
+  });
+
+  it("trims and rejects a whitespace-only title", () => {
+    expect(jobEditSchema.safeParse({ title: "   " }).success).toBe(false);
+  });
+
+  it("rejects a description that's present but blank", () => {
+    // Distinct from omitting it: an empty box must not wipe the brief.
+    expect(jobEditSchema.safeParse({ title: "Job", description: "  " }).success).toBe(false);
+  });
+
+  it("holds the same bounds as job creation", () => {
+    expect(jobEditSchema.safeParse({ title: "a".repeat(141) }).success).toBe(false);
+    expect(jobEditSchema.safeParse({ title: "ok", description: "d".repeat(4001) }).success).toBe(false);
   });
 });
 

@@ -402,6 +402,17 @@ export async function updateJobIntakePhotos(id: string, photos: string[]): Promi
   await updateDoc(doc(db, "jobs", id), { intakePhotos: photos });
 }
 
+// Rename a job / correct its brief from the job page. `title` and `description`
+// are the only two job fields the rules leave un-pinned for a party (identity,
+// trade, counterparty display fields and every server-managed field are frozen
+// in firestore.rules), so this is a plain party update with no callable needed.
+export async function updateJobDetails(
+  id: string,
+  fields: { title: string; description?: string },
+): Promise<void> {
+  await updateDoc(doc(db, "jobs", id), { ...fields });
+}
+
 // Marketplace-originated jobs enter the system in status="accepted" with an
 // empty intakeFormData. Once the client fills the trade-specific intake, we
 // write it and advance to "requested" so the standard flow takes over.

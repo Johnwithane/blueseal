@@ -303,6 +303,25 @@ Provision yourself on the post's trade first (`/qa`) so the post is in your feed
    the **Send quote** action row stays pinned to the bottom of the viewport in a
    long itemized form.
 
+### 3.5a Rename a job / fix its brief
+
+1. As **Tradesperson**, open a **solo or invite** job you created that the client
+   has **not joined** yet. **Expected:** a pencil button sits beside the job
+   title in the header, visible from every tab.
+2. Tap it. **Expected:** an **Edit job** dialog with **Job title** and **What the
+   job is**. **Save** is disabled until something changes.
+3. Change both and save. **Expected:** the header title updates immediately (the
+   job doc is a live subscription, so no refresh), and the **Brief** tab's
+   **Original request** shows the new text.
+4. Open a job whose client **has** joined and tap the pencil. **Expected:** only
+   the **title** is editable; a line explains the client's own description stays
+   as they wrote it.
+5. Open a job you **won from the job board** (`sourcePostId` set), and a
+   **complete / reviewed / cancelled** job. **Expected:** no pencil at all.
+6. As the **client** on any job. **Expected:** no pencil.
+7. Mobile (375px): the pencil sits to the right of the title without pushing it
+   off-screen, and the dialog is full-width.
+
 ### 3.5b Preview the quote PDF before sending
 
 1. Build a quote until the send button shows a total. **Expected:** a

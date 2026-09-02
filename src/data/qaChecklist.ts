@@ -589,6 +589,18 @@ export const QA_CHECKLIST: QaRoleChecklist[] = [
               "A fresh quote opens on three cards (Time & materials / Itemized quote / Site visit first) with only Cancel in the footer. Time & materials pre-seeds an Hourly line at your profile rate plus a Materials line, and hides discount/upfront/validity/terms behind 'Show every option'. Switching approaches keeps everything you've typed. Back on step 1 returns to the cards, not a dead end. In Scope of work the +Hourly/+Flat rate/+Materials buttons sit ABOVE an 'On this quote (N)' block that holds the rows. A resend skips the chooser and opens the full form. Mobile 375px: cards are full-width, 64px+ tall.",
           },
           {
+            id: "tradie-edit-job-title",
+            title: "Rename a job / fix its brief from the job page",
+            steps: [
+              "Open a solo or invite job you created that the client has NOT joined. Tap the pencil beside the title.",
+              "Change the title and the description, save, and check the header and the Brief tab.",
+              "Open a job whose client HAS joined and tap the pencil.",
+              "Open a job you won from the job board (sourcePostId set), and a completed job.",
+            ],
+            expected:
+              "On the unclaimed job both Job title and What the job is are editable; saving updates the header immediately (live subscription, no refresh) and the Brief tab's Original request. On a joined-client job only the title is editable, with a line explaining their description stays as they wrote it. On a marketplace job and on a complete / reviewed / cancelled job the pencil is absent entirely. Save is disabled until something actually changes. Mobile 375px: the pencil sits right of the title without pushing it off-screen, and the dialog is full-width.",
+          },
+          {
             id: "tradie-quote-preview-pdf",
             title: "Preview the quote PDF before sending (nothing is written)",
             steps: [

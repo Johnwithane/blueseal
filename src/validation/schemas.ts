@@ -202,6 +202,15 @@ export const budgetRangeSchema = z
     path: ["max"],
   });
 
+// Editing an existing job's label + brief from the job page. Bounds match
+// jobRequestSchema / inviteJobSchema so an edit can't push a job outside what
+// creation would have allowed. `description` is optional because the dialog
+// only offers it while the job has no joined client (see JobEditDialog).
+export const jobEditSchema = z.object({
+  title: z.string().trim().min(1, "Add a title").max(140),
+  description: z.string().trim().min(1, "Add a description").max(4000).optional(),
+});
+
 export const createJobPostSchema = z.object({
   trade: tradeKeyEnum,
   title: z.string().trim().min(1, "Add a title").max(100),

@@ -111,6 +111,43 @@ describe("jobs — PM read-only visibility (drivenByProjectManagerId)", () => {
   });
 });
 
+describe("jobs — title/description are party-editable (JobEditDialog)", () => {
+  // The Edit job dialog writes these two straight from the client SDK, on the
+  // strength of them NOT being in the update rule's pinned set. Pin that here:
+  // if a future rule freezes either, the dialog would 403 in prod the way the
+  // Clients tab did, and only a rules test catches it.
+  it("tradesperson can rename their own job and rewrite its description", async () => {
+    await seedJob();
+    const tradie = env.authenticatedContext(TRADIE_UID, TRADIE_CLAIMS).firestore();
+    await assertSucceeds(
+      updateDoc(doc(tradie, "jobs", JOB_ID), {
+        title: "Relocate hot water tank",
+        description: "Move the tank and re-run the gas line.",
+      }),
+    );
+  });
+
+  it("client can rename their own job", async () => {
+    await seedJob();
+    const client = env.authenticatedContext(CLIENT_UID, CLIENT_CLAIMS).firestore();
+    await assertSucceeds(updateDoc(doc(client, "jobs", JOB_ID), { title: "New name" }));
+  });
+
+  it("an outsider cannot rename the job", async () => {
+    await seedJob();
+    const stranger = env.authenticatedContext(OTHER_CLIENT_UID, CLIENT_CLAIMS).firestore();
+    await assertFails(updateDoc(doc(stranger, "jobs", JOB_ID), { title: "Hijacked" }));
+  });
+
+  it("renaming still cannot smuggle in a trade change", async () => {
+    await seedJob();
+    const tradie = env.authenticatedContext(TRADIE_UID, TRADIE_CLAIMS).firestore();
+    await assertFails(
+      updateDoc(doc(tradie, "jobs", JOB_ID), { title: "Relabelled", trade: "electrician" }),
+    );
+  });
+});
+
 describe("jobs archive — per-party gate", () => {
   it("client can set their own archivedAt", async () => {
     await seedJob();

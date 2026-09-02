@@ -82,6 +82,7 @@ import { clockIn, clockOut, formatElapsed } from "@/firebase/services/timeEntrie
 import { humanizeError, isPaywallError } from "@/utils/errors";
 import { statusLabel, STATUS_SEVERITY } from "@/utils/jobStatus";
 import { jobBillingType } from "@/utils/jobBilling";
+import JobEditDialog from "@/components/JobEditDialog.vue";
 import JobTabBar, { type JobTab } from "@/features/jobDetail/JobTabBar.vue";
 import BriefTab from "@/features/jobDetail/BriefTab.vue";
 import ScheduleTab from "@/features/jobDetail/ScheduleTab.vue";
@@ -224,6 +225,20 @@ const markingUpfront = ref(false);
 
 const isTradie = computed(() => auth.fbUser?.uid === job.value?.tradespersonId);
 const isClient = computed(() => auth.fbUser?.uid === job.value?.clientId);
+
+// Rename / correct the job. Same gate as the trade-specific brief in BriefTab
+// (own non-marketplace job, not closed out): a marketplace job's title came
+// from the client's posting, and a finished job is a record. The dialog decides
+// separately whether the DESCRIPTION is ours to edit — see JobEditDialog.
+const JOB_CLOSED_STATUSES = ["complete", "reviewed", "cancelled"];
+const editJobOpen = ref(false);
+const canEditJobDetails = computed(
+  () =>
+    isTradie.value &&
+    !!job.value &&
+    !job.value.sourcePostId &&
+    !JOB_CLOSED_STATUSES.includes(job.value.status),
+);
 
 // Quick labour clock-in/out from the header. The full Work Order tab handles
 // travel + change-order sessions; the header is the one-tap common case.
@@ -1258,7 +1273,24 @@ function onReturnToApplicants() {
     </div>
     <template v-else-if="job">
       <header class="mt-1 mb-3">
-        <h1 class="text-xl font-bold break-words leading-tight">{{ job.title }}</h1>
+        <div class="flex items-start gap-2">
+          <h1 class="min-w-0 flex-1 text-xl font-bold break-words leading-tight">
+            {{ job.title }}
+          </h1>
+          <!-- Next to the title because that's where the reporter looked for
+               "change the name of the job". Visible from every tab, since the
+               header sits above the tab bar. -->
+          <Button
+            v-if="canEditJobDetails"
+            icon="pi pi-pencil"
+            severity="secondary"
+            text
+            rounded
+            aria-label="Edit job"
+            class="shrink-0 -mt-1"
+            @click="editJobOpen = true"
+          />
+        </div>
         <div class="text-[11px] text-[color:var(--bs-muted)] mt-0.5 truncate">
           {{ tradeLabel(job.trade) }} · {{ job.address.line1 }}, {{ job.address.city }}
         </div>
@@ -1924,6 +1956,16 @@ function onReturnToApplicants() {
       v-model:visible="showReportProblem"
       :job-id="job.id"
       :job-title="job.title"
+    />
+
+    <!-- The job doc is a live subscription, so a save propagates on its own. -->
+    <JobEditDialog
+      v-if="job"
+      v-model:visible="editJobOpen"
+      :job-id="job.id"
+      :title="job.title"
+      :description="job.description"
+      :can-edit-description="!job.clientId"
     />
   </section>
 </template>
